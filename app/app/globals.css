@@ -1,0 +1,159 @@
+@import url("https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,200..800&display=swap");
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  --c-glass: #bbbbbc;
+  --c-light: #fff;
+  --c-dark: #000;
+
+  --c-content: #2d3142;
+  --c-action: #0052f5;
+
+  --c-bg: #f9f8fc;
+
+  --glass-reflex-dark: 1;
+  --glass-reflex-light: 1;
+
+  --saturation: 150%;
+
+  font-size: 18px;
+  font-family: "Bricolage Grotesque", ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial,
+    "Apple Color Emoji", "Segoe UI Emoji";
+  font-optical-sizing: auto;
+  background: var(--c-bg);
+  color: var(--c-content);
+
+  transition: background 400ms cubic-bezier(1, 0, 0.4, 1), color 400ms cubic-bezier(1, 0, 0.4, 1);
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(1200px 700px at 15% 18%, rgba(0, 82, 245, 0.08), transparent 60%),
+    radial-gradient(900px 600px at 85% 20%, rgba(255, 72, 169, 0.06), transparent 55%),
+    radial-gradient(900px 700px at 50% 90%, rgba(3, 213, 255, 0.05), transparent 55%);
+  pointer-events: none;
+  z-index: -2;
+}
+
+a {
+  color: color-mix(in srgb, var(--c-content), var(--c-action) 55%);
+  text-decoration: none;
+}
+
+a:hover {
+  color: var(--c-action);
+}
+
+.home {
+  min-height: 100vh;
+  position: relative;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  padding: 64px 20px;
+}
+
+.home__hero {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+}
+
+.home__content {
+  width: min(720px, 100%);
+  display: grid;
+  justify-items: center;
+  gap: 18px;
+  text-align: center;
+  animation: home-in 720ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.home__title {
+  font-size: 44px;
+  letter-spacing: -0.05em;
+  line-height: 1.02;
+}
+
+.home__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  justify-content: center;
+}
+
+.home__button {
+  color: var(--c-content);
+  text-decoration: none;
+  font-size: 22px;
+  border: none;
+  background: none;
+  font-weight: 700;
+  display: inline-block;
+  position: relative;
+  padding: 8px 6px;
+}
+
+.home__button::before {
+  margin-left: auto;
+}
+
+.home__button::after,
+.home__button::before {
+  content: '';
+  width: 0%;
+  height: 2px;
+  background: #000;
+  display: block;
+  transition: width 0.5s;
+}
+
+.home__button:hover {
+  cursor: pointer;
+  color: color-mix(in srgb, #000, var(--c-content) 35%);
+}
+
+.home__button:hover::after,
+.home__button:hover::before {
+  width: 100%;
+}
+
+@keyframes home-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--c-action) 50%, transparent);
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--c-action) 60%, transparent);
+}
