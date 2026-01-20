@@ -1,0 +1,19 @@
+services:
+  color-room:
+    build:
+      context: ./app
+    container_name: color-room
+    ports:
+      - "8080:3000"
+    environment:
+      - COLOR_ROOM_PORT=3000
+      - COLOR_ROOM_DB_PATH=/data/ColorRoomDB.db
+    volumes:
+      - ../SupervisionAPI/data/ColorRoomDB.db:/data/ColorRoomDB.db
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:3000/api/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
