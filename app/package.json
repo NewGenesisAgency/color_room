@@ -1,0 +1,28 @@
+{
+  "name": "color-room",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev -p 3000",
+    "build": "next build",
+    "start": "next start -p 3000"
+  },
+  "dependencies": {
+    "better-sqlite3": "11.5.0",
+    "lenis": "1.1.20",
+    "lucide-react": "0.263.1",
+    "next": "14.2.5",
+    "react": "18.2.0",
+    "react-dom": "18.2.0",
+    "reactflow": "11.11.4",
+    "three": "0.160.1"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "7.6.12",
+    "@types/node": "20.14.10",
+    "@types/react": "18.3.3",
+    "@types/react-dom": "18.3.0",
+    "@types/three": "^0.160.0",
+    "typescript": "5.5.3"
+  }
+}
