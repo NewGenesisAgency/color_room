@@ -4,7 +4,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import EditorTilesViewport from '@/app/_components/EditorTilesViewport';
 
-import { Plus } from 'lucide-react';
+import { Check, Plus, Save, Trash2 } from 'lucide-react';
 
 type IdFactory = () => string;
 
@@ -55,6 +55,10 @@ type GameDoc = {
   id: string;
   name: string;
   tileCount?: number;
+  ui?: {
+    title?: string;
+    accentColor?: string;
+  };
   nodes: EditorNode[];
   edges: GraphEdge[];
 };
@@ -161,6 +165,12 @@ type EditorSnapshot = {
   selectedNodeId: string | null;
 };
 
+type EditorDraftV1 = {
+  v: 1;
+  updatedAt: number;
+  game: GameDoc;
+};
+
 function isEditableTarget(target: EventTarget | null): boolean {
   const el = target as HTMLElement | null;
   if (!el) return false;
@@ -212,6 +222,15 @@ function getNum(params: Record<string, unknown>, key: string, fallback: number):
 function getColor(params: Record<string, unknown>, key: string, fallback: string): string {
   const raw = params[key];
   return isHexColor(raw) ? raw : fallback;
+}
+
+function makeUniqueNodeName(existing: EditorNode[], baseName: string): string {
+  const base = baseName.trim().length > 0 ? baseName.trim() : 'Noeud';
+  const used = new Set(existing.map((n) => String(n.name ?? '').trim()).filter(Boolean));
+  if (!used.has(base)) return base;
+  let i = 2;
+  while (used.has(`${base} ${i}`)) i++;
+  return `${base} ${i}`;
 }
 
 function applyRenderNode(tiles: TileState[], node: EditorNode, tSeconds: number) {
@@ -641,17 +660,52 @@ export default function EditeurPage() {
   }, [selectedTileIndex, tileCount]);
 
   const serializeGameConfig = (g: GameDoc): unknown => {
-    return { version: 1, tileCount: g.tileCount ?? tiles.length, nodes: g.nodes, edges: g.edges };
+    return { version: 1, tileCount: g.tileCount ?? tiles.length, ui: g.ui ?? {}, nodes: g.nodes, edges: g.edges };
   };
 
-  const parseGameConfig = (config: unknown): { tileCount?: number; nodes: EditorNode[]; edges: GraphEdge[] } | null => {
+  const DRAFT_KEY_PREFIX = 'editeur:draft:';
+  const draftSaveTimerRef = useRef<number>(0);
+
+  const saveDraftToLocalStorage = (g: GameDoc) => {
+    try {
+      const payload: EditorDraftV1 = { v: 1, updatedAt: Date.now(), game: g };
+      localStorage.setItem(`${DRAFT_KEY_PREFIX}${g.id}`, JSON.stringify(payload));
+    } catch {
+      // ignore
+    }
+  };
+
+  const loadDraftFromLocalStorage = (gameId: string): EditorDraftV1 | null => {
+    try {
+      const raw = localStorage.getItem(`${DRAFT_KEY_PREFIX}${gameId}`);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw) as EditorDraftV1;
+      if (!parsed || parsed.v !== 1 || !parsed.game || typeof parsed.updatedAt !== 'number') return null;
+      return parsed;
+    } catch {
+      return null;
+    }
+  };
+
+  const clearDraftFromLocalStorage = (gameId: string) => {
+    try {
+      localStorage.removeItem(`${DRAFT_KEY_PREFIX}${gameId}`);
+    } catch {
+      // ignore
+    }
+  };
+
+  const parseGameConfig = (
+    config: unknown,
+  ): { tileCount?: number; ui?: { title?: string; accentColor?: string }; nodes: EditorNode[]; edges: GraphEdge[] } | null => {
     if (!config || typeof config !== 'object') return null;
     const o = config as any;
     const tileCount = typeof o.tileCount === 'number' && Number.isFinite(o.tileCount) ? o.tileCount : undefined;
+    const ui = o.ui && typeof o.ui === 'object' ? (o.ui as { title?: string; accentColor?: string }) : undefined;
     const nodes = Array.isArray(o.nodes) ? (o.nodes as EditorNode[]) : null;
     const edges = Array.isArray(o.edges) ? (o.edges as GraphEdge[]) : null;
     if (!nodes || !edges) return null;
-    return { tileCount, nodes, edges };
+    return { tileCount, ui, nodes, edges };
   };
 
   const createDbGame = async (name: string, initialGame: GameDoc): Promise<string | null> => {
@@ -705,11 +759,12 @@ export default function EditeurPage() {
       id: provisionalId,
       name: gameName,
       tileCount: Math.max(1, tiles.length || 1),
+      ui: { title: gameName, accentColor: '#4361ee' },
       nodes: [
         {
           id: nodeId,
           kind: 'event_begin',
-          name: gameName,
+          name: 'Début',
           enabled: true,
           params: {},
           pos: { x: 80, y: 80 },
@@ -758,6 +813,7 @@ export default function EditeurPage() {
               id: String(r.id),
               name: String(r.name),
               tileCount: cfg.tileCount,
+              ui: cfg.ui,
               nodes: cfg.nodes,
               edges: cfg.edges,
             } satisfies GameDoc;
@@ -802,6 +858,7 @@ export default function EditeurPage() {
       return;
     }
     setDirty(false);
+    clearDraftFromLocalStorage(activeGame.id);
     setStatus('Sauvegardé');
   };
 
@@ -812,6 +869,8 @@ export default function EditeurPage() {
       setStatus('Suppression impossible');
       return;
     }
+
+    clearDraftFromLocalStorage(activeGame.id);
 
     commit((cur) => {
       const nextGames = cur.games.filter((g) => g.id !== activeGame.id);
@@ -840,7 +899,9 @@ export default function EditeurPage() {
         const spec = NODE_CATALOG.find((x) => x.kind === kind);
         const title = spec?.title ?? kind;
         const params = spec?.defaults ?? {};
-        const base: Omit<EditorNode, 'pos'> = { id: nextId, kind, name: `${title} ${g.nodes.length + 1}`, enabled: true, params };
+        const baseName = kind === 'event_begin' ? 'Début' : title;
+        const name = makeUniqueNodeName(g.nodes, baseName);
+        const base: Omit<EditorNode, 'pos'> = { id: nextId, kind, name, enabled: true, params };
         const nodeWithPos: EditorNode = { ...base, pos: basePos };
         return { ...g, nodes: [...g.nodes, nodeWithPos] };
       });
@@ -864,7 +925,9 @@ export default function EditeurPage() {
         const spec = NODE_CATALOG.find((x) => x.kind === kind);
         const title = spec?.title ?? kind;
         const params = { ...(spec?.defaults ?? {}), ...(overrides?.params ?? {}) };
-        const name = overrides?.name && overrides.name.trim().length > 0 ? overrides.name.trim() : `${title} ${g.nodes.length + 1}`;
+        const baseName = kind === 'event_begin' ? 'Début' : title;
+        const requested = overrides?.name && overrides.name.trim().length > 0 ? overrides.name.trim() : baseName;
+        const name = makeUniqueNodeName(g.nodes, requested);
         const base: Omit<EditorNode, 'pos'> = { id: nextId, kind, name, enabled: true, params };
         const nodeWithPos: EditorNode = { ...base, pos: basePos };
         return { ...g, nodes: [...g.nodes, nodeWithPos] };
@@ -878,7 +941,52 @@ export default function EditeurPage() {
     if (!activeGameId) return;
     commit((cur) => ({
       ...cur,
-      games: cur.games.map((g) => (g.id === cur.activeGameId ? { ...g, name } : g)),
+      games: cur.games.map((g) =>
+        g.id === cur.activeGameId
+          ? {
+              ...g,
+              name,
+              ui: { ...(g.ui ?? {}), title: (g.ui?.title ?? g.name) === g.name ? name : g.ui?.title },
+            }
+          : g,
+      ),
+    }));
+  };
+
+  useEffect(() => {
+    if (!activeGameId) return;
+    const draft = loadDraftFromLocalStorage(activeGameId);
+    if (!draft) return;
+
+    commit((cur) => {
+      const current = cur.games.find((g) => g.id === cur.activeGameId) ?? null;
+      if (!current) return cur;
+      const nextGames = cur.games.map((g) => (g.id === cur.activeGameId ? draft.game : g));
+      const nextSelected = draft.game.nodes.some((n) => n.id === cur.selectedNodeId)
+        ? cur.selectedNodeId
+        : draft.game.nodes[0]?.id ?? null;
+      return { ...cur, games: nextGames, selectedNodeId: nextSelected };
+    });
+    setStatus('Brouillon restauré');
+  }, [activeGameId]);
+
+  useEffect(() => {
+    if (!dirty) return;
+    if (!activeGame) return;
+    if (draftSaveTimerRef.current) window.clearTimeout(draftSaveTimerRef.current);
+    draftSaveTimerRef.current = window.setTimeout(() => {
+      saveDraftToLocalStorage(activeGame);
+    }, 400);
+    return () => {
+      if (draftSaveTimerRef.current) window.clearTimeout(draftSaveTimerRef.current);
+    };
+  }, [dirty, activeGameId, activeGame?.nodes.length, activeGame?.edges.length, activeGame?.name]);
+
+  const updateActiveGameUi = (patch: { title?: string; accentColor?: string }) => {
+    if (!activeGameId) return;
+    commit((cur) => ({
+      ...cur,
+      games: cur.games.map((g) => (g.id === cur.activeGameId ? { ...g, ui: { ...(g.ui ?? {}), ...patch } } : g)),
     }));
   };
 
@@ -904,7 +1012,7 @@ export default function EditeurPage() {
 
     if (!selectedNodeId) return;
     if (!selectedNode) return;
-    if (selectedNode.kind !== 'tile') return;
+    if (selectedNode.kind !== 'tile' && selectedNode.kind !== 'tile_get' && selectedNode.kind !== 'tile_set') return;
     updateSelectedParams({ tileIndex: safe });
     setStatus(`Dalle D${safe + 1} assignée`);
   };
@@ -990,23 +1098,39 @@ export default function EditeurPage() {
         <aside className="ue__left glass">
             <div className="panelhead">
               <strong>Explorateur</strong>
-              <span className="panelhead__meta">Jeux</span>
             </div>
 
             <div className="panelbody">
               <div className="panelsection">
                 <div className="panelsection__head">
                   <div className="panelsection__title">Jeux</div>
-                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                    <button className="btn btn--mini" disabled={!activeGame || dbLoading} onClick={() => void saveActiveGame()}>
-                      <span>{dirty ? 'Sauvegarder' : 'Sauvegardé'}</span>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                    <button
+                      className={dirty ? 'btn btn--mini btn--icon btn--accent' : 'btn btn--mini btn--icon btn--good'}
+                      disabled={!activeGame || dbLoading || !dirty}
+                      onClick={() => void saveActiveGame()}
+                      aria-label={dirty ? 'Sauvegarder' : 'Sauvegardé'}
+                      title={dirty ? 'Sauvegarder' : 'Sauvegardé'}
+                    >
+                      {dirty ? <Save className="btn__icon" aria-hidden /> : <Check className="btn__icon" aria-hidden />}
                     </button>
-                    <button className="btn btn--mini" disabled={!activeGame || dbLoading} onClick={() => void deleteActiveGame()}>
-                      <span>Supprimer</span>
+                    <button
+                      className="btn btn--mini btn--icon btn--danger"
+                      disabled={!activeGame || dbLoading}
+                      onClick={() => void deleteActiveGame()}
+                      aria-label="Supprimer"
+                      title="Supprimer"
+                    >
+                      <Trash2 className="btn__icon" aria-hidden />
                     </button>
-                    <button className="btn btn--mini" disabled={dbLoading} onClick={() => void createGame()}>
+                    <button
+                      className="btn btn--mini btn--icon btn--accent"
+                      disabled={dbLoading}
+                      onClick={() => void createGame()}
+                      aria-label="Nouveau"
+                      title="Nouveau"
+                    >
                       <Plus className="btn__icon" aria-hidden />
-                      <span>{dbLoading ? '...' : 'Nouveau'}</span>
                     </button>
                   </div>
                 </div>
@@ -1078,8 +1202,6 @@ export default function EditeurPage() {
                 </div>
               </div>
             </div>
-
-            <div className="divider" />
           </aside>
 
           <section
@@ -1375,6 +1497,9 @@ export default function EditeurPage() {
                       const pulseLegacyAmp = clamp01(getNum(n.params, 'amp', 0.7));
                       const pulseFrom = clamp01(getNum(n.params, 'fromIntensity', pulseLegacyBase));
                       const pulseTo = clamp01(getNum(n.params, 'toIntensity', clamp01(pulseLegacyBase + pulseLegacyAmp)));
+                      const constColorValue = getColor(n.params, 'value', '#ffffff');
+                      const tileGetIndex = Math.max(0, Math.min(tileCount - 1, Math.round(getNum(n.params, 'tileIndex', 0))));
+                      const tileGetPreview = tiles[Math.max(0, Math.min(tileCount - 1, tileGetIndex))] ?? { color: '#000000', intensity: 0 };
                       return (
                         <div
                           key={n.id}
@@ -1617,6 +1742,46 @@ export default function EditeurPage() {
                                 />
                               </div>
                             </div>
+                          ) : n.kind === 'tile_get' ? (
+                            <div className="bp-node__vars" onPointerDown={(e) => e.stopPropagation()}>
+                              <div className="bp-node__varrow">
+                                <div className="bp-node__var">
+                                  <span className="bp-node__varlabel">Dalle</span>
+                                  <div className="bp-node__varctrl">
+                                    <select
+                                      className="bp-node__varselect"
+                                      value={String(tileGetIndex)}
+                                      onChange={(e) => updateNodeParamsById(n.id, { tileIndex: Number(e.target.value) })}
+                                    >
+                                      {Array.from({ length: tileCount }, (_, i) => (
+                                        <option key={i} value={i}>
+                                          D{i + 1}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                </div>
+                                <div className="bp-node__var" style={{ minWidth: 88 }}>
+                                  <span className="bp-node__varlabel">Lu</span>
+                                  <div className="bp-node__varctrl" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                                    <div className="bp-node__colorpreview" style={{ background: tileGetPreview.color }} />
+                                    <span style={{ fontSize: 12, opacity: 0.8 }}>{Math.round(tileGetPreview.intensity * 100)}%</span>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          ) : n.kind === 'const_color' ? (
+                            <div className="bp-node__vars" onPointerDown={(e) => e.stopPropagation()}>
+                              <div className="bp-node__color">
+                                <div className="bp-node__colorpreview" style={{ background: constColorValue }} />
+                                <input
+                                  className="bp-node__colorinput"
+                                  type="color"
+                                  value={constColorValue}
+                                  onChange={(e) => updateNodeParamsById(n.id, { value: e.target.value })}
+                                />
+                              </div>
+                            </div>
                           ) : null}
 
                           <div className="bp-node__io">
@@ -1732,7 +1897,40 @@ export default function EditeurPage() {
 
             <div className="panelbody">
               {!selectedNode ? (
-                <div className="muted">Sélectionne un noeud.</div>
+                !activeGame ? (
+                  <div className="muted">Crée ou sélectionne un jeu.</div>
+                ) : (
+                  <div className="form">
+                    <div className="muted">Aucun noeud sélectionné.</div>
+                    <div className="divider" />
+                    <div className="panelsection">
+                      <div className="panelsection__head">
+                        <div className="panelsection__title">Visuel</div>
+                      </div>
+
+                      <label className="field">
+                        <span>Titre (HUD)</span>
+                        <input
+                          className="input"
+                          value={String(activeGame.ui?.title ?? activeGame.name)}
+                          onChange={(e) => updateActiveGameUi({ title: e.target.value })}
+                          onBlur={() => void saveActiveGame()}
+                        />
+                      </label>
+
+                      <label className="field">
+                        <span>Couleur d'accent</span>
+                        <input
+                          className="input"
+                          type="color"
+                          value={getColor(activeGame.ui ?? {}, 'accentColor', '#4361ee')}
+                          onChange={(e) => updateActiveGameUi({ accentColor: e.target.value })}
+                          onBlur={() => void saveActiveGame()}
+                        />
+                      </label>
+                    </div>
+                  </div>
+                )
               ) : (
                 <div className="form">
                   <label className="field">
@@ -1913,7 +2111,7 @@ export default function EditeurPage() {
                       </label>
                       <div className="muted">Retarde l'exécution de la prochaine action dans la séquence.</div>
                     </>
-                  ) : (
+                  ) : selectedNode.kind === 'tile' || selectedNode.kind === 'tile_set' ? (
                     <>
                       <label className="field">
                         <span>Dalle</span>
@@ -1962,6 +2160,69 @@ export default function EditeurPage() {
                       </label>
 
                       <div className="muted">Astuce: clique une dalle dans le viewport pour l'assigner.</div>
+                    </>
+                  ) : selectedNode.kind === 'tile_get' ? (
+                    <>
+                      <label className="field">
+                        <span>Dalle</span>
+                        <select
+                          className="input"
+                          value={String(Math.max(0, Math.min(tileCount - 1, Math.round(getNum(selectedNode.params, 'tileIndex', 0))))) }
+                          onChange={(e) => {
+                            const idx = Math.max(0, Math.min(tileCount - 1, Number(e.target.value)));
+                            setSelectedTileIndex(idx);
+                            updateSelectedParams({ tileIndex: idx });
+                          }}
+                        >
+                          {Array.from({ length: tileCount }, (_, i) => (
+                            <option key={i} value={i}>
+                              D{i + 1}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+
+                      <label className="field">
+                        <span>Lecture</span>
+                        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                          <div
+                            style={{
+                              width: 36,
+                              height: 18,
+                              borderRadius: 999,
+                              border: '1px solid rgba(0,0,0,0.12)',
+                              background:
+                                tiles[Math.max(0, Math.min(tileCount - 1, Math.round(getNum(selectedNode.params, 'tileIndex', 0))))]?.color ??
+                                '#000000',
+                            }}
+                          />
+                          <span style={{ fontSize: 12, opacity: 0.75 }}>
+                            {Math.round(
+                              (tiles[Math.max(0, Math.min(tileCount - 1, Math.round(getNum(selectedNode.params, 'tileIndex', 0))))]
+                                ?.intensity ?? 0) * 100,
+                            )}%
+                          </span>
+                        </div>
+                      </label>
+
+                      <div className="muted">Astuce: clique une dalle dans le viewport pour l'assigner.</div>
+                    </>
+                  ) : selectedNode.kind === 'const_color' ? (
+                    <>
+                      <label className="field">
+                        <span>Couleur</span>
+                        <input
+                          type="color"
+                          value={getColor(selectedNode.params, 'value', '#ffffff')}
+                          onChange={(e) => updateSelectedParams({ value: e.target.value })}
+                          className="input"
+                        />
+                      </label>
+                      <div className="muted">Constante de couleur (sortie) utilisable par d'autres noeuds.</div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="muted">Paramètres: aucun.</div>
                     </>
                   )}
                 </div>
