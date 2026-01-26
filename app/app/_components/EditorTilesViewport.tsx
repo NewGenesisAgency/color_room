@@ -20,7 +20,8 @@ export default function EditorTilesViewport({
   const containerRef = useRef<HTMLDivElement | null>(null);
 
   const safeTiles = useMemo(() => {
-    const fallback: TileState[] = Array.from({ length: 9 }, () => ({ color: '#000000', intensity: 0 }));
+    const count = Array.isArray(tiles) ? Math.max(1, tiles.length) : 9;
+    const fallback: TileState[] = Array.from({ length: count }, () => ({ color: '#000000', intensity: 0 }));
     const src = Array.isArray(tiles) ? tiles : fallback;
     const out = fallback.map((t, i) => {
       const v = src[i];
@@ -83,62 +84,69 @@ export default function EditorTilesViewport({
     const gap = 0.08;
     const size = 1;
     const step = size + gap;
+    const count = Math.max(1, safeTiles.length);
+    const cols = Math.max(1, Math.ceil(Math.sqrt(count)));
+    const rows = Math.max(1, Math.ceil(count / cols));
+    const halfW = ((cols - 1) * step) / 2;
+    const halfH = ((rows - 1) * step) / 2;
 
-    for (let r = 0; r < 3; r++) {
-      for (let c = 0; c < 3; c++) {
-        const idx = r * 3 + c;
+    for (let idx = 0; idx < count; idx++) {
+      const r = Math.floor(idx / cols);
+      const c = idx % cols;
 
-        const base = new THREE.MeshStandardMaterial({
-          color: new THREE.Color('#0f1116'),
-          emissive: new THREE.Color('#000000'),
-          emissiveIntensity: 2.1,
-          roughness: 0.18,
-          metalness: 0.02,
-        });
-        materials.push(base);
+      const base = new THREE.MeshStandardMaterial({
+        color: new THREE.Color('#0f1116'),
+        emissive: new THREE.Color('#000000'),
+        emissiveIntensity: 2.1,
+        roughness: 0.18,
+        metalness: 0.02,
+      });
+      materials.push(base);
 
-        const mesh = new THREE.Mesh(tileGeo, base);
-        mesh.position.x = (c - 1) * step;
-        mesh.position.y = (1 - r) * step;
-        mesh.userData.tileIndex = idx;
-        tilesGroup.add(mesh);
-        meshes.push(mesh);
+      const mesh = new THREE.Mesh(tileGeo, base);
+      mesh.position.x = c * step - halfW;
+      mesh.position.y = halfH - r * step;
+      mesh.userData.tileIndex = idx;
+      tilesGroup.add(mesh);
+      meshes.push(mesh);
 
-        const line = new THREE.LineSegments(
-          edgeGeo,
-          new THREE.LineBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.55 }),
-        );
-        line.position.copy(mesh.position);
-        line.position.z += 0.001;
-        tilesGroup.add(line);
-        edges.push(line);
+      const line = new THREE.LineSegments(
+        edgeGeo,
+        new THREE.LineBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.55 }),
+      );
+      line.position.copy(mesh.position);
+      line.position.z += 0.001;
+      tilesGroup.add(line);
+      edges.push(line);
 
-        const mMat = new THREE.MeshStandardMaterial({
-          color: new THREE.Color('#0f1116'),
-          emissive: new THREE.Color('#000000'),
-          emissiveIntensity: 1.45,
-          roughness: 0.28,
-          metalness: 0.02,
-          transparent: true,
-          opacity: 0.12,
-          depthWrite: false,
-        });
-        mirrorMaterials.push(mMat);
+      const mMat = new THREE.MeshStandardMaterial({
+        color: new THREE.Color('#0f1116'),
+        emissive: new THREE.Color('#000000'),
+        emissiveIntensity: 1.45,
+        roughness: 0.28,
+        metalness: 0.02,
+        transparent: true,
+        opacity: 0.12,
+        depthWrite: false,
+      });
+      mirrorMaterials.push(mMat);
 
-        const m = new THREE.Mesh(tileGeo, mMat);
-        m.position.x = mesh.position.x;
-        m.position.y = mesh.position.y;
-        mirrorGroup.add(m);
-        mirrorMeshes.push(m);
+      const m = new THREE.Mesh(tileGeo, mMat);
+      m.position.x = mesh.position.x;
+      m.position.y = mesh.position.y;
+      mirrorGroup.add(m);
+      mirrorMeshes.push(m);
 
-        const initial = safeTiles[idx] ?? { color: '#000000', intensity: 0 };
-        const c0 = new THREE.Color(initial.color);
-        base.emissive.copy(c0);
-        base.emissiveIntensity = 2.1 * initial.intensity;
-        mMat.emissive.copy(c0);
-        mMat.emissiveIntensity = 1.45 * (0.75 * initial.intensity);
-      }
+      const initial = safeTiles[idx] ?? { color: '#000000', intensity: 0 };
+      const c0 = new THREE.Color(initial.color);
+      base.emissive.copy(c0);
+      base.emissiveIntensity = 2.1 * initial.intensity;
+      mMat.emissive.copy(c0);
+      mMat.emissiveIntensity = 1.45 * (0.75 * initial.intensity);
     }
+
+    const frame = Math.max(cols, rows) * step;
+    camera.position.set(0, 0.25, 6 + frame * 1.6);
 
     const clock = new THREE.Clock();
 
@@ -164,6 +172,16 @@ export default function EditorTilesViewport({
     };
 
     const onPointerDown = (e: PointerEvent) => {
+      const rect = mountEl.getBoundingClientRect();
+      const x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+      const y = -(((e.clientY - rect.top) / rect.height) * 2 - 1);
+      ndc.set(x, y);
+      raycaster.setFromCamera(ndc, camera);
+      const hit = raycaster.intersectObjects(meshes, false)[0];
+      if (!hit) return;
+      const idx = meshes.indexOf(hit.object as any);
+      if (idx < 0) return;
+      onTileClick?.(idx);
       isDown = true;
       moved = false;
       lastX = e.clientX;
@@ -225,7 +243,7 @@ export default function EditorTilesViewport({
     const onResize = () => resize();
     window.addEventListener('resize', onResize);
 
-    const colors = Array.from({ length: 9 }, () => new THREE.Color('#000000'));
+    const colors = Array.from({ length: count }, () => new THREE.Color('#000000'));
 
     const animate = () => {
       const t = clock.getElapsedTime();
@@ -243,7 +261,7 @@ export default function EditorTilesViewport({
       root.rotation.x = -pitch + -mouseCurrent.y * 0.08;
       root.position.y = Math.sin(t * 0.35) * 0.05;
 
-      for (let i = 0; i < 9; i++) {
+      for (let i = 0; i < count; i++) {
         const tile = safeTiles[i] ?? { color: '#000000', intensity: 0 };
         colors[i].set(tile.color);
 
@@ -257,10 +275,12 @@ export default function EditorTilesViewport({
         mirrorMaterials[i].emissive.copy(colors[i]);
         mirrorMaterials[i].emissiveIntensity = 1.45 * (0.75 * intensity);
 
-        const mat = edges[i].material as THREE.LineBasicMaterial;
-        const selected = typeof selectedTileIndex === 'number' && selectedTileIndex === i;
-        mat.opacity = selected ? 0.95 : 0.55;
-        mat.color.set(selected ? 0xffffff : 0x000000);
+        const mat = edges[i]?.material as THREE.LineBasicMaterial | undefined;
+        if (mat) {
+          const selected = typeof selectedTileIndex === 'number' && selectedTileIndex === i;
+          mat.opacity = selected ? 0.95 : 0.55;
+          mat.color.set(selected ? 0xffffff : 0x000000);
+        }
       }
 
       renderer.render(scene, camera);
