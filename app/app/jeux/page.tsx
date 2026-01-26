@@ -568,6 +568,28 @@ export default function JeuxPage() {
   const [mpPlayers, setMpPlayers] = useState<Array<{ seat: MpSeat; name: string }>>([]);
   const [mpValue, setMpValue] = useState<number>(0);
   const [mpAutoFollow, setMpAutoFollow] = useState<boolean>(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadMe = async () => {
+      try {
+        const res = await fetch('/api/me', { cache: 'no-store' });
+        const data = (await res.json().catch(() => null)) as any;
+        const me = data?.ok ? data.user : null;
+        if (!me || !me.name) return;
+        if (cancelled) return;
+        setCurrentUser(String(me.name));
+        setUserType(String(me.userType) === 'enseignant' ? 'enseignant' : 'apprenant');
+        setView('main');
+      } catch {
+        // ignore
+      }
+    };
+    void loadMe();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   const [mpSnoozedSessionId, setMpSnoozedSessionId] = useState<string>('');
   const [mpJoinPrompt, setMpJoinPrompt] = useState<{ open: boolean; sessionId: string }>(
     { open: false, sessionId: '' },
@@ -812,12 +834,7 @@ export default function JeuxPage() {
   }
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const stored = window.localStorage.getItem('crg_mp_token') ?? '';
-    if (stored) setMpToken(stored);
-
-    const snoozed = window.localStorage.getItem('crg_mp_snooze_session') ?? '';
-    if (snoozed) setMpSnoozedSessionId(snoozed);
+    // no local persistence: multiplayer token/snooze are kept in DB (server-side) and client memory only.
   }, []);
 
   useEffect(() => {
@@ -1036,7 +1053,6 @@ export default function JeuxPage() {
       const token = String(data.token ?? '');
       const seat: MpSeat = Number(data.seat) as MpSeat;
       setMpToken(token);
-      window.localStorage.setItem('crg_mp_token', token);
       setMpSeat(seat);
       return { token, seat };
     } catch {
@@ -1160,26 +1176,41 @@ export default function JeuxPage() {
       return;
     }
 
-    setCurrentUser(username.trim());
-    if (typeof window !== 'undefined') {
-      window.localStorage.setItem('crg_user_type', userType);
-    }
-    setView('main');
-    setScore(0);
-    setGamesCompleted(0);
-    updateLeaderboard(0, niveau, username.trim());
+    void (async () => {
+      const name = username.trim();
+      try {
+        const res = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ name, userType }),
+        });
+        const data = (await res.json().catch(() => null)) as any;
+        if (!res.ok || !data?.ok) {
+          setMessage('Connexion impossible');
+          return;
+        }
+        setCurrentUser(name);
+        setView('main');
+        setScore(0);
+        setGamesCompleted(0);
+        updateLeaderboard(0, niveau, name);
+      } catch {
+        setMessage('Connexion impossible');
+      }
+    })();
   }
 
   function logout() {
+    void fetch('/api/auth/logout', { method: 'POST' }).catch(() => null);
     setCurrentUser(null);
     setView('login');
     setGameActive(false);
     setCurrentGame(null);
-    if (typeof window !== 'undefined') {
-      window.localStorage.removeItem('crg_user_type');
-    }
     setScore(0);
     setGamesCompleted(0);
+    setMpToken('');
+    setMpSeat(null);
+    setMpSnoozedSessionId('');
     setMessage('Sélectionnez un jeu et cliquez sur "Démarrer le Jeu"');
     resetScene();
   }
@@ -1317,7 +1348,6 @@ export default function JeuxPage() {
       setMpEndPrompt(false);
       setMpAutoFollow(true);
       setMpSnoozedSessionId('');
-      window.localStorage.removeItem('crg_mp_snooze_session');
       void (async () => {
         // Host-claim: start will also create the host player (seat 1) and return token+seat.
         // This does NOT start the timer (lobby mode), it only prepares the session.
@@ -1330,7 +1360,6 @@ export default function JeuxPage() {
           const data = (await res.json().catch(() => null)) as any;
           if (data?.ok && typeof data.token === 'string' && Number.isFinite(Number(data.seat))) {
             setMpToken(String(data.token));
-            window.localStorage.setItem('crg_mp_token', String(data.token));
             setMpSeat(Number(data.seat) as MpSeat);
             setMpSessionId(String(data.sessionId ?? ''));
           }
@@ -1666,7 +1695,6 @@ export default function JeuxPage() {
                   setMpJoinPrompt({ open: false, sessionId: '' });
                   if (sid) {
                     setMpSnoozedSessionId(sid);
-                    window.localStorage.setItem('crg_mp_snooze_session', sid);
                     setMessage('Session multijoueur active : sélectionne le jeu Multijoueur pour rejoindre.');
                   }
                 }}
@@ -1685,7 +1713,6 @@ export default function JeuxPage() {
                     }
                     setMpJoinPrompt({ open: false, sessionId: '' });
                     setMpSnoozedSessionId('');
-                    window.localStorage.removeItem('crg_mp_snooze_session');
                     setMpAutoFollow(true);
                     setCurrentGame('multiplayer-split');
                     setGameActive(true);
@@ -1747,7 +1774,6 @@ export default function JeuxPage() {
                       }).catch(() => null);
                       setMpSeat(null);
                       setMpSnoozedSessionId('');
-                      window.localStorage.removeItem('crg_mp_snooze_session');
                       setMpAutoFollow(true);
                       await ensureMpJoined(currentUser ?? undefined);
                       setCurrentGame('multiplayer-split');

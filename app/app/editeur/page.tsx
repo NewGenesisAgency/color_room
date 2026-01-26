@@ -4,64 +4,9 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import EditorTilesViewport from '@/app/_components/EditorTilesViewport';
 
-import { FilePlus2, Pencil, Plus, Save, Trash2 } from 'lucide-react';
+import { Plus } from 'lucide-react';
 
 type IdFactory = () => string;
-
-type CustomGameVarValue = number | string | boolean;
-
-type CustomWidgetBase = {
-  id: string;
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-  z?: number;
-};
-
-type CustomWidgetSlider = CustomWidgetBase & {
-  type: 'slider';
-  label: string;
-  min: number;
-  max: number;
-  step: number;
-  bindVar: string;
-};
-
-type CustomWidgetShape = CustomWidgetBase & {
-  type: 'shape';
-  shape: 'circle' | 'square';
-  colorExpr: string;
-};
-
-type CustomWidgetColorBox = CustomWidgetBase & {
-  type: 'color_box';
-  title: string;
-  colorExpr: string;
-};
-
-type CustomWidgetButton = CustomWidgetBase & {
-  type: 'button';
-  label: string;
-  points: number;
-  message: string;
-};
-
-type CustomWidget = CustomWidgetSlider | CustomWidgetShape | CustomWidgetColorBox | CustomWidgetButton;
-
-type CustomWidgetLink = {
-  id: string;
-  fromId: string;
-  toId: string;
-};
-
-type CustomGameConfigV1 = {
-  version: 1;
-  title: string;
-  vars: Record<string, CustomGameVarValue>;
-  widgets: CustomWidget[];
-  links: CustomWidgetLink[];
-};
 
 type TileState = {
   color: string;
@@ -109,6 +54,7 @@ type EditorNode = {
 type GameDoc = {
   id: string;
   name: string;
+  tileCount?: number;
   nodes: EditorNode[];
   edges: GraphEdge[];
 };
@@ -170,48 +116,8 @@ function clamp255(v: number): number {
   return Math.max(0, Math.min(255, Math.round(v)));
 }
 
-function parseCustomConfig(raw: unknown): CustomGameConfigV1 {
-  const base: CustomGameConfigV1 = { version: 1, title: 'Jeu custom', vars: { r: 128, g: 64, b: 200 }, widgets: [], links: [] };
-  if (!raw || typeof raw !== 'object') return base;
-  const o = raw as any;
-  const title = typeof o.title === 'string' ? o.title : base.title;
-  const vars = o.vars && typeof o.vars === 'object' ? (o.vars as Record<string, CustomGameVarValue>) : base.vars;
-  const widgets = Array.isArray(o.widgets) ? (o.widgets as CustomWidget[]) : [];
-  const links = Array.isArray(o.links) ? (o.links as CustomWidgetLink[]) : [];
-  return { version: 1, title, vars: vars ?? {}, widgets: widgets ?? [], links: links ?? [] };
-}
-
 function randomId(): string {
   return `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
-}
-
-function evalColorExpr(expr: string, vars: Record<string, CustomGameVarValue>): string {
-  const s = String(expr || '').trim();
-  const m = /^(rgba?)\((.*)\)$/.exec(s);
-  if (!m) return 'rgb(0,0,0)';
-  const fn = m[1];
-  const args = m[2]
-    .split(',')
-    .map((x) => x.trim())
-    .filter(Boolean);
-
-  const read = (token: string): number => {
-    const v = vars[token];
-    const n = typeof v === 'number' ? v : Number(v);
-    return Number.isFinite(n) ? n : Number(token);
-  };
-
-  const r = clamp255(read(args[0] ?? '0'));
-  const g = clamp255(read(args[1] ?? '0'));
-  const b = clamp255(read(args[2] ?? '0'));
-
-  if (fn === 'rgba') {
-    const aRaw = read(args[3] ?? '1');
-    const a = Math.max(0, Math.min(1, Number.isFinite(aRaw) ? aRaw : 1));
-    return `rgba(${r}, ${g}, ${b}, ${a})`;
-  }
-
-  return `rgb(${r}, ${g}, ${b})`;
 }
 
 function isEditorNodeKind(v: string): v is EditorNodeKind {
@@ -234,7 +140,7 @@ function formatNodeParamsInline(node: EditorNode): string {
     return `spd=${speed.toFixed(2)}`;
   }
   if (node.kind === 'tile') {
-    const idx = Math.max(0, Math.min(8, Math.round(getNum(node.params, 'tileIndex', 0))));
+    const idx = Math.max(0, Math.round(getNum(node.params, 'tileIndex', 0)));
     const intensity = clamp01(getNum(node.params, 'intensity', 0.85));
     return `D${idx + 1} • I=${intensity.toFixed(2)}`;
   }
@@ -314,7 +220,7 @@ function applyRenderNode(tiles: TileState[], node: EditorNode, tSeconds: number)
     const intensity = clamp01(getNum(node.params, 'intensity', 0.8));
     const mask = String(node.params.mask ?? 'all');
 
-    for (let i = 0; i < 9; i++) {
+    for (let i = 0; i < tiles.length; i++) {
       const apply = mask === 'all' || ((mask === 'border' || mask === 'borders') && i !== 4);
       if (!apply) continue;
       tiles[i] = { color, intensity };
@@ -337,7 +243,7 @@ function applyRenderNode(tiles: TileState[], node: EditorNode, tSeconds: number)
     const intensity = clamp01(lerp(fromIntensity, toIntensity, t01));
     const color = lerpColor(baseColor, targetColor, t01);
 
-    for (let i = 0; i < 9; i++) {
+    for (let i = 0; i < tiles.length; i++) {
       if (intensity <= tiles[i].intensity) continue;
       tiles[i] = { color, intensity };
     }
@@ -345,7 +251,8 @@ function applyRenderNode(tiles: TileState[], node: EditorNode, tSeconds: number)
 
   if (node.kind === 'tile') {
     const tileIndexRaw = getNum(node.params, 'tileIndex', 0);
-    const tileIndex = Math.max(0, Math.min(8, Math.round(tileIndexRaw)));
+    const maxIndex = Math.max(0, tiles.length - 1);
+    const tileIndex = Math.max(0, Math.min(maxIndex, Math.round(tileIndexRaw)));
     const color = getColor(node.params, 'color', '#ff2aa6');
     const intensity = clamp01(getNum(node.params, 'intensity', 0.85));
     tiles[tileIndex] = { color, intensity };
@@ -353,7 +260,8 @@ function applyRenderNode(tiles: TileState[], node: EditorNode, tSeconds: number)
 }
 
 function computeTiles(game: GameDoc, tSeconds: number): TileState[] {
-  const tiles: TileState[] = Array.from({ length: 9 }, () => ({ color: '#000000', intensity: 0 }));
+  const tileCount = Math.max(1, Math.round(Number(game.tileCount ?? 9)));
+  const tiles: TileState[] = Array.from({ length: tileCount }, () => ({ color: '#000000', intensity: 0 }));
 
   // Runtime MVP: exécute une seule chaîne depuis event_begin en suivant les edges.
   // wait(seconds) retarde l'action suivante, fill(seconds) définit la durée d'affichage, puis boucle.
@@ -444,295 +352,24 @@ function computeTiles(game: GameDoc, tSeconds: number): TileState[] {
 
 export default function EditeurPage() {
   const [isTeacher, setIsTeacher] = useState<boolean | null>(null);
-  const [dbGames, setDbGames] = useState<Array<{ id: string; name: string; kind: string; updatedAt: string; config: unknown }>>([]);
-  const [dbGamesLoading, setDbGamesLoading] = useState(false);
-  const [customEditor, setCustomEditor] = useState<{ open: boolean; gameId: string | null }>({ open: false, gameId: null });
-  const [customDraft, setCustomDraft] = useState<CustomGameConfigV1 | null>(null);
-  const [customSaving, setCustomSaving] = useState(false);
-  const [customSelectedWidgetId, setCustomSelectedWidgetId] = useState<string | null>(null);
-  const customDragRef = useRef<{ wid: string; dx: number; dy: number } | null>(null);
-  const [customMessage, setCustomMessage] = useState<string>('');
-  const [customLinkDrag, setCustomLinkDrag] = useState<{ active: boolean; fromId: string; x: number; y: number } | null>(null);
-  const customCanvasRef = useRef<HTMLDivElement | null>(null);
+  const [dbLoading, setDbLoading] = useState<boolean>(false);
+  const [dirty, setDirty] = useState<boolean>(false);
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const t = window.localStorage.getItem('crg_user_type') ?? '';
-    setIsTeacher(t === 'enseignant');
-  }, []);
-
-  useEffect(() => {
-    if (isTeacher !== true) return;
     let cancelled = false;
-    const load = async () => {
-      setDbGamesLoading(true);
+    const loadMe = async () => {
       try {
-        const res = await fetch('/api/games', { cache: 'no-store' });
-        if (!res.ok) return;
-        const json = (await res.json().catch(() => null)) as any;
-        if (!json || json.ok !== true || !Array.isArray(json.games)) return;
-        if (cancelled) return;
-        setDbGames(json.games);
-      } finally {
-        if (!cancelled) setDbGamesLoading(false);
+        const res = await fetch('/api/me', { cache: 'no-store' });
+        const data = (await res.json().catch(() => null)) as any;
+        const role = String(data?.user?.userType ?? '');
+        if (!cancelled) setIsTeacher(role === 'enseignant');
+      } catch {
+        if (!cancelled) setIsTeacher(false);
       }
     };
-    void load();
+    void loadMe();
     return () => {
       cancelled = true;
-    };
-  }, [isTeacher]);
-
-  async function createCustomGame() {
-    const name = 'Nouveau jeu custom';
-    const cfg: CustomGameConfigV1 = {
-      version: 1,
-      title: name,
-      vars: { r: 128, g: 64, b: 200 },
-      widgets: [
-        {
-          id: randomId(),
-          type: 'slider',
-          x: 20,
-          y: 20,
-          w: 320,
-          h: 64,
-          label: 'Rouge',
-          min: 0,
-          max: 255,
-          step: 1,
-          bindVar: 'r',
-        },
-        {
-          id: randomId(),
-          type: 'slider',
-          x: 20,
-          y: 96,
-          w: 320,
-          h: 64,
-          label: 'Vert',
-          min: 0,
-          max: 255,
-          step: 1,
-          bindVar: 'g',
-        },
-        {
-          id: randomId(),
-          type: 'slider',
-          x: 20,
-          y: 172,
-          w: 320,
-          h: 64,
-          label: 'Bleu',
-          min: 0,
-          max: 255,
-          step: 1,
-          bindVar: 'b',
-        },
-        {
-          id: randomId(),
-          type: 'shape',
-          x: 380,
-          y: 30,
-          w: 140,
-          h: 140,
-          shape: 'circle',
-          colorExpr: 'rgb(r,g,b)',
-        },
-        {
-          id: randomId(),
-          type: 'color_box',
-          x: 360,
-          y: 200,
-          w: 220,
-          h: 90,
-          title: 'Couleur',
-          colorExpr: 'rgb(r,g,b)',
-        },
-      ],
-      links: [],
-    };
-
-    try {
-      const res = await fetch('/api/games', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ name, kind: 'custom', config: cfg }),
-      });
-      const json = (await res.json().catch(() => null)) as any;
-      if (!res.ok || !json || json.ok !== true) {
-        setCustomMessage('Création impossible.');
-        return;
-      }
-      setDbGames((prev) => [json.game, ...prev]);
-      setCustomMessage('Jeu custom créé.');
-      void openCustomEditor(String(json.game?.id ?? ''));
-    } catch {
-      setCustomMessage('Création impossible.');
-    }
-  }
-
-  async function openCustomEditor(gameId: string) {
-    setCustomEditor({ open: true, gameId });
-    setCustomSelectedWidgetId(null);
-    setCustomDraft(null);
-    try {
-      const res = await fetch(`/api/games/${encodeURIComponent(gameId)}`, { cache: 'no-store' });
-      const json = (await res.json().catch(() => null)) as any;
-      if (!res.ok || !json || json.ok !== true) {
-        setCustomMessage('Impossible de charger le jeu.');
-        return;
-      }
-      const cfg = parseCustomConfig(json.game?.config);
-      setCustomDraft(cfg);
-    } catch {
-      setCustomMessage('Impossible de charger le jeu.');
-    }
-  }
-
-  async function saveCustomEditor() {
-    const gameId = customEditor.gameId;
-    if (!gameId || !customDraft) return;
-    setCustomSaving(true);
-    try {
-      const res = await fetch(`/api/games/${encodeURIComponent(gameId)}`, {
-        method: 'PATCH',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ config: customDraft, kind: 'custom', name: customDraft.title || 'Jeu custom' }),
-      });
-      const json = (await res.json().catch(() => null)) as any;
-      if (!res.ok || !json || json.ok !== true) {
-        setCustomMessage('Sauvegarde impossible.');
-        return;
-      }
-      setDbGames((prev) => prev.map((g) => (g.id === gameId ? json.game : g)));
-      setCustomMessage('Sauvegardé.');
-    } catch {
-      setCustomMessage('Sauvegarde impossible.');
-    } finally {
-      setCustomSaving(false);
-    }
-  }
-
-  async function deleteDbGame(gameId: string) {
-    try {
-      const res = await fetch(`/api/games/${encodeURIComponent(gameId)}`, { method: 'DELETE' });
-      if (!res.ok) {
-        setCustomMessage('Suppression impossible.');
-        return;
-      }
-      setDbGames((prev) => prev.filter((g) => g.id !== gameId));
-      setCustomMessage('Jeu supprimé.');
-    } catch {
-      setCustomMessage('Suppression impossible.');
-    }
-  }
-
-  function addWidget(kind: CustomWidget['type']) {
-    if (!customDraft) return;
-    const id = randomId();
-    const base = { id, x: 40, y: 40, w: 240, h: 80 };
-    const next: CustomWidget =
-      kind === 'slider'
-        ? {
-            ...base,
-            type: 'slider',
-            label: 'Slider',
-            min: 0,
-            max: 255,
-            step: 1,
-            bindVar: 'x',
-          }
-        : kind === 'shape'
-          ? { ...base, type: 'shape', shape: 'circle', w: 140, h: 140, colorExpr: 'rgb(r,g,b)' }
-          : kind === 'button'
-            ? { ...base, type: 'button', h: 56, label: 'Valider', points: 50, message: '+50 points.' }
-            : { ...base, type: 'color_box', title: 'Couleur', colorExpr: 'rgb(r,g,b)', h: 90 };
-
-    setCustomDraft((prev) => {
-      if (!prev) return prev;
-      return { ...prev, widgets: [...prev.widgets, next] };
-    });
-    setCustomSelectedWidgetId(id);
-  }
-
-  function updateWidget(id: string, patch: Partial<CustomWidget>) {
-    setCustomDraft((prev) => {
-      if (!prev) return prev;
-      return {
-        ...prev,
-        widgets: prev.widgets.map((w) => (w.id === id ? ({ ...w, ...patch } as any) : w)),
-      };
-    });
-  }
-
-  function addWidgetLink(fromId: string, toId: string) {
-    if (fromId === toId) return;
-    setCustomDraft((prev) => {
-      if (!prev) return prev;
-      if (!prev.widgets.some((w) => w.id === fromId)) return prev;
-      if (!prev.widgets.some((w) => w.id === toId)) return prev;
-      if (prev.links.some((l) => l.fromId === fromId && l.toId === toId)) return prev;
-      return { ...prev, links: [...prev.links, { id: randomId(), fromId, toId }] };
-    });
-  }
-
-  function removeWidgetLink(linkId: string) {
-    setCustomDraft((prev) => {
-      if (!prev) return prev;
-      return { ...prev, links: prev.links.filter((l) => l.id !== linkId) };
-    });
-  }
-
-  function updateVar(name: string, value: CustomGameVarValue) {
-    setCustomDraft((prev) => {
-      if (!prev) return prev;
-      return { ...prev, vars: { ...prev.vars, [name]: value } };
-    });
-  }
-
-  const selectedWidget = useMemo(() => {
-    if (!customDraft || !customSelectedWidgetId) return null;
-    return customDraft.widgets.find((w) => w.id === customSelectedWidgetId) ?? null;
-  }, [customDraft, customSelectedWidgetId]);
-
-  useEffect(() => {
-    const onMove = (e: MouseEvent) => {
-      const drag = customDragRef.current;
-      if (!drag || !customDraft) return;
-      const x = Math.max(0, e.clientX - drag.dx);
-      const y = Math.max(0, e.clientY - drag.dy);
-      updateWidget(drag.wid, { x, y } as any);
-    };
-    const onUp = () => {
-      customDragRef.current = null;
-    };
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', onUp);
-    return () => {
-      window.removeEventListener('mousemove', onMove);
-      window.removeEventListener('mouseup', onUp);
-    };
-  }, [customDraft]);
-
-  useEffect(() => {
-    const onMove = (e: MouseEvent) => {
-      setCustomLinkDrag((prev) => {
-        if (!prev || !prev.active) return prev;
-        return { ...prev, x: e.clientX, y: e.clientY };
-      });
-    };
-    const onUp = () => {
-      setCustomLinkDrag((prev) => {
-        if (!prev || !prev.active) return prev;
-        return null;
-      });
-    };
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', onUp);
-    return () => {
-      window.removeEventListener('mousemove', onMove);
-      window.removeEventListener('mouseup', onUp);
     };
   }, []);
 
@@ -788,6 +425,7 @@ export default function EditeurPage() {
     setEditor((cur) => {
       const next = recipe(cur);
       setHistory((h) => ({ past: [...h.past, cur], future: [] }));
+      setDirty(true);
       return next;
     });
   };
@@ -993,37 +631,200 @@ export default function EditeurPage() {
 
   const tiles = editorTiles;
 
-  const createGame = (forcedName?: string) => {
+  const tileCount = tiles.length;
+
+  useEffect(() => {
+    if (typeof selectedTileIndex !== 'number') return;
+    if (selectedTileIndex < 0 || selectedTileIndex >= tileCount) {
+      setSelectedTileIndex(null);
+    }
+  }, [selectedTileIndex, tileCount]);
+
+  const serializeGameConfig = (g: GameDoc): unknown => {
+    return { version: 1, tileCount: g.tileCount ?? tiles.length, nodes: g.nodes, edges: g.edges };
+  };
+
+  const parseGameConfig = (config: unknown): { tileCount?: number; nodes: EditorNode[]; edges: GraphEdge[] } | null => {
+    if (!config || typeof config !== 'object') return null;
+    const o = config as any;
+    const tileCount = typeof o.tileCount === 'number' && Number.isFinite(o.tileCount) ? o.tileCount : undefined;
+    const nodes = Array.isArray(o.nodes) ? (o.nodes as EditorNode[]) : null;
+    const edges = Array.isArray(o.edges) ? (o.edges as GraphEdge[]) : null;
+    if (!nodes || !edges) return null;
+    return { tileCount, nodes, edges };
+  };
+
+  const createDbGame = async (name: string, initialGame: GameDoc): Promise<string | null> => {
+    try {
+      const res = await fetch('/api/games', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ name, kind: 'editor', config: serializeGameConfig(initialGame) }),
+      });
+      const json = (await res.json().catch(() => null)) as any;
+      if (!res.ok || !json || json.ok !== true) return null;
+      return String(json.game?.id ?? '');
+    } catch {
+      return null;
+    }
+  };
+
+  const saveDbGame = async (g: GameDoc): Promise<boolean> => {
+    try {
+      const res = await fetch(`/api/games/${encodeURIComponent(g.id)}`, {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ name: g.name, kind: 'editor', config: serializeGameConfig(g) }),
+      });
+      const json = (await res.json().catch(() => null)) as any;
+      if (!res.ok || !json || json.ok !== true) return false;
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const deleteDbGame = async (id: string): Promise<boolean> => {
+    try {
+      const res = await fetch(`/api/games/${encodeURIComponent(id)}`, { method: 'DELETE' });
+      const json = (await res.json().catch(() => null)) as any;
+      if (!res.ok || !json || json.ok !== true) return false;
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const createGame = async (forcedName?: string) => {
     const makeId: IdFactory = () => `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
-    const gameId = makeId();
+    const provisionalId = makeId();
     const nodeId = makeId();
     const nextIndex = (editorRef.current.games.length || 0) + 1;
     const gameName = forcedName && forcedName.trim().length > 0 ? forcedName.trim() : `Jeu${nextIndex}`;
-    commit((cur) => {
-      const newGame: GameDoc = {
-        id: gameId,
-        name: gameName,
-        nodes: [
-          {
-            id: nodeId,
-            kind: 'event_begin',
-            name: gameName,
-            enabled: true,
-            params: {},
-            pos: { x: 80, y: 80 },
-          },
-        ],
-        edges: [],
-      };
+    const provisionalGame: GameDoc = {
+      id: provisionalId,
+      name: gameName,
+      tileCount: Math.max(1, tiles.length || 1),
+      nodes: [
+        {
+          id: nodeId,
+          kind: 'event_begin',
+          name: gameName,
+          enabled: true,
+          params: {},
+          pos: { x: 80, y: 80 },
+        },
+      ],
+      edges: [],
+    };
 
+    const dbId = await createDbGame(gameName, provisionalGame);
+    if (!dbId) {
+      setStatus('Création DB impossible');
+      return;
+    }
+
+    const newGame: GameDoc = { ...provisionalGame, id: dbId };
+    commit((cur) => ({
+      ...cur,
+      games: [...cur.games, newGame],
+      activeGameId: dbId,
+      selectedNodeId: nodeId,
+    }));
+    setDirty(false);
+    setStatus('Jeu créé (DB)');
+  };
+
+  useEffect(() => {
+    if (isTeacher !== true) return;
+    let cancelled = false;
+    const load = async () => {
+      setDbLoading(true);
+      try {
+        const res = await fetch('/api/games', { cache: 'no-store' });
+        const json = (await res.json().catch(() => null)) as any;
+        if (!res.ok || !json || json.ok !== true || !Array.isArray(json.games)) {
+          return;
+        }
+
+        const rows = json.games as Array<{ id: string; name: string; kind: string; config: unknown }>;
+        const editorRows = rows.filter((r) => String(r.kind) === 'editor');
+
+        const loaded: GameDoc[] = editorRows
+          .map((r) => {
+            const cfg = parseGameConfig(r.config);
+            if (!cfg) return null;
+            return {
+              id: String(r.id),
+              name: String(r.name),
+              tileCount: cfg.tileCount,
+              nodes: cfg.nodes,
+              edges: cfg.edges,
+            } satisfies GameDoc;
+          })
+          .filter(Boolean) as GameDoc[];
+
+        if (cancelled) return;
+
+        if (loaded.length > 0) {
+          setEditor({
+            games: loaded,
+            activeGameId: loaded[0].id,
+            selectedNodeId: loaded[0].nodes[0]?.id ?? null,
+          });
+          editorRef.current = {
+            games: loaded,
+            activeGameId: loaded[0].id,
+            selectedNodeId: loaded[0].nodes[0]?.id ?? null,
+          };
+          setHistory({ past: [], future: [] });
+          setDirty(false);
+          setStatus('Jeux chargés');
+          return;
+        }
+
+        await createGame('Jeu1');
+      } finally {
+        if (!cancelled) setDbLoading(false);
+      }
+    };
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [isTeacher]);
+
+  const saveActiveGame = async () => {
+    if (!activeGame) return;
+    const ok = await saveDbGame(activeGame);
+    if (!ok) {
+      setStatus('Sauvegarde impossible');
+      return;
+    }
+    setDirty(false);
+    setStatus('Sauvegardé');
+  };
+
+  const deleteActiveGame = async () => {
+    if (!activeGame) return;
+    const ok = await deleteDbGame(activeGame.id);
+    if (!ok) {
+      setStatus('Suppression impossible');
+      return;
+    }
+
+    commit((cur) => {
+      const nextGames = cur.games.filter((g) => g.id !== activeGame.id);
+      const nextActive = nextGames[0];
       return {
         ...cur,
-        games: [...cur.games, newGame],
-        activeGameId: gameId,
-        selectedNodeId: nodeId,
+        games: nextGames,
+        activeGameId: nextActive?.id ?? null,
+        selectedNodeId: nextActive?.nodes[0]?.id ?? null,
       };
     });
-    setStatus('Jeu créé');
+    setDirty(false);
+    setStatus('Jeu supprimé');
   };
 
   const addNode = (kind: EditorNodeKind, pos?: { x: number; y: number }): string | null => {
@@ -1098,13 +899,14 @@ export default function EditeurPage() {
   };
 
   const assignSelectedTileToNode = (tileIndex: number) => {
-    setSelectedTileIndex(tileIndex);
+    const safe = Math.max(0, Math.min(tileCount - 1, Math.round(tileIndex)));
+    setSelectedTileIndex(safe);
 
     if (!selectedNodeId) return;
     if (!selectedNode) return;
     if (selectedNode.kind !== 'tile') return;
-    updateSelectedParams({ tileIndex });
-    setStatus(`Dalle D${tileIndex + 1} assignée`);
+    updateSelectedParams({ tileIndex: safe });
+    setStatus(`Dalle D${safe + 1} assignée`);
   };
 
   const updateSelectedNode = (patch: Partial<EditorNode>) => {
@@ -1152,488 +954,65 @@ export default function EditeurPage() {
 
   if (isTeacher === false) {
     return (
-      <main className="stage">
-        <div className="ue">
-          <aside className="ue__left glass">
-            <div className="panelhead">
-              <strong>Accès refusé</strong>
-              <span className="panelhead__meta">Enseignant requis</span>
+      <main className="stage" style={{ display: 'grid', placeItems: 'center' }}>
+        <div
+          className="glass"
+          style={{
+            width: 'min(720px, calc(100vw - 28px))',
+            padding: 22,
+            borderRadius: 22,
+            textAlign: 'center',
+          }}
+        >
+          <div style={{ display: 'grid', gap: 8 }}>
+            <div style={{ fontSize: 14, opacity: 0.8 }}>Enseignant requis</div>
+            <div style={{ fontSize: 22, fontWeight: 900, letterSpacing: '-0.02em' }}>Accès refusé</div>
+            <div style={{ fontSize: 13, opacity: 0.82, lineHeight: 1.6, marginTop: 4 }}>
+              Cette page est réservée aux enseignants.
+              <br />
+              Connecte-toi en tant qu'enseignant depuis <a href="/jeux">/jeux</a>.
             </div>
-            <div className="panelbody">
-              <div className="muted">
-                Cette page est réservée aux enseignants.
-                <br />
-                Connecte-toi en tant qu'enseignant depuis <a href="/jeux">/jeux</a>.
-              </div>
-            </div>
-          </aside>
+          </div>
+
+          <div style={{ display: 'flex', gap: 12, justifyContent: 'center', marginTop: 18, flexWrap: 'wrap' }}>
+            <a className="btn btn--hero" href="/jeux" style={{ textDecoration: 'none' }}>
+              Aller à /jeux
+            </a>
+          </div>
         </div>
       </main>
     );
   }
 
   return (
-    <>
-      {customEditor.open ? (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0,0,0,0.42)',
-            display: 'grid',
-            placeItems: 'center',
-            zIndex: 1200,
-          }}
-          onClick={() => setCustomEditor({ open: false, gameId: null })}
-        >
-          <div
-            className="glass"
-            style={{
-              width: 'min(1100px, calc(100vw - 24px))',
-              height: 'min(720px, calc(100vh - 24px))',
-              padding: 16,
-              borderRadius: 18,
-              display: 'grid',
-              gridTemplateRows: 'auto 1fr',
-              gap: 12,
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
-                <Pencil size={18} />
-                <strong style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {customDraft?.title ?? 'Éditeur (chargement...)'}
-                </strong>
-              </div>
-              <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-                <button className="btn" onClick={() => setCustomEditor({ open: false, gameId: null })}>
-                  Fermer
-                </button>
-                <button className="btn btn--hero" disabled={!customDraft || customSaving} onClick={() => void saveCustomEditor()}>
-                  <Save size={18} /> Sauvegarder
-                </button>
-              </div>
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr 280px', gap: 12, minHeight: 0 }}>
-              <div className="glass" style={{ padding: 12, borderRadius: 16, minHeight: 0 }}>
-                <div style={{ fontWeight: 800 }}>Palette</div>
-                <div style={{ marginTop: 10, display: 'grid', gap: 8 }}>
-                  <button className="btn btn--hero" disabled={!customDraft} onClick={() => addWidget('slider')}>
-                    <Plus size={18} /> Slider
-                  </button>
-                  <button className="btn btn--hero" disabled={!customDraft} onClick={() => addWidget('shape')}>
-                    <Plus size={18} /> Forme
-                  </button>
-                  <button className="btn btn--hero" disabled={!customDraft} onClick={() => addWidget('color_box')}>
-                    <Plus size={18} /> Color Box
-                  </button>
-                  <button className="btn btn--hero" disabled={!customDraft} onClick={() => addWidget('button')}>
-                    <Plus size={18} /> Bouton points
-                  </button>
-                </div>
-              </div>
-
-              <div className="glass" style={{ padding: 12, borderRadius: 16, position: 'relative', overflow: 'hidden' }}>
-                <div style={{ fontWeight: 800, marginBottom: 10 }}>Zone de jeu (canvas)</div>
-                <div
-                  ref={customCanvasRef}
-                  style={{
-                    position: 'relative',
-                    width: '100%',
-                    height: '100%',
-                    borderRadius: 14,
-                    background: 'rgba(0,0,0,0.06)',
-                    border: '1px solid rgba(0,0,0,0.10)',
-                    overflow: 'hidden',
-                  }}
-                  onMouseDown={() => setCustomSelectedWidgetId(null)}
-                >
-                  <svg
-                    style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}
-                  >
-                    {customDraft?.links.map((l) => {
-                      const from = customDraft.widgets.find((w) => w.id === l.fromId);
-                      const to = customDraft.widgets.find((w) => w.id === l.toId);
-                      if (!from || !to) return null;
-                      const x1 = from.x + from.w;
-                      const y1 = from.y + from.h / 2;
-                      const x2 = to.x;
-                      const y2 = to.y + to.h / 2;
-                      const cx1 = x1 + 60;
-                      const cx2 = x2 - 60;
-                      const d = `M ${x1} ${y1} C ${cx1} ${y1} ${cx2} ${y2} ${x2} ${y2}`;
-                      return (
-                        <g key={l.id}>
-                          <path
-                            d={d}
-                            fill="none"
-                            stroke="rgba(67,97,238,0.75)"
-                            strokeWidth={2}
-                          />
-                          <path
-                            d={d}
-                            fill="none"
-                            stroke="rgba(0,0,0,0)"
-                            strokeWidth={12}
-                            onMouseDown={(e) => {
-                              e.stopPropagation();
-                              removeWidgetLink(l.id);
-                            }}
-                            style={{ cursor: 'pointer' }}
-                          />
-                        </g>
-                      );
-                    })}
-
-                    {customLinkDrag?.active && customDraft ? (() => {
-                      const from = customDraft.widgets.find((w) => w.id === customLinkDrag.fromId);
-                      const canvas = customCanvasRef.current;
-                      if (!from || !canvas) return null;
-                      const rect = canvas.getBoundingClientRect();
-                      const x1 = from.x + from.w;
-                      const y1 = from.y + from.h / 2;
-                      const x2 = customLinkDrag.x - rect.left;
-                      const y2 = customLinkDrag.y - rect.top;
-                      const cx1 = x1 + 60;
-                      const cx2 = x2 - 60;
-                      const d = `M ${x1} ${y1} C ${cx1} ${y1} ${cx2} ${y2} ${x2} ${y2}`;
-                      return <path d={d} fill="none" stroke="rgba(6,214,160,0.7)" strokeWidth={2} strokeDasharray="6 6" />;
-                    })() : null}
-                  </svg>
-
-                  {customDraft?.widgets.map((w) => {
-                    const isSel = w.id === customSelectedWidgetId;
-                    const border = isSel ? '2px solid rgba(67,97,238,0.65)' : '1px solid rgba(0,0,0,0.12)';
-                    const boxShadow = isSel ? '0 0 0 3px rgba(67,97,238,0.18)' : 'none';
-                    const z = typeof w.z === 'number' ? w.z : 1;
-
-                    const onDown = (e: React.MouseEvent) => {
-                      const t = e.target as HTMLElement;
-                      const tag = (t?.tagName || '').toLowerCase();
-                      if (tag === 'input' || tag === 'select' || tag === 'button' || tag === 'textarea') return;
-                      e.stopPropagation();
-                      setCustomSelectedWidgetId(w.id);
-                      const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
-                      customDragRef.current = { wid: w.id, dx: e.clientX - rect.left, dy: e.clientY - rect.top };
-                    };
-
-                    const commonStyle: React.CSSProperties = {
-                      position: 'absolute',
-                      left: w.x,
-                      top: w.y,
-                      width: w.w,
-                      height: w.h,
-                      zIndex: z,
-                      border,
-                      boxShadow,
-                      borderRadius: 14,
-                      background: 'rgba(255,255,255,0.75)',
-                      padding: 10,
-                      color: '#111',
-                      cursor: 'grab',
-                      overflow: 'hidden',
-                    };
-
-                    const pinCommon: React.CSSProperties = {
-                      position: 'absolute',
-                      top: '50%',
-                      width: 12,
-                      height: 12,
-                      borderRadius: 999,
-                      transform: 'translateY(-50%)',
-                      background: 'rgba(67,97,238,0.9)',
-                      border: '2px solid rgba(255,255,255,0.9)',
-                      boxShadow: '0 6px 16px rgba(0,0,0,0.18)',
-                      pointerEvents: 'auto',
-                    };
-
-                    const startLink = (e: React.MouseEvent) => {
-                      e.stopPropagation();
-                      setCustomLinkDrag({ active: true, fromId: w.id, x: e.clientX, y: e.clientY });
-                    };
-
-                    const finishLink = (e: React.MouseEvent) => {
-                      e.stopPropagation();
-                      setCustomLinkDrag((prev) => {
-                        if (!prev || !prev.active) return null;
-                        addWidgetLink(prev.fromId, w.id);
-                        return null;
-                      });
-                    };
-
-                    if (w.type === 'slider') {
-                      const v = customDraft?.vars?.[w.bindVar];
-                      const n = typeof v === 'number' && Number.isFinite(v) ? v : 0;
-                      return (
-                        <div key={w.id} style={commonStyle} onMouseDown={onDown}>
-                          <div onMouseDown={startLink} style={{ ...pinCommon, right: -6 }} />
-                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, opacity: 0.9 }}>
-                            <strong>{w.label}</strong>
-                            <span>{clamp255(n)}</span>
-                          </div>
-                          <input
-                            type="range"
-                            min={w.min}
-                            max={w.max}
-                            step={w.step}
-                            value={Number(n)}
-                            onChange={(e) => updateVar(w.bindVar, Number(e.target.value))}
-                            style={{ width: '100%', marginTop: 10 }}
-                          />
-                          <div style={{ marginTop: 6, fontSize: 11, opacity: 0.75 }}>var: {w.bindVar}</div>
-                        </div>
-                      );
-                    }
-
-                    if (w.type === 'button') {
-                      return (
-                        <div key={w.id} style={commonStyle} onMouseDown={onDown}>
-                          <div onMouseUp={finishLink} style={{ ...pinCommon, left: -6, background: 'rgba(6,214,160,0.9)' }} />
-                          <button className="btn btn--hero" style={{ width: '100%' }}>
-                            {w.label}
-                          </button>
-                        </div>
-                      );
-                    }
-
-                    if (w.type === 'shape') {
-                      const bg = evalColorExpr(w.colorExpr, customDraft?.vars ?? {});
-                      return (
-                        <div key={w.id} style={commonStyle} onMouseDown={onDown}>
-                          <div onMouseUp={finishLink} style={{ ...pinCommon, left: -6, background: 'rgba(6,214,160,0.9)' }} />
-                          <div
-                            style={{
-                              width: '100%',
-                              height: '100%',
-                              borderRadius: w.shape === 'circle' ? 999 : 18,
-                              background: bg,
-                              boxShadow: `0 0 18px ${bg}`,
-                            }}
-                          />
-                        </div>
-                      );
-                    }
-
-                    const bg = evalColorExpr(w.colorExpr, customDraft?.vars ?? {});
-                    return (
-                      <div key={w.id} style={commonStyle} onMouseDown={onDown}>
-                        <div onMouseUp={finishLink} style={{ ...pinCommon, left: -6, background: 'rgba(6,214,160,0.9)' }} />
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                          <strong style={{ fontSize: 12 }}>{w.title}</strong>
-                        </div>
-                        <div
-                          style={{
-                            marginTop: 10,
-                            width: '100%',
-                            height: `calc(100% - 22px)`,
-                            borderRadius: 12,
-                            background: bg,
-                            boxShadow: `0 0 18px ${bg}`,
-                            border: '1px solid rgba(0,0,0,0.10)',
-                          }}
-                        />
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div className="glass" style={{ padding: 12, borderRadius: 16, minHeight: 0, overflow: 'auto' }}>
-                <div style={{ fontWeight: 800 }}>Propriétés</div>
-                {!customDraft ? <div style={{ marginTop: 10, opacity: 0.75 }}>Chargement…</div> : null}
-
-                {customDraft ? (
-                  <div style={{ marginTop: 10, display: 'grid', gap: 10 }}>
-                    <div style={{ display: 'grid', gap: 6 }}>
-                      <div style={{ fontSize: 12, opacity: 0.8 }}>Titre</div>
-                      <input
-                        className="input"
-                        value={customDraft.title}
-                        onChange={(e) => setCustomDraft((p) => (p ? { ...p, title: e.target.value } : p))}
-                      />
-                    </div>
-
-                    <div className="glass" style={{ padding: 10, borderRadius: 14 }}>
-                      <div style={{ fontWeight: 800, fontSize: 12, opacity: 0.9 }}>Variables</div>
-                      <div style={{ marginTop: 8, display: 'grid', gap: 8 }}>
-                        {Object.entries(customDraft.vars).map(([k, v]) => (
-                          <div key={k} style={{ display: 'grid', gridTemplateColumns: '80px 1fr', gap: 8, alignItems: 'center' }}>
-                            <div style={{ fontSize: 12, opacity: 0.8 }}>{k}</div>
-                            <input
-                              className="input"
-                              value={String(v)}
-                              onChange={(e) => {
-                                const raw = e.target.value;
-                                const n = Number(raw);
-                                updateVar(k, Number.isFinite(n) && raw.trim() !== '' ? n : raw);
-                              }}
-                            />
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    {selectedWidget ? (
-                      <div className="glass" style={{ padding: 10, borderRadius: 14 }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <div style={{ fontWeight: 800, fontSize: 12, opacity: 0.9 }}>Widget</div>
-                          <button
-                            className="btn"
-                            onClick={() => {
-                              const id = selectedWidget.id;
-                              setCustomDraft((prev) => (prev ? { ...prev, widgets: prev.widgets.filter((w) => w.id !== id) } : prev));
-                              setCustomSelectedWidgetId(null);
-                            }}
-                          >
-                            <Trash2 size={18} />
-                          </button>
-                        </div>
-
-                        <div style={{ marginTop: 10, display: 'grid', gap: 8 }}>
-                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                            <input
-                              className="input"
-                              value={String(selectedWidget.x)}
-                              onChange={(e) => updateWidget(selectedWidget.id, { x: Math.max(0, Number(e.target.value) || 0) } as any)}
-                            />
-                            <input
-                              className="input"
-                              value={String(selectedWidget.y)}
-                              onChange={(e) => updateWidget(selectedWidget.id, { y: Math.max(0, Number(e.target.value) || 0) } as any)}
-                            />
-                          </div>
-
-                          {selectedWidget.type === 'slider' ? (
-                            <>
-                              <input
-                                className="input"
-                                value={selectedWidget.label}
-                                onChange={(e) => updateWidget(selectedWidget.id, { label: e.target.value } as any)}
-                              />
-                              <input
-                                className="input"
-                                value={selectedWidget.bindVar}
-                                onChange={(e) => updateWidget(selectedWidget.id, { bindVar: e.target.value } as any)}
-                              />
-                            </>
-                          ) : null}
-
-                          {selectedWidget.type === 'shape' ? (
-                            <>
-                              <select
-                                className="input"
-                                value={selectedWidget.shape}
-                                onChange={(e) => updateWidget(selectedWidget.id, { shape: e.target.value as any } as any)}
-                              >
-                                <option value="circle">circle</option>
-                                <option value="square">square</option>
-                              </select>
-                              <input
-                                className="input"
-                                value={selectedWidget.colorExpr}
-                                onChange={(e) => updateWidget(selectedWidget.id, { colorExpr: e.target.value } as any)}
-                              />
-                            </>
-                          ) : null}
-
-                          {selectedWidget.type === 'button' ? (
-                            <>
-                              <input
-                                className="input"
-                                value={selectedWidget.label}
-                                onChange={(e) => updateWidget(selectedWidget.id, { label: e.target.value } as any)}
-                              />
-                              <input
-                                className="input"
-                                type="number"
-                                value={String(selectedWidget.points)}
-                                onChange={(e) => updateWidget(selectedWidget.id, { points: Number(e.target.value) } as any)}
-                              />
-                              <input
-                                className="input"
-                                value={selectedWidget.message}
-                                onChange={(e) => updateWidget(selectedWidget.id, { message: e.target.value } as any)}
-                              />
-                            </>
-                          ) : null}
-
-                          {selectedWidget.type === 'color_box' ? (
-                            <>
-                              <input
-                                className="input"
-                                value={selectedWidget.title}
-                                onChange={(e) => updateWidget(selectedWidget.id, { title: e.target.value } as any)}
-                              />
-                              <input
-                                className="input"
-                                value={selectedWidget.colorExpr}
-                                onChange={(e) => updateWidget(selectedWidget.id, { colorExpr: e.target.value } as any)}
-                              />
-                            </>
-                          ) : null}
-                        </div>
-                      </div>
-                    ) : null}
-                  </div>
-                ) : null}
-              </div>
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      <main className="stage">
-        <div className="ue">
-          <aside className="ue__left glass">
+    <main className="stage">
+      <div className="ue">
+        <aside className="ue__left glass">
             <div className="panelhead">
               <strong>Explorateur</strong>
               <span className="panelhead__meta">Jeux</span>
             </div>
 
             <div className="panelbody">
-              <div style={{ display: 'grid', gap: 10, marginBottom: 12 }}>
-                <div className="glass" style={{ padding: 10, borderRadius: 14 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
-                    <strong>Jeux custom (DB)</strong>
-                    <button className="btn btn--hero" onClick={() => void createCustomGame()}>
-                      <FilePlus2 className="btn__icon" aria-hidden />
-                      <span>Nouveau</span>
+              <div className="panelsection">
+                <div className="panelsection__head">
+                  <div className="panelsection__title">Jeux</div>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <button className="btn btn--mini" disabled={!activeGame || dbLoading} onClick={() => void saveActiveGame()}>
+                      <span>{dirty ? 'Sauvegarder' : 'Sauvegardé'}</span>
+                    </button>
+                    <button className="btn btn--mini" disabled={!activeGame || dbLoading} onClick={() => void deleteActiveGame()}>
+                      <span>Supprimer</span>
+                    </button>
+                    <button className="btn btn--mini" disabled={dbLoading} onClick={() => void createGame()}>
+                      <Plus className="btn__icon" aria-hidden />
+                      <span>{dbLoading ? '...' : 'Nouveau'}</span>
                     </button>
                   </div>
-
-                  {customMessage ? <div style={{ marginTop: 8, fontSize: 12, opacity: 0.85 }}>{customMessage}</div> : null}
-                  {dbGamesLoading ? <div className="muted" style={{ marginTop: 8 }}>Chargement…</div> : null}
-
-                  <div style={{ display: 'grid', gap: 8, marginTop: 10 }}>
-                    {dbGames
-                      .filter((g) => String(g.kind) === 'custom')
-                      .map((g) => (
-                        <div key={g.id} className="glass" style={{ padding: 10, borderRadius: 14, display: 'flex', gap: 10 }}>
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontWeight: 800, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{g.name}</div>
-                            <div className="muted" style={{ fontSize: 12 }}>
-                              {g.updatedAt}
-                            </div>
-                          </div>
-                          <button className="btn" onClick={() => void openCustomEditor(g.id)}>
-                            <Pencil className="btn__icon" aria-hidden />
-                          </button>
-                          <button className="btn" onClick={() => void deleteDbGame(g.id)}>
-                            <Trash2 className="btn__icon" aria-hidden />
-                          </button>
-                        </div>
-                      ))}
-                  </div>
                 </div>
-              </div>
 
-              <div className="list">
-                {games.length === 0 ? (
-                  <div className="muted">Aucun jeu. Clique “Créer un jeu” pour commencer.</div>
-                ) : (
-                  games.map((g) => (
+                <div className="list panelsection__list">
+                  {games.map((g) => (
                     <button
                       key={g.id}
                       className={g.id === activeGameId ? 'list__item list__item--active' : 'list__item'}
@@ -1645,43 +1024,58 @@ export default function EditeurPage() {
                       <span className="list__title">{g.name}</span>
                       <span className="list__meta">{g.nodes.length} noeuds</span>
                     </button>
-                  ))
-                )}
-              </div>
+                  ))}
+                </div>
 
-              {activeGame ? (
-                <>
-                  <div className="divider" />
-                  <label className="field">
+                {activeGame ? (
+                  <label className="field" style={{ marginTop: 10 }}>
                     <span>Nom du jeu</span>
-                    <input className="input" value={activeGame.name} onChange={(e) => renameActiveGame(e.target.value)} />
+                    <input
+                      className="input"
+                      value={activeGame.name}
+                      onChange={(e) => renameActiveGame(e.target.value)}
+                      onBlur={() => void saveActiveGame()}
+                    />
                   </label>
-                </>
-              ) : null}
+                ) : null}
+              </div>
 
               <div className="divider" />
 
-              <div className="panelhead" style={{ padding: 0 }}>
-                <strong>Noeuds</strong>
-                <span className="panelhead__meta">{activeGame ? activeGame.name : '—'}</span>
-              </div>
-              <div className="list">
-                {!activeGame ? (
-                  <div className="muted">Crée un jeu pour commencer.</div>
-                ) : activeGame.nodes.length === 0 ? (
-                  <div className="muted">Aucun noeud. Ajoute un bloc (clic droit) ou double clic pour "Remplissage".</div>
-                ) : (
-                  activeGame.nodes.map((n) => (
-                    <button
-                      key={n.id}
-                      className={n.id === selectedNodeId ? 'list__item list__item--active' : 'list__item'}
-                      onClick={() => commit((cur) => ({ ...cur, selectedNodeId: n.id }))}
-                    >
-                      <span className="list__title">{n.name}</span>
-                      <span className="list__meta">{labelNodeKind(n.kind)}</span>
-                    </button>
-                  ))
-                )}
+              <div className="panelsection">
+                <div className="panelsection__head">
+                  <div className="panelsection__title">Noeuds</div>
+                  <button
+                    className="btn btn--mini"
+                    disabled={!activeGameId}
+                    onClick={() => {
+                      const id = addNode('fill');
+                      if (id) setStatus('Noeud ajouté');
+                    }}
+                  >
+                    <Plus className="btn__icon" aria-hidden />
+                    <span>Ajouter</span>
+                  </button>
+                </div>
+
+                <div className="list panelsection__list">
+                  {!activeGame ? (
+                    <div className="muted">Crée un jeu pour commencer.</div>
+                  ) : activeGame.nodes.length === 0 ? (
+                    <div className="muted">Aucun noeud. Ajoute un bloc (clic droit) ou double clic pour "Remplissage".</div>
+                  ) : (
+                    activeGame.nodes.map((n) => (
+                      <button
+                        key={n.id}
+                        className={n.id === selectedNodeId ? 'list__item list__item--active' : 'list__item'}
+                        onClick={() => commit((cur) => ({ ...cur, selectedNodeId: n.id }))}
+                      >
+                        <span className="list__title">{n.name}</span>
+                        <span className="list__meta">{labelNodeKind(n.kind)}</span>
+                      </button>
+                    ))
+                  )}
+                </div>
               </div>
             </div>
 
@@ -1704,10 +1098,42 @@ export default function EditeurPage() {
             <div className="ue__viewport glass">
               <div className="panelhead">
                 <strong>Aperçu</strong>
-                <span className="panelhead__meta">Simulation 9 dalles</span>
+                <span className="panelhead__meta">Simulation {tileCount} dalles</span>
               </div>
               <div className="viewport">
-                <EditorTilesViewport tiles={tiles} selectedTileIndex={selectedTileIndex} onTileClick={assignSelectedTileToNode} />
+                {activeGame ? (
+                  <div className="viewport__split">
+                    <div className="viewport__pane viewport__pane--tiles">
+                      <EditorTilesViewport
+                        tiles={tiles}
+                        selectedTileIndex={selectedTileIndex}
+                        onTileClick={assignSelectedTileToNode}
+                      />
+                    </div>
+                    <div className="viewport__pane viewport__pane--ui">
+                      <div className="viewport-ui">
+                        <div className="viewport-ui__card glass">
+                          <div className="viewport-ui__title">Visuel du jeu</div>
+                          <div className="viewport-ui__hint">
+                            Prévisualisation de l’interface 2D et des éléments interactifs.
+                            <br />
+                            (Le rendu complet arrive juste après la refonte du runtime.)
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="bp-empty" style={{ height: '100%', display: 'grid', placeItems: 'center' }}>
+                    <div style={{ display: 'grid', gap: 10, textAlign: 'center' }}>
+                      <button className="btn btn--hero" onClick={() => createGame()}>
+                        <Plus className="btn__icon" aria-hidden />
+                        <span>Créer un jeu</span>
+                      </button>
+                      <div className="bp-empty__hint">Commence par créer un jeu, puis ajoute des noeuds et règle les dalles.</div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -2493,14 +1919,14 @@ export default function EditeurPage() {
                         <span>Dalle</span>
                         <select
                           className="input"
-                          value={String(Math.max(0, Math.min(8, Math.round(getNum(selectedNode.params, 'tileIndex', 0))))) }
+                          value={String(Math.max(0, Math.min(tileCount - 1, Math.round(getNum(selectedNode.params, 'tileIndex', 0))))) }
                           onChange={(e) => {
-                            const idx = Math.max(0, Math.min(8, Number(e.target.value)));
+                            const idx = Math.max(0, Math.min(tileCount - 1, Number(e.target.value)));
                             setSelectedTileIndex(idx);
                             updateSelectedParams({ tileIndex: idx });
                           }}
                         >
-                          {Array.from({ length: 9 }, (_, i) => (
+                          {Array.from({ length: tileCount }, (_, i) => (
                             <option key={i} value={i}>
                               D{i + 1}
                             </option>
@@ -2541,9 +1967,8 @@ export default function EditeurPage() {
                 </div>
               )}
             </div>
-          </aside>
-        </div>
-      </main>
-    </>
+        </aside>
+      </div>
+    </main>
   );
 }
