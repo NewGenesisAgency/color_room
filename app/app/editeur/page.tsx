@@ -4,7 +4,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import EditorTilesViewport from '@/app/_components/EditorTilesViewport';
 
-import { Boxes, Gamepad2, Plus } from 'lucide-react';
+import { Boxes, Gamepad2, Plus, Play, Pause, RotateCcw, Save, Trash2, FolderPlus, X, ChevronRight, Layers, Zap, Palette, Clock, MousePointer2, LayoutGrid, Maximize2, Minimize2 } from 'lucide-react';
 
 type IdFactory = () => string;
 
@@ -146,6 +146,20 @@ function formatNodeParamsInline(node: EditorNode): string {
   }
   return '';
 }
+
+type ModalState =
+  | { type: 'create-project' }
+  | { type: 'confirm-delete'; gameId: string; gameName: string }
+  | { type: 'node-help'; kind: EditorNodeKind }
+  | null;
+
+type ViewMode = 'split' | 'tiles-only' | 'ui-only' | 'fullscreen-graph';
+
+type VisualComponent =
+  | { id: string; type: 'button'; label: string; x: number; y: number; w: number; h: number; color: string }
+  | { id: string; type: 'slider'; label: string; x: number; y: number; w: number; h: number; min: number; max: number; value: number }
+  | { id: string; type: 'color-picker'; label: string; x: number; y: number; w: number; h: number; color: string }
+  | { id: string; type: 'label'; text: string; x: number; y: number; w: number; h: number; fontSize: number };
 
 type LegacyJsonlNodeSpec = {
   kind: string;
@@ -354,6 +368,17 @@ export default function EditeurPage() {
   const [isTeacher, setIsTeacher] = useState<boolean | null>(null);
   const [dbLoading, setDbLoading] = useState<boolean>(false);
   const [dirty, setDirty] = useState<boolean>(false);
+
+  // Nouveaux états pour l'interface améliorée
+  const [modal, setModal] = useState<ModalState>(null);
+  const [viewMode, setViewMode] = useState<ViewMode>('split');
+  const [isPlaying, setIsPlaying] = useState<boolean>(true);
+  const [visualComponents, setVisualComponents] = useState<VisualComponent[]>([]);
+  const [selectedVisualComponent, setSelectedVisualComponent] = useState<string | null>(null);
+  const [showGrid, setShowGrid] = useState<boolean>(true);
+  const [zoomLevel, setZoomLevel] = useState<number>(100);
+  const [newProjectName, setNewProjectName] = useState<string>('');
+  const [newProjectTemplate, setNewProjectTemplate] = useState<'blank' | 'tutorial' | 'animation' | 'interactive'>('blank');
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -683,26 +708,52 @@ export default function EditeurPage() {
     }
   };
 
-  const createGame = async (forcedName?: string) => {
+  const createGame = async (forcedName?: string, template: 'blank' | 'tutorial' | 'animation' | 'interactive' = 'blank') => {
     const makeId: IdFactory = () => `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
     const provisionalId = makeId();
-    const nodeId = makeId();
     const nextIndex = (editorRef.current.games.length || 0) + 1;
     const gameName = forcedName && forcedName.trim().length > 0 ? forcedName.trim() : `Jeu${nextIndex}`;
-    const provisionalGame: GameDoc = {
-      id: provisionalId,
-      name: gameName,
-      tileCount: Math.max(1, tiles.length || 1),
-      nodes: [
+    
+    // Créer les nœuds de base selon le template
+    let initialNodes: EditorNode[] = [];
+    const eventId = makeId();
+    
+    if (template === 'blank') {
+      initialNodes = [
         {
-          id: nodeId,
+          id: eventId,
           kind: 'event_begin',
-          name: gameName,
+          name: 'Démarrer',
           enabled: true,
           params: {},
           pos: { x: 80, y: 80 },
         },
-      ],
+      ];
+    } else if (template === 'tutorial') {
+      const fillId = makeId();
+      initialNodes = [
+        { id: eventId, kind: 'event_begin', name: 'Démarrer', enabled: true, params: {}, pos: { x: 80, y: 80 } },
+        { id: fillId, kind: 'fill', name: 'Remplissage bleu', enabled: true, params: { color: '#00d7ff', intensity: 0.6, mask: 'all', seconds: 2 }, pos: { x: 400, y: 80 } },
+      ];
+    } else if (template === 'animation') {
+      const pulseId = makeId();
+      initialNodes = [
+        { id: eventId, kind: 'event_begin', name: 'Démarrer', enabled: true, params: {}, pos: { x: 80, y: 80 } },
+        { id: pulseId, kind: 'pulse', name: 'Pulsation', enabled: true, params: { baseColor: '#ff2aa6', targetColor: '#00d7ff', fromIntensity: 0.1, toIntensity: 0.8, speed: 1.0, phase: 0 }, pos: { x: 400, y: 80 } },
+      ];
+    } else if (template === 'interactive') {
+      const tileId = makeId();
+      initialNodes = [
+        { id: eventId, kind: 'event_begin', name: 'Démarrer', enabled: true, params: {}, pos: { x: 80, y: 80 } },
+        { id: tileId, kind: 'tile', name: 'Dalle centrale', enabled: true, params: { tileIndex: 4, color: '#ff2aa6', intensity: 0.9 }, pos: { x: 400, y: 80 } },
+      ];
+    }
+    
+    const provisionalGame: GameDoc = {
+      id: provisionalId,
+      name: gameName,
+      tileCount: Math.max(1, tiles.length || 1),
+      nodes: initialNodes,
       edges: [],
     };
 
@@ -717,10 +768,12 @@ export default function EditeurPage() {
       ...cur,
       games: [...cur.games, newGame],
       activeGameId: dbId,
-      selectedNodeId: nodeId,
+      selectedNodeId: initialNodes[0]?.id ?? null,
     }));
     setDirty(false);
-    setStatus('Jeu créé (DB)');
+    setStatus(`Jeu créé: ${gameName}`);
+    setModal(null);
+    setNewProjectName('');
   };
 
   useEffect(() => {
@@ -988,14 +1041,29 @@ export default function EditeurPage() {
                     <Gamepad2 size={16} />
                   </div>
                   <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                    <button className="btn btn--mini" disabled={!activeGame || dbLoading} onClick={() => void saveActiveGame()}>
+                    <button 
+                      className="btn btn--mini" 
+                      disabled={!activeGame || dbLoading} 
+                      onClick={() => void saveActiveGame()}
+                      title="Sauvegarder"
+                    >
+                      <Save size={16} />
                       <span>{dirty ? 'Sauvegarder' : 'Sauvegardé'}</span>
                     </button>
-                    <button className="btn btn--mini" disabled={!activeGame || dbLoading} onClick={() => void deleteActiveGame()}>
-                      <span>Supprimer</span>
+                    <button 
+                      className="btn btn--mini" 
+                      disabled={!activeGame || dbLoading} 
+                      onClick={() => activeGame && setModal({ type: 'confirm-delete', gameId: activeGame.id, gameName: activeGame.name })}
+                      title="Supprimer"
+                    >
+                      <Trash2 size={16} />
                     </button>
-                    <button className="btn btn--mini" disabled={dbLoading} onClick={() => void createGame()}>
-                      <Plus className="btn__icon" aria-hidden />
+                    <button 
+                      className="btn btn--mini btn--primary" 
+                      disabled={dbLoading} 
+                      onClick={() => setModal({ type: 'create-project' })}
+                    >
+                      <FolderPlus className="btn__icon" aria-hidden size={16} />
                       <span>{dbLoading ? '...' : 'Nouveau'}</span>
                     </button>
                   </div>
@@ -1018,15 +1086,32 @@ export default function EditeurPage() {
                 </div>
 
                 {activeGame ? (
-                  <label className="field" style={{ marginTop: 10 }}>
-                    <span>Nom du jeu</span>
-                    <input
-                      className="input"
-                      value={activeGame.name}
-                      onChange={(e) => renameActiveGame(e.target.value)}
-                      onBlur={() => void saveActiveGame()}
-                    />
-                  </label>
+                  <div className="game-info-card" style={{ marginTop: 12, padding: 12, borderRadius: 12, background: 'rgba(67, 97, 238, 0.06)', border: '1px solid rgba(67, 97, 238, 0.15)' }}>
+                    <label className="field" style={{ margin: 0 }}>
+                      <span style={{ fontSize: 12, opacity: 0.8, marginBottom: 6, display: 'block' }}>Nom du projet</span>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <input
+                          className="input"
+                          value={activeGame.name}
+                          onChange={(e) => renameActiveGame(e.target.value)}
+                          onBlur={() => void saveActiveGame()}
+                          style={{ flex: 1 }}
+                        />
+                        <button 
+                          className="btn btn--mini"
+                          onClick={() => void saveActiveGame()}
+                          title="Sauvegarder"
+                        >
+                          <Save size={16} />
+                        </button>
+                      </div>
+                    </label>
+                    <div style={{ display: 'flex', gap: 16, marginTop: 10, fontSize: 12, opacity: 0.7 }}>
+                      <span>{activeGame.nodes.length} nœuds</span>
+                      <span>{activeGame.edges.length} connexions</span>
+                      <span>{tileCount} dalles</span>
+                    </div>
+                  </div>
                 ) : null}
               </div>
 
@@ -1117,12 +1202,22 @@ export default function EditeurPage() {
                   </div>
                 ) : (
                   <div className="bp-empty" style={{ height: '100%', display: 'grid', placeItems: 'center' }}>
-                    <div style={{ display: 'grid', gap: 10, textAlign: 'center' }}>
-                      <button className="btn btn--hero" onClick={() => createGame()}>
-                        <Plus className="btn__icon" aria-hidden />
-                        <span>Créer un jeu</span>
+                    <div style={{ display: 'grid', gap: 16, textAlign: 'center', maxWidth: 320 }}>
+                      <div style={{ fontSize: 48, opacity: 0.3 }}>💡</div>
+                      <div>
+                        <h3 style={{ margin: '0 0 8px', fontSize: 18 }}>Aucun projet</h3>
+                        <p style={{ margin: 0, fontSize: 13, opacity: 0.7, lineHeight: 1.5 }}>
+                          Créez votre premier jeu lumineux pour commencer à explorer l'éditeur visuel.
+                        </p>
+                      </div>
+                      <button 
+                        className="btn btn--hero" 
+                        onClick={() => setModal({ type: 'create-project' })}
+                        style={{ marginTop: 8 }}
+                      >
+                        <FolderPlus className="btn__icon" aria-hidden size={20} />
+                        <span>Créer un projet</span>
                       </button>
-                      <div className="bp-empty__hint">Commence par créer un jeu, puis ajoute des noeuds et règle les dalles.</div>
                     </div>
                   </div>
                 )}
@@ -1248,10 +1343,17 @@ export default function EditeurPage() {
                   >
                     {games.length === 0 ? (
                       <div className="bp-empty">
-                        <button className="btn btn--hero" onClick={() => createGame()}>
-                          <Plus className="btn__icon" aria-hidden />
-                          <span>Créer un jeu</span>
-                        </button>
+                        <div style={{ textAlign: 'center', padding: 40 }}>
+                          <div style={{ fontSize: 48, opacity: 0.3, marginBottom: 16 }}>🎮</div>
+                          <p style={{ margin: '0 0 20px', fontSize: 14, opacity: 0.7 }}>Commencez par créer votre premier jeu</p>
+                          <button 
+                            className="btn btn--hero" 
+                            onClick={() => setModal({ type: 'create-project' })}
+                          >
+                            <FolderPlus className="btn__icon" aria-hidden size={18} />
+                            <span>Créer un projet</span>
+                          </button>
+                        </div>
                         <div className="bp-empty__hint">Clic droit pour ajouter des noeuds • Double clic = Remplissage</div>
                       </div>
                     ) : null}
@@ -1982,6 +2084,261 @@ export default function EditeurPage() {
             </div>
         </aside>
       </div>
+
+      {/* Modal de création de projet amélioré */}
+      {modal?.type === 'create-project' && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.45)',
+            backdropFilter: 'blur(8px)',
+            display: 'grid',
+            placeItems: 'center',
+            zIndex: 10000,
+          }}
+          onClick={() => setModal(null)}
+        >
+          <div
+            className="glass"
+            style={{
+              width: 'min(520px, calc(100vw - 40px))',
+              padding: 28,
+              borderRadius: 24,
+              boxShadow: '0 24px 60px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.15)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div
+                  style={{
+                    width: 44,
+                    height: 44,
+                    borderRadius: 14,
+                    background: 'linear-gradient(135deg, #4361ee, #3a0ca3)',
+                    display: 'grid',
+                    placeItems: 'center',
+                  }}
+                >
+                  <FolderPlus size={22} color="#fff" />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800 }}>Nouveau projet</h3>
+                  <p style={{ margin: '4px 0 0', fontSize: 13, opacity: 0.7 }}>Créez un jeu lumineux interactif</p>
+                </div>
+              </div>
+              <button
+                className="btn btn--mini"
+                onClick={() => setModal(null)}
+                style={{ borderRadius: 10, width: 36, height: 36, padding: 0 }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div style={{ display: 'grid', gap: 16 }}>
+              <div>
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 8, opacity: 0.9 }}>
+                  Nom du projet
+                </label>
+                <input
+                  type="text"
+                  className="input"
+                  placeholder="Mon super jeu..."
+                  value={newProjectName}
+                  onChange={(e) => setNewProjectName(e.target.value)}
+                  style={{ width: '100%', height: 44, fontSize: 15 }}
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      void createGame(newProjectName, newProjectTemplate);
+                    }
+                  }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 12, opacity: 0.9 }}>
+                  Template de départ
+                </label>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
+                  {[
+                    { id: 'blank', icon: Layers, label: 'Vide', desc: 'Projet vide avec événement initial' },
+                    { id: 'tutorial', icon: Zap, label: 'Tutoriel', desc: 'Remplissage simple démonstratif' },
+                    { id: 'animation', icon: Play, label: 'Animation', desc: 'Pulsation automatique' },
+                    { id: 'interactive', icon: MousePointer2, label: 'Interactif', desc: 'Contrôle d\'une dalle' },
+                  ].map((t) => (
+                    <button
+                      key={t.id}
+                      onClick={() => setNewProjectTemplate(t.id as typeof newProjectTemplate)}
+                      style={{
+                        padding: 14,
+                        borderRadius: 16,
+                        border: `2px solid ${newProjectTemplate === t.id ? '#4361ee' : 'rgba(0,0,0,0.08)'}`,
+                        background: newProjectTemplate === t.id ? 'rgba(67, 97, 238, 0.08)' : 'rgba(255,255,255,0.5)',
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                        transition: 'all 0.15s ease',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+                        <t.icon size={18} color={newProjectTemplate === t.id ? '#4361ee' : '#666'} />
+                        <span style={{ fontWeight: 700, fontSize: 14 }}>{t.label}</span>
+                      </div>
+                      <p style={{ margin: 0, fontSize: 12, opacity: 0.7, lineHeight: 1.4 }}>{t.desc}</p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', marginTop: 24 }}>
+              <button
+                className="btn"
+                onClick={() => setModal(null)}
+                style={{ height: 44, padding: '0 20px' }}
+              >
+                Annuler
+              </button>
+              <button
+                className="btn btn--cta"
+                onClick={() => void createGame(newProjectName, newProjectTemplate)}
+                disabled={dbLoading}
+                style={{ height: 44, padding: '0 24px' }}
+              >
+                {dbLoading ? 'Création...' : 'Créer le projet'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de confirmation de suppression */}
+      {modal?.type === 'confirm-delete' && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.45)',
+            backdropFilter: 'blur(8px)',
+            display: 'grid',
+            placeItems: 'center',
+            zIndex: 10000,
+          }}
+          onClick={() => setModal(null)}
+        >
+          <div
+            className="glass"
+            style={{
+              width: 'min(400px, calc(100vw - 40px))',
+              padding: 28,
+              borderRadius: 24,
+              textAlign: 'center',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div
+              style={{
+                width: 56,
+                height: 56,
+                borderRadius: 16,
+                background: 'linear-gradient(135deg, #ef476f, #c9184a)',
+                display: 'grid',
+                placeItems: 'center',
+                margin: '0 auto 16px',
+              }}
+            >
+              <Trash2 size={26} color="#fff" />
+            </div>
+            <h3 style={{ margin: '0 0 8px', fontSize: 18, fontWeight: 800 }}>Supprimer le projet ?</h3>
+            <p style={{ margin: '0 0 24px', fontSize: 14, opacity: 0.8 }}>
+              "{modal.gameName}" sera définitivement supprimé.
+            </p>
+            <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+              <button
+                className="btn"
+                onClick={() => setModal(null)}
+                style={{ height: 44, padding: '0 24px' }}
+              >
+                Annuler
+              </button>
+              <button
+                className="btn"
+                onClick={() => {
+                  void deleteActiveGame();
+                  setModal(null);
+                }}
+                style={{ height: 44, padding: '0 24px', background: 'linear-gradient(135deg, #ef476f, #c9184a)', color: '#fff', border: 'none' }}
+              >
+                Supprimer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Barre d'outils flottante pour le viewport */}
+      {activeGame && (
+        <div
+          style={{
+            position: 'fixed',
+            bottom: 24,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            display: 'flex',
+            gap: 8,
+            padding: '8px 12px',
+            borderRadius: 16,
+            background: 'rgba(255,255,255,0.85)',
+            backdropFilter: 'blur(20px)',
+            boxShadow: '0 8px 32px rgba(0,0,0,0.15), inset 0 1px 0 rgba(255,255,255,0.5)',
+            zIndex: 100,
+            border: '1px solid rgba(0,0,0,0.06)',
+          }}
+        >
+          <button
+            className="btn btn--mini"
+            onClick={() => setIsPlaying(!isPlaying)}
+            title={isPlaying ? 'Pause' : 'Lecture'}
+            style={{ width: 36, height: 36, padding: 0 }}
+          >
+            {isPlaying ? <Pause size={16} /> : <Play size={16} />}
+          </button>
+          <div style={{ width: 1, background: 'rgba(0,0,0,0.1)', margin: '4px 4px' }} />
+          <button
+            className="btn btn--mini"
+            onClick={() => setViewMode(viewMode === 'split' ? 'tiles-only' : viewMode === 'tiles-only' ? 'ui-only' : 'split')}
+            title="Changer vue"
+            style={{ width: 36, height: 36, padding: 0 }}
+          >
+            {viewMode === 'split' ? <LayoutGrid size={16} /> : viewMode === 'tiles-only' ? <Maximize2 size={16} /> : <Minimize2 size={16} />}
+          </button>
+          <button
+            className="btn btn--mini"
+            onClick={() => setShowGrid(!showGrid)}
+            title="Grille"
+            style={{ width: 36, height: 36, padding: 0, opacity: showGrid ? 1 : 0.5 }}
+          >
+            <div style={{ width: 14, height: 14, border: '2px solid currentColor', borderRadius: 3 }} />
+          </button>
+          <div style={{ width: 1, background: 'rgba(0,0,0,0.1)', margin: '4px 4px' }} />
+          <button
+            className="btn btn--mini"
+            onClick={() => {
+              setGraphZoom(1);
+              setGraphPan({ x: 0, y: 0 });
+            }}
+            title="Réinitialiser vue"
+            style={{ width: 36, height: 36, padding: 0 }}
+          >
+            <RotateCcw size={16} />
+          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '0 8px' }}>
+            <span style={{ fontSize: 12, opacity: 0.7 }}>{Math.round(graphZoom * 100)}%</span>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

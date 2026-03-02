@@ -1110,6 +1110,222 @@ input[type='checkbox']:focus-visible {
     0 12px 22px color-mix(in srgb, var(--c-dark) 12%, transparent);
 }
 
+/* Styles améliorés pour l'interface moderne */
+.btn--primary {
+  background: linear-gradient(135deg, #4361ee, #3a0ca3);
+  color: #fff;
+  border: none;
+  box-shadow: 0 4px 14px rgba(67, 97, 238, 0.35);
+}
+
+.btn--primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(67, 97, 238, 0.45);
+}
+
+/* Carte d'info projet */
+.game-info-card {
+  transition: all 0.2s ease;
+}
+
+.game-info-card:hover {
+  background: rgba(67, 97, 238, 0.1) !important;
+  border-color: rgba(67, 97, 238, 0.25) !important;
+}
+
+/* Animation de pulse pour les éléments actifs */
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(67, 97, 238, 0.4); }
+  50% { box-shadow: 0 0 0 8px rgba(67, 97, 238, 0); }
+}
+
+.bp-node--active {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+/* Améliorations des nœuds */
+.bp-node {
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.bp-node:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0px 14px 28px color-mix(in srgb, var(--c-dark) 12%, transparent),
+    inset 0 0 0 1px color-mix(in srgb, var(--c-light) 30%, transparent);
+}
+
+/* Amélioration du menu contextuel */
+.bp-menu {
+  animation: menu-appear 0.15s ease-out;
+}
+
+@keyframes menu-appear {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.bp-menu__item {
+  transition: all 0.12s ease;
+}
+
+.bp-menu__item:hover {
+  transform: translateX(4px);
+}
+
+/* Améliorations du viewport */
+.viewport__pane {
+  transition: all 0.2s ease;
+}
+
+.viewport__pane:hover {
+  border-color: color-mix(in srgb, var(--c-action) 25%, transparent);
+}
+
+/* Styles pour la barre d'outils flottante */
+.floating-toolbar {
+  animation: toolbar-slide-up 0.3s ease-out;
+}
+
+@keyframes toolbar-slide-up {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+/* Amélioration des fils de connexion */
+.bp-wire {
+  transition: stroke-opacity 0.2s ease, stroke-width 0.2s ease;
+}
+
+.bp-wire:hover {
+  stroke-opacity: 1;
+  stroke-width: 3;
+}
+
+/* Style pour les pins actifs */
+.bp-dot--active {
+  animation: dot-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes dot-pulse {
+  0%, 100% { 
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(67, 97, 238, 0.6);
+  }
+  50% { 
+    transform: scale(1.1);
+    box-shadow: 0 0 0 6px rgba(67, 97, 238, 0);
+  }
+}
+
+/* Amélioration des sliders */
+input[type='range']:hover::-webkit-slider-thumb {
+  transform: scale(1.1);
+}
+
+/* Effet glass amélioré pour les modals */
+.modal-glass {
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(24px) saturate(1.4);
+  -webkit-backdrop-filter: blur(24px) saturate(1.4);
+}
+
+/* Animation d'apparition des éléments de liste */
+.list__item {
+  animation: item-appear 0.2s ease-out;
+}
+
+@keyframes item-appear {
+  from {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Style pour le statut */
+.status-bar {
+  animation: status-fade 0.3s ease;
+}
+
+@keyframes status-fade {
+  from { opacity: 0; transform: translateY(-5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Amélioration des inputs */
+.input:focus {
+  box-shadow: 
+    0 0 0 3px rgba(67, 97, 238, 0.15),
+    0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+/* Style pour les boutons de template */
+.template-card {
+  transition: all 0.15s ease;
+}
+
+.template-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+}
+
+.template-card--selected {
+  border-color: #4361ee;
+  background: rgba(67, 97, 238, 0.08);
+}
+
+/* Amélioration des tooltips et labels */
+.bp-node__varlabel {
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+
+/* Animation de chargement */
+.loading-spinner {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Scrollbar personnalisée */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.03);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.25);
+}
+
 .bp-node__name {
   font-weight: 850;
   font-size: 13px;
