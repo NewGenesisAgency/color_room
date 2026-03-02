@@ -92,6 +92,43 @@ type CustomGameConfigV1 = {
   widgets: CustomWidget[];
 };
 
+type UiWidgetKind = 'card' | 'text' | 'button' | 'slider' | 'rgb' | 'progress' | 'image';
+
+type UiWidget = {
+  id: string;
+  kind: UiWidgetKind;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  text?: string;
+  tint?: { r: number; g: number; b: number };
+  rgb?: { r: number; g: number; b: number };
+  min?: number;
+  max?: number;
+  value?: number;
+  src?: string;
+  events?: {
+    clickNodeId?: string;
+    hoverNodeId?: string;
+    changeNodeId?: string;
+  };
+};
+
+type EditorGameConfigV1 = {
+  version: 1;
+  tileCount?: number;
+  ui?: {
+    title?: string;
+    accentColor?: string;
+    baseColor?: string;
+    targetColor?: string;
+    widgets?: UiWidget[];
+  };
+  nodes?: unknown[];
+  edges?: unknown[];
+};
+
 type LeaderboardEntry = { name: string; score: number; niveau: Niveau };
 
 type TargetColor = { r: number; g: number; b: number };
@@ -174,11 +211,163 @@ function clamp100(v: number): number {
   return Math.max(0, Math.min(100, Math.round(v)));
 }
 
+function lerp(a: number, b: number, t01: number): number {
+  const t = Math.max(0, Math.min(1, t01));
+  return a + (b - a) * t;
+}
+
+function parseCssColorToRgb255(input: string): { r: number; g: number; b: number } {
+  const s = String(input || '').trim();
+  const hex = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(s);
+  if (hex) {
+    const raw = hex[1];
+    if (raw.length === 3) {
+      const r = parseInt(raw[0] + raw[0], 16);
+      const g = parseInt(raw[1] + raw[1], 16);
+      const b = parseInt(raw[2] + raw[2], 16);
+      return { r: clamp255(r), g: clamp255(g), b: clamp255(b) };
+    }
+    const r = parseInt(raw.slice(0, 2), 16);
+    const g = parseInt(raw.slice(2, 4), 16);
+    const b = parseInt(raw.slice(4, 6), 16);
+    return { r: clamp255(r), g: clamp255(g), b: clamp255(b) };
+  }
+
+  const rgb = /^rgba?\(([^)]+)\)$/i.exec(s);
+  if (rgb) {
+    const parts = rgb[1]
+      .split(',')
+      .map((x) => x.trim())
+      .filter(Boolean);
+    const r = clamp255(Number(parts[0] ?? 0));
+    const g = clamp255(Number(parts[1] ?? 0));
+    const b = clamp255(Number(parts[2] ?? 0));
+    return { r, g, b };
+  }
+
+  return { r: 0, g: 0, b: 0 };
+}
+
+function lerpColor(a: string, b: string, t01: number): string {
+  const ca = parseCssColorToRgb255(a);
+  const cb = parseCssColorToRgb255(b);
+  const t = Math.max(0, Math.min(1, t01));
+  const r = clamp255(lerp(ca.r, cb.r, t));
+  const g = clamp255(lerp(ca.g, cb.g, t));
+  const b0 = clamp255(lerp(ca.b, cb.b, t));
+  return `rgb(${r}, ${g}, ${b0})`;
+}
+
+function intensityToMasterPercent(v: unknown, fallback: number): number {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return fallback;
+  if (n <= 1.01) return clamp100(n * 100);
+  return clamp100(n);
+}
+
 function rgbToCss(c?: Partial<TargetColor> | null): string {
   const r = clamp255(Number(c?.r ?? 0));
   const g = clamp255(Number(c?.g ?? 0));
   const b = clamp255(Number(c?.b ?? 0));
   return `rgb(${r}, ${g}, ${b})`;
+}
+
+function isUiWidgetKind(v: unknown): v is UiWidgetKind {
+  return v === 'card' || v === 'text' || v === 'button' || v === 'slider' || v === 'rgb' || v === 'progress' || v === 'image';
+}
+
+function parseUiWidgets(raw: unknown): UiWidget[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((w) => {
+      if (!w || typeof w !== 'object') return null;
+      const o = w as any;
+      const id = typeof o.id === 'string' ? o.id : null;
+      const kind = isUiWidgetKind(o.kind) ? (o.kind as UiWidgetKind) : null;
+      const x = typeof o.x === 'number' && Number.isFinite(o.x) ? o.x : null;
+      const y = typeof o.y === 'number' && Number.isFinite(o.y) ? o.y : null;
+      const w0 = typeof o.w === 'number' && Number.isFinite(o.w) ? o.w : null;
+      const h0 = typeof o.h === 'number' && Number.isFinite(o.h) ? o.h : null;
+      if (!id || !kind || x === null || y === null || w0 === null || h0 === null) return null;
+
+      const text = typeof o.text === 'string' ? o.text : undefined;
+
+      const tintRaw = o.tint;
+      const tint =
+        tintRaw && typeof tintRaw === 'object'
+          ? {
+              r: clamp255(Number((tintRaw as any).r ?? 0)),
+              g: clamp255(Number((tintRaw as any).g ?? 0)),
+              b: clamp255(Number((tintRaw as any).b ?? 0)),
+            }
+          : undefined;
+
+      const rgbRaw = o.rgb;
+      const rgb =
+        rgbRaw && typeof rgbRaw === 'object'
+          ? {
+              r: clamp255(Number((rgbRaw as any).r ?? 0)),
+              g: clamp255(Number((rgbRaw as any).g ?? 0)),
+              b: clamp255(Number((rgbRaw as any).b ?? 0)),
+            }
+          : undefined;
+
+      const min = Number.isFinite(Number(o.min)) ? Number(o.min) : undefined;
+      const max = Number.isFinite(Number(o.max)) ? Number(o.max) : undefined;
+      const value = Number.isFinite(Number(o.value)) ? Number(o.value) : undefined;
+
+      const src = typeof o.src === 'string' ? o.src : undefined;
+
+      const eventsRaw = o.events;
+      const events =
+        eventsRaw && typeof eventsRaw === 'object'
+          ? {
+              clickNodeId: typeof (eventsRaw as any).clickNodeId === 'string' ? String((eventsRaw as any).clickNodeId) : undefined,
+              hoverNodeId: typeof (eventsRaw as any).hoverNodeId === 'string' ? String((eventsRaw as any).hoverNodeId) : undefined,
+              changeNodeId: typeof (eventsRaw as any).changeNodeId === 'string' ? String((eventsRaw as any).changeNodeId) : undefined,
+            }
+          : undefined;
+
+      return { id, kind, x, y, w: w0, h: h0, text, tint, rgb, min, max, value, src, events } satisfies UiWidget;
+    })
+    .filter(Boolean) as UiWidget[];
+}
+
+type GraphEdge = { id: string; from: string; to: string };
+type EditorNode = { id: string; kind: string; enabled: boolean; name: string; params: Record<string, unknown> };
+
+function buildGraph(cfg: EditorGameConfigV1) {
+  const nodes = Array.isArray(cfg.nodes) ? (cfg.nodes as EditorNode[]) : ([] as EditorNode[]);
+  const edges = Array.isArray(cfg.edges) ? (cfg.edges as GraphEdge[]) : ([] as GraphEdge[]);
+  const byId = new Map(nodes.map((n) => [String(n.id), n] as const));
+  const out = new Map<string, string[]>();
+  for (const e of edges) {
+    const from = String((e as any).from ?? '');
+    const to = String((e as any).to ?? '');
+    if (!from || !to) continue;
+    const arr = out.get(from) ?? [];
+    arr.push(to);
+    out.set(from, arr);
+  }
+  return { nodes, edges, byId, out };
+}
+
+function parseEditorGameConfig(raw: unknown): EditorGameConfigV1 | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const o = raw as any;
+  if (Number(o.version) !== 1) return null;
+  const uiRaw = o.ui && typeof o.ui === 'object' ? (o.ui as any) : null;
+  const ui = uiRaw
+    ? {
+        title: typeof uiRaw.title === 'string' ? uiRaw.title : undefined,
+        accentColor: typeof uiRaw.accentColor === 'string' ? uiRaw.accentColor : undefined,
+        baseColor: typeof uiRaw.baseColor === 'string' ? uiRaw.baseColor : undefined,
+        targetColor: typeof uiRaw.targetColor === 'string' ? uiRaw.targetColor : undefined,
+        widgets: parseUiWidgets(uiRaw.widgets),
+      }
+    : undefined;
+  const tileCount = typeof o.tileCount === 'number' && Number.isFinite(o.tileCount) ? o.tileCount : undefined;
+  return { version: 1, tileCount, ui, nodes: o.nodes, edges: o.edges } satisfies EditorGameConfigV1;
 }
 
 function parseCustomConfig(raw: unknown): CustomGameConfigV1 {
@@ -518,6 +707,7 @@ export default function JeuxPage() {
   >([]);
   const [dbGamesLoading, setDbGamesLoading] = useState(false);
   const [customRun, setCustomRun] = useState<{ gameId: string; name: string; cfg: CustomGameConfigV1 } | null>(null);
+  const [hudRun, setHudRun] = useState<{ gameId: string; name: string; cfg: EditorGameConfigV1; showHud: boolean } | null>(null);
   const [view, setView] = useState<'login' | 'main'>('login');
   const [userType, setUserType] = useState<UserType>('apprenant');
   const [username, setUsername] = useState<string>('Apprenant1');
@@ -568,28 +758,6 @@ export default function JeuxPage() {
   const [mpPlayers, setMpPlayers] = useState<Array<{ seat: MpSeat; name: string }>>([]);
   const [mpValue, setMpValue] = useState<number>(0);
   const [mpAutoFollow, setMpAutoFollow] = useState<boolean>(true);
-
-  useEffect(() => {
-    let cancelled = false;
-    const loadMe = async () => {
-      try {
-        const res = await fetch('/api/me', { cache: 'no-store' });
-        const data = (await res.json().catch(() => null)) as any;
-        const me = data?.ok ? data.user : null;
-        if (!me || !me.name) return;
-        if (cancelled) return;
-        setCurrentUser(String(me.name));
-        setUserType(String(me.userType) === 'enseignant' ? 'enseignant' : 'apprenant');
-        setView('main');
-      } catch {
-        // ignore
-      }
-    };
-    void loadMe();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
   const [mpSnoozedSessionId, setMpSnoozedSessionId] = useState<string>('');
   const [mpJoinPrompt, setMpJoinPrompt] = useState<{ open: boolean; sessionId: string }>(
     { open: false, sessionId: '' },
@@ -674,7 +842,7 @@ export default function JeuxPage() {
 
     hwTimersRef.current[key] = window.setTimeout(async () => {
       try {
-        await fetch(`/api/supervision/state/plaque/${plaqueId}/canal/${canalIndex}/${Math.max(0, Math.min(255, Math.round(intensity)))}`,
+        await fetch(`/api/supervision/state/plaque/${plaqueId}/cursor/${canalIndex}/${Math.max(0, Math.min(255, Math.round(intensity)))}`,
           {
             method: 'PUT',
             cache: 'no-store',
@@ -834,7 +1002,12 @@ export default function JeuxPage() {
   }
 
   useEffect(() => {
-    // no local persistence: multiplayer token/snooze are kept in DB (server-side) and client memory only.
+    if (typeof window === 'undefined') return;
+    const stored = window.localStorage.getItem('crg_mp_token') ?? '';
+    if (stored) setMpToken(stored);
+
+    const snoozed = window.localStorage.getItem('crg_mp_snooze_session') ?? '';
+    if (snoozed) setMpSnoozedSessionId(snoozed);
   }, []);
 
   useEffect(() => {
@@ -914,26 +1087,31 @@ export default function JeuxPage() {
   }, [view, mpToken, currentGame, gameActive, mpSnoozedSessionId]);
 
   useEffect(() => {
-    let cancelled = false;
-    const load = async () => {
-      setDbGamesLoading(true);
+    if (view !== 'main') return;
+    let alive = true;
+    let timer = 0;
+
+    const tick = async () => {
+      if (!alive) return;
       try {
         const res = await fetch('/api/games', { cache: 'no-store' });
         if (!res.ok) return;
         const json = (await res.json().catch(() => null)) as any;
         if (!json || json.ok !== true || !Array.isArray(json.games)) return;
-        if (cancelled) return;
-        setDbGames(json.games);
+        if (alive) setDbGames(json.games);
       } finally {
-        if (!cancelled) setDbGamesLoading(false);
+        if (alive) {
+          timer = window.setTimeout(tick, 30000);
+        }
       }
     };
 
-    void load();
+    void tick();
     return () => {
-      cancelled = true;
+      alive = false;
+      if (timer) window.clearTimeout(timer);
     };
-  }, []);
+  }, [view]);
 
   useEffect(() => {
     let stopped = false;
@@ -1053,6 +1231,7 @@ export default function JeuxPage() {
       const token = String(data.token ?? '');
       const seat: MpSeat = Number(data.seat) as MpSeat;
       setMpToken(token);
+      window.localStorage.setItem('crg_mp_token', token);
       setMpSeat(seat);
       return { token, seat };
     } catch {
@@ -1063,9 +1242,7 @@ export default function JeuxPage() {
   function applyChannels32ToSelectedPlates(channels32: number[]) {
     const targets = getTargetPlateIds();
     for (const plaqueId of targets) {
-      for (let canalIndex = 0; canalIndex < 32; canalIndex++) {
-        scheduleSetCanal(plaqueId, canalIndex, channels32[canalIndex] ?? 0);
-      }
+      for (let i = 0; i < 32; i++) scheduleSetCanal(plaqueId, i, clamp255(channels32[i] ?? 0));
     }
 
     const preview = channels32ToPreviewRgb255(channels32, 255);
@@ -1160,6 +1337,130 @@ export default function JeuxPage() {
     setPlateActive(Array(9).fill(active));
   }
 
+  const hudGraphRunRef = useRef<{ timers: number[]; stop: boolean }>({ timers: [], stop: false });
+
+  const stopHudGraph = () => {
+    hudGraphRunRef.current.stop = true;
+    for (const t of hudGraphRunRef.current.timers) window.clearTimeout(t);
+    hudGraphRunRef.current.timers = [];
+  };
+
+  const runHudGraphFrom = (startNodeId: string) => {
+    if (!hudRun?.cfg) return;
+    stopHudGraph();
+    hudGraphRunRef.current.stop = false;
+
+    const g = buildGraph(hudRun.cfg);
+    const start = g.byId.get(String(startNodeId));
+    if (!start || start.enabled === false) return;
+
+    const getNum = (o: Record<string, unknown>, key: string, fallback: number): number => {
+      const v = Number((o as any)[key]);
+      return Number.isFinite(v) ? v : fallback;
+    };
+    const getColor = (o: Record<string, unknown>, key: string, fallback: string): string => {
+      const v = (o as any)[key];
+      return typeof v === 'string' && v.trim() ? String(v) : fallback;
+    };
+
+    const execNode = (node: EditorNode, tSeconds: number) => {
+      const params = (node.params && typeof node.params === 'object' ? node.params : {}) as Record<string, unknown>;
+
+      if (node.kind === 'fill') {
+        const color = getColor(params, 'color', '#4361ee');
+        const intensity = intensityToMasterPercent(params.intensity, masterIntensity);
+        setMasterIntensity(intensity);
+
+        const mask = String(params.mask ?? 'all');
+        if (mask === 'all') {
+          setAllPlates(color, intensity > 0);
+        } else if (mask === 'border' || mask === 'borders') {
+          setPlateColors((prev) => {
+            const next = [...prev];
+            for (let i = 0; i < 9; i++) {
+              if (i === 4) continue;
+              next[i] = color;
+            }
+            return next;
+          });
+          setPlateActive((prev) => {
+            const next = [...prev];
+            for (let i = 0; i < 9; i++) {
+              if (i === 4) continue;
+              next[i] = intensity > 0;
+            }
+            return next;
+          });
+        } else {
+          setSelectedPlatesColor(color, intensity > 0);
+        }
+      }
+
+      if (node.kind === 'tile') {
+        const tileIndex = Math.max(0, Math.min(8, Math.round(getNum(params, 'tileIndex', 0))));
+        const color = getColor(params, 'color', '#4361ee');
+        const intensity = intensityToMasterPercent(params.intensity, masterIntensity);
+        setMasterIntensity(intensity);
+        setPlateColor(tileIndex, color, intensity > 0);
+      }
+
+      if (node.kind === 'pulse') {
+        const baseColor = getColor(params, 'baseColor', getColor(params, 'color', '#4361ee'));
+        const targetColor = getColor(params, 'targetColor', getColor(params, 'color', '#ff2aa6'));
+        const speed = Math.max(0.01, getNum(params, 'speed', 1));
+        const phase = getNum(params, 'phase', 0);
+        const t01 = Math.max(0, Math.min(1, 0.5 + 0.5 * Math.sin(tSeconds * speed + phase)));
+
+        const fromIntensity = Math.max(0, Math.min(1, getNum(params, 'fromIntensity', 0.15)));
+        const toIntensity = Math.max(0, Math.min(1, getNum(params, 'toIntensity', 0.8)));
+        const intensity = clamp100((fromIntensity + (toIntensity - fromIntensity) * t01) * 100);
+        setMasterIntensity(intensity);
+        setSelectedPlatesColor(lerpColor(baseColor, targetColor, t01), intensity > 0);
+      }
+    };
+
+    const walk = (nodeId: string) => {
+      if (hudGraphRunRef.current.stop) return;
+      const node = g.byId.get(nodeId);
+      if (!node || node.enabled === false) return;
+
+      const params = (node.params && typeof node.params === 'object' ? node.params : {}) as Record<string, unknown>;
+
+      if (node.kind === 'ui_event_click' || node.kind === 'ui_event_change' || node.kind === 'ui_event_hover' || node.kind === 'event_begin') {
+        const nextId = g.out.get(node.id)?.[0];
+        if (nextId) walk(nextId);
+        return;
+      }
+
+      if (node.kind === 'wait') {
+        const seconds = Math.max(0, getNum(params, 'seconds', 1));
+        const nextId = g.out.get(node.id)?.[0];
+        const t = window.setTimeout(() => {
+          if (nextId) walk(nextId);
+        }, Math.round(seconds * 1000));
+        hudGraphRunRef.current.timers.push(t);
+        return;
+      }
+
+      const nowSec = Date.now() / 1000;
+      execNode(node, nowSec);
+
+      const secondsAfter = node.kind === 'fill' ? Math.max(0.01, getNum(params, 'seconds', 1)) : 0;
+      const nextId = g.out.get(node.id)?.[0];
+      if (!nextId) return;
+      if (secondsAfter > 0) {
+        const t = window.setTimeout(() => {
+          walk(nextId);
+        }, Math.round(secondsAfter * 1000));
+        hudGraphRunRef.current.timers.push(t);
+      } else {
+        walk(nextId);
+      }
+    };
+
+    walk(start.id);
+  };
+
   function resetScene() {
     setPlateColors(Array(9).fill('#000000'));
     setPlateActive(Array(9).fill(false));
@@ -1176,41 +1477,26 @@ export default function JeuxPage() {
       return;
     }
 
-    void (async () => {
-      const name = username.trim();
-      try {
-        const res = await fetch('/api/auth/login', {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ name, userType }),
-        });
-        const data = (await res.json().catch(() => null)) as any;
-        if (!res.ok || !data?.ok) {
-          setMessage('Connexion impossible');
-          return;
-        }
-        setCurrentUser(name);
-        setView('main');
-        setScore(0);
-        setGamesCompleted(0);
-        updateLeaderboard(0, niveau, name);
-      } catch {
-        setMessage('Connexion impossible');
-      }
-    })();
+    setCurrentUser(username.trim());
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('crg_user_type', userType);
+    }
+    setView('main');
+    setScore(0);
+    setGamesCompleted(0);
+    updateLeaderboard(0, niveau, username.trim());
   }
 
   function logout() {
-    void fetch('/api/auth/logout', { method: 'POST' }).catch(() => null);
     setCurrentUser(null);
     setView('login');
     setGameActive(false);
     setCurrentGame(null);
+    if (typeof window !== 'undefined') {
+      window.localStorage.removeItem('crg_user_type');
+    }
     setScore(0);
     setGamesCompleted(0);
-    setMpToken('');
-    setMpSeat(null);
-    setMpSnoozedSessionId('');
     setMessage('Sélectionnez un jeu et cliquez sur "Démarrer le Jeu"');
     resetScene();
   }
@@ -1218,16 +1504,37 @@ export default function JeuxPage() {
   function startCustomFromDb(game: { id: string; name: string; config: unknown }) {
     const cfg = parseCustomConfig(game.config);
     setCustomRun({ gameId: game.id, name: game.name, cfg });
+    setHudRun(null);
     setCurrentGame(null);
     setGameActive(true);
     setMessage(`Jeu custom: ${game.name}`);
     resetScene();
-    setSecretRevealed(false);
-    setTargetColor(null);
-    setTargetTemp(null);
-    setEscapeProgress(0);
-    setMpEndPrompt(false);
-    setMpAutoFollow(false);
+  }
+
+  function startHudFromDb(game: { id: string; name: string; config: unknown }) {
+    const cfg = parseEditorGameConfig(game.config);
+    if (!cfg) {
+      setMessage('Jeu éditeur: config invalide');
+      return;
+    }
+
+    const showHud = Boolean(cfg.ui && Array.isArray(cfg.ui.widgets) && cfg.ui.widgets.length > 0);
+    setHudRun({ gameId: game.id, name: game.name, cfg, showHud });
+    setCustomRun(null);
+    setCurrentGame(null);
+    setGameActive(true);
+    setMessage(`Jeu éditeur: ${game.name}`);
+    resetScene();
+
+    try {
+      const g = buildGraph(cfg);
+      const begin = g.nodes.find((n) => n.kind === 'event_begin' && n.enabled !== false);
+      if (begin?.id) {
+        setTimeout(() => runHudGraphFrom(String(begin.id)), 0);
+      }
+    } catch {
+      // ignore
+    }
   }
 
   function customRunUpdateVar(name: string, value: CustomGameVarValue) {
@@ -1257,6 +1564,7 @@ export default function JeuxPage() {
     }
     setGameActive(false);
     setCustomRun(null);
+    setHudRun(null);
     setSecretRevealed(false);
     setTargetColor(null);
     setTargetTemp(null);
@@ -1265,6 +1573,7 @@ export default function JeuxPage() {
     setMpAutoFollow(false);
     setMessage('Jeu arrêté.');
     resetScene();
+    stopHudGraph();
   }
 
   function startGame() {
@@ -1348,6 +1657,7 @@ export default function JeuxPage() {
       setMpEndPrompt(false);
       setMpAutoFollow(true);
       setMpSnoozedSessionId('');
+      window.localStorage.removeItem('crg_mp_snooze_session');
       void (async () => {
         // Host-claim: start will also create the host player (seat 1) and return token+seat.
         // This does NOT start the timer (lobby mode), it only prepares the session.
@@ -1360,6 +1670,7 @@ export default function JeuxPage() {
           const data = (await res.json().catch(() => null)) as any;
           if (data?.ok && typeof data.token === 'string' && Number.isFinite(Number(data.seat))) {
             setMpToken(String(data.token));
+            window.localStorage.setItem('crg_mp_token', String(data.token));
             setMpSeat(Number(data.seat) as MpSeat);
             setMpSessionId(String(data.sessionId ?? ''));
           }
@@ -1695,6 +2006,7 @@ export default function JeuxPage() {
                   setMpJoinPrompt({ open: false, sessionId: '' });
                   if (sid) {
                     setMpSnoozedSessionId(sid);
+                    window.localStorage.setItem('crg_mp_snooze_session', sid);
                     setMessage('Session multijoueur active : sélectionne le jeu Multijoueur pour rejoindre.');
                   }
                 }}
@@ -1713,6 +2025,7 @@ export default function JeuxPage() {
                     }
                     setMpJoinPrompt({ open: false, sessionId: '' });
                     setMpSnoozedSessionId('');
+                    window.localStorage.removeItem('crg_mp_snooze_session');
                     setMpAutoFollow(true);
                     setCurrentGame('multiplayer-split');
                     setGameActive(true);
@@ -1774,6 +2087,7 @@ export default function JeuxPage() {
                       }).catch(() => null);
                       setMpSeat(null);
                       setMpSnoozedSessionId('');
+                      window.localStorage.removeItem('crg_mp_snooze_session');
                       setMpAutoFollow(true);
                       await ensureMpJoined(currentUser ?? undefined);
                       setCurrentGame('multiplayer-split');
@@ -1922,6 +2236,11 @@ export default function JeuxPage() {
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                           {String(g.kind) === 'custom' ? (
                             <button className="btn" onClick={() => startCustomFromDb({ id: g.id, name: g.name, config: g.config })}>
+                              <Play size={18} />
+                            </button>
+                          ) : null}
+                          {String(g.kind) === 'editor' ? (
+                            <button className="btn" onClick={() => startHudFromDb({ id: g.id, name: g.name, config: g.config })}>
                               <Play size={18} />
                             </button>
                           ) : null}
