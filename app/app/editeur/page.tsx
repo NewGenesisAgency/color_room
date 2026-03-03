@@ -1882,21 +1882,94 @@ export default function EditeurPage() {
                         />
                       </label>
 
+                      {/* RGB Sliders */}
+                      <div className="rgb-sliders">
+                        {(() => {
+                          const color = getColor(selectedNode.params, 'color', '#6d28ff');
+                          const rgb = hexToRgb(color);
+                          const updateColor = (r: number, g: number, b: number) => {
+                            updateSelectedParams({ color: rgbToHex(r, g, b) });
+                          };
+                          return (
+                            <>
+                              <div className="slider-row">
+                                <span className="slider-label slider-label--red">Rouge</span>
+                                <input
+                                  type="range"
+                                  className="slider-red"
+                                  min={0}
+                                  max={255}
+                                  step={1}
+                                  value={rgb.r}
+                                  style={{
+                                    ['--min' as any]: 0,
+                                    ['--max' as any]: 255,
+                                    ['--value' as any]: rgb.r,
+                                  }}
+                                  onChange={(e) => updateColor(Number(e.target.value), rgb.g, rgb.b)}
+                                />
+                                <span className="slider-value slider-value--red">{rgb.r}</span>
+                              </div>
+                              <div className="slider-row">
+                                <span className="slider-label slider-label--green">Vert</span>
+                                <input
+                                  type="range"
+                                  className="slider-green"
+                                  min={0}
+                                  max={255}
+                                  step={1}
+                                  value={rgb.g}
+                                  style={{
+                                    ['--min' as any]: 0,
+                                    ['--max' as any]: 255,
+                                    ['--value' as any]: rgb.g,
+                                  }}
+                                  onChange={(e) => updateColor(rgb.r, Number(e.target.value), rgb.b)}
+                                />
+                                <span className="slider-value slider-value--green">{rgb.g}</span>
+                              </div>
+                              <div className="slider-row">
+                                <span className="slider-label slider-label--blue">Bleu</span>
+                                <input
+                                  type="range"
+                                  className="slider-blue"
+                                  min={0}
+                                  max={255}
+                                  step={1}
+                                  value={rgb.b}
+                                  style={{
+                                    ['--min' as any]: 0,
+                                    ['--max' as any]: 255,
+                                    ['--value' as any]: rgb.b,
+                                  }}
+                                  onChange={(e) => updateColor(rgb.r, rgb.g, Number(e.target.value))}
+                                />
+                                <span className="slider-value slider-value--blue">{rgb.b}</span>
+                              </div>
+                            </>
+                          );
+                        })()}
+                      </div>
+
                       <label className="field">
-                        <span>Intensité</span>
-                        <input
-                          type="range"
-                          min={0}
-                          max={1}
-                          step={0.01}
-                          value={clamp01(getNum(selectedNode.params, 'intensity', 0.7))}
-                          style={{
-                            ['--min' as any]: 0,
-                            ['--max' as any]: 1,
-                            ['--value' as any]: clamp01(getNum(selectedNode.params, 'intensity', 0.7)),
-                          }}
-                          onChange={(e) => updateSelectedParams({ intensity: Number(e.target.value) })}
-                        />
+                        <span className="slider-label slider-label--intensity">Intensité globale</span>
+                        <div className="slider-row">
+                          <input
+                            type="range"
+                            className="slider-intensity"
+                            min={0}
+                            max={1}
+                            step={0.01}
+                            value={clamp01(getNum(selectedNode.params, 'intensity', 0.8))}
+                            style={{
+                              ['--min' as any]: 0,
+                              ['--max' as any]: 1,
+                              ['--value' as any]: clamp01(getNum(selectedNode.params, 'intensity', 0.8)),
+                            }}
+                            onChange={(e) => updateSelectedParams({ intensity: Number(e.target.value) })}
+                          />
+                          <span className="slider-value slider-value--intensity">{Math.round(clamp01(getNum(selectedNode.params, 'intensity', 0.8)) * 100)}</span>
+                        </div>
                       </label>
 
                       <label className="field">
@@ -1948,53 +2021,61 @@ export default function EditeurPage() {
                       </label>
 
                       <label className="field">
-                        <span>Intensité départ</span>
-                        <input
-                          type="range"
-                          min={0}
-                          max={1}
-                          step={0.01}
-                          value={clamp01(getNum(selectedNode.params, 'fromIntensity', clamp01(getNum(selectedNode.params, 'base', 0.1))))}
-                          style={{
-                            ['--min' as any]: 0,
-                            ['--max' as any]: 1,
-                            ['--value' as any]: clamp01(
-                              getNum(selectedNode.params, 'fromIntensity', clamp01(getNum(selectedNode.params, 'base', 0.1))),
-                            ),
-                          }}
-                          onChange={(e) => updateSelectedParams({ fromIntensity: Number(e.target.value) })}
-                        />
+                        <span className="slider-label slider-label--intensity">Intensité départ</span>
+                        <div className="slider-row">
+                          <input
+                            type="range"
+                            className="slider-intensity"
+                            min={0}
+                            max={1}
+                            step={0.01}
+                            value={clamp01(getNum(selectedNode.params, 'fromIntensity', clamp01(getNum(selectedNode.params, 'base', 0))))}
+                            style={{
+                              ['--min' as any]: 0,
+                              ['--max' as any]: 1,
+                              ['--value' as any]: clamp01(
+                                getNum(selectedNode.params, 'fromIntensity', clamp01(getNum(selectedNode.params, 'base', 0))),
+                              ),
+                            }}
+                            onChange={(e) => updateSelectedParams({ fromIntensity: Number(e.target.value) })}
+                          />
+                          <span className="slider-value slider-value--intensity">{Math.round(clamp01(getNum(selectedNode.params, 'fromIntensity', clamp01(getNum(selectedNode.params, 'base', 0)))) * 100)}</span>
+                        </div>
                       </label>
 
                       <label className="field">
-                        <span>Intensité cible</span>
-                        <input
-                          type="range"
-                          min={0}
-                          max={1}
-                          step={0.01}
-                          value={clamp01(
-                            getNum(
-                              selectedNode.params,
-                              'toIntensity',
-                              clamp01(getNum(selectedNode.params, 'base', 0.1) + clamp01(getNum(selectedNode.params, 'amp', 0.7))),
-                            ),
-                          )}
-                          style={{
-                            ['--min' as any]: 0,
-                            ['--max' as any]: 1,
-                            ['--value' as any]: clamp01(
+                        <span className="slider-label slider-label--intensity">Intensité cible</span>
+                        <div className="slider-row">
+                          <input
+                            type="range"
+                            className="slider-intensity"
+                            min={0}
+                            max={1}
+                            step={0.01}
+                            value={clamp01(
                               getNum(
                                 selectedNode.params,
                                 'toIntensity',
-                                clamp01(
-                                  getNum(selectedNode.params, 'base', 0.1) + clamp01(getNum(selectedNode.params, 'amp', 0.7)),
+                                clamp01(getNum(selectedNode.params, 'base', 0) + clamp01(getNum(selectedNode.params, 'amp', 0.8))),
+                              ),
+                            )}
+                            style={{
+                              ['--min' as any]: 0,
+                              ['--max' as any]: 1,
+                              ['--value' as any]: clamp01(
+                                getNum(
+                                  selectedNode.params,
+                                  'toIntensity',
+                                  clamp01(
+                                    getNum(selectedNode.params, 'base', 0) + clamp01(getNum(selectedNode.params, 'amp', 0.8)),
+                                  ),
                                 ),
                               ),
-                            ),
-                          }}
-                          onChange={(e) => updateSelectedParams({ toIntensity: Number(e.target.value) })}
-                        />
+                            }}
+                            onChange={(e) => updateSelectedParams({ toIntensity: Number(e.target.value) })}
+                          />
+                          <span className="slider-value slider-value--intensity">{Math.round(clamp01(getNum(selectedNode.params, 'toIntensity', clamp01(getNum(selectedNode.params, 'base', 0) + clamp01(getNum(selectedNode.params, 'amp', 0.8))))) * 100)}</span>
+                        </div>
                       </label>
 
                       <label className="field">
@@ -2059,21 +2140,94 @@ export default function EditeurPage() {
                         />
                       </label>
 
+                      {/* RGB Sliders */}
+                      <div className="rgb-sliders">
+                        {(() => {
+                          const color = getColor(selectedNode.params, 'color', '#ff2aa6');
+                          const rgb = hexToRgb(color);
+                          const updateColor = (r: number, g: number, b: number) => {
+                            updateSelectedParams({ color: rgbToHex(r, g, b) });
+                          };
+                          return (
+                            <>
+                              <div className="slider-row">
+                                <span className="slider-label slider-label--red">Rouge</span>
+                                <input
+                                  type="range"
+                                  className="slider-red"
+                                  min={0}
+                                  max={255}
+                                  step={1}
+                                  value={rgb.r}
+                                  style={{
+                                    ['--min' as any]: 0,
+                                    ['--max' as any]: 255,
+                                    ['--value' as any]: rgb.r,
+                                  }}
+                                  onChange={(e) => updateColor(Number(e.target.value), rgb.g, rgb.b)}
+                                />
+                                <span className="slider-value slider-value--red">{rgb.r}</span>
+                              </div>
+                              <div className="slider-row">
+                                <span className="slider-label slider-label--green">Vert</span>
+                                <input
+                                  type="range"
+                                  className="slider-green"
+                                  min={0}
+                                  max={255}
+                                  step={1}
+                                  value={rgb.g}
+                                  style={{
+                                    ['--min' as any]: 0,
+                                    ['--max' as any]: 255,
+                                    ['--value' as any]: rgb.g,
+                                  }}
+                                  onChange={(e) => updateColor(rgb.r, Number(e.target.value), rgb.b)}
+                                />
+                                <span className="slider-value slider-value--green">{rgb.g}</span>
+                              </div>
+                              <div className="slider-row">
+                                <span className="slider-label slider-label--blue">Bleu</span>
+                                <input
+                                  type="range"
+                                  className="slider-blue"
+                                  min={0}
+                                  max={255}
+                                  step={1}
+                                  value={rgb.b}
+                                  style={{
+                                    ['--min' as any]: 0,
+                                    ['--max' as any]: 255,
+                                    ['--value' as any]: rgb.b,
+                                  }}
+                                  onChange={(e) => updateColor(rgb.r, rgb.g, Number(e.target.value))}
+                                />
+                                <span className="slider-value slider-value--blue">{rgb.b}</span>
+                              </div>
+                            </>
+                          );
+                        })()}
+                      </div>
+
                       <label className="field">
-                        <span>Intensité</span>
-                        <input
-                          type="range"
-                          min={0}
-                          max={1}
-                          step={0.01}
-                          value={clamp01(getNum(selectedNode.params, 'intensity', 0.9))}
-                          style={{
-                            ['--min' as any]: 0,
-                            ['--max' as any]: 1,
-                            ['--value' as any]: clamp01(getNum(selectedNode.params, 'intensity', 0.9)),
-                          }}
-                          onChange={(e) => updateSelectedParams({ intensity: Number(e.target.value) })}
-                        />
+                        <span className="slider-label slider-label--intensity">Intensité globale</span>
+                        <div className="slider-row">
+                          <input
+                            type="range"
+                            className="slider-intensity"
+                            min={0}
+                            max={1}
+                            step={0.01}
+                            value={clamp01(getNum(selectedNode.params, 'intensity', 0.8))}
+                            style={{
+                              ['--min' as any]: 0,
+                              ['--max' as any]: 1,
+                              ['--value' as any]: clamp01(getNum(selectedNode.params, 'intensity', 0.8)),
+                            }}
+                            onChange={(e) => updateSelectedParams({ intensity: Number(e.target.value) })}
+                          />
+                          <span className="slider-value slider-value--intensity">{Math.round(clamp01(getNum(selectedNode.params, 'intensity', 0.8)) * 100)}</span>
+                        </div>
                       </label>
 
                       <div className="muted">Astuce: clique une dalle dans le viewport pour l'assigner.</div>
