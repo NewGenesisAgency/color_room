@@ -810,6 +810,19 @@ export default function JeuxPage() {
     return [0];
   }
 
+  function setSelectedPlates(indexes: number[], active = true) {
+    setPlateActive((prev) => {
+      const next = [...prev];
+      // Reset all first
+      for (let i = 0; i < 9; i++) next[i] = false;
+      // Set selected
+      for (const i of indexes) {
+        if (i >= 0 && i < 9) next[i] = active;
+      }
+      return next;
+    });
+  }
+
   function setSelectedPlatesColor(color: string, active = true) {
     const targets = getTargetPlateIndexes();
     setPlateColors((prev) => {
@@ -1715,10 +1728,11 @@ export default function JeuxPage() {
 
     if (currentGame === 'escape-game') {
       setEscapeProgress(0);
+      setEscapeError('');
       setMessage('Escape Game: Résolvez 3 énigmes lumineuses.');
       resetScene();
       // Only select first plate for the escape game (single plate mode)
-      setSelectedPlates(new Set([0]));
+      setSelectedPlates([0], true);
       return;
     }
   }
