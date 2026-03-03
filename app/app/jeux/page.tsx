@@ -1717,6 +1717,8 @@ export default function JeuxPage() {
       setEscapeProgress(0);
       setMessage('Escape Game: Résolvez 3 énigmes lumineuses.');
       resetScene();
+      // Only select first plate for the escape game (single plate mode)
+      setSelectedPlates(new Set([0]));
       return;
     }
   }
@@ -1748,6 +1750,8 @@ export default function JeuxPage() {
     return { r: 0, g: 0, b: 0 };
   }
 
+  const [escapeError, setEscapeError] = useState<string>('');
+
   function checkEscapeProgress() {
     // Énigme 1: plaques impaires actives (1,3,5,7,9 -> index 0,2,4,6,8)
     if (escapeProgress === 0) {
@@ -1756,9 +1760,11 @@ export default function JeuxPage() {
       if (oddPlatesActive && evenPlatesInactive) {
         setEscapeProgress(1);
         setMessage('Énigme 1 réussie! Passez à l\'énigme 2.');
+        setEscapeError('');
         awardPoints(50, 'Énigme 1 résolue! +50 points.');
       } else {
-        setMessage('Activez les plaques impaires (1,3,5,7,9) et désactivez les paires.');
+        setEscapeError('Raté! Activez les plaques impaires (1,3,5,7,9) et désactivez les paires.');
+        setMessage('');
       }
       return;
     }
@@ -1772,9 +1778,11 @@ export default function JeuxPage() {
       if (darkBlue && medBlue && lightBlue) {
         setEscapeProgress(2);
         setMessage('Énigme 2 réussie! Passez à l\'énigme finale.');
+        setEscapeError('');
         awardPoints(100, 'Énigme 2 résolue! +100 points.');
       } else {
-        setMessage('Créez un dégradé de bleu: plaques 1-3 bleu foncé, 4-6 bleu moyen, 7-9 bleu clair.');
+        setEscapeError('Raté! Créez un dégradé de bleu: plaques 1-3 bleu foncé, 4-6 bleu moyen, 7-9 bleu clair.');
+        setMessage('');
       }
       return;
     }
@@ -1788,9 +1796,11 @@ export default function JeuxPage() {
       
       if (allGold) {
         setEscapeProgress(3);
+        setEscapeError('');
         award(150, 'Escape Game réussi! Vous vous êtes échappé! +150 points.');
       } else {
-        setMessage('Réglez toutes les plaques sur RGB(255,215,0) - couleur or.');
+        setEscapeError('Raté! Réglez toutes les plaques sur RGB(255,215,0) - couleur or.');
+        setMessage('');
       }
     }
   }
@@ -2977,6 +2987,70 @@ export default function JeuxPage() {
                           'Énigme 3: Réglez toutes les plaques sur RGB(255,215,0) - couleur or',
                         ][Math.min(escapeProgress, 2)]}
                       </p>
+
+                      {/* Error message in liquid glass style */}
+                      {escapeError ? (
+                        <div className="glass" style={{ 
+                          padding: '16px 20px', 
+                          borderRadius: 16, 
+                          marginBottom: 20,
+                          background: 'rgba(255, 59, 92, 0.25)',
+                          border: '1px solid rgba(255, 59, 92, 0.5)',
+                          color: '#ff6b8a',
+                          fontWeight: 600
+                        }}>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <XCircle size={18} />
+                            {escapeError}
+                          </span>
+                        </div>
+                      ) : null}
+
+                      {/* RGB sliders for enigmas 2 and 3 */}
+                      {escapeProgress >= 1 ? (
+                        <div style={{ margin: '20px 0' }}>
+                          <div className="led-slider led-slider--red">
+                            <label>
+                              <span>Rouge</span>
+                              <span>{beginnerRgb.r}</span>
+                            </label>
+                            <input
+                              type="range"
+                              min={0}
+                              max={255}
+                              value={beginnerRgb.r}
+                              onChange={(e) => adjustBeginnerRgb('r', Number(e.target.value))}
+                            />
+                          </div>
+                          <div className="led-slider led-slider--green">
+                            <label>
+                              <span>Vert</span>
+                              <span>{beginnerRgb.g}</span>
+                            </label>
+                            <input
+                              type="range"
+                              min={0}
+                              max={255}
+                              value={beginnerRgb.g}
+                              onChange={(e) => adjustBeginnerRgb('g', Number(e.target.value))}
+                            />
+                          </div>
+                          <div className="led-slider led-slider--blue">
+                            <label>
+                              <span>Bleu</span>
+                              <span>{beginnerRgb.b}</span>
+                            </label>
+                            <input
+                              type="range"
+                              min={0}
+                              max={255}
+                              value={beginnerRgb.b}
+                              onChange={(e) => adjustBeginnerRgb('b', Number(e.target.value))}
+                            />
+                          </div>
+                        </div>
+                      ) : null}
+
                       <button
                         className="btn btn-success"
                         onClick={checkEscapeProgress}
