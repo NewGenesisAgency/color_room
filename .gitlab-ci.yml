@@ -1,0 +1,13 @@
+stages:
+  - deploy
+
+deploy:
+  stage: deploy
+  only:
+    - ux-app
+  script:
+    - echo "Début du déploiement sur le Raspberry Pi..."
+    - cd $CI_PROJECT_DIR
+    - docker compose down --remove-orphans
+    - docker compose up --build -d
+    - echo "Déploiement terminé - App disponible sur http://localhost:8080"
