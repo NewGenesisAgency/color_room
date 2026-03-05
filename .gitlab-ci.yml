@@ -3,6 +3,8 @@ stages:
 
 deploy:
   stage: deploy
+  tags:
+    - raspberry
   only:
     - ux-app
   script:
