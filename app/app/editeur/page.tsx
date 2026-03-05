@@ -364,6 +364,68 @@ function computeTiles(game: GameDoc, tSeconds: number): TileState[] {
   return tiles;
 }
 
+// Hardware control constants and functions (from /jeux)
+const PLATE_ID_BY_INDEX: number[] = [1, 2, 3, 4, 5, 6, 7, 8, 9];
+
+function hexToRgb255(hex: string): { r: number; g: number; b: number } {
+  const m = /^#([0-9a-fA-F]{6})$/.exec(hex);
+  if (!m) return { r: 0, g: 0, b: 0 };
+  const n = parseInt(m[1], 16);
+  return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
+}
+
+function rgbToChannels32(rgb: { r: number; g: number; b: number }, masterIntensity100: number): number[] {
+  const ch = Array(32).fill(0);
+  const intensity01 = Math.max(0, Math.min(100, masterIntensity100)) / 100;
+  const baseR = Math.round(rgb.r * intensity01);
+  const baseG = Math.round(rgb.g * intensity01);
+  const baseB = Math.round(rgb.b * intensity01);
+
+  // Simplified spectrum mapping: B=0-6, G=7-16, R=17-31
+  for (let i = 0; i < 7; i++) ch[i] = baseB;
+  for (let i = 7; i < 17; i++) ch[i] = baseG;
+  for (let i = 17; i < 32; i++) ch[i] = baseR;
+
+  return ch;
+}
+
+// Hardware timers for debouncing
+const hwTimersRef: { current: Record<string, number> } = { current: {} };
+
+function scheduleSetCanal(plaqueId: number, canalIndex: number, intensity: number) {
+  const key = `${plaqueId}:${canalIndex}`;
+  const existing = hwTimersRef.current[key];
+  if (existing) window.clearTimeout(existing);
+
+  hwTimersRef.current[key] = window.setTimeout(async () => {
+    try {
+      await fetch(
+        `/api/supervision/state/plaque/${plaqueId}/cursor/${canalIndex}/${Math.max(0, Math.min(255, Math.round(intensity)))}`,
+        { method: 'PUT', cache: 'no-store' }
+      );
+    } catch {
+      // ignore
+    }
+  }, 60);
+}
+
+function sendChannelsToHardware(channels32: number[], plateIds: number[]) {
+  for (const plaqueId of plateIds) {
+    for (let i = 0; i < 32; i++) {
+      scheduleSetCanal(plaqueId, i, clamp255(channels32[i] ?? 0));
+    }
+  }
+}
+
+function sendRgbToHardware(rgb: { r: number; g: number; b: number }, intensity100: number, plateIds: number[]) {
+  const channels32 = rgbToChannels32(rgb, intensity100);
+  sendChannelsToHardware(channels32, plateIds);
+}
+
+function getPlateIdsFromIndexes(indexes: number[]): number[] {
+  return indexes.map((i) => PLATE_ID_BY_INDEX[i] ?? 1).filter(Boolean);
+}
+
 export default function EditeurPage() {
   const [isTeacher, setIsTeacher] = useState<boolean | null>(null);
   const [dbLoading, setDbLoading] = useState<boolean>(false);
@@ -643,6 +705,29 @@ export default function EditeurPage() {
   }, [activeGame, t]);
 
   const tiles = editorTiles;
+
+  // Send tile changes to hardware (same logic as /jeux)
+  useEffect(() => {
+    if (!activeGame) return;
+    if (!isPlaying) return;
+
+    // Send each tile's color/intensity to hardware
+    tiles.forEach((tile, index) => {
+      const plateId = PLATE_ID_BY_INDEX[index];
+      if (!plateId) return;
+
+      const rgb = hexToRgb255(tile.color);
+      const intensity100 = Math.round(tile.intensity * 100);
+
+      // Only send if intensity > 0, otherwise black out
+      if (tile.intensity > 0) {
+        sendRgbToHardware(rgb, intensity100, [plateId]);
+      } else {
+        // Send black to turn off
+        sendRgbToHardware({ r: 0, g: 0, b: 0 }, 0, [plateId]);
+      }
+    });
+  }, [tiles, activeGame, isPlaying]);
 
   const tileCount = tiles.length;
 
@@ -1175,7 +1260,17 @@ export default function EditeurPage() {
             <div className="ue__viewport glass">
               <div className="panelhead">
                 <strong>Aperçu</strong>
-                <span className="panelhead__meta">Simulation {tileCount} dalles</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <button
+                    className={`btn btn--mini ${isPlaying ? 'btn--primary' : ''}`}
+                    onClick={() => setIsPlaying((p) => !p)}
+                    title={isPlaying ? 'Pause envoi hardware' : 'Play envoi hardware'}
+                  >
+                    {isPlaying ? <Pause size={14} /> : <Play size={14} />}
+                    <span>{isPlaying ? 'Hardware ON' : 'Hardware OFF'}</span>
+                  </button>
+                  <span className="panelhead__meta">Simulation {tileCount} dalles</span>
+                </div>
               </div>
               <div className="viewport">
                 {activeGame ? (
