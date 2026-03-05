@@ -810,6 +810,19 @@ export default function JeuxPage() {
     return [0];
   }
 
+  function setSelectedPlates(indexes: number[], active = true) {
+    setPlateActive((prev) => {
+      const next = [...prev];
+      // Reset all first
+      for (let i = 0; i < 9; i++) next[i] = false;
+      // Set selected
+      for (const i of indexes) {
+        if (i >= 0 && i < 9) next[i] = active;
+      }
+      return next;
+    });
+  }
+
   function setSelectedPlatesColor(color: string, active = true) {
     const targets = getTargetPlateIndexes();
     setPlateColors((prev) => {
@@ -1061,7 +1074,9 @@ export default function JeuxPage() {
               setMpJoinPrompt({ open: true, sessionId });
             }
           } else {
-            if (mpAutoFollow) {
+            // Only auto-follow if user has previously joined this session
+            // Don't auto-start just because a session exists
+            if (mpAutoFollow && mpToken && youSeat) {
               if (currentGame !== 'multiplayer-split') setCurrentGame('multiplayer-split');
               if (!gameActive) setGameActive(true);
             }
@@ -1201,22 +1216,52 @@ export default function JeuxPage() {
     };
   }, [gameActive, currentGame, mpState?.endsAtMs]);
 
+  // Fetch current colors when beginner-control game starts
   useEffect(() => {
     if (!gameActive) return;
-    if (currentGame !== 'multiplayer-split') return;
-    const scoreNow = Number(mpState?.score ?? 0);
-    const prev = mpPrevScoreRef.current;
-    if (Number.isFinite(scoreNow) && scoreNow > prev) {
-      const delta = Math.max(1, scoreNow - prev);
-      setMpPlusValue(delta);
-      setMpPlusAnimKey((k) => k + 1);
-      setMpCenterAnimKey((k) => k + 1);
-      setMpThemeIndex((i) => (i + 1) % mpThemes.length);
-      setMpWinPulse(true);
-      window.setTimeout(() => setMpWinPulse(false), 650);
-    }
-    mpPrevScoreRef.current = Number.isFinite(scoreNow) ? scoreNow : prev;
-  }, [mpState?.score, gameActive, currentGame, mpThemes.length]);
+    if (currentGame !== 'beginner-control') return;
+
+    const fetchCurrentColors = async () => {
+      try {
+        const targets = getTargetPlateIds();
+        if (targets.length === 0) return;
+
+        // Fetch state from first selected plate
+        const plaqueId = targets[0];
+        const res = await fetch(`/api/supervision/state/plaque/${plaqueId}`, { cache: 'no-store' });
+        if (!res.ok) return;
+
+        const data = (await res.json().catch(() => null)) as any;
+        if (!data) return;
+
+        // Extract channel values
+        const channels = extractChannelValues(data);
+        const ch32 = channels.slice(0, 32);
+
+        // Calculate average intensity
+        const avgIntensity = ch32.reduce((a, b) => a + b, 0) / 32;
+        const intensityPercent = Math.round((avgIntensity / 255) * 100);
+
+        // Convert spectrum to RGB
+        const rgb = spectrum32ToRgb255(ch32);
+
+        // Update state with fetched values
+        setBeginnerRgb({ r: rgb.r, g: rgb.g, b: rgb.b });
+        setMasterIntensity(intensityPercent);
+        setLedValues(() => {
+          const next: Record<number, number> = {};
+          for (let i = 0; i < 32; i++) next[i] = ch32[i] ?? 0;
+          return next;
+        });
+
+        setMessage('Couleurs actuelles chargées depuis les plaques.');
+      } catch {
+        // Silently fail - keep default values
+      }
+    };
+
+    void fetchCurrentColors();
+  }, [gameActive, currentGame]);
 
   async function ensureMpJoined(name?: string): Promise<{ token: string; seat: MpSeat } | null> {
     if (mpToken && mpSeat != null && mpSeat >= 1 && mpSeat <= 8) return { token: mpToken, seat: mpSeat };
@@ -1683,8 +1728,11 @@ export default function JeuxPage() {
 
     if (currentGame === 'escape-game') {
       setEscapeProgress(0);
+      setEscapeError('');
       setMessage('Escape Game: Résolvez 3 énigmes lumineuses.');
       resetScene();
+      // Only select first plate for the escape game (single plate mode)
+      setSelectedPlates([0], true);
       return;
     }
   }
@@ -1706,6 +1754,69 @@ export default function JeuxPage() {
   function award(points: number, text: string) {
     awardPoints(points, text);
     setGamesCompleted((v) => v + 1);
+  }
+
+  function extractRgbFromCss(css: string): { r: number; g: number; b: number } {
+    const match = css.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+    if (match) {
+      return { r: parseInt(match[1]), g: parseInt(match[2]), b: parseInt(match[3]) };
+    }
+    return { r: 0, g: 0, b: 0 };
+  }
+
+  const [escapeError, setEscapeError] = useState<string>('');
+
+  function checkEscapeProgress() {
+    // Énigme 1: plaques impaires actives (1,3,5,7,9 -> index 0,2,4,6,8)
+    if (escapeProgress === 0) {
+      const oddPlatesActive = [0, 2, 4, 6, 8].every(i => plateActive[i]);
+      const evenPlatesInactive = [1, 3, 5, 7].every(i => !plateActive[i]);
+      if (oddPlatesActive && evenPlatesInactive) {
+        setEscapeProgress(1);
+        setMessage('Énigme 1 réussie! Passez à l\'énigme 2.');
+        setEscapeError('');
+        awardPoints(50, 'Énigme 1 résolue! +50 points.');
+      } else {
+        setEscapeError('Raté! Activez les plaques impaires (1,3,5,7,9) et désactivez les paires.');
+        setMessage('');
+      }
+      return;
+    }
+
+    // Énigme 2: dégradé de bleu
+    if (escapeProgress === 1) {
+      const darkBlue = [0, 1, 2].every(i => plateColors[i].includes('0,0,'));
+      const medBlue = [3, 4, 5].every(i => plateColors[i].includes('100,150,255'));
+      const lightBlue = [6, 7, 8].every(i => plateColors[i].includes('150,200,255'));
+      
+      if (darkBlue && medBlue && lightBlue) {
+        setEscapeProgress(2);
+        setMessage('Énigme 2 réussie! Passez à l\'énigme finale.');
+        setEscapeError('');
+        awardPoints(100, 'Énigme 2 résolue! +100 points.');
+      } else {
+        setEscapeError('Raté! Créez un dégradé de bleu: plaques 1-3 bleu foncé, 4-6 bleu moyen, 7-9 bleu clair.');
+        setMessage('');
+      }
+      return;
+    }
+
+    // Énigme 3: RGB(255,215,0) - Or
+    if (escapeProgress === 2) {
+      const allGold = plateColors.every(c => {
+        const rgb = extractRgbFromCss(c);
+        return rgb.r >= 240 && rgb.r <= 255 && rgb.g >= 200 && rgb.g <= 220 && rgb.b >= 0 && rgb.b <= 20;
+      });
+      
+      if (allGold) {
+        setEscapeProgress(3);
+        setEscapeError('');
+        award(150, 'Escape Game réussi! Vous vous êtes échappé! +150 points.');
+      } else {
+        setEscapeError('Raté! Réglez toutes les plaques sur RGB(255,215,0) - couleur or.');
+        setMessage('');
+      }
+    }
   }
 
   function activateUV() {
@@ -1834,12 +1945,62 @@ export default function JeuxPage() {
     });
   }
 
+  const rgbDebounceRef = useRef<number>(0);
+  const intensityDebounceRef = useRef<number>(0);
+  const pendingRgbRef = useRef<TargetColor>({ r: 0, g: 0, b: 0 });
+  const pendingIntensityRef = useRef<number>(80);
+
+  function adjustBeginnerRgb(channel: keyof TargetColor, value: number) {
+    const next = { ...beginnerRgb, [channel]: clamp255(value) };
+    setBeginnerRgb(next);
+    pendingRgbRef.current = next;
+    
+    // Update plates immediately for responsive UI
+    applyBeginnerRgbLocal(next, masterIntensity);
+    
+    // Debounce API call
+    if (rgbDebounceRef.current) window.clearTimeout(rgbDebounceRef.current);
+    rgbDebounceRef.current = window.setTimeout(() => {
+      applyBeginnerRgb(pendingRgbRef.current, masterIntensity);
+    }, 80);
+  }
+
   function adjustBeginnerIntensity(v: number) {
     const nextIntensity = clamp100(v);
     setMasterIntensity(nextIntensity);
-    applyBeginnerRgb(beginnerRgb, nextIntensity);
+    pendingIntensityRef.current = nextIntensity;
+    
+    // Update plates immediately for responsive UI
+    applyBeginnerRgbLocal(beginnerRgb, nextIntensity);
+    
+    // Debounce API call
+    if (intensityDebounceRef.current) window.clearTimeout(intensityDebounceRef.current);
+    intensityDebounceRef.current = window.setTimeout(() => {
+      applyBeginnerRgb(beginnerRgb, nextIntensity);
+    }, 80);
   }
 
+  // Local version that updates UI without API calls (for during slider drag)
+  function applyBeginnerRgbLocal(rgb: TargetColor, intensity: number) {
+    const channels32 = rgbToChannels32(rgb, intensity);
+    
+    const preview = channels32ToPreviewRgb255(channels32, 100);
+    const css = rgbToCss(preview);
+    setHardwarePreviewCss(css);
+    setSelectedPlatesColor(css, true);
+    
+    // Update LED values locally
+    setLedValues(() => {
+      const next: Record<number, number> = {};
+      for (let i = 0; i < 32; i++) next[i] = channels32[i];
+      return next;
+    });
+
+    const totalPower = channels32.reduce((sum, val) => sum + val, 0);
+    setInstrument((p) => ({ ...p, power: `${Math.floor(totalPower * 3)}W` }));
+  }
+
+  // API version that sends to hardware (debounced)
   function applyBeginnerRgb(rgb: TargetColor, intensity: number) {
     const channels32 = rgbToChannels32(rgb, intensity);
     const targets = getTargetPlateIds();
@@ -1860,14 +2021,6 @@ export default function JeuxPage() {
 
     const totalPower = channels32.reduce((sum, val) => sum + val, 0);
     setInstrument((p) => ({ ...p, power: `${Math.floor(totalPower * 3)}W` }));
-  }
-
-  function adjustBeginnerRgb(channel: keyof TargetColor, value: number) {
-    setBeginnerRgb((prev) => {
-      const next = { ...prev, [channel]: clamp255(value) };
-      applyBeginnerRgb(next, masterIntensity);
-      return next;
-    });
   }
 
   function validateSpectrum() {
@@ -2607,7 +2760,7 @@ export default function JeuxPage() {
                 {gameActive && currentGame === 'beginner-control' ? (
                   <>
                     <div style={{ margin: '20px 0' }}>
-                      <div className="led-slider">
+                      <div className="led-slider led-slider--intensity">
                         <label>
                           <span>Intensité globale</span>
                           <span>{masterIntensity}</span>
@@ -2621,7 +2774,7 @@ export default function JeuxPage() {
                         />
                       </div>
 
-                      <div className="led-slider">
+                      <div className="led-slider led-slider--red">
                         <label>
                           <span>Rouge</span>
                           <span>{beginnerRgb.r}</span>
@@ -2635,7 +2788,7 @@ export default function JeuxPage() {
                         />
                       </div>
 
-                      <div className="led-slider">
+                      <div className="led-slider led-slider--green">
                         <label>
                           <span>Vert</span>
                           <span>{beginnerRgb.g}</span>
@@ -2649,7 +2802,7 @@ export default function JeuxPage() {
                         />
                       </div>
 
-                      <div className="led-slider">
+                      <div className="led-slider led-slider--blue">
                         <label>
                           <span>Bleu</span>
                           <span>{beginnerRgb.b}</span>
@@ -2669,7 +2822,7 @@ export default function JeuxPage() {
                 {gameActive && currentGame === 'color-cancel' ? (
                   <>
                     <div style={{ margin: '20px 0' }}>
-                      <div className="led-slider">
+                      <div className="led-slider led-slider--red">
                         <label>
                           <span>Canal Rouge</span>
                           <span>{cancelColor.r}</span>
@@ -2682,7 +2835,7 @@ export default function JeuxPage() {
                           onChange={(e) => adjustCancelLight('r', Number(e.target.value))}
                         />
                       </div>
-                      <div className="led-slider">
+                      <div className="led-slider led-slider--green">
                         <label>
                           <span>Canal Vert</span>
                           <span>{cancelColor.g}</span>
@@ -2707,34 +2860,22 @@ export default function JeuxPage() {
                     <div style={{ margin: '20px 0' }}>
                       <h4 style={{ marginBottom: 16, fontWeight: 700 }}>Couleur de référence (plaques 1-3)</h4>
                       <div className="rgb-display">
-                        <div className="rgb-value">
-                          <div className="label" style={{ color: '#ef476f' }}>
-                            R
-                          </div>
-                          <div className="value" style={{ color: '#ef476f' }}>
-                            {targetColor.r}
-                          </div>
+                        <div className="rgb-value rgb-value--red">
+                          <div className="label">R</div>
+                          <div className="value">{targetColor.r}</div>
                         </div>
-                        <div className="rgb-value">
-                          <div className="label" style={{ color: '#06d6a0' }}>
-                            G
-                          </div>
-                          <div className="value" style={{ color: '#06d6a0' }}>
-                            {targetColor.g}
-                          </div>
+                        <div className="rgb-value rgb-value--green">
+                          <div className="label">G</div>
+                          <div className="value">{targetColor.g}</div>
                         </div>
-                        <div className="rgb-value">
-                          <div className="label" style={{ color: '#4361ee' }}>
-                            B
-                          </div>
-                          <div className="value" style={{ color: '#4361ee' }}>
-                            {targetColor.b}
-                          </div>
+                        <div className="rgb-value rgb-value--blue">
+                          <div className="label">B</div>
+                          <div className="value">{targetColor.b}</div>
                         </div>
                       </div>
 
                       <h4 style={{ margin: '24px 0 16px', fontWeight: 700 }}>Votre couleur (plaques 4-6)</h4>
-                      <div className="led-slider">
+                      <div className="led-slider led-slider--red">
                         <label>
                           <span>Rouge</span>
                           <span>{userColor.r}</span>
@@ -2747,7 +2888,7 @@ export default function JeuxPage() {
                           onChange={(e) => adjustMatchColor('r', Number(e.target.value))}
                         />
                       </div>
-                      <div className="led-slider">
+                      <div className="led-slider led-slider--green">
                         <label>
                           <span>Vert</span>
                           <span>{userColor.g}</span>
@@ -2760,7 +2901,7 @@ export default function JeuxPage() {
                           onChange={(e) => adjustMatchColor('g', Number(e.target.value))}
                         />
                       </div>
-                      <div className="led-slider">
+                      <div className="led-slider led-slider--blue">
                         <label>
                           <span>Bleu</span>
                           <span>{userColor.b}</span>
@@ -2855,23 +2996,78 @@ export default function JeuxPage() {
                       </div>
                       <p style={{ margin: '20px 0', fontSize: '1.1em', fontWeight: 500 }}>
                         {[
-                          'Énigme 1: Activez les plaques impaires',
-                          'Énigme 2: Créez un dégradé de bleu',
-                          'Énigme 3: Code final: RGB(255,215,0)',
+                          'Énigme 1: Activez les plaques impaires (1,3,5,7,9) et désactivez les paires',
+                          'Énigme 2: Créez un dégradé de bleu (1-3 foncé, 4-6 moyen, 7-9 clair)',
+                          'Énigme 3: Réglez toutes les plaques sur RGB(255,215,0) - couleur or',
                         ][Math.min(escapeProgress, 2)]}
                       </p>
+
+                      {/* Error message in liquid glass style */}
+                      {escapeError ? (
+                        <div className="glass" style={{ 
+                          padding: '16px 20px', 
+                          borderRadius: 16, 
+                          marginBottom: 20,
+                          background: 'rgba(255, 59, 92, 0.25)',
+                          border: '1px solid rgba(255, 59, 92, 0.5)',
+                          color: '#ff6b8a',
+                          fontWeight: 600
+                        }}>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <XCircle size={18} />
+                            {escapeError}
+                          </span>
+                        </div>
+                      ) : null}
+
+                      {/* RGB sliders for enigmas 2 and 3 */}
+                      {escapeProgress >= 1 ? (
+                        <div style={{ margin: '20px 0' }}>
+                          <div className="led-slider led-slider--red">
+                            <label>
+                              <span>Rouge</span>
+                              <span>{beginnerRgb.r}</span>
+                            </label>
+                            <input
+                              type="range"
+                              min={0}
+                              max={255}
+                              value={beginnerRgb.r}
+                              onChange={(e) => adjustBeginnerRgb('r', Number(e.target.value))}
+                            />
+                          </div>
+                          <div className="led-slider led-slider--green">
+                            <label>
+                              <span>Vert</span>
+                              <span>{beginnerRgb.g}</span>
+                            </label>
+                            <input
+                              type="range"
+                              min={0}
+                              max={255}
+                              value={beginnerRgb.g}
+                              onChange={(e) => adjustBeginnerRgb('g', Number(e.target.value))}
+                            />
+                          </div>
+                          <div className="led-slider led-slider--blue">
+                            <label>
+                              <span>Bleu</span>
+                              <span>{beginnerRgb.b}</span>
+                            </label>
+                            <input
+                              type="range"
+                              min={0}
+                              max={255}
+                              value={beginnerRgb.b}
+                              onChange={(e) => adjustBeginnerRgb('b', Number(e.target.value))}
+                            />
+                          </div>
+                        </div>
+                      ) : null}
+
                       <button
                         className="btn btn-success"
-                        onClick={() => {
-                          const next = escapeProgress + 1;
-                          if (next >= 3) {
-                            award(300, 'Victoire! Vous vous êtes échappé. +300 points.');
-                            setEscapeProgress(3);
-                          } else {
-                            setEscapeProgress(next);
-                            setMessage('Étape validée.');
-                          }
-                        }}
+                        onClick={checkEscapeProgress}
                       >
                         <CheckCircle2 size={18} /> Vérifier
                       </button>
