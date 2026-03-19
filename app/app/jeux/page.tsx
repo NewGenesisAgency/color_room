@@ -23,6 +23,9 @@ import {
   Zap,
 } from 'lucide-react';
 
+import { computeTiles } from '@/lib/game/tilesRuntime';
+import MaitreDuBlanc from '@/app/_games/maitre-du-blanc/MaitreDuBlanc';
+
 type UserType = 'apprenant' | 'enseignant';
 
 type Niveau = 'college' | 'lycee' | 'universite' | 'grand-public';
@@ -35,7 +38,8 @@ type GameId =
   | 'white-balance'
   | 'spectrum-challenge'
   | 'escape-game'
-  | 'multiplayer-split';
+  | 'multiplayer-split'
+  | 'maitre-du-blanc';
 
 type GameDef = {
   id: GameId;
@@ -168,6 +172,12 @@ const games: GameDef[] = [
     id: 'white-balance',
     name: 'Balance des Blancs',
     description: 'Créez différents types de blanc selon température',
+    difficulty: 3,
+  },
+  {
+    id: 'maitre-du-blanc',
+    name: 'Le Maître du Blanc',
+    description: 'Reproduisez des blancs (température) en ajustant le RGB, score basé sur XYZ',
     difficulty: 3,
   },
   {
@@ -726,6 +736,36 @@ export default function JeuxPage() {
 
   const [hardwarePreviewCss, setHardwarePreviewCss] = useState<string>('rgb(0,0,0)');
 
+  useEffect(() => {
+    if (!hudRun?.cfg) return;
+
+    let raf = 0;
+    const start = performance.now();
+
+    const tick = (now: number) => {
+      const tSeconds = (now - start) / 1000;
+
+      const tiles = computeTiles(
+        {
+          tileCount: 9,
+          nodes: (hudRun.cfg.nodes ?? []) as any,
+          edges: (hudRun.cfg.edges ?? []) as any,
+        },
+        tSeconds,
+      );
+
+      setPlateColors(() => tiles.slice(0, 9).map((x) => x.color));
+      setPlateActive(() => tiles.slice(0, 9).map((x) => x.intensity > 0));
+
+      raf = window.requestAnimationFrame(tick);
+    };
+
+    raf = window.requestAnimationFrame(tick);
+    return () => {
+      window.cancelAnimationFrame(raf);
+    };
+  }, [hudRun?.gameId]);
+
   const [ledValues, setLedValues] = useState<Record<number, number>>({});
   const [message, setMessage] = useState<string>('Sélectionnez un jeu et cliquez sur "Démarrer le Jeu"');
 
@@ -1114,6 +1154,8 @@ export default function JeuxPage() {
         const json = (await res.json().catch(() => null)) as any;
         if (!json || json.ok !== true || !Array.isArray(json.games)) return;
         if (alive) setDbGames(json.games);
+      } catch {
+        // ignore (offline / serveur pas prêt)
       } finally {
         if (alive) {
           timer = window.setTimeout(tick, 30000);
@@ -1571,15 +1613,7 @@ export default function JeuxPage() {
     setMessage(`Jeu éditeur: ${game.name}`);
     resetScene();
 
-    try {
-      const g = buildGraph(cfg);
-      const begin = g.nodes.find((n) => n.kind === 'event_begin' && n.enabled !== false);
-      if (begin?.id) {
-        setTimeout(() => runHudGraphFrom(String(begin.id)), 0);
-      }
-    } catch {
-      // ignore
-    }
+    // V1-A: simulation via computeTiles() (moteur partagé) dans un raf loop.
   }
 
   function customRunUpdateVar(name: string, value: CustomGameVarValue) {
@@ -1687,6 +1721,12 @@ export default function JeuxPage() {
       setCurrentTemp(5000);
       resetScene();
       setAllPlates('rgb(255,240,220)', true);
+      return;
+    }
+
+    if (currentGame === 'maitre-du-blanc') {
+      setMessage('Reproduisez un blanc cible en ajustant le RGB (score basé sur XYZ).');
+      resetScene();
       return;
     }
 
@@ -2576,6 +2616,10 @@ export default function JeuxPage() {
                       <Sparkles size={18} /> Activer UV (380-400nm)
                     </button>
                   </>
+                ) : null}
+
+                {gameActive && currentGame === 'maitre-du-blanc' ? (
+                  <MaitreDuBlanc />
                 ) : null}
 
                 {gameActive && currentGame === 'multiplayer-split' ? (
