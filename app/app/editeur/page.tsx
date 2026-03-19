@@ -7,6 +7,22 @@ import { computeTiles } from '@/lib/game/tilesRuntime';
 
 import { Boxes, Gamepad2, Plus, Play, Pause, RotateCcw, Save, Trash2, FolderPlus, X, ChevronRight, Layers, Zap, Palette, Clock, MousePointer2, LayoutGrid, Maximize2, Minimize2 } from 'lucide-react';
 
+// Constantes pour le matériel
+const PLATE_ID_BY_INDEX: number[] = [1, 1, 1, 1, 1, 1, 1, 1, 1];
+
+// Types pour les couleurs
+type TargetColor = {
+  r: number;
+  g: number;
+  b: number;
+};
+
+// Fonction pour envoyer RVB au matériel
+function sendRgbToHardware(rgb: TargetColor) {
+  // TODO: implémenter l'envoi vers le matériel Lumen
+  console.log('Envoi RVB au matériel:', rgb);
+}
+
 type IdFactory = () => string;
 
 type TileState = {
@@ -509,24 +525,24 @@ export default function EditeurPage() {
 
   const tiles = editorTiles;
 
-  // Send tile changes to hardware (same logic as /jeux)
+  // Envoyer les changements de dalles vers le matériel (même logique que /jeux)
   useEffect(() => {
     if (!activeGame) return;
     if (!isPlaying) return;
 
-    // Send each tile's color/intensity to hardware
+    // Envoyer la couleur/intensité de chaque dalle vers le matériel
     tiles.forEach((tile, index) => {
       const plateId = PLATE_ID_BY_INDEX[index];
       if (!plateId) return;
 
-      const rgb = hexToRgb255(tile.color);
+      const rgb = hexToRgb(tile.color);
       const intensity100 = Math.round(tile.intensity * 100);
 
-      // Only send if intensity > 0, otherwise black out
+      // N'envoyer que si l'intensité > 0, sinon éteindre
       if (tile.intensity > 0) {
         sendRgbToHardware(rgb, intensity100, [plateId]);
       } else {
-        // Send black to turn off
+        // Envoyer du noir pour éteindre
         sendRgbToHardware({ r: 0, g: 0, b: 0 }, 0, [plateId]);
       }
     });

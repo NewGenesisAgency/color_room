@@ -25,6 +25,7 @@ import {
 
 import { computeTiles } from '@/lib/game/tilesRuntime';
 import MaitreDuBlanc from '@/app/_games/maitre-du-blanc/MaitreDuBlanc';
+import ChromaticityDiagram from '@/app/_games/chromaticity-diagram/ChromaticityDiagram';
 
 type UserType = 'apprenant' | 'enseignant';
 
@@ -39,7 +40,8 @@ type GameId =
   | 'spectrum-challenge'
   | 'escape-game'
   | 'multiplayer-split'
-  | 'maitre-du-blanc';
+  | 'maitre-du-blanc'
+  | 'chromaticity-diagram';
 
 type GameDef = {
   id: GameId;
@@ -179,6 +181,12 @@ const games: GameDef[] = [
     name: 'Le Maître du Blanc',
     description: 'Reproduisez des blancs (température) en ajustant le RGB, score basé sur XYZ',
     difficulty: 3,
+  },
+  {
+    id: 'chromaticity-diagram',
+    name: 'Diagramme de Chromaticité',
+    description: 'Explorez le diagramme u′v′ CIE 1976 UCS et trouvez les coordonnées chromatiques',
+    difficulty: 2,
   },
   {
     id: 'spectrum-challenge',
@@ -1730,6 +1738,12 @@ export default function JeuxPage() {
       return;
     }
 
+    if (currentGame === 'chromaticity-diagram') {
+      setMessage('Explorez le diagramme de chromaticité u′v′ CIE 1976 UCS.');
+      resetScene();
+      return;
+    }
+
     if (currentGame === 'spectrum-challenge') {
       setMessage('Composez un spectre lumineux avec les 32 types de LED.');
       resetScene();
@@ -2620,6 +2634,10 @@ export default function JeuxPage() {
 
                 {gameActive && currentGame === 'maitre-du-blanc' ? (
                   <MaitreDuBlanc />
+                ) : null}
+
+                {gameActive && currentGame === 'chromaticity-diagram' ? (
+                  <ChromaticityDiagram />
                 ) : null}
 
                 {gameActive && currentGame === 'multiplayer-split' ? (
