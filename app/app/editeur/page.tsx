@@ -259,7 +259,7 @@ export default function EditeurPage() {
   const [showGrid, setShowGrid] = useState<boolean>(true);
   const [zoomLevel, setZoomLevel] = useState<number>(100);
   const [newProjectName, setNewProjectName] = useState<string>('');
-  const [newProjectTemplate, setNewProjectTemplate] = useState<'blank' | 'tutorial' | 'animation' | 'interactive'>('blank');
+  const [newProjectTemplate, setNewProjectTemplate] = useState<'blank' | 'tutorial' | 'animation' | 'interactive' | 'white_master'>('blank');
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -612,7 +612,7 @@ export default function EditeurPage() {
     }
   };
 
-  const createGame = async (forcedName?: string, template: 'blank' | 'tutorial' | 'animation' | 'interactive' = 'blank') => {
+  const createGame = async (forcedName?: string, template: 'blank' | 'tutorial' | 'animation' | 'interactive' | 'white_master' = 'blank') => {
     const makeId: IdFactory = () => `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
     const provisionalId = makeId();
     const nextIndex = (editorRef.current.games.length || 0) + 1;
@@ -620,6 +620,7 @@ export default function EditeurPage() {
     
     // Créer les nœuds de base selon le template
     let initialNodes: EditorNode[] = [];
+    let initialEdges: GraphEdge[] = [];
     const eventId = makeId();
     
     if (template === 'blank') {
@@ -651,14 +652,38 @@ export default function EditeurPage() {
         { id: eventId, kind: 'event_begin', name: 'Démarrer', enabled: true, params: {}, pos: { x: 80, y: 80 } },
         { id: tileId, kind: 'tile', name: 'Dalle centrale', enabled: true, params: { tileIndex: 4, color: '#ff2aa6', intensity: 0.9 }, pos: { x: 400, y: 80 } },
       ];
+    } else if (template === 'white_master') {
+      const coldId = makeId();
+      const wait1Id = makeId();
+      const neutralId = makeId();
+      const wait2Id = makeId();
+      const warmId = makeId();
+      const offId = makeId();
+      initialNodes = [
+        { id: eventId, kind: 'event_begin', name: 'Démarrer', enabled: true, params: {}, pos: { x: 80, y: 80 } },
+        { id: coldId, kind: 'fill', name: 'Blanc froid', enabled: true, params: { color: '#EAF3FF', intensity: 0.85, mask: 'all', seconds: 3 }, pos: { x: 360, y: 60 } },
+        { id: wait1Id, kind: 'wait', name: 'Attente essai 1', enabled: true, params: { seconds: 10 }, pos: { x: 620, y: 60 } },
+        { id: neutralId, kind: 'fill', name: 'Blanc neutre', enabled: true, params: { color: '#FFFFFF', intensity: 0.85, mask: 'all', seconds: 3 }, pos: { x: 880, y: 60 } },
+        { id: wait2Id, kind: 'wait', name: 'Attente essai 2', enabled: true, params: { seconds: 10 }, pos: { x: 1140, y: 60 } },
+        { id: warmId, kind: 'fill', name: 'Blanc chaud', enabled: true, params: { color: '#FFEAD0', intensity: 0.85, mask: 'all', seconds: 3 }, pos: { x: 1400, y: 60 } },
+        { id: offId, kind: 'fill', name: 'Off', enabled: true, params: { color: '#000000', intensity: 0, mask: 'all', seconds: 1 }, pos: { x: 1660, y: 60 } },
+      ];
+      initialEdges = [
+        { id: makeId(), from: eventId, to: coldId },
+        { id: makeId(), from: coldId, to: wait1Id },
+        { id: makeId(), from: wait1Id, to: neutralId },
+        { id: makeId(), from: neutralId, to: wait2Id },
+        { id: makeId(), from: wait2Id, to: warmId },
+        { id: makeId(), from: warmId, to: offId },
+      ];
     }
     
     const provisionalGame: GameDoc = {
       id: provisionalId,
       name: gameName,
-      tileCount: Math.max(1, tiles.length || 1),
+      tileCount: 9,
       nodes: initialNodes,
-      edges: [],
+      edges: initialEdges,
     };
 
     const dbId = await createDbGame(gameName, provisionalGame);
@@ -2236,6 +2261,7 @@ export default function EditeurPage() {
                     { id: 'tutorial', icon: Zap, label: 'Tutoriel', desc: 'Remplissage simple démonstratif' },
                     { id: 'animation', icon: Play, label: 'Animation', desc: 'Pulsation automatique' },
                     { id: 'interactive', icon: MousePointer2, label: 'Interactif', desc: 'Contrôle d\'une dalle' },
+                    { id: 'white_master', icon: Palette, label: 'White Master', desc: 'Suite de blancs + temps d\'essai (prêt à jouer)' },
                   ].map((t) => (
                     <button
                       key={t.id}
