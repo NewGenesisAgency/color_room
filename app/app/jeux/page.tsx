@@ -24,8 +24,6 @@ import {
 } from 'lucide-react';
 
 import { computeTiles } from '@/lib/game/tilesRuntime';
-import MaitreDuBlanc from '@/app/_games/maitre-du-blanc/MaitreDuBlanc';
-import ChromaticityDiagram from '@/app/_games/chromaticity-diagram/ChromaticityDiagram';
 
 type UserType = 'apprenant' | 'enseignant';
 
@@ -40,8 +38,7 @@ type GameId =
   | 'spectrum-challenge'
   | 'escape-game'
   | 'multiplayer-split'
-  | 'maitre-du-blanc'
-  | 'chromaticity-diagram';
+  ;
 
 type GameDef = {
   id: GameId;
@@ -175,18 +172,6 @@ const games: GameDef[] = [
     name: 'Balance des Blancs',
     description: 'Créez différents types de blanc selon température',
     difficulty: 3,
-  },
-  {
-    id: 'maitre-du-blanc',
-    name: 'Le Maître du Blanc',
-    description: 'Reproduisez des blancs (température) en ajustant le RGB, score basé sur XYZ',
-    difficulty: 3,
-  },
-  {
-    id: 'chromaticity-diagram',
-    name: 'Diagramme de Chromaticité',
-    description: 'Explorez le diagramme u′v′ CIE 1976 UCS et trouvez les coordonnées chromatiques',
-    difficulty: 2,
   },
   {
     id: 'spectrum-challenge',
@@ -764,6 +749,24 @@ export default function JeuxPage() {
 
       setPlateColors(() => tiles.slice(0, 9).map((x) => x.color));
       setPlateActive(() => tiles.slice(0, 9).map((x) => x.intensity > 0));
+
+      // Afficher des instructions simples pour White Master
+      if (hudRun.name.toLowerCase().includes('white master') || hudRun.name.toLowerCase().includes('maître du blanc')) {
+        const phase = Math.floor(tSeconds / 3); // Change toutes les 3 secondes
+        if (phase === 0) {
+          setMessage('Blanc FROID - Observez la teinte bleutée');
+        } else if (phase === 1) {
+          setMessage('Pause - Comparez mentalement');
+        } else if (phase === 2) {
+          setMessage('Blanc NEUTRE - Blanc pur');
+        } else if (phase === 3) {
+          setMessage('Pause - Comparez avec le précédent');
+        } else if (phase === 4) {
+          setMessage('Blanc CHAUD - Observez la teinte jaunâtre');
+        } else if (phase >= 5) {
+          setMessage('Fin du jeu - Avez-vous vu les différences ?');
+        }
+      }
 
       raf = window.requestAnimationFrame(tick);
     };
@@ -1613,12 +1616,19 @@ export default function JeuxPage() {
       return;
     }
 
+    // Ajout d'une interface simple pour White Master
     const showHud = Boolean(cfg.ui && Array.isArray(cfg.ui.widgets) && cfg.ui.widgets.length > 0);
     setHudRun({ gameId: game.id, name: game.name, cfg, showHud });
     setCustomRun(null);
     setCurrentGame(null);
     setGameActive(true);
-    setMessage(`Jeu éditeur: ${game.name}`);
+    
+    // Message d'instructions pour White Master
+    if (game.name.toLowerCase().includes('white master') || game.name.toLowerCase().includes('maître du blanc')) {
+      setMessage(`Jeu éditeur: ${game.name} - Observez bien les différentes teintes de blanc !`);
+    } else {
+      setMessage(`Jeu éditeur: ${game.name}`);
+    }
     resetScene();
 
     // V1-A: simulation via computeTiles() (moteur partagé) dans un raf loop.
@@ -1729,18 +1739,6 @@ export default function JeuxPage() {
       setCurrentTemp(5000);
       resetScene();
       setAllPlates('rgb(255,240,220)', true);
-      return;
-    }
-
-    if (currentGame === 'maitre-du-blanc') {
-      setMessage('Reproduisez un blanc cible en ajustant le RGB (score basé sur XYZ).');
-      resetScene();
-      return;
-    }
-
-    if (currentGame === 'chromaticity-diagram') {
-      setMessage('Explorez le diagramme de chromaticité u′v′ CIE 1976 UCS.');
-      resetScene();
       return;
     }
 
@@ -2439,6 +2437,12 @@ export default function JeuxPage() {
                           <div style={{ fontSize: 12, opacity: 0.75 }}>
                             Type: {g.kind}
                           </div>
+                          {/* Instructions pour White Master */}
+                          {(g.name.toLowerCase().includes('white master') || g.name.toLowerCase().includes('maître du blanc')) ? (
+                            <div style={{ fontSize: 11, opacity: 0.65, marginTop: 4 }}>
+                              💡 Observez les différentes teintes de blanc !
+                            </div>
+                          ) : null}
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                           {String(g.kind) === 'custom' ? (
@@ -2630,14 +2634,6 @@ export default function JeuxPage() {
                       <Sparkles size={18} /> Activer UV (380-400nm)
                     </button>
                   </>
-                ) : null}
-
-                {gameActive && currentGame === 'maitre-du-blanc' ? (
-                  <MaitreDuBlanc />
-                ) : null}
-
-                {gameActive && currentGame === 'chromaticity-diagram' ? (
-                  <ChromaticityDiagram />
                 ) : null}
 
                 {gameActive && currentGame === 'multiplayer-split' ? (
