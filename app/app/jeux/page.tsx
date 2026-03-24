@@ -727,6 +727,14 @@ export default function JeuxPage() {
   const [plateColors, setPlateColors] = useState<string[]>(Array(9).fill('#000000'));
   const [plateActive, setPlateActive] = useState<boolean[]>(Array(9).fill(false));
 
+  // États pour le jeu White Master interactif
+  const [whiteMasterPhase, setWhiteMasterPhase] = useState<'observation' | 'question' | 'feedback'>('observation');
+  const [currentWhiteColor, setCurrentWhiteColor] = useState<'cold' | 'neutral' | 'warm'>('cold');
+  const [whiteMasterScore, setWhiteMasterScore] = useState(0);
+  const [whiteMasterQuestion, setWhiteMasterQuestion] = useState('');
+  const [showAnswerButtons, setShowAnswerButtons] = useState(false);
+  const [feedback, setFeedback] = useState('');
+
   const [hardwarePreviewCss, setHardwarePreviewCss] = useState<string>('rgb(0,0,0)');
 
   useEffect(() => {
@@ -750,21 +758,62 @@ export default function JeuxPage() {
       setPlateColors(() => tiles.slice(0, 9).map((x) => x.color));
       setPlateActive(() => tiles.slice(0, 9).map((x) => x.intensity > 0));
 
-      // Afficher des instructions simples pour White Master
+      // Logique interactive pour White Master
       if (hudRun.name.toLowerCase().includes('white master') || hudRun.name.toLowerCase().includes('maître du blanc')) {
         const phase = Math.floor(tSeconds / 3); // Change toutes les 3 secondes
+        
         if (phase === 0) {
-          setMessage('Blanc FROID - Observez la teinte bleutée');
+          // Phase d'observation du blanc froid
+          setMessage('Blanc FROID - Observez bien la teinte bleutée');
+          setCurrentWhiteColor('cold');
+          setWhiteMasterPhase('observation');
+          setShowAnswerButtons(false);
+          setFeedback('');
         } else if (phase === 1) {
-          setMessage('Pause - Comparez mentalement');
+          // Phase de question après le blanc froid
+          setMessage('Quel blanc avez-vous observé ?');
+          setWhiteMasterQuestion('Quel blanc avez-vous observé ?');
+          setWhiteMasterPhase('question');
+          setShowAnswerButtons(true);
+          // Éteindre les dalles pendant la question
+          setPlateColors(Array(9).fill('#000000'));
+          setPlateActive(Array(9).fill(false));
         } else if (phase === 2) {
-          setMessage('Blanc NEUTRE - Blanc pur');
+          // Phase d'observation du blanc neutre
+          setMessage('Blanc NEUTRE - Observez le blanc pur');
+          setCurrentWhiteColor('neutral');
+          setWhiteMasterPhase('observation');
+          setShowAnswerButtons(false);
+          setFeedback('');
         } else if (phase === 3) {
-          setMessage('Pause - Comparez avec le précédent');
+          // Phase de question après le blanc neutre
+          setMessage('Quel blanc avez-vous observé ?');
+          setWhiteMasterQuestion('Quel blanc avez-vous observé ?');
+          setWhiteMasterPhase('question');
+          setShowAnswerButtons(true);
+          setPlateColors(Array(9).fill('#000000'));
+          setPlateActive(Array(9).fill(false));
         } else if (phase === 4) {
+          // Phase d'observation du blanc chaud
           setMessage('Blanc CHAUD - Observez la teinte jaunâtre');
-        } else if (phase >= 5) {
-          setMessage('Fin du jeu - Avez-vous vu les différences ?');
+          setCurrentWhiteColor('warm');
+          setWhiteMasterPhase('observation');
+          setShowAnswerButtons(false);
+          setFeedback('');
+        } else if (phase === 5) {
+          // Phase de question après le blanc chaud
+          setMessage('Quel blanc avez-vous observé ?');
+          setWhiteMasterQuestion('Quel blanc avez-vous observé ?');
+          setWhiteMasterPhase('question');
+          setShowAnswerButtons(true);
+          setPlateColors(Array(9).fill('#000000'));
+          setPlateActive(Array(9).fill(false));
+        } else if (phase >= 6) {
+          // Fin du jeu
+          setMessage(`Jeu terminé ! Score : ${whiteMasterScore}/3`);
+          setWhiteMasterPhase('feedback');
+          setShowAnswerButtons(false);
+          setFeedback(`Score final : ${whiteMasterScore}/3 bonnes réponses !`);
         }
       }
 
@@ -775,7 +824,23 @@ export default function JeuxPage() {
     return () => {
       window.cancelAnimationFrame(raf);
     };
-  }, [hudRun?.gameId]);
+  }, [hudRun?.gameId, whiteMasterScore]);
+
+  // Fonction pour gérer les réponses au jeu White Master
+  function handleWhiteMasterAnswer(answer: 'cold' | 'neutral' | 'warm') {
+    if (answer === currentWhiteColor) {
+      // Bonne réponse
+      setWhiteMasterScore(prev => prev + 1);
+      setFeedback('✅ Bonne réponse !');
+    } else {
+      // Mauvaise réponse
+      setFeedback(`❌ Mauvaise réponse ! C'était ${currentWhiteColor === 'cold' ? 'Blanc FROID' : currentWhiteColor === 'neutral' ? 'Blanc NEUTRE' : 'Blanc CHAUD'}`);
+    }
+    
+    // Masquer les boutons après réponse
+    setShowAnswerButtons(false);
+    setWhiteMasterPhase('feedback');
+  }
 
   const [ledValues, setLedValues] = useState<Record<number, number>>({});
   const [message, setMessage] = useState<string>('Sélectionnez un jeu et cliquez sur "Démarrer le Jeu"');
@@ -2488,6 +2553,76 @@ export default function JeuxPage() {
               </h3>
 
               <div className="message-box">{message}</div>
+
+              {/* Interface interactive pour White Master */}
+              {hudRun && (hudRun.name.toLowerCase().includes('white master') || hudRun.name.toLowerCase().includes('maître du blanc')) && (
+                <div className="glass" style={{ padding: 16, borderRadius: 16, marginBottom: 16 }}>
+                  {/* Score */}
+                  <div style={{ textAlign: 'center', marginBottom: 12 }}>
+                    <strong style={{ fontSize: 18 }}>Score : {whiteMasterScore}/3</strong>
+                  </div>
+                  
+                  {/* Feedback */}
+                  {feedback && (
+                    <div style={{ 
+                      textAlign: 'center', 
+                      marginBottom: 12, 
+                      padding: 8, 
+                      borderRadius: 8, 
+                      backgroundColor: feedback.includes('✅') ? 'rgba(34, 197, 94, 0.2)' : 'rgba(239, 68, 68, 0.2)',
+                      border: feedback.includes('✅') ? '1px solid rgba(34, 197, 94, 0.5)' : '1px solid rgba(239, 68, 68, 0.5)',
+                      color: feedback.includes('✅') ? '#22c55e' : '#ef4444'
+                    }}>
+                      {feedback}
+                    </div>
+                  )}
+                  
+                  {/* Boutons de réponse */}
+                  {showAnswerButtons && (
+                    <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+                      <button 
+                        className="btn" 
+                        onClick={() => handleWhiteMasterAnswer('cold')}
+                        style={{ 
+                          backgroundColor: '#e0f2fe', 
+                          color: '#0284c7',
+                          border: '1px solid #0284c7',
+                          padding: '12px 20px',
+                          borderRadius: 8
+                        }}
+                      >
+                        🔵 Blanc FROID
+                      </button>
+                      <button 
+                        className="btn" 
+                        onClick={() => handleWhiteMasterAnswer('neutral')}
+                        style={{ 
+                          backgroundColor: '#f8fafc', 
+                          color: '#475569',
+                          border: '1px solid #475569',
+                          padding: '12px 20px',
+                          borderRadius: 8
+                        }}
+                      >
+                        ⚪ Blanc NEUTRE
+                      </button>
+                      <button 
+                        className="btn" 
+                        onClick={() => handleWhiteMasterAnswer('warm')}
+                        style={{ 
+                          backgroundColor: '#fef3c7', 
+                          color: '#d97706',
+                          border: '1px solid #d97706',
+                          padding: '12px 20px',
+                          borderRadius: 8
+                        }}
+                      >
+                        🟡 Blanc CHAUD
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div className="light-plates-grid">
                 {Array.from({ length: 9 }).map((_, i) => (
