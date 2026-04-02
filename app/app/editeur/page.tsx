@@ -3,8 +3,11 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import EditorTilesViewport from '@/app/_components/EditorTilesViewport';
+import TetrisGame from '@/app/_components/TetrisGame';
+import CS150Panel from '@/app/_components/CS150Panel';
+import type { TetrisSnapshot } from '@/app/_components/TetrisGame';
 
-import { Boxes, Gamepad2, Plus, Play, Pause, RotateCcw, Save, Trash2, FolderPlus, X, ChevronRight, Layers, Zap, Palette, Clock, MousePointer2, LayoutGrid, Maximize2, Minimize2 } from 'lucide-react';
+import { Boxes, Gamepad2, Plus, Play, Pause, RotateCcw, Save, Trash2, FolderPlus, X, Lightbulb, Layers, Zap, Palette, Clock, MousePointer2, LayoutGrid, Maximize2, Minimize2, Eye, Star, Heart, Sun, Moon, Flame, Snowflake, Music, Target, Puzzle, Sparkles, Trophy, Rocket, Ghost, Dice1, Brain, type LucideIcon } from 'lucide-react';
 
 type IdFactory = () => string;
 
@@ -40,7 +43,19 @@ type EditorNodeKind =
   | 'time_seconds'
   | 'random_01'
   | 'tile_get'
-  | 'tile_set';
+  | 'tile_set'
+  | 'game_tetris'
+  | 'on_timer'
+  | 'on_click'
+  // CS150 Colorimeter nodes
+  | 'cs150_connect'
+  | 'cs150_measure'
+  | 'cs150_read_xyz'
+  | 'cs150_read_lvxy'
+  | 'cs150_set_backlight'
+  | 'cs150_set_calib_ch'
+  | 'cs150_rgb_calib'
+  | 'cs150_single_calib';
 
 type EditorNode = {
   id: string;
@@ -51,10 +66,25 @@ type EditorNode = {
   pos: { x: number; y: number };
 };
 
+type GameDifficulty = 1 | 2 | 3 | 4 | 5;
+
+type GameIconName = 'Lightbulb' | 'Gamepad2' | 'Star' | 'Heart' | 'Sun' | 'Moon' | 'Flame' | 'Snowflake' | 'Music' | 'Target' | 'Puzzle' | 'Sparkles' | 'Trophy' | 'Rocket' | 'Ghost' | 'Palette' | 'Zap' | 'Dice1';
+
+const GAME_ICON_MAP: Record<GameIconName, LucideIcon> = {
+  Lightbulb, Gamepad2, Star, Heart, Sun, Moon, Flame, Snowflake, Music, Target, Puzzle, Sparkles, Trophy, Rocket, Ghost, Palette, Zap, Dice1,
+};
+
+const GAME_ICON_NAMES: GameIconName[] = Object.keys(GAME_ICON_MAP) as GameIconName[];
+
 type GameDoc = {
   id: string;
   name: string;
   tileCount?: number;
+  icon?: GameIconName;
+  difficulty?: GameDifficulty;
+  description?: string;
+  bgColor?: string;
+  accentColor?: string;
   nodes: EditorNode[];
   edges: GraphEdge[];
 };
@@ -105,6 +135,26 @@ const NODE_CATALOG: NodeCatalogItem[] = [
   { kind: 'logic_not', category: 'Logique', title: 'NON', defaults: {} },
   { kind: 'time_seconds', category: 'Temps', title: 'Secondes', defaults: {} },
   { kind: 'random_01', category: 'Aléatoire', title: 'Aléatoire 0..1', defaults: {} },
+  { kind: 'game_tetris', category: 'Jeux', title: 'Tetris Lumière', defaults: { speed: 500, bgColor: '#0a0a0f', borderColor: '#222233' } },
+  { kind: 'on_timer', category: 'Évènements', title: 'Timer', defaults: { intervalMs: 1000 } },
+  { kind: 'on_click', category: 'Évènements', title: 'On Click', defaults: { tileIndex: 0 } },
+  // CS150 Colorimeter nodes
+  { kind: 'cs150_connect', category: 'Colorimètre', title: 'CS150 Connect', defaults: {} },
+  { kind: 'cs150_measure', category: 'Colorimètre', title: 'CS150 Mesurer', defaults: {} },
+  { kind: 'cs150_read_xyz', category: 'Colorimètre', title: 'CS150 Lire XYZ', defaults: {} },
+  { kind: 'cs150_read_lvxy', category: 'Colorimètre', title: 'CS150 Lire Lvxy', defaults: {} },
+  { kind: 'cs150_set_backlight', category: 'Colorimètre', title: 'CS150 Rétroéclairage', defaults: { mode: 'on' } },
+  { kind: 'cs150_set_calib_ch', category: 'Colorimètre', title: 'CS150 Canal Calib', defaults: { channel: 0 } },
+  { kind: 'cs150_rgb_calib', category: 'Colorimètre', title: 'CS150 Calib RGB', defaults: { 
+    trueRedX: 800, trueRedY: 400, trueRedZ: 300,
+    trueGreenX: 600, trueGreenY: 1000, trueGreenZ: 400,
+    trueBlueX: 500, trueBlueY: 600, trueBlueZ: 1000,
+    calibId: 'rgb_calib_001', targetChannel: 1 
+  }},
+  { kind: 'cs150_single_calib', category: 'Colorimètre', title: 'CS150 Calib 1 Point', defaults: { 
+    trueLv: 11.0, trueX: 0.4, trueY: 0.4,
+    calibId: 'single_calib_001', targetChannel: 1 
+  }},
 ];
 
 function labelNodeKind(kind: EditorNodeKind): string {
@@ -173,6 +223,9 @@ type EditorSnapshot = {
   games: GameDoc[];
   activeGameId: string;
   selectedNodeId: string | null;
+  drillDownFrom?: string;
+  expandedGameNodeId?: string;
+  visibleNodeIds?: string[];
 };
 
 function isEditableTarget(target: EventTarget | null): boolean {
@@ -253,7 +306,7 @@ function applyRenderNode(tiles: TileState[], node: EditorNode, tSeconds: number)
 
     const speed = Math.max(0.01, getNum(node.params, 'speed', 0.9));
     const phase = getNum(node.params, 'phase', 0);
-    const t01 = clamp01(0.5 + 0.5 * Math.sin(tSeconds * speed + phase));
+    const t01 = clamp01(0.5 + 0.5 * Math.sin(tSeconds * speed * 2 * Math.PI + phase));
     const intensity = clamp01(lerp(fromIntensity, toIntensity, t01));
     const color = lerpColor(baseColor, targetColor, t01);
 
@@ -274,7 +327,7 @@ function applyRenderNode(tiles: TileState[], node: EditorNode, tSeconds: number)
 }
 
 function computeTiles(game: GameDoc, tSeconds: number): TileState[] {
-  const tileCount = Math.max(1, Math.round(Number(game.tileCount ?? 9)));
+  const tileCount = Math.max(1, Math.round(Number(game.tileCount ?? 42)));
   const tiles: TileState[] = Array.from({ length: tileCount }, () => ({ color: '#000000', intensity: 0 }));
 
   // Runtime MVP: exécute une seule chaîne depuis event_begin en suivant les edges.
@@ -327,6 +380,13 @@ function computeTiles(game: GameDoc, tSeconds: number): TileState[] {
 
   const total = segments.reduce((acc, s) => acc + s.duration, 0);
   if (total <= 0.0001 || segments.length === 0) {
+    // Fallback: apply all enabled render nodes if no valid timeline
+    for (const node of game.nodes) {
+      if (!node.enabled) continue;
+      if (node.kind === 'fill' || node.kind === 'pulse' || node.kind === 'tile') {
+        applyRenderNode(tiles, node, tSeconds);
+      }
+    }
     return tiles;
   }
 
@@ -365,7 +425,7 @@ function computeTiles(game: GameDoc, tSeconds: number): TileState[] {
 }
 
 // Hardware control constants and functions (from /jeux)
-const PLATE_ID_BY_INDEX: number[] = [1, 2, 3, 4, 5, 6, 7, 8, 9];
+const PLATE_ID_BY_INDEX: number[] = Array.from({ length: 42 }, (_, i) => i + 1);
 
 function hexToRgb255(hex: string): { r: number; g: number; b: number } {
   const m = /^#([0-9a-fA-F]{6})$/.exec(hex);
@@ -374,45 +434,149 @@ function hexToRgb255(hex: string): { r: number; g: number; b: number } {
   return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
 }
 
+// Channel profiles matching COULEURS.md (32 LED channels per plaque)
+const CHANNEL_PROFILES: { rgb: [number, number, number]; strength: number }[] = [
+  { rgb: [0.30, 0.00, 0.50], strength: 1.0 },  // 1: violet foncé
+  { rgb: [0.55, 0.10, 0.85], strength: 1.0 },  // 2: violet clair
+  { rgb: [0.25, 0.05, 0.95], strength: 1.0 },  // 3: bleu violet
+  { rgb: [0.05, 0.05, 0.40], strength: 1.0 },  // 4: bleu marine
+  { rgb: [0.00, 0.65, 1.00], strength: 1.0 },  // 5: bleu turquoise
+  { rgb: [0.25, 1.00, 0.35], strength: 1.0 },  // 6: vert clair
+  { rgb: [0.00, 0.55, 0.12], strength: 1.0 },  // 7: vert foncé
+  { rgb: [1.00, 1.00, 0.40], strength: 1.0 },  // 8: jaune clair
+  { rgb: [1.00, 0.55, 0.00], strength: 1.0 },  // 9: orange
+  { rgb: [0.75, 0.25, 0.00], strength: 1.0 },  // 10: rouge/orangé
+  { rgb: [0.55, 0.00, 0.00], strength: 1.0 },  // 11: rouge foncé
+  { rgb: [1.00, 0.05, 0.05], strength: 1.0 },  // 12: rouge pétant
+  { rgb: [0.95, 0.00, 0.20], strength: 1.0 },  // 13: rouge cerise
+  { rgb: [0.90, 0.00, 0.22], strength: 1.0 },  // 14: rouge cerise+
+  { rgb: [0.35, 0.00, 0.00], strength: 1.0 },  // 15: rouge foncé
+  { rgb: [0.20, 0.00, 0.00], strength: 0.25 }, // 16: rouge très foncé
+  { rgb: [0.10, 0.00, 0.00], strength: 0.15 }, // 17: rouge invisible
+  { rgb: [0.10, 0.00, 0.00], strength: 0.15 }, // 18: rouge invisible
+  { rgb: [1.00, 0.58, 0.00], strength: 1.0 },  // 19: jaune orange
+  { rgb: [1.00, 0.70, 0.10], strength: 1.0 },  // 20: jaune orange clair
+  { rgb: [1.00, 0.78, 0.15], strength: 0.55 }, // 21
+  { rgb: [1.00, 0.80, 0.20], strength: 0.45 }, // 22
+  { rgb: [1.00, 0.82, 0.22], strength: 0.35 }, // 23
+  { rgb: [1.00, 0.92, 0.78], strength: 1.0 },  // 24: jaune orange blanc
+  { rgb: [1.00, 0.97, 0.90], strength: 1.0 },  // 25: blanc jaunis
+  { rgb: [1.00, 1.00, 1.00], strength: 1.0 },  // 26: blanc
+  { rgb: [0.90, 0.90, 0.90], strength: 0.75 }, // 27
+  { rgb: [0.80, 0.80, 0.80], strength: 0.60 }, // 28
+  { rgb: [0.55, 0.55, 0.55], strength: 0.45 }, // 29: gris
+  { rgb: [0.40, 0.40, 0.40], strength: 0.40 }, // 30
+  { rgb: [0.78, 0.78, 0.78], strength: 0.55 }, // 31
+  { rgb: [0.92, 0.92, 0.92], strength: 0.70 }, // 32
+];
+
 function rgbToChannels32(rgb: { r: number; g: number; b: number }, masterIntensity100: number): number[] {
-  const ch = Array(32).fill(0);
-  const intensity01 = Math.max(0, Math.min(100, masterIntensity100)) / 100;
-  const baseR = Math.round(rgb.r * intensity01);
-  const baseG = Math.round(rgb.g * intensity01);
-  const baseB = Math.round(rgb.b * intensity01);
+  const r = clamp255(rgb.r) / 255;
+  const g = clamp255(rgb.g) / 255;
+  const b = clamp255(rgb.b) / 255;
+  const scale = Math.max(0, Math.min(100, masterIntensity100)) / 100;
 
-  // Simplified spectrum mapping: B=0-6, G=7-16, R=17-31
-  for (let i = 0; i < 7; i++) ch[i] = baseB;
-  for (let i = 7; i < 17; i++) ch[i] = baseG;
-  for (let i = 17; i < 32; i++) ch[i] = baseR;
+  const energy = Math.max(r, g, b);
+  const channels = Array(32).fill(0);
+  if (energy <= 1e-6 || scale <= 1e-6) return channels;
 
-  return ch;
+  // Find the best matching channel using cosine similarity with CHANNEL_PROFILES
+  const norm = Math.max(1e-6, Math.sqrt(r * r + g * g + b * b));
+  const tr = r / norm;
+  const tg = g / norm;
+  const tb = b / norm;
+
+  let bestIdx = 11; // Canal 12 (rouge pétant) as safe default
+  let bestScore = -1;
+  for (let i = 0; i < 32; i++) {
+    const p = CHANNEL_PROFILES[i];
+    if (!p || p.strength <= 0.05) continue;
+    const pn = Math.max(1e-6, Math.sqrt(p.rgb[0] * p.rgb[0] + p.rgb[1] * p.rgb[1] + p.rgb[2] * p.rgb[2]));
+    const pr = p.rgb[0] / pn;
+    const pg = p.rgb[1] / pn;
+    const pb = p.rgb[2] / pn;
+    const score = pr * tr + pg * tg + pb * tb;
+    if (score > bestScore) {
+      bestScore = score;
+      bestIdx = i;
+    }
+  }
+
+  const mainValue = Math.max(0, Math.min(100, Math.round(energy * 100 * scale)));
+  channels[bestIdx] = mainValue;
+
+  // Boost intensity with white channels (COULEURS.md canaux 25-28)
+  // to increase overall luminosity — proportional to energy and scale
+  const whiteBoost = Math.round(mainValue * 0.4);
+  if (whiteBoost > 0) {
+    channels[24] = Math.round(whiteBoost * 0.5);  // Canal 25: Blanc un peu jaunis
+    channels[25] = whiteBoost;                      // Canal 26: Blanc (dominant)
+    channels[26] = Math.round(whiteBoost * 0.7);   // Canal 27: Blanc un peu moins lumineux
+    channels[27] = Math.round(whiteBoost * 0.4);   // Canal 28: Blanc encore moins lumineux
+  }
+
+  return channels;
 }
 
-// Hardware timers for debouncing
-const hwTimersRef: { current: Record<string, number> } = { current: {} };
+// Hardware batch timer for throttled sending
+let hwBatchTimer: ReturnType<typeof setTimeout> | null = null;
+let hwPendingBatch: Map<string, { plaqueId: number; canal: number; value: number }> = new Map();
+const hwLastSent: Map<string, number> = new Map(); // cache to skip unchanged values
+let hwFlushInFlight = false;
+
+function flushHardwareBatch() {
+  hwBatchTimer = null;
+  if (hwFlushInFlight) {
+    // Re-schedule if a flush is already in progress
+    hwBatchTimer = setTimeout(flushHardwareBatch, 300);
+    return;
+  }
+  const batch = hwPendingBatch;
+  hwPendingBatch = new Map();
+
+  // Filter out unchanged values
+  const toSend: { plaqueId: number; canal: number; value: number }[] = [];
+  for (const [key, entry] of batch) {
+    const clamped = Math.max(0, Math.min(255, Math.round(entry.value)));
+    const prev = hwLastSent.get(key);
+    if (prev === clamped) continue; // skip unchanged
+    hwLastSent.set(key, clamped);
+    toSend.push({ ...entry, value: clamped });
+  }
+
+  if (toSend.length === 0) return;
+
+  // Send in small sequential batches to avoid flooding
+  hwFlushInFlight = true;
+  const MAX_PARALLEL = 6;
+  let idx = 0;
+  function sendNext() {
+    const chunk = toSend.slice(idx, idx + MAX_PARALLEL);
+    if (chunk.length === 0) { hwFlushInFlight = false; return; }
+    idx += chunk.length;
+    Promise.all(
+      chunk.map(({ plaqueId, canal, value }) =>
+        fetch(`/api/supervision/state/plaque/${plaqueId}/cursor/${canal}/${value}`, { method: 'PUT', cache: 'no-store' }).catch(() => {})
+      )
+    ).then(sendNext).catch(() => { hwFlushInFlight = false; });
+  }
+  sendNext();
+}
 
 function scheduleSetCanal(plaqueId: number, canalIndex: number, intensity: number) {
   const key = `${plaqueId}:${canalIndex}`;
-  const existing = hwTimersRef.current[key];
-  if (existing) window.clearTimeout(existing);
+  hwPendingBatch.set(key, { plaqueId, canal: canalIndex, value: intensity });
 
-  hwTimersRef.current[key] = window.setTimeout(async () => {
-    try {
-      await fetch(
-        `/api/supervision/state/plaque/${plaqueId}/cursor/${canalIndex}/${Math.max(0, Math.min(255, Math.round(intensity)))}`,
-        { method: 'PUT', cache: 'no-store' }
-      );
-    } catch {
-      // ignore
-    }
-  }, 60);
+  if (!hwBatchTimer) {
+    hwBatchTimer = setTimeout(flushHardwareBatch, 300);
+  }
 }
 
 function sendChannelsToHardware(channels32: number[], plateIds: number[]) {
   for (const plaqueId of plateIds) {
     for (let i = 0; i < 32; i++) {
-      scheduleSetCanal(plaqueId, i, clamp255(channels32[i] ?? 0));
+      const v = clamp255(channels32[i] ?? 0);
+      if (v > 0) scheduleSetCanal(plaqueId, i, v); // only schedule non-zero
     }
   }
 }
@@ -434,13 +598,14 @@ export default function EditeurPage() {
   // Nouveaux états pour l'interface améliorée
   const [modal, setModal] = useState<ModalState>(null);
   const [viewMode, setViewMode] = useState<ViewMode>('split');
+  const [showGameOverlay, setShowGameOverlay] = useState(false);
   const [isPlaying, setIsPlaying] = useState<boolean>(true);
   const [visualComponents, setVisualComponents] = useState<VisualComponent[]>([]);
   const [selectedVisualComponent, setSelectedVisualComponent] = useState<string | null>(null);
   const [showGrid, setShowGrid] = useState<boolean>(true);
   const [zoomLevel, setZoomLevel] = useState<number>(100);
   const [newProjectName, setNewProjectName] = useState<string>('');
-  const [newProjectTemplate, setNewProjectTemplate] = useState<'blank' | 'tutorial' | 'animation' | 'interactive'>('blank');
+  const [newProjectTemplate, setNewProjectTemplate] = useState<'blank' | 'tutorial' | 'animation' | 'interactive' | 'fluorescence' | 'color-demo' | 'pulse-advanced' | 'rainbow' | 'tetris' | 'memory'>('blank');
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -450,6 +615,7 @@ export default function EditeurPage() {
 
   const [status, setStatus] = useState<string>('');
   const [selectedTileIndex, setSelectedTileIndex] = useState<number | null>(null);
+  const tetrisSnapRef = useRef<TetrisSnapshot | null>(null);
 
   const [viewportHeight, setViewportHeight] = useState<number>(300);
   const [resizing, setResizing] = useState<{ active: boolean; y: number; start: number }>(
@@ -607,6 +773,11 @@ export default function EditeurPage() {
   }, [activeGame, selectedNodeId]);
 
 
+  const activeTetrisNode = useMemo(() => {
+    if (!activeGame) return null;
+    return activeGame.nodes.find((n) => n.kind === 'game_tetris' && n.enabled) ?? null;
+  }, [activeGame]);
+
   const addEdge = (from: string, to: string) => {
     if (!activeGameId) return;
     commit((cur) => {
@@ -681,6 +852,13 @@ export default function EditeurPage() {
       if ((e.key === 'Delete' || e.key === 'Backspace') && editor.selectedNodeId) {
         e.preventDefault();
         const nodeId = editor.selectedNodeId;
+        // Prevent deletion of event_begin nodes
+        const game = editor.games.find((g) => g.id === editor.activeGameId);
+        const targetNode = game?.nodes.find((n) => n.id === nodeId);
+        if (targetNode?.kind === 'event_begin') {
+          setStatus('⛔ Impossible de supprimer l\'évènement de départ');
+          return;
+        }
         commit((cur) => {
           const nextGames = cur.games.map((g) => {
             if (g.id !== cur.activeGameId) return g;
@@ -728,6 +906,114 @@ export default function EditeurPage() {
       }
     });
   }, [tiles, activeGame, isPlaying]);
+
+  // PREVIEW MODE: Show selected node color on ALL plates in real-time when editing
+  useEffect(() => {
+    if (!activeGame || isPlaying) return;
+    if (!editor.selectedNodeId) return;
+
+    const selectedNode = activeGame.nodes.find((n) => n.id === editor.selectedNodeId);
+    if (!selectedNode || !selectedNode.enabled) return;
+
+    // Extract color and intensity from render nodes
+    let previewColor: string | null = null;
+    let previewIntensity = 0.8;
+
+    if (selectedNode.kind === 'fill') {
+      previewColor = getColor(selectedNode.params, 'color', '#6d28ff');
+      previewIntensity = clamp01(getNum(selectedNode.params, 'intensity', 0.8));
+    } else if (selectedNode.kind === 'pulse') {
+      // ANIMATED pulse preview using live t
+      const legacyColor = getColor(selectedNode.params, 'color', '#ff2aa6');
+      const baseColor = getColor(selectedNode.params, 'baseColor', legacyColor);
+      const targetColor = getColor(selectedNode.params, 'targetColor', legacyColor);
+      
+      const legacyBase = clamp01(getNum(selectedNode.params, 'base', 0.15));
+      const legacyAmp = clamp01(getNum(selectedNode.params, 'amp', 0.75));
+      const fromIntensity = clamp01(getNum(selectedNode.params, 'fromIntensity', legacyBase));
+      const toIntensity = clamp01(getNum(selectedNode.params, 'toIntensity', clamp01(legacyBase + legacyAmp)));
+      
+      const speed = Math.max(0.01, getNum(selectedNode.params, 'speed', 0.9));
+      const phase = getNum(selectedNode.params, 'phase', 0);
+      const t01 = clamp01(0.5 + 0.5 * Math.sin(t * speed * 2 * Math.PI + phase));
+      
+      previewColor = lerpColor(baseColor, targetColor, t01);
+      previewIntensity = clamp01(lerp(fromIntensity, toIntensity, t01));
+    } else if (selectedNode.kind === 'tile') {
+      previewColor = getColor(selectedNode.params, 'color', '#ff2aa6');
+      previewIntensity = clamp01(getNum(selectedNode.params, 'intensity', 0.85));
+    }
+
+    if (!previewColor) return;
+
+    // Send to all plates
+    const rgb = hexToRgb255(previewColor);
+    const intensity100 = Math.round(previewIntensity * 100);
+    const allPlateIds = PLATE_ID_BY_INDEX.filter(Boolean);
+    sendRgbToHardware(rgb, intensity100, allPlateIds);
+  }, [activeGame, editor.selectedNodeId, isPlaying, t]);
+
+  // Map Tetris grid to hardware tiles — throttled to 500ms interval (not every frame)
+  useEffect(() => {
+    if (!activeTetrisNode || !isPlaying) return;
+
+    function syncTetrisToHardware() {
+      const snap = tetrisSnapRef.current;
+      if (!snap) return;
+      const { grid, piece } = snap;
+      if (!grid || grid.length === 0) return;
+
+      const GRID_ROWS = grid.length;
+      const GRID_COLS = grid[0]?.length ?? 6;
+
+      // Merge current piece onto grid copy
+      const merged: (string | null)[][] = grid.map(row => [...row]);
+      if (piece) {
+        const { shape, x: px, y: py, color: pColor } = piece;
+        for (let r = 0; r < shape.length; r++) {
+          for (let c = 0; c < shape[r].length; c++) {
+            if (shape[r][c]) {
+              const gr = py + r;
+              const gc = px + c;
+              if (gr >= 0 && gr < GRID_ROWS && gc >= 0 && gc < GRID_COLS) {
+                merged[gr][gc] = pColor;
+              }
+            }
+          }
+        }
+      }
+
+      const TOTAL_PLATES = 42;
+      const HW_COLS = 6;
+      const HW_ROWS = 7;
+
+      // 1:1 mapping: show bottom 7 rows of Tetris grid on the 7 hardware rows
+      const gridOffset = Math.max(0, GRID_ROWS - HW_ROWS);
+
+      for (let hr = 0; hr < HW_ROWS; hr++) {
+        const gridRow = gridOffset + hr;
+        for (let hc = 0; hc < HW_COLS; hc++) {
+          const tileIdx = hr * HW_COLS + hc;
+          if (tileIdx >= TOTAL_PLATES) continue;
+          const plateId = PLATE_ID_BY_INDEX[tileIdx];
+          if (!plateId) continue;
+
+          const cellColor = merged[gridRow]?.[hc] ?? null;
+
+          if (cellColor) {
+            const rgb = hexToRgb255(cellColor);
+            sendRgbToHardware(rgb, 90, [plateId]);
+          } else {
+            sendRgbToHardware({ r: 0, g: 0, b: 0 }, 0, [plateId]);
+          }
+        }
+      }
+    }
+
+    syncTetrisToHardware(); // initial sync
+    const iv = setInterval(syncTetrisToHardware, 500); // poll every 500ms
+    return () => clearInterval(iv);
+  }, [activeTetrisNode, isPlaying]);
 
   const tileCount = tiles.length;
 
@@ -793,14 +1079,15 @@ export default function EditeurPage() {
     }
   };
 
-  const createGame = async (forcedName?: string, template: 'blank' | 'tutorial' | 'animation' | 'interactive' = 'blank') => {
+  const createGame = async (forcedName?: string, template: 'blank' | 'tutorial' | 'animation' | 'interactive' | 'fluorescence' | 'color-demo' | 'pulse-advanced' | 'rainbow' | 'tetris' | 'memory' = 'blank') => {
     const makeId: IdFactory = () => `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
     const provisionalId = makeId();
     const nextIndex = (editorRef.current.games.length || 0) + 1;
     const gameName = forcedName && forcedName.trim().length > 0 ? forcedName.trim() : `Jeu${nextIndex}`;
     
-    // Créer les nœuds de base selon le template
+    // Créer les nœuds et connexions selon le template
     let initialNodes: EditorNode[] = [];
+    let initialEdges: GraphEdge[] = [];
     const eventId = makeId();
     
     if (template === 'blank') {
@@ -820,26 +1107,232 @@ export default function EditeurPage() {
         { id: eventId, kind: 'event_begin', name: 'Démarrer', enabled: true, params: {}, pos: { x: 80, y: 80 } },
         { id: fillId, kind: 'fill', name: 'Remplissage bleu', enabled: true, params: { color: '#00d7ff', intensity: 0.6, mask: 'all', seconds: 2 }, pos: { x: 400, y: 80 } },
       ];
+      initialEdges = [{ id: makeId(), from: eventId, to: fillId }];
     } else if (template === 'animation') {
       const pulseId = makeId();
       initialNodes = [
         { id: eventId, kind: 'event_begin', name: 'Démarrer', enabled: true, params: {}, pos: { x: 80, y: 80 } },
         { id: pulseId, kind: 'pulse', name: 'Pulsation', enabled: true, params: { baseColor: '#ff2aa6', targetColor: '#00d7ff', fromIntensity: 0.1, toIntensity: 0.8, speed: 1.0, phase: 0 }, pos: { x: 400, y: 80 } },
       ];
+      initialEdges = [{ id: makeId(), from: eventId, to: pulseId }];
     } else if (template === 'interactive') {
       const tileId = makeId();
       initialNodes = [
         { id: eventId, kind: 'event_begin', name: 'Démarrer', enabled: true, params: {}, pos: { x: 80, y: 80 } },
         { id: tileId, kind: 'tile', name: 'Dalle centrale', enabled: true, params: { tileIndex: 4, color: '#ff2aa6', intensity: 0.9 }, pos: { x: 400, y: 80 } },
       ];
+      initialEdges = [{ id: makeId(), from: eventId, to: tileId }];
+    } else if (template === 'fluorescence') {
+      const fill1 = makeId();
+      const wait1 = makeId();
+      const fill2 = makeId();
+      initialNodes = [
+        { id: eventId, kind: 'event_begin', name: 'Démarrer', enabled: true, params: {}, pos: { x: 80, y: 80 } },
+        { id: fill1, kind: 'fill', name: 'UV Activation', enabled: true, params: { color: '#8b00ff', intensity: 0.3, mask: 'all', seconds: 1 }, pos: { x: 400, y: 80 } },
+        { id: wait1, kind: 'wait', name: 'Pause', enabled: true, params: { seconds: 2 }, pos: { x: 400, y: 200 } },
+        { id: fill2, kind: 'fill', name: 'Fluorescence', enabled: true, params: { color: '#00ff88', intensity: 0.8, mask: 'all', seconds: 3 }, pos: { x: 400, y: 320 } },
+      ];
+      initialEdges = [
+        { id: makeId(), from: eventId, to: fill1 },
+        { id: makeId(), from: fill1, to: wait1 },
+        { id: makeId(), from: wait1, to: fill2 },
+      ];
+    } else if (template === 'color-demo') {
+      const tile1 = makeId();
+      const tile2 = makeId();
+      const tile3 = makeId();
+      initialNodes = [
+        { id: eventId, kind: 'event_begin', name: 'Démarrer', enabled: true, params: {}, pos: { x: 80, y: 80 } },
+        { id: tile1, kind: 'tile', name: 'Rouge', enabled: true, params: { tileIndex: 0, color: '#ff0000', intensity: 0.8 }, pos: { x: 400, y: 50 } },
+        { id: tile2, kind: 'tile', name: 'Vert', enabled: true, params: { tileIndex: 1, color: '#00ff00', intensity: 0.8 }, pos: { x: 400, y: 170 } },
+        { id: tile3, kind: 'tile', name: 'Bleu', enabled: true, params: { tileIndex: 2, color: '#0000ff', intensity: 0.8 }, pos: { x: 400, y: 290 } },
+      ];
+      initialEdges = [
+        { id: makeId(), from: eventId, to: tile1 },
+        { id: makeId(), from: eventId, to: tile2 },
+        { id: makeId(), from: eventId, to: tile3 },
+      ];
+    } else if (template === 'pulse-advanced') {
+      const pulse1 = makeId();
+      const wait1 = makeId();
+      const pulse2 = makeId();
+      initialNodes = [
+        { id: eventId, kind: 'event_begin', name: 'Démarrer', enabled: true, params: {}, pos: { x: 80, y: 80 } },
+        { id: pulse1, kind: 'pulse', name: 'Pulsation chaude', enabled: true, params: { baseColor: '#ff6b00', targetColor: '#ffeb00', fromIntensity: 0.2, toIntensity: 0.9, speed: 0.8, phase: 0 }, pos: { x: 400, y: 80 } },
+        { id: wait1, kind: 'wait', name: 'Transition', enabled: true, params: { seconds: 3 }, pos: { x: 400, y: 200 } },
+        { id: pulse2, kind: 'pulse', name: 'Pulsation froide', enabled: true, params: { baseColor: '#00d4ff', targetColor: '#b829dd', fromIntensity: 0.2, toIntensity: 0.9, speed: 1.2, phase: 0 }, pos: { x: 400, y: 320 } },
+      ];
+      initialEdges = [
+        { id: makeId(), from: eventId, to: pulse1 },
+        { id: makeId(), from: pulse1, to: wait1 },
+        { id: makeId(), from: wait1, to: pulse2 },
+      ];
+    } else if (template === 'rainbow') {
+      const fill1 = makeId();
+      const fill2 = makeId();
+      const fill3 = makeId();
+      const fill4 = makeId();
+      const fill5 = makeId();
+      initialNodes = [
+        { id: eventId, kind: 'event_begin', name: 'Démarrer', enabled: true, params: {}, pos: { x: 80, y: 80 } },
+        { id: fill1, kind: 'fill', name: 'Rouge', enabled: true, params: { color: '#ff0000', intensity: 0.7, mask: 'all', seconds: 0.8 }, pos: { x: 400, y: 40 } },
+        { id: fill2, kind: 'fill', name: 'Jaune', enabled: true, params: { color: '#ffff00', intensity: 0.7, mask: 'all', seconds: 0.8 }, pos: { x: 400, y: 140 } },
+        { id: fill3, kind: 'fill', name: 'Vert', enabled: true, params: { color: '#00ff00', intensity: 0.7, mask: 'all', seconds: 0.8 }, pos: { x: 400, y: 240 } },
+        { id: fill4, kind: 'fill', name: 'Cyan', enabled: true, params: { color: '#00ffff', intensity: 0.7, mask: 'all', seconds: 0.8 }, pos: { x: 400, y: 340 } },
+        { id: fill5, kind: 'fill', name: 'Bleu', enabled: true, params: { color: '#0000ff', intensity: 0.7, mask: 'all', seconds: 0.8 }, pos: { x: 400, y: 440 } },
+      ];
+      initialEdges = [
+        { id: makeId(), from: eventId, to: fill1 },
+        { id: makeId(), from: fill1, to: fill2 },
+        { id: makeId(), from: fill2, to: fill3 },
+        { id: makeId(), from: fill3, to: fill4 },
+        { id: makeId(), from: fill4, to: fill5 },
+      ];
+    } else if (template === 'tetris') {
+      // Jeu Tetris avec nœuds internes détaillés
+      const tetrisMainId = makeId();
+      const initGrid = makeId();
+      const spawnPiece = makeId();
+      const renderGrid = makeId();
+      const gameLoop = makeId();
+      const moveDown = makeId();
+      const checkCollision = makeId();
+      const mergePiece = makeId();
+      const clearLines = makeId();
+      const checkGameOver = makeId();
+      const gameOverFill = makeId();
+      const scorePulse = makeId();
+      const waitTick = makeId();
+      const bgFill = makeId();
+      const borderTiles = makeId();
+      
+      // IDs pour les 4 pièces Tetris (exemples)
+      const pieceI = makeId();
+      const pieceL = makeId();
+      const pieceT = makeId();
+      const pieceSquare = makeId();
+      const rotateCheck = makeId();
+      const inputHandler = makeId();
+      const timerEvent = makeId();
+      
+      initialNodes = [
+        { id: eventId, kind: 'event_begin', name: 'Démarrer', enabled: true, params: {}, pos: { x: 80, y: 300 } },
+        // Nœud principal du jeu (celui sur lequel on double-clique)
+        { id: tetrisMainId, kind: 'game_tetris', name: 'Tetris Lumière', enabled: true, params: { speed: 500, bgColor: '#0a0a0f', borderColor: '#222233' }, pos: { x: 300, y: 300 } },
+        
+        // Nœuds internes visibles quand on double-clique
+        { id: bgFill, kind: 'fill', name: 'Fond noir', enabled: true, params: { color: '#0a0a0f', intensity: 1, mask: 'all', seconds: 0 }, pos: { x: 520, y: 80 } },
+        { id: borderTiles, kind: 'tile', name: 'Bordure', enabled: true, params: { tileIndex: 21, color: '#444466', intensity: 0.5 }, pos: { x: 740, y: 80 } },
+        { id: initGrid, kind: 'sequence', name: 'Init Grille', enabled: true, params: {}, pos: { x: 520, y: 180 } },
+        { id: gameLoop, kind: 'while', name: 'Boucle Jeu', enabled: true, params: {}, pos: { x: 520, y: 280 } },
+        { id: spawnPiece, kind: 'random_01', name: 'Nouvelle Pièce', enabled: true, params: {}, pos: { x: 740, y: 180 } },
+        { id: pieceI, kind: 'tile', name: 'Pièce I (cyan)', enabled: true, params: { tileIndex: 10, color: '#00ffff', intensity: 0.9 }, pos: { x: 960, y: 80 } },
+        { id: pieceL, kind: 'tile', name: 'Pièce L (orange)', enabled: true, params: { tileIndex: 11, color: '#ffaa00', intensity: 0.9 }, pos: { x: 960, y: 160 } },
+        { id: pieceT, kind: 'tile', name: 'Pièce T (violet)', enabled: true, params: { tileIndex: 12, color: '#aa00ff', intensity: 0.9 }, pos: { x: 960, y: 240 } },
+        { id: pieceSquare, kind: 'tile', name: 'Pièce O (jaune)', enabled: true, params: { tileIndex: 13, color: '#ffff00', intensity: 0.9 }, pos: { x: 960, y: 320 } },
+        { id: moveDown, kind: 'math_add', name: 'Descendre', enabled: true, params: {}, pos: { x: 740, y: 280 } },
+        { id: checkCollision, kind: 'compare_eq', name: 'Collision?', enabled: true, params: {}, pos: { x: 740, y: 360 } },
+        { id: mergePiece, kind: 'sequence', name: 'Fusionner', enabled: true, params: {}, pos: { x: 960, y: 400 } },
+        { id: clearLines, kind: 'pulse', name: 'Ligne complète', enabled: true, params: { baseColor: '#ffffff', targetColor: '#00ff00', fromIntensity: 0.5, toIntensity: 1, speed: 3 }, pos: { x: 1180, y: 400 } },
+        { id: renderGrid, kind: 'fill', name: 'Rafraîchir', enabled: true, params: { color: '#0a0a0f', intensity: 0.1, mask: 'all', seconds: 0.05 }, pos: { x: 520, y: 480 } },
+        { id: waitTick, kind: 'wait', name: 'Attente tick', enabled: true, params: { seconds: 0.5 }, pos: { x: 520, y: 560 } },
+        { id: checkGameOver, kind: 'compare_gt', name: 'Game Over?', enabled: true, params: {}, pos: { x: 740, y: 560 } },
+        { id: gameOverFill, kind: 'fill', name: 'Game Over Rouge', enabled: true, params: { color: '#ff0000', intensity: 0.8, mask: 'all', seconds: 2 }, pos: { x: 960, y: 560 } },
+        { id: scorePulse, kind: 'pulse', name: 'Pulse Score', enabled: true, params: { baseColor: '#00ff88', targetColor: '#88ffaa', fromIntensity: 0.3, toIntensity: 0.9, speed: 4 }, pos: { x: 1180, y: 280 } },
+        { id: rotateCheck, kind: 'logic_and', name: 'Rotation OK?', enabled: true, params: {}, pos: { x: 1180, y: 200 } },
+        { id: inputHandler, kind: 'on_click', name: 'Input Joueur', enabled: true, params: { target: 'any' }, pos: { x: 1400, y: 300 } },
+        { id: timerEvent, kind: 'on_timer', name: 'Timer Jeu', enabled: true, params: { interval: 500 }, pos: { x: 1400, y: 380 } },
+      ];
+      initialEdges = [
+        { id: makeId(), from: eventId, to: tetrisMainId },
+        // Flux principal du jeu (ces nœuds sont "internes" au jeu)
+        { id: makeId(), from: tetrisMainId, to: bgFill },
+        { id: makeId(), from: bgFill, to: borderTiles },
+        { id: makeId(), from: borderTiles, to: initGrid },
+        { id: makeId(), from: initGrid, to: gameLoop },
+        { id: makeId(), from: gameLoop, to: spawnPiece },
+        { id: makeId(), from: spawnPiece, to: pieceI },
+        { id: makeId(), from: spawnPiece, to: pieceL },
+        { id: makeId(), from: spawnPiece, to: pieceT },
+        { id: makeId(), from: spawnPiece, to: pieceSquare },
+        { id: makeId(), from: pieceI, to: moveDown },
+        { id: makeId(), from: pieceL, to: moveDown },
+        { id: makeId(), from: pieceT, to: moveDown },
+        { id: makeId(), from: pieceSquare, to: moveDown },
+        { id: makeId(), from: moveDown, to: checkCollision },
+        { id: makeId(), from: checkCollision, to: mergePiece },
+        { id: makeId(), from: mergePiece, to: clearLines },
+        { id: makeId(), from: clearLines, to: renderGrid },
+        { id: makeId(), from: renderGrid, to: waitTick },
+        { id: makeId(), from: waitTick, to: checkGameOver },
+        { id: makeId(), from: checkGameOver, to: gameLoop },
+        { id: makeId(), from: checkGameOver, to: gameOverFill },
+        // Bonus score
+        { id: makeId(), from: clearLines, to: scorePulse },
+        // Input et rotation
+        { id: makeId(), from: inputHandler, to: rotateCheck },
+        { id: makeId(), from: timerEvent, to: moveDown },
+      ];
+    } else if (template === 'memory') {
+      // Jeu de mémoire type Simon
+      const seqStart = makeId();
+      const tile1 = makeId();
+      const tile2 = makeId();
+      const tile3 = makeId();
+      const tile4 = makeId();
+      const wait1 = makeId();
+      const wait2 = makeId();
+      const wait3 = makeId();
+      const wait4 = makeId();
+      const pulse1 = makeId();
+      const pulse2 = makeId();
+      const pulse3 = makeId();
+      const pulse4 = makeId();
+      
+      initialNodes = [
+        { id: eventId, kind: 'event_begin', name: 'Démarrer', enabled: true, params: {}, pos: { x: 80, y: 200 } },
+        // Séquence de démarrage
+        { id: seqStart, kind: 'sequence', name: 'Séquence', enabled: true, params: {}, pos: { x: 300, y: 200 } },
+        // Attentes entre les flashs
+        { id: wait1, kind: 'wait', name: 'Pause 0.5s', enabled: true, params: { seconds: 0.5 }, pos: { x: 520, y: 50 } },
+        { id: wait2, kind: 'wait', name: 'Pause 0.5s', enabled: true, params: { seconds: 0.5 }, pos: { x: 520, y: 150 } },
+        { id: wait3, kind: 'wait', name: 'Pause 0.5s', enabled: true, params: { seconds: 0.5 }, pos: { x: 520, y: 250 } },
+        { id: wait4, kind: 'wait', name: 'Pause 0.5s', enabled: true, params: { seconds: 0.5 }, pos: { x: 520, y: 350 } },
+        // Dalles à mémoriser (coins)
+        { id: tile1, kind: 'tile', name: 'Coin HG', enabled: true, params: { tileIndex: 0, color: '#ff0000', intensity: 0.9 }, pos: { x: 740, y: 50 } },
+        { id: tile2, kind: 'tile', name: 'Coin HD', enabled: true, params: { tileIndex: 5, color: '#00ff00', intensity: 0.9 }, pos: { x: 740, y: 150 } },
+        { id: tile3, kind: 'tile', name: 'Coin BG', enabled: true, params: { tileIndex: 36, color: '#0000ff', intensity: 0.9 }, pos: { x: 740, y: 250 } },
+        { id: tile4, kind: 'tile', name: 'Coin BD', enabled: true, params: { tileIndex: 41, color: '#ffff00', intensity: 0.9 }, pos: { x: 740, y: 350 } },
+        // Pulsations pour l'effet visuel
+        { id: pulse1, kind: 'pulse', name: 'Pulse R', enabled: true, params: { baseColor: '#ff0000', targetColor: '#ff6666', fromIntensity: 0.3, toIntensity: 1, speed: 2, phase: 0 }, pos: { x: 960, y: 50 } },
+        { id: pulse2, kind: 'pulse', name: 'Pulse V', enabled: true, params: { baseColor: '#00ff00', targetColor: '#66ff66', fromIntensity: 0.3, toIntensity: 1, speed: 2, phase: 0 }, pos: { x: 960, y: 150 } },
+        { id: pulse3, kind: 'pulse', name: 'Pulse B', enabled: true, params: { baseColor: '#0000ff', targetColor: '#6666ff', fromIntensity: 0.3, toIntensity: 1, speed: 2, phase: 0 }, pos: { x: 960, y: 250 } },
+        { id: pulse4, kind: 'pulse', name: 'Pulse J', enabled: true, params: { baseColor: '#ffff00', targetColor: '#ffff66', fromIntensity: 0.3, toIntensity: 1, speed: 2, phase: 0 }, pos: { x: 960, y: 350 } },
+      ];
+      initialEdges = [
+        { id: makeId(), from: eventId, to: seqStart },
+        // Séquence: R -> pause -> V -> pause -> B -> pause -> J
+        { id: makeId(), from: seqStart, to: tile1 },
+        { id: makeId(), from: tile1, to: wait1 },
+        { id: makeId(), from: wait1, to: tile2 },
+        { id: makeId(), from: tile2, to: wait2 },
+        { id: makeId(), from: wait2, to: tile3 },
+        { id: makeId(), from: tile3, to: wait3 },
+        { id: makeId(), from: wait3, to: tile4 },
+        // Pulsations liées aux dalles
+        { id: makeId(), from: tile1, to: pulse1 },
+        { id: makeId(), from: tile2, to: pulse2 },
+        { id: makeId(), from: tile3, to: pulse3 },
+        { id: makeId(), from: tile4, to: pulse4 },
+      ];
     }
     
     const provisionalGame: GameDoc = {
       id: provisionalId,
       name: gameName,
-      tileCount: Math.max(1, tiles.length || 1),
+      tileCount: 42,
       nodes: initialNodes,
-      edges: [],
+      edges: initialEdges,
     };
 
     const dbId = await createDbGame(gameName, provisionalGame);
@@ -909,7 +1402,9 @@ export default function EditeurPage() {
           return;
         }
 
-        await createGame('Jeu1');
+        // Create default games if none exist
+        await createGame('Simon', 'memory');
+        await createGame('Tetris', 'tetris');
       } finally {
         if (!cancelled) setDbLoading(false);
       }
@@ -928,8 +1423,22 @@ export default function EditeurPage() {
       return;
     }
     setDirty(false);
-    setStatus('Sauvegardé');
+    setStatus('Sauvegardé ✓');
   };
+
+  // Auto-save every 3 seconds when dirty
+  useEffect(() => {
+    if (!dirty || !activeGame) return;
+    const timer = setTimeout(() => {
+      void saveDbGame(activeGame).then((ok) => {
+        if (ok) {
+          setDirty(false);
+          setStatus('Auto-sauvegardé ✓');
+        }
+      });
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, [dirty, activeGame]);
 
   const deleteActiveGame = async () => {
     if (!activeGame) return;
@@ -1005,6 +1514,14 @@ export default function EditeurPage() {
     commit((cur) => ({
       ...cur,
       games: cur.games.map((g) => (g.id === cur.activeGameId ? { ...g, name } : g)),
+    }));
+  };
+
+  const updateActiveGameMeta = (patch: Partial<Pick<GameDoc, 'icon' | 'difficulty' | 'description' | 'bgColor' | 'accentColor' | 'tileCount'>>) => {
+    if (!activeGameId) return;
+    commit((cur) => ({
+      ...cur,
+      games: cur.games.map((g) => (g.id === cur.activeGameId ? { ...g, ...patch } : g)),
     }));
   };
 
@@ -1113,89 +1630,206 @@ export default function EditeurPage() {
   return (
     <main className="stage">
       <div className="ue">
-        <aside className="ue__left glass">
-            <div className="panelhead">
-              <strong>Explorateur</strong>
-              <span className="panelhead__meta">Jeux</span>
+        <aside className="ue__left" style={{ borderRadius: 16, overflow: 'hidden', background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(20px)', border: '1px solid rgba(0,0,0,0.06)' }}>
+            <div className="panelhead" style={{ background: '#fff', borderBottom: '1px solid rgba(0,0,0,0.06)', padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <Gamepad2 size={16} color="#1a1a1a" />
+                <strong style={{ fontSize: 14, fontWeight: 800, letterSpacing: '-0.02em', color: '#1a1a1a' }}>Explorateur</strong>
+              </div>
+              <Lightbulb size={14} style={{ color: '#4361ee' }} />
+              <span style={{ fontSize: 12, fontWeight: 600, color: '#666' }}>Jeux</span>
             </div>
 
             <div className="panelbody">
               <div className="panelsection">
                 <div className="panelsection__head">
-                  <div className="panelsection__title" title="Jeux" aria-label="Jeux">
-                    <Gamepad2 size={16} />
-                  </div>
-                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                     <button 
-                      className="btn btn--mini" 
+                      className="g-btn g-btn--sm" 
                       disabled={!activeGame || dbLoading} 
                       onClick={() => void saveActiveGame()}
                       title="Sauvegarder"
                     >
-                      <Save size={16} />
-                      <span>{dirty ? 'Sauvegarder' : 'Sauvegardé'}</span>
+                      <Save size={14} />
+                      <span>{dirty ? '❌' : '✓'}</span>
                     </button>
                     <button 
-                      className="btn btn--mini" 
+                      className="g-btn g-btn--sm g-btn--danger" 
                       disabled={!activeGame || dbLoading} 
                       onClick={() => activeGame && setModal({ type: 'confirm-delete', gameId: activeGame.id, gameName: activeGame.name })}
                       title="Supprimer"
                     >
-                      <Trash2 size={16} />
+                      <Trash2 size={14} />
                     </button>
                     <button 
-                      className="btn btn--mini btn--primary" 
+                      className="g-btn g-btn--sm g-btn--accent" 
                       disabled={dbLoading} 
                       onClick={() => setModal({ type: 'create-project' })}
                     >
-                      <FolderPlus className="btn__icon" aria-hidden size={16} />
+                      <FolderPlus size={14} />
                       <span>{dbLoading ? '...' : 'Nouveau'}</span>
                     </button>
                   </div>
                 </div>
 
                 <div className="list panelsection__list">
-                  {games.map((g) => (
-                    <button
-                      key={g.id}
-                      className={g.id === activeGameId ? 'list__item list__item--active' : 'list__item'}
-                      onClick={() => {
-                        commit((cur) => ({ ...cur, activeGameId: g.id, selectedNodeId: g.nodes[0]?.id ?? null }));
-                        setStatus('Jeu sélectionné');
-                      }}
-                    >
-                      <span className="list__title">{g.name}</span>
-                      <span className="list__meta">{g.nodes.length} noeuds</span>
-                    </button>
-                  ))}
+                  {games.map((g) => {
+                    const GIcon = GAME_ICON_MAP[g.icon ?? 'Lightbulb'] ?? Lightbulb;
+                    return (
+                      <button
+                        key={g.id}
+                        className={g.id === activeGameId ? 'list__item list__item--active' : 'list__item'}
+                        onClick={() => {
+                          commit((cur) => ({ ...cur, activeGameId: g.id, selectedNodeId: g.nodes[0]?.id ?? null }));
+                          setStatus('Jeu sélectionné');
+                        }}
+                        style={{ display: 'flex', alignItems: 'center', gap: 8 }}
+                      >
+                        <GIcon size={14} style={{ opacity: 0.6, flexShrink: 0 }} />
+                        <span className="list__title" style={{ flex: 1 }}>{g.name}</span>
+                        <span className="list__meta">{g.nodes.length} noeuds · {g.tileCount ?? 42}d</span>
+                      </button>
+                    );
+                  })}
                 </div>
 
                 {activeGame ? (
-                  <div className="game-info-card" style={{ marginTop: 12, padding: 12, borderRadius: 12, background: 'rgba(67, 97, 238, 0.06)', border: '1px solid rgba(67, 97, 238, 0.15)' }}>
-                    <label className="field" style={{ margin: 0 }}>
-                      <span style={{ fontSize: 12, opacity: 0.8, marginBottom: 6, display: 'block' }}>Nom du projet</span>
-                      <div style={{ display: 'flex', gap: 8 }}>
+                  <div className="g-card" style={{ marginTop: 12, padding: 14, borderRadius: 14, display: 'grid', gap: 12 }}>
+                    <label style={{ display: 'grid', gap: 6 }}>
+                      <span className="g-label">Nom du projet</span>
+                      <div style={{ display: 'flex', gap: 6 }}>
                         <input
-                          className="input"
+                          className="g-input"
                           value={activeGame.name}
                           onChange={(e) => renameActiveGame(e.target.value)}
                           onBlur={() => void saveActiveGame()}
-                          style={{ flex: 1 }}
+                          style={{ flex: 1, height: 36, fontSize: 13 }}
                         />
                         <button 
-                          className="btn btn--mini"
+                          className="g-btn g-btn--sm g-btn--icon"
                           onClick={() => void saveActiveGame()}
                           title="Sauvegarder"
+                          style={{ width: 36, height: 36 }}
                         >
-                          <Save size={16} />
+                          <Save size={14} />
                         </button>
                       </div>
                     </label>
-                    <div style={{ display: 'flex', gap: 16, marginTop: 10, fontSize: 12, opacity: 0.7 }}>
-                      <span>{activeGame.nodes.length} nœuds</span>
-                      <span>{activeGame.edges.length} connexions</span>
-                      <span>{tileCount} dalles</span>
+
+                    <label style={{ display: 'grid', gap: 6 }}>
+                      <span className="g-label">Description</span>
+                      <input
+                        className="g-input"
+                        value={activeGame.description ?? ''}
+                        onChange={(e) => updateActiveGameMeta({ description: e.target.value })}
+                        onBlur={() => void saveActiveGame()}
+                        placeholder="Description courte du jeu..."
+                        style={{ height: 36, fontSize: 13 }}
+                      />
+                    </label>
+
+                    <div>
+                      <span className="g-label" style={{ display: 'block', marginBottom: 6 }}>Icône du jeu</span>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                        {GAME_ICON_NAMES.map((iconName) => {
+                          const IconComp = GAME_ICON_MAP[iconName];
+                          const isActive = (activeGame.icon ?? 'Lightbulb') === iconName;
+                          return (
+                            <button
+                              key={iconName}
+                              onClick={() => { updateActiveGameMeta({ icon: iconName }); void saveActiveGame(); }}
+                              title={iconName}
+                              style={{
+                                width: 34, height: 34, borderRadius: 8, border: isActive ? '2px solid #4361ee' : '1px solid rgba(0,0,0,0.08)',
+                                background: isActive ? 'rgba(67,97,238,0.08)' : '#fff', display: 'grid', placeItems: 'center',
+                                cursor: 'pointer', transition: 'all 0.15s',
+                              }}
+                            >
+                              <IconComp size={16} color={isActive ? '#4361ee' : '#888'} />
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
+
+                    <div>
+                      <span className="g-label" style={{ display: 'block', marginBottom: 6 }}>Difficulté</span>
+                      <div style={{ display: 'flex', gap: 4 }}>
+                        {([1, 2, 3, 4, 5] as GameDifficulty[]).map((lvl) => (
+                          <button
+                            key={lvl}
+                            onClick={() => { updateActiveGameMeta({ difficulty: lvl }); void saveActiveGame(); }}
+                            style={{
+                              width: 32, height: 32, borderRadius: 8, border: 'none', background: 'none',
+                              cursor: 'pointer', padding: 0, display: 'grid', placeItems: 'center',
+                              transition: 'transform 0.12s',
+                            }}
+                            title={`Difficulté ${lvl}`}
+                          >
+                            <Star size={18} fill={lvl <= (activeGame.difficulty ?? 1) ? '#fbbf24' : 'none'} color={lvl <= (activeGame.difficulty ?? 1) ? '#f59e0b' : '#ddd'} />
+                          </button>
+                        ))}
+                        <span style={{ fontSize: 12, color: '#888', marginLeft: 6, alignSelf: 'center', fontWeight: 600 }}>
+                          {activeGame.difficulty ?? 1}/5
+                        </span>
+                      </div>
+                    </div>
+
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                        <span className="g-label">Dalles cibles</span>
+                        <span style={{ fontSize: 13, fontWeight: 700, color: '#1a1a1a' }}>{activeGame.tileCount ?? 42}</span>
+                      </div>
+                      <input
+                        type="range" className="g-slider g-slider--accent" min={1} max={42} step={1}
+                        value={activeGame.tileCount ?? 42}
+                        onChange={(e) => updateActiveGameMeta({ tileCount: Number(e.target.value) })}
+                        onMouseUp={() => void saveActiveGame()}
+                        style={{ width: '100%', ['--pct' as any]: `${((activeGame.tileCount ?? 42) / 42) * 100}%` }}
+                      />
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#aaa', marginTop: 2 }}>
+                        <span>1</span><span>21</span><span>42</span>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                      <label style={{ display: 'grid', gap: 4 }}>
+                        <span className="g-label" style={{ fontSize: 11 }}>Fond du jeu</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <input
+                            type="color"
+                            value={activeGame.bgColor ?? '#0a0a0f'}
+                            onChange={(e) => updateActiveGameMeta({ bgColor: e.target.value })}
+                            onBlur={() => void saveActiveGame()}
+                            style={{ width: 32, height: 32, border: '1px solid rgba(0,0,0,0.1)', borderRadius: 8, cursor: 'pointer', padding: 2 }}
+                          />
+                          <span style={{ fontSize: 11, color: '#888', fontFamily: 'monospace' }}>{activeGame.bgColor ?? '#0a0a0f'}</span>
+                        </div>
+                      </label>
+                      <label style={{ display: 'grid', gap: 4 }}>
+                        <span className="g-label" style={{ fontSize: 11 }}>Couleur accent</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <input
+                            type="color"
+                            value={activeGame.accentColor ?? '#4361ee'}
+                            onChange={(e) => updateActiveGameMeta({ accentColor: e.target.value })}
+                            onBlur={() => void saveActiveGame()}
+                            style={{ width: 32, height: 32, border: '1px solid rgba(0,0,0,0.1)', borderRadius: 8, cursor: 'pointer', padding: 2 }}
+                          />
+                          <span style={{ fontSize: 11, color: '#888', fontFamily: 'monospace' }}>{activeGame.accentColor ?? '#4361ee'}</span>
+                        </div>
+                      </label>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 2, fontSize: 11 }}>
+                      <span className="g-badge" style={{ fontSize: 10 }}>{activeGame.nodes.length} nœuds</span>
+                      <span className="g-badge" style={{ fontSize: 10, background: 'rgba(6,214,160,0.1)', color: '#06d6a0', borderColor: 'rgba(6,214,160,0.15)' }}>{activeGame.edges.length} connexions</span>
+                      <span className="g-badge" style={{ fontSize: 10, background: 'rgba(255,165,0,0.1)', color: '#e88a1a', borderColor: 'rgba(255,165,0,0.15)' }}>{activeGame.tileCount ?? 42} dalles</span>
+                    </div>
+
+                    <p style={{ fontSize: 10, color: '#aaa', margin: '4px 0 0', lineHeight: 1.4 }}>
+                      32 canaux LED par dalle · Couleurs selon COULEURS.md
+                    </p>
                   </div>
                 ) : null}
               </div>
@@ -1204,18 +1838,19 @@ export default function EditeurPage() {
 
               <div className="panelsection">
                 <div className="panelsection__head">
-                  <div className="panelsection__title" title="Noeuds" aria-label="Noeuds">
-                    <Boxes size={16} />
+                  <div className="panelsection__title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <Boxes size={14} style={{ color: '#06d6a0' }} />
+                    <span>Nœuds</span>
                   </div>
                   <button
-                    className="btn btn--mini"
+                    className="g-btn g-btn--sm g-btn--success"
                     disabled={!activeGameId}
                     onClick={() => {
                       const id = addNode('fill');
                       if (id) setStatus('Noeud ajouté');
                     }}
                   >
-                    <Plus className="btn__icon" aria-hidden />
+                    <Plus size={14} />
                     <span>Ajouter</span>
                   </button>
                 </div>
@@ -1257,19 +1892,31 @@ export default function EditeurPage() {
               setResizing({ active: false, y: 0, start: viewportHeight });
             }}
           >
-            <div className="ue__viewport glass">
-              <div className="panelhead">
-                <strong>Aperçu</strong>
+            <div className="ue__viewport" style={{ borderRadius: 16, overflow: 'hidden', background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(20px)', border: '1px solid rgba(0,0,0,0.06)' }}>
+              <div className="panelhead" style={{ background: '#fff', borderBottom: '1px solid rgba(0,0,0,0.06)', padding: '14px 20px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <Eye size={16} color="#1a1a1a" />
+                  <strong style={{ fontSize: 14, fontWeight: 800, letterSpacing: '-0.02em', color: '#1a1a1a' }}>Aperçu</strong>
+                </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <button
-                    className={`btn btn--mini ${isPlaying ? 'btn--primary' : ''}`}
+                    className="g-btn g-btn--sm"
                     onClick={() => setIsPlaying((p) => !p)}
                     title={isPlaying ? 'Pause envoi hardware' : 'Play envoi hardware'}
+                    style={isPlaying ? { background: '#1a1a1a', color: '#fff', borderColor: '#1a1a1a' } : {}}
                   >
                     {isPlaying ? <Pause size={14} /> : <Play size={14} />}
-                    <span>{isPlaying ? 'Hardware ON' : 'Hardware OFF'}</span>
+                    <span>{isPlaying ? 'ON' : 'OFF'}</span>
                   </button>
-                  <span className="panelhead__meta">Simulation {tileCount} dalles</span>
+                  <button
+                    className="g-btn g-btn--sm"
+                    onClick={() => setShowGameOverlay(true)}
+                    title="Ouvrir le visuel 2D du jeu"
+                  >
+                    <Maximize2 size={14} />
+                    <span>2D</span>
+                  </button>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: '#999' }}>{tileCount} dalles</span>
                 </div>
               </div>
               <div className="viewport">
@@ -1282,17 +1929,29 @@ export default function EditeurPage() {
                         onTileClick={assignSelectedTileToNode}
                       />
                     </div>
-                    <div className="viewport__pane viewport__pane--ui">
-                      <div className="viewport-ui">
-                        <div className="viewport-ui__card glass">
-                          <div className="viewport-ui__title">Visuel du jeu</div>
-                          <div className="viewport-ui__hint">
-                            Prévisualisation de l’interface 2D et des éléments interactifs.
-                            <br />
-                            (Le rendu complet arrive juste après la refonte du runtime.)
+                    <div className="viewport__pane viewport__pane--ui" style={activeTetrisNode ? { flex: 2, minWidth: 0, overflow: 'auto' } : undefined}>
+                      {activeTetrisNode ? (
+                        <TetrisGame
+                          params={{
+                            speed: Math.max(50, getNum(activeTetrisNode.params, 'speed', 500)),
+                            bgColor: getColor(activeTetrisNode.params, 'bgColor', '#0a0a0f'),
+                            borderColor: getColor(activeTetrisNode.params, 'borderColor', '#222233'),
+                          }}
+                          isPlaying={isPlaying}
+                          onSnapshot={(snap) => { tetrisSnapRef.current = snap; }}
+                        />
+                      ) : (
+                        <div className="viewport-ui">
+                          <div className="viewport-ui__card glass">
+                            <div className="viewport-ui__title">Visuel du jeu</div>
+                            <div className="viewport-ui__hint">
+                              Ajoutez un noeud <b>Tetris Lumière</b> (catégorie Jeux) pour lancer un jeu interactif.
+                              <br />
+                              Clic droit dans le graphe → Jeux → Tetris Lumière
+                            </div>
                           </div>
                         </div>
-                      </div>
+                      )}
                     </div>
                   </div>
                 ) : (
@@ -1306,11 +1965,11 @@ export default function EditeurPage() {
                         </p>
                       </div>
                       <button 
-                        className="btn btn--hero" 
+                        className="g-btn g-btn--accent" 
                         onClick={() => setModal({ type: 'create-project' })}
-                        style={{ marginTop: 8 }}
+                        style={{ marginTop: 8, height: 48, padding: '0 24px', fontSize: 14 }}
                       >
-                        <FolderPlus className="btn__icon" aria-hidden size={20} />
+                        <FolderPlus size={18} />
                         <span>Créer un projet</span>
                       </button>
                     </div>
@@ -1329,9 +1988,30 @@ export default function EditeurPage() {
             />
 
             <div className="ue__graph glass">
-              <div className="panelhead">
+              <div className="panelhead" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                 <strong>Graphe</strong>
                 <span className="panelhead__meta">MVP</span>
+                {activeGame && (
+                  <span style={{ marginLeft: 'auto', fontSize: 12, opacity: 0.8 }}>
+                    {activeGame.name}
+                  </span>
+                )}
+                {editor.expandedGameNodeId && (
+                  <button
+                    className="btn btn--small"
+                    onClick={() => {
+                      commit((cur) => ({
+                        ...cur,
+                        expandedGameNodeId: undefined,
+                        visibleNodeIds: undefined,
+                      }));
+                      setStatus('Vue complète');
+                    }}
+                    style={{ marginLeft: 8 }}
+                  >
+                    Afficher tout
+                  </button>
+                )}
               </div>
               <div className="panelbody">
                 <div
@@ -1442,10 +2122,11 @@ export default function EditeurPage() {
                           <div style={{ fontSize: 48, opacity: 0.3, marginBottom: 16 }}>🎮</div>
                           <p style={{ margin: '0 0 20px', fontSize: 14, opacity: 0.7 }}>Commencez par créer votre premier jeu</p>
                           <button 
-                            className="btn btn--hero" 
+                            className="g-btn g-btn--accent" 
                             onClick={() => setModal({ type: 'create-project' })}
+                            style={{ height: 46, padding: '0 22px', fontSize: 14 }}
                           >
-                            <FolderPlus className="btn__icon" aria-hidden size={18} />
+                            <FolderPlus size={18} />
                             <span>Créer un projet</span>
                           </button>
                         </div>
@@ -1563,7 +2244,15 @@ export default function EditeurPage() {
                       })() : null}
                     </svg>
 
-                    {(activeGame?.nodes ?? []).map((n) => {
+                    {(activeGame?.nodes ?? [])
+                      .filter((n) => {
+                        // If we have visibleNodeIds (drill-down mode), only show those nodes
+                        if (editor.visibleNodeIds && editor.visibleNodeIds.length > 0) {
+                          return editor.visibleNodeIds.includes(n.id);
+                        }
+                        return true;
+                      })
+                      .map((n) => {
                       const selected = n.id === selectedNodeId;
                       const hasInput = n.kind !== 'event_begin';
                       const inLabel = n.kind === 'fill' ? 'Entrée' : n.kind === 'pulse' ? 'Temps' : 'Entrée';
@@ -1597,6 +2286,136 @@ export default function EditeurPage() {
                             commit((cur) => ({ ...cur, selectedNodeId: n.id }));
                             beginDrag();
                             setGraphDrag({ nodeId: n.id, x: e.clientX, y: e.clientY });
+                          }}
+                          onDoubleClick={(e) => {
+                            e.stopPropagation();
+                            // Drill-down for game nodes - show/create connected internal nodes
+                            if (n.kind === 'game_tetris' || n.kind === 'game_simon' || n.kind === 'game_memory') {
+                              const activeGame = editor.games.find(g => g.id === editor.activeGameId);
+                              if (!activeGame) return;
+                              
+                              // Find all nodes connected to this game node
+                              const connectedNodeIds = new Set<string>();
+                              connectedNodeIds.add(n.id);
+                              
+                              // Find nodes connected FROM this game node (outputs)
+                              activeGame.edges.forEach(edge => {
+                                if (edge.from === n.id) {
+                                  connectedNodeIds.add(edge.to);
+                                }
+                              });
+                              
+                              // Find nodes connected TO this game node (inputs)
+                              activeGame.edges.forEach(edge => {
+                                if (edge.to === n.id) {
+                                  connectedNodeIds.add(edge.from);
+                                }
+                              });
+                              
+                              // If no connected nodes found, create internal nodes dynamically
+                              if (connectedNodeIds.size <= 1) {
+                                // Create default internal nodes for this game
+                                const makeId = () => Math.random().toString(36).slice(2);
+                                const gameX = n.pos.x;
+                                const gameY = n.pos.y;
+                                
+                                const internalNodes: EditorNode[] = [];
+                                const internalEdges: GraphEdge[] = [];
+                                
+                                if (n.kind === 'game_tetris') {
+                                  // Create Tetris internal nodes
+                                  const ids = Array(8).fill(0).map(() => makeId());
+                                  internalNodes.push(
+                                    { id: ids[0], kind: 'fill', name: 'Fond noir', enabled: true, params: { color: '#0a0a0f', intensity: 1, mask: 'all', seconds: 0 }, pos: { x: gameX + 200, y: gameY - 150 } },
+                                    { id: ids[1], kind: 'tile', name: 'Bordure', enabled: true, params: { tileIndex: 21, color: '#444466', intensity: 0.5 }, pos: { x: gameX + 400, y: gameY - 150 } },
+                                    { id: ids[2], kind: 'sequence', name: 'Init Grille', enabled: true, params: {}, pos: { x: gameX + 200, y: gameY - 50 } },
+                                    { id: ids[3], kind: 'while', name: 'Boucle Jeu', enabled: true, params: {}, pos: { x: gameX + 200, y: gameY + 50 } },
+                                    { id: ids[4], kind: 'random_01', name: 'Nouvelle Pièce', enabled: true, params: {}, pos: { x: gameX + 400, y: gameY - 50 } },
+                                    { id: ids[5], kind: 'tile', name: 'Pièce active', enabled: true, params: { tileIndex: 10, color: '#00ffff', intensity: 0.9 }, pos: { x: gameX + 600, y: gameY - 50 } },
+                                    { id: ids[6], kind: 'wait', name: 'Attente', enabled: true, params: { seconds: 0.5 }, pos: { x: gameX + 200, y: gameY + 150 } },
+                                    { id: ids[7], kind: 'pulse', name: 'Pulse Score', enabled: true, params: { baseColor: '#00ff88', targetColor: '#88ffaa', fromIntensity: 0.3, toIntensity: 0.9, speed: 4 }, pos: { x: gameX + 600, y: gameY + 50 } },
+                                  );
+                                  internalEdges.push(
+                                    { id: makeId(), from: n.id, to: ids[0] },
+                                    { id: makeId(), from: ids[0], to: ids[1] },
+                                    { id: makeId(), from: ids[1], to: ids[2] },
+                                    { id: makeId(), from: ids[2], to: ids[3] },
+                                    { id: makeId(), from: ids[3], to: ids[4] },
+                                    { id: makeId(), from: ids[4], to: ids[5] },
+                                    { id: makeId(), from: ids[3], to: ids[6] },
+                                    { id: makeId(), from: ids[6], to: ids[3] },
+                                    { id: makeId(), from: ids[5], to: ids[7] },
+                                  );
+                                } else if (n.kind === 'game_simon') {
+                                  // Create Simon internal nodes
+                                  const ids = Array(6).fill(0).map(() => makeId());
+                                  internalNodes.push(
+                                    { id: ids[0], kind: 'fill', name: 'Fond noir', enabled: true, params: { color: '#0a0a0f', intensity: 1, mask: 'all', seconds: 0 }, pos: { x: gameX + 200, y: gameY - 100 } },
+                                    { id: ids[1], kind: 'sequence', name: 'Séquence Simon', enabled: true, params: {}, pos: { x: gameX + 200, y: gameY } },
+                                    { id: ids[2], kind: 'random_01', name: 'Couleur aléatoire', enabled: true, params: {}, pos: { x: gameX + 400, y: gameY - 50 } },
+                                    { id: ids[3], kind: 'tile', name: 'Rouge', enabled: true, params: { tileIndex: 0, color: '#ff0000', intensity: 0.9 }, pos: { x: gameX + 600, y: gameY - 100 } },
+                                    { id: ids[4], kind: 'tile', name: 'Bleu', enabled: true, params: { tileIndex: 1, color: '#0000ff', intensity: 0.9 }, pos: { x: gameX + 600, y: gameY } },
+                                    { id: ids[5], kind: 'tile', name: 'Vert', enabled: true, params: { tileIndex: 2, color: '#00ff00', intensity: 0.9 }, pos: { x: gameX + 600, y: gameY + 100 } },
+                                  );
+                                  internalEdges.push(
+                                    { id: makeId(), from: n.id, to: ids[0] },
+                                    { id: makeId(), from: ids[0], to: ids[1] },
+                                    { id: makeId(), from: ids[1], to: ids[2] },
+                                    { id: makeId(), from: ids[2], to: ids[3] },
+                                    { id: makeId(), from: ids[2], to: ids[4] },
+                                    { id: makeId(), from: ids[2], to: ids[5] },
+                                  );
+                                }
+                                
+                                // Add internal nodes and edges to the game
+                                commit((cur) => {
+                                  const gameIndex = cur.games.findIndex(g => g.id === cur.activeGameId);
+                                  if (gameIndex === -1) return cur;
+                                  const game = cur.games[gameIndex];
+                                  const updatedGame = {
+                                    ...game,
+                                    nodes: [...game.nodes, ...internalNodes],
+                                    edges: [...game.edges, ...internalEdges],
+                                  };
+                                  const newGames = [...cur.games];
+                                  newGames[gameIndex] = updatedGame;
+                                  
+                                  // Add all new node IDs to visible set
+                                  internalNodes.forEach(node => connectedNodeIds.add(node.id));
+                                  
+                                  return {
+                                    ...cur,
+                                    games: newGames,
+                                    expandedGameNodeId: n.id,
+                                    visibleNodeIds: Array.from(connectedNodeIds),
+                                  };
+                                });
+                                setStatus(`Création et affichage des nœuds internes: ${n.name} (${internalNodes.length} nœuds)`);
+                              } else {
+                                // Find nodes connected to those connected nodes (2 levels deep)
+                                const level1Nodes = Array.from(connectedNodeIds);
+                                level1Nodes.forEach(nodeId => {
+                                  if (nodeId === n.id) return;
+                                  activeGame.edges.forEach(edge => {
+                                    if (edge.from === nodeId) {
+                                      connectedNodeIds.add(edge.to);
+                                    }
+                                    if (edge.to === nodeId) {
+                                      connectedNodeIds.add(edge.from);
+                                    }
+                                  });
+                                });
+                                
+                                // Store the expanded state and filtered nodes
+                                commit((cur) => ({
+                                  ...cur,
+                                  selectedNodeId: n.id,
+                                  expandedGameNodeId: n.id,
+                                  visibleNodeIds: Array.from(connectedNodeIds),
+                                }));
+                                setStatus(`Nœuds internes de: ${n.name} (${connectedNodeIds.size} nœuds)`);
+                              }
+                            }
                           }}
                         >
                           <div className="bp-node__title">
@@ -1934,30 +2753,35 @@ export default function EditeurPage() {
             </div>
           </section>
 
-          <aside className="ue__right glass">
-            <div className="panelhead">
-              <strong>Détails</strong>
-              <span className="panelhead__meta">{selectedNode ? selectedNode.id : '—'}</span>
+          <aside className="ue__right" style={{ borderRadius: 16, overflow: 'hidden', background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(20px)', border: '1px solid rgba(0,0,0,0.06)' }}>
+            <div className="panelhead" style={{ background: '#fff', borderBottom: '1px solid rgba(0,0,0,0.06)', padding: '18px 20px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <Layers size={16} color="#1a1a1a" />
+                <strong style={{ fontSize: 14, fontWeight: 800, letterSpacing: '-0.02em', color: '#1a1a1a' }}>Détails</strong>
+              </div>
+              <span style={{ fontSize: 12, fontWeight: 600, color: '#666' }}>{selectedNode ? labelNodeKind(selectedNode.kind) : '—'}</span>
             </div>
 
-            <div className="panelbody">
+            <div className="panelbody" style={{ padding: 20 }}>
               {!selectedNode ? (
-                <div className="muted">Sélectionne un noeud.</div>
+                <div className="muted" style={{ padding: 24, textAlign: 'center', color: '#999' }}>Sélectionne un noeud dans le graphe.</div>
               ) : (
                 <div className="form">
                   <label className="field">
-                    <span>Nom</span>
+                    <span className="g-label">Nom</span>
                     <input
                       value={selectedNode.name}
                       onChange={(e) => updateSelectedNode({ name: e.target.value })}
-                      className="input"
+                      className="g-input"
+                      style={{ height: 38, fontSize: 13 }}
                     />
                   </label>
 
                   <label className="field field--row">
-                    <span>Actif</span>
+                    <span className="g-label">Actif</span>
                     <input
                       type="checkbox"
+                      className="g-check"
                       checked={selectedNode.enabled}
                       onChange={(e) => updateSelectedNode({ enabled: e.target.checked })}
                     />
@@ -1967,249 +2791,454 @@ export default function EditeurPage() {
 
                   {selectedNode.kind === 'fill' ? (
                     <>
-                      <label className="field">
-                        <span>Couleur</span>
-                        <input
-                          type="color"
-                          value={getColor(selectedNode.params, 'color', '#6d28ff')}
-                          onChange={(e) => updateSelectedParams({ color: e.target.value })}
-                          className="input"
-                        />
-                      </label>
+                      {(() => {
+                        const color = getColor(selectedNode.params, 'color', '#6d28ff');
+                        const rgb = hexToRgb(color);
+                        const intensity = clamp01(getNum(selectedNode.params, 'intensity', 0.8));
+                        const updateColor = (r: number, g: number, b: number) => {
+                          updateSelectedParams({ color: rgbToHex(r, g, b) });
+                        };
 
-                      {/* RGB Sliders */}
-                      <div className="rgb-sliders">
-                        {(() => {
-                          const color = getColor(selectedNode.params, 'color', '#6d28ff');
-                          const rgb = hexToRgb(color);
-                          const updateColor = (r: number, g: number, b: number) => {
-                            updateSelectedParams({ color: rgbToHex(r, g, b) });
-                          };
+                        const SliderRow = ({ label, value, max, color: c, onChange }: { label: string; value: number; max: number; color: string; onChange: (v: number) => void }) => {
+                          const pct = `${(value / max) * 100}%`;
+                          const variant = c === '#e53e3e' || c === '#ef4444' ? 'g-slider--red' : c === '#38a169' || c === '#22c55e' ? 'g-slider--green' : c === '#3182ce' || c === '#3b82f6' ? 'g-slider--blue' : '';
                           return (
-                            <>
-                              <div className="slider-row">
-                                <span className="slider-label slider-label--red">Rouge</span>
-                                <input
-                                  type="range"
-                                  className="slider-red"
-                                  min={0}
-                                  max={255}
-                                  step={1}
-                                  value={rgb.r}
-                                  style={{
-                                    ['--min' as any]: 0,
-                                    ['--max' as any]: 255,
-                                    ['--value' as any]: rgb.r,
-                                  }}
-                                  onChange={(e) => updateColor(Number(e.target.value), rgb.g, rgb.b)}
-                                />
-                                <span className="slider-value slider-value--red">{rgb.r}</span>
-                              </div>
-                              <div className="slider-row">
-                                <span className="slider-label slider-label--green">Vert</span>
-                                <input
-                                  type="range"
-                                  className="slider-green"
-                                  min={0}
-                                  max={255}
-                                  step={1}
-                                  value={rgb.g}
-                                  style={{
-                                    ['--min' as any]: 0,
-                                    ['--max' as any]: 255,
-                                    ['--value' as any]: rgb.g,
-                                  }}
-                                  onChange={(e) => updateColor(rgb.r, Number(e.target.value), rgb.b)}
-                                />
-                                <span className="slider-value slider-value--green">{rgb.g}</span>
-                              </div>
-                              <div className="slider-row">
-                                <span className="slider-label slider-label--blue">Bleu</span>
-                                <input
-                                  type="range"
-                                  className="slider-blue"
-                                  min={0}
-                                  max={255}
-                                  step={1}
-                                  value={rgb.b}
-                                  style={{
-                                    ['--min' as any]: 0,
-                                    ['--max' as any]: 255,
-                                    ['--value' as any]: rgb.b,
-                                  }}
-                                  onChange={(e) => updateColor(rgb.r, rgb.g, Number(e.target.value))}
-                                />
-                                <span className="slider-value slider-value--blue">{rgb.b}</span>
-                              </div>
-                            </>
+                            <div style={{ display: 'grid', gridTemplateColumns: '32px 1fr 36px', gap: 12, alignItems: 'center' }}>
+                              <span style={{ fontSize: 12, fontWeight: 700, color: '#1a1a1a', letterSpacing: '0.02em' }}>{label}</span>
+                              <input
+                                type="range"
+                                className={`g-slider ${variant}`}
+                                min={0}
+                                max={max}
+                                step={1}
+                                value={value}
+                                onChange={(e) => onChange(Number(e.target.value))}
+                                style={{ ['--pct' as any]: pct }}
+                              />
+                              <span style={{ fontSize: 13, fontWeight: 700, color: '#1a1a1a', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{value}</span>
+                            </div>
                           );
-                        })()}
+                        };
+
+                        return (
+                          <>
+                            <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 8 }}>
+                              <div style={{
+                                width: 36, height: 36, borderRadius: 10,
+                                background: color,
+                                border: '1px solid rgba(0,0,0,0.1)',
+                                flexShrink: 0,
+                              }} />
+                              <input
+                                type="color"
+                                value={color}
+                                onChange={(e) => updateSelectedParams({ color: e.target.value })}
+                                style={{
+                                  width: '100%', height: 32, borderRadius: 8, border: '1px solid rgba(0,0,0,0.1)',
+                                  cursor: 'pointer', padding: 0, background: '#fff',
+                                }}
+                              />
+                            </div>
+
+                            <div style={{
+                              padding: 16, borderRadius: 12,
+                              background: '#fff',
+                              border: '1px solid rgba(0,0,0,0.06)',
+                              display: 'grid', gap: 12,
+                            }}>
+                              <SliderRow label="R" value={rgb.r} max={255} color="#ef4444" onChange={(v) => updateColor(v, rgb.g, rgb.b)} />
+                              <SliderRow label="G" value={rgb.g} max={255} color="#22c55e" onChange={(v) => updateColor(rgb.r, v, rgb.b)} />
+                              <SliderRow label="B" value={rgb.b} max={255} color="#3b82f6" onChange={(v) => updateColor(rgb.r, rgb.g, v)} />
+                            </div>
+
+                            <div style={{
+                              padding: 16, borderRadius: 12, marginTop: 4,
+                              background: '#fff',
+                              border: '1px solid rgba(0,0,0,0.06)',
+                            }}>
+                              <div style={{ display: 'grid', gridTemplateColumns: '1fr 42px', gap: 12, alignItems: 'center' }}>
+                                <div>
+                                  <span className="g-label" style={{ marginBottom: 8, display: 'block' }}>Intensité</span>
+                                  <input
+                                    type="range" className="g-slider g-slider--accent" min={0} max={1} step={0.01} value={intensity}
+                                    onChange={(e) => updateSelectedParams({ intensity: Number(e.target.value) })}
+                                    style={{ ['--pct' as any]: `${intensity * 100}%` }}
+                                  />
+                                </div>
+                                <span style={{ fontSize: 13, fontWeight: 700, color: '#1a1a1a', textAlign: 'right' }}>{Math.round(intensity * 100)}%</span>
+                              </div>
+                            </div>
+                          </>
+                        );
+                      })()}
+
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 4 }}>
+                        <label style={{ display: 'grid', gap: 4 }}>
+                          <span className="g-label">Durée (s)</span>
+                          <input
+                            type="number"
+                            min={0}
+                            step={0.1}
+                            value={Math.max(0, getNum(selectedNode.params, 'seconds', 1))}
+                            onChange={(e) => updateSelectedParams({ seconds: Number(e.target.value) })}
+                            className="g-input"
+                            style={{ height: 36, fontSize: 13 }}
+                          />
+                        </label>
+                        <label style={{ display: 'grid', gap: 4 }}>
+                          <span className="g-label">Masque</span>
+                          <select
+                            className="g-select"
+                            style={{ height: 36, fontSize: 13 }}
+                            value={String(selectedNode.params.mask ?? 'all')}
+                            onChange={(e) => updateSelectedParams({ mask: e.target.value })}
+                          >
+                            <option value="all">Tout</option>
+                            <option value="border">Bord</option>
+                            <option value="corners">Coins</option>
+                            <option value="center">Centre</option>
+                          </select>
+                        </label>
                       </div>
 
-                      <label className="field">
-                        <span className="slider-label slider-label--intensity">Intensité globale</span>
-                        <div className="slider-row">
-                          <input
-                            type="range"
-                            className="slider-intensity"
-                            min={0}
-                            max={1}
-                            step={0.01}
-                            value={clamp01(getNum(selectedNode.params, 'intensity', 0.8))}
-                            style={{
-                              ['--min' as any]: 0,
-                              ['--max' as any]: 1,
-                              ['--value' as any]: clamp01(getNum(selectedNode.params, 'intensity', 0.8)),
-                            }}
-                            onChange={(e) => updateSelectedParams({ intensity: Number(e.target.value) })}
-                          />
-                          <span className="slider-value slider-value--intensity">{Math.round(clamp01(getNum(selectedNode.params, 'intensity', 0.8)) * 100)}</span>
-                        </div>
-                      </label>
-
-                      <label className="field">
-                        <span>Durée (s)</span>
-                        <input
-                          type="number"
-                          min={0}
-                          step={0.1}
-                          value={Math.max(0, getNum(selectedNode.params, 'seconds', 1))}
-                          onChange={(e) => updateSelectedParams({ seconds: Number(e.target.value) })}
-                          className="input"
-                        />
-                      </label>
-
-                      <label className="field">
-                        <span>Masque</span>
-                        <select
-                          className="input"
-                          value={String(selectedNode.params.mask ?? 'all')}
-                          onChange={(e) => updateSelectedParams({ mask: e.target.value })}
-                        >
-                          <option value="all">Tout</option>
-                          <option value="border">Bord</option>
-                          <option value="corners">Coins</option>
-                          <option value="center">Centre</option>
-                        </select>
-                      </label>
+                      <p style={{ fontSize: 11, opacity: 0.5, marginTop: 4, lineHeight: 1.4 }}>Clique une dalle dans le viewport pour l'assigner.</p>
                     </>
                   ) : selectedNode.kind === 'pulse' ? (
                     <>
-                      <label className="field">
-                        <span>Couleur de base</span>
-                        <input
-                          type="color"
-                          value={getColor(selectedNode.params, 'baseColor', getColor(selectedNode.params, 'color', '#ff2aa6'))}
-                          onChange={(e) => updateSelectedParams({ baseColor: e.target.value })}
-                          className="input"
-                        />
-                      </label>
+                      {(() => {
+                        const baseColor = getColor(selectedNode.params, 'baseColor', getColor(selectedNode.params, 'color', '#ff2aa6'));
+                        const targetColor = getColor(selectedNode.params, 'targetColor', getColor(selectedNode.params, 'color', '#ff2aa6'));
+                        const fromI = clamp01(getNum(selectedNode.params, 'fromIntensity', clamp01(getNum(selectedNode.params, 'base', 0))));
+                        const toI = clamp01(getNum(selectedNode.params, 'toIntensity', clamp01(getNum(selectedNode.params, 'base', 0) + clamp01(getNum(selectedNode.params, 'amp', 0.8)))));
+                        const speed = Math.max(0.01, getNum(selectedNode.params, 'speed', 1));
 
-                      <label className="field">
-                        <span>Couleur cible</span>
-                        <input
-                          type="color"
-                          value={getColor(selectedNode.params, 'targetColor', getColor(selectedNode.params, 'color', '#ff2aa6'))}
-                          onChange={(e) => updateSelectedParams({ targetColor: e.target.value })}
-                          className="input"
-                        />
-                      </label>
+                        const MiniSlider = ({ label, value, max, unit, color: c, onChange }: { label: string; value: number; max: number; unit: string; color: string; onChange: (v: number) => void }) => {
+                          const pct = `${(value / max) * 100}%`;
+                          const variant = c === '#4361ee' ? 'g-slider--accent' : c === '#b829dd' || c === '#805ad5' ? 'g-slider--purple' : c === '#06d6a0' || c === '#319795' ? 'g-slider--teal' : 'g-slider--accent';
+                          return (
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 48px', gap: 10, alignItems: 'center' }}>
+                              <div>
+                                <span className="g-label" style={{ marginBottom: 6, display: 'block' }}>{label}</span>
+                                <input
+                                  type="range" className={`g-slider ${variant}`} min={0} max={max} step={max > 2 ? 0.05 : 0.01} value={value}
+                                  onChange={(e) => onChange(Number(e.target.value))}
+                                  style={{ ['--pct' as any]: pct }}
+                                />
+                              </div>
+                              <span style={{ fontSize: 13, fontWeight: 700, color: '#1a1a1a', textAlign: 'right' }}>{max <= 2 ? `${Math.round(value * 100)}%` : value.toFixed(1)}{unit}</span>
+                            </div>
+                          );
+                        };
 
-                      <label className="field">
-                        <span className="slider-label slider-label--intensity">Intensité départ</span>
-                        <div className="slider-row">
-                          <input
-                            type="range"
-                            className="slider-intensity"
-                            min={0}
-                            max={1}
-                            step={0.01}
-                            value={clamp01(getNum(selectedNode.params, 'fromIntensity', clamp01(getNum(selectedNode.params, 'base', 0))))}
-                            style={{
-                              ['--min' as any]: 0,
-                              ['--max' as any]: 1,
-                              ['--value' as any]: clamp01(
-                                getNum(selectedNode.params, 'fromIntensity', clamp01(getNum(selectedNode.params, 'base', 0))),
-                              ),
-                            }}
-                            onChange={(e) => updateSelectedParams({ fromIntensity: Number(e.target.value) })}
-                          />
-                          <span className="slider-value slider-value--intensity">{Math.round(clamp01(getNum(selectedNode.params, 'fromIntensity', clamp01(getNum(selectedNode.params, 'base', 0)))) * 100)}</span>
-                        </div>
-                      </label>
+                        return (
+                          <>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                              <label style={{ display: 'grid', gap: 6 }}>
+                                <span className="g-label">Base</span>
+                                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                                  <div style={{ width: 28, height: 28, borderRadius: 8, background: baseColor, border: '1px solid rgba(0,0,0,0.1)', flexShrink: 0 }} />
+                                  <input type="color" value={baseColor} onChange={(e) => updateSelectedParams({ baseColor: e.target.value })} style={{ flex: 1, height: 28, borderRadius: 8, border: '1px solid rgba(0,0,0,0.1)', cursor: 'pointer', padding: 0, background: '#fff' }} />
+                                </div>
+                              </label>
+                              <label style={{ display: 'grid', gap: 6 }}>
+                                <span className="g-label">Cible</span>
+                                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                                  <div style={{ width: 28, height: 28, borderRadius: 8, background: targetColor, border: '1px solid rgba(0,0,0,0.1)', flexShrink: 0 }} />
+                                  <input type="color" value={targetColor} onChange={(e) => updateSelectedParams({ targetColor: e.target.value })} style={{ flex: 1, height: 28, borderRadius: 8, border: '1px solid rgba(0,0,0,0.1)', cursor: 'pointer', padding: 0, background: '#fff' }} />
+                                </div>
+                              </label>
+                            </div>
 
-                      <label className="field">
-                        <span className="slider-label slider-label--intensity">Intensité cible</span>
-                        <div className="slider-row">
-                          <input
-                            type="range"
-                            className="slider-intensity"
-                            min={0}
-                            max={1}
-                            step={0.01}
-                            value={clamp01(
-                              getNum(
-                                selectedNode.params,
-                                'toIntensity',
-                                clamp01(getNum(selectedNode.params, 'base', 0) + clamp01(getNum(selectedNode.params, 'amp', 0.8))),
-                              ),
-                            )}
-                            style={{
-                              ['--min' as any]: 0,
-                              ['--max' as any]: 1,
-                              ['--value' as any]: clamp01(
-                                getNum(
-                                  selectedNode.params,
-                                  'toIntensity',
-                                  clamp01(
-                                    getNum(selectedNode.params, 'base', 0) + clamp01(getNum(selectedNode.params, 'amp', 0.8)),
-                                  ),
-                                ),
-                              ),
-                            }}
-                            onChange={(e) => updateSelectedParams({ toIntensity: Number(e.target.value) })}
-                          />
-                          <span className="slider-value slider-value--intensity">{Math.round(clamp01(getNum(selectedNode.params, 'toIntensity', clamp01(getNum(selectedNode.params, 'base', 0) + clamp01(getNum(selectedNode.params, 'amp', 0.8))))) * 100)}</span>
-                        </div>
-                      </label>
-
-                      <label className="field">
-                        <span>Vitesse</span>
-                        <input
-                          type="range"
-                          min={0.05}
-                          max={4}
-                          step={0.05}
-                          value={Math.max(0.01, getNum(selectedNode.params, 'speed', 1))}
-                          style={{
-                            ['--min' as any]: 0.05,
-                            ['--max' as any]: 4,
-                            ['--value' as any]: Math.max(0.01, getNum(selectedNode.params, 'speed', 1)),
-                          }}
-                          onChange={(e) => updateSelectedParams({ speed: Number(e.target.value) })}
-                        />
-                      </label>
+                            <div style={{ padding: 16, borderRadius: 12, background: '#fff', border: '1px solid rgba(0,0,0,0.06)', display: 'grid', gap: 14 }}>
+                              <MiniSlider label="Int. départ" value={fromI} max={1} unit="" color="#4361ee" onChange={(v) => updateSelectedParams({ fromIntensity: v })} />
+                              <MiniSlider label="Int. cible" value={toI} max={1} unit="" color="#b829dd" onChange={(v) => updateSelectedParams({ toIntensity: v })} />
+                              <MiniSlider label="Vitesse" value={speed} max={10} unit="" color="#06d6a0" onChange={(v) => updateSelectedParams({ speed: v })} />
+                            </div>
+                          </>
+                        );
+                      })()}
                     </>
                   ) : selectedNode.kind === 'wait' ? (
                     <>
-                      <label className="field">
-                        <span>Durée (secondes)</span>
+                      <label style={{ display: 'grid', gap: 4 }}>
+                        <span className="g-label">Durée (secondes)</span>
                         <input
-                          className="input"
+                          className="g-input"
                           type="number"
                           step={0.1}
+                          style={{ height: 36, fontSize: 13 }}
                           value={getNum(selectedNode.params, 'seconds', 1)}
                           onChange={(e) => updateSelectedParams({ seconds: Number(e.target.value) })}
                         />
                       </label>
-                      <div className="muted">Retarde l'exécution de la prochaine action dans la séquence.</div>
+                      <p style={{ fontSize: 11, opacity: 0.5, lineHeight: 1.4 }}>Retarde l'exécution de la prochaine action dans la séquence.</p>
+                    </>
+                  ) : selectedNode.kind === 'game_tetris' ? (
+                    <>
+                      <div style={{ padding: 16, borderRadius: 12, background: '#fff', border: '1px solid rgba(0,0,0,0.06)', display: 'grid', gap: 14 }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 60px', gap: 10, alignItems: 'center' }}>
+                          <div>
+                            <span className="g-label" style={{ marginBottom: 6, display: 'block' }}>Vitesse (ms)</span>
+                            <input
+                              type="range" className="g-slider g-slider--accent" min={80} max={1200} step={10}
+                              value={getNum(selectedNode.params, 'speed', 500)}
+                              onChange={(e) => updateSelectedParams({ speed: Number(e.target.value) })}
+                              style={{ ['--pct' as any]: `${((getNum(selectedNode.params, 'speed', 500) - 80) / 1120) * 100}%` }}
+                            />
+                          </div>
+                          <span style={{ fontSize: 13, fontWeight: 700, color: '#1a1a1a', textAlign: 'right' }}>{Math.round(getNum(selectedNode.params, 'speed', 500))}ms</span>
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                          <label style={{ display: 'grid', gap: 4 }}>
+                            <span className="g-label">Fond</span>
+                            <input type="color" value={getColor(selectedNode.params, 'bgColor', '#0a0a0f')}
+                              onChange={(e) => updateSelectedParams({ bgColor: e.target.value })}
+                              style={{ width: '100%', height: 28, borderRadius: 8, border: '1px solid rgba(0,0,0,0.1)', cursor: 'pointer', padding: 0 }}
+                            />
+                          </label>
+                          <label style={{ display: 'grid', gap: 4 }}>
+                            <span className="g-label">Bordure</span>
+                            <input type="color" value={getColor(selectedNode.params, 'borderColor', '#222233')}
+                              onChange={(e) => updateSelectedParams({ borderColor: e.target.value })}
+                              style={{ width: '100%', height: 28, borderRadius: 8, border: '1px solid rgba(0,0,0,0.1)', cursor: 'pointer', padding: 0 }}
+                            />
+                          </label>
+                        </div>
+                      </div>
+                      <p style={{ fontSize: 11, opacity: 0.5, marginTop: 4, lineHeight: 1.4 }}>
+                        Tetris interactif dans le viewport. Contrôles: ← → ↑ ↓ Espace.
+                        <br />Les couleurs sont envoyées sur les dalles physiques en temps réel.
+                      </p>
+                    </>
+                  ) : selectedNode.kind === 'on_timer' ? (
+                    <>
+                      <label style={{ display: 'grid', gap: 4 }}>
+                        <span className="g-label">Intervalle (ms)</span>
+                        <input className="g-input" type="number" step={100} min={50}
+                          style={{ height: 36, fontSize: 13 }}
+                          value={getNum(selectedNode.params, 'intervalMs', 1000)}
+                          onChange={(e) => updateSelectedParams({ intervalMs: Number(e.target.value) })}
+                        />
+                      </label>
+                    </>
+                  ) : selectedNode.kind === 'on_click' ? (
+                    <>
+                      <label style={{ display: 'grid', gap: 4 }}>
+                        <span className="g-label">Dalle cible</span>
+                        <select className="g-select" style={{ height: 36, fontSize: 13 }}
+                          value={String(Math.round(getNum(selectedNode.params, 'tileIndex', 0)))}
+                          onChange={(e) => updateSelectedParams({ tileIndex: Number(e.target.value) })}
+                        >
+                          {Array.from({ length: tileCount }, (_, i) => (
+                            <option key={i} value={i}>D{i + 1}</option>
+                          ))}
+                        </select>
+                      </label>
+                      <p style={{ fontSize: 11, opacity: 0.5, lineHeight: 1.4 }}>Se déclenche quand la dalle est cliquée/touchée.</p>
+                    </>
+                  ) : selectedNode.kind.startsWith('cs150_') ? (
+                    <>
+                      <div style={{ padding: 16, borderRadius: 12, background: '#fff', border: '1px solid rgba(0,0,0,0.06)', display: 'grid', gap: 14 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+                          <div style={{ width: 36, height: 36, borderRadius: 10, background: 'linear-gradient(135deg, #8b5cf6, #6366f1)', display: 'grid', placeItems: 'center' }}>
+                            <Target size={18} color="#fff" />
+                          </div>
+                          <div>
+                            <div style={{ fontWeight: 700, fontSize: 14 }}>Colorimètre CS150</div>
+                            <div style={{ fontSize: 12, opacity: 0.6 }}>Konica Minolta</div>
+                          </div>
+                        </div>
+                        
+                        {selectedNode.kind === 'cs150_connect' && (
+                          <p style={{ fontSize: 12, opacity: 0.7, lineHeight: 1.5 }}>
+                            Connecte le colorimètre CS150 via USB/RS232.
+                          </p>
+                        )}
+                        
+                        {selectedNode.kind === 'cs150_measure' && (
+                          <p style={{ fontSize: 12, opacity: 0.7, lineHeight: 1.5 }}>
+                            Lance une mesure one-shot (mesure + polling + lecture).
+                          </p>
+                        )}
+                        
+                        {selectedNode.kind === 'cs150_read_xyz' && (
+                          <>
+                            <p style={{ fontSize: 12, opacity: 0.7, lineHeight: 1.5, marginBottom: 8 }}>
+                              Lit les valeurs XYZ de la dernière mesure.
+                            </p>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, padding: 10, background: '#f8fafc', borderRadius: 8 }}>
+                              <div style={{ textAlign: 'center' }}>
+                                <div style={{ fontSize: 10, color: '#94a3b8' }}>X</div>
+                                <div style={{ fontSize: 13, fontWeight: 600, fontFamily: 'monospace' }}>--</div>
+                              </div>
+                              <div style={{ textAlign: 'center' }}>
+                                <div style={{ fontSize: 10, color: '#94a3b8' }}>Y</div>
+                                <div style={{ fontSize: 13, fontWeight: 600, fontFamily: 'monospace' }}>--</div>
+                              </div>
+                              <div style={{ textAlign: 'center' }}>
+                                <div style={{ fontSize: 10, color: '#94a3b8' }}>Z</div>
+                                <div style={{ fontSize: 13, fontWeight: 600, fontFamily: 'monospace' }}>--</div>
+                              </div>
+                            </div>
+                          </>
+                        )}
+                        
+                        {selectedNode.kind === 'cs150_read_lvxy' && (
+                          <>
+                            <p style={{ fontSize: 12, opacity: 0.7, lineHeight: 1.5, marginBottom: 8 }}>
+                              Lit les valeurs Lv, x, y de la dernière mesure.
+                            </p>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, padding: 10, background: '#f8fafc', borderRadius: 8 }}>
+                              <div style={{ textAlign: 'center' }}>
+                                <div style={{ fontSize: 10, color: '#94a3b8' }}>Lv</div>
+                                <div style={{ fontSize: 13, fontWeight: 600, fontFamily: 'monospace' }}>--</div>
+                              </div>
+                              <div style={{ textAlign: 'center' }}>
+                                <div style={{ fontSize: 10, color: '#94a3b8' }}>x</div>
+                                <div style={{ fontSize: 13, fontWeight: 600, fontFamily: 'monospace' }}>--</div>
+                              </div>
+                              <div style={{ textAlign: 'center' }}>
+                                <div style={{ fontSize: 10, color: '#94a3b8' }}>y</div>
+                                <div style={{ fontSize: 13, fontWeight: 600, fontFamily: 'monospace' }}>--</div>
+                              </div>
+                            </div>
+                          </>
+                        )}
+                        
+                        {selectedNode.kind === 'cs150_set_backlight' && (
+                          <label style={{ display: 'grid', gap: 6 }}>
+                            <span className="g-label">Mode rétroéclairage</span>
+                            <select 
+                              className="g-select" 
+                              style={{ height: 36, fontSize: 13 }}
+                              value={String(selectedNode.params.mode ?? 'on')}
+                              onChange={(e) => updateSelectedParams({ mode: e.target.value })}
+                            >
+                              <option value="on">ON</option>
+                              <option value="off">OFF</option>
+                            </select>
+                          </label>
+                        )}
+                        
+                        {selectedNode.kind === 'cs150_set_calib_ch' && (
+                          <label style={{ display: 'grid', gap: 6 }}>
+                            <span className="g-label">Canal de calibration</span>
+                            <select 
+                              className="g-select" 
+                              style={{ height: 36, fontSize: 13 }}
+                              value={Number(selectedNode.params.channel ?? 0)}
+                              onChange={(e) => updateSelectedParams({ channel: Number(e.target.value) })}
+                            >
+                              {Array.from({ length: 11 }, (_, i) => (
+                                <option key={i} value={i}>Canal {i}</option>
+                              ))}
+                            </select>
+                          </label>
+                        )}
+                        
+                        {selectedNode.kind === 'cs150_rgb_calib' && (
+                          <>
+                            <p style={{ fontSize: 12, opacity: 0.7, lineHeight: 1.5, marginBottom: 12 }}>
+                              Calibration RGB: mesure Rouge, Vert, Bleu puis calcule la matrice.
+                            </p>
+                            <div style={{ display: 'grid', gap: 10 }}>
+                              <label style={{ display: 'grid', gap: 4 }}>
+                                <span className="g-label" style={{ fontSize: 11 }}>ID Calibration</span>
+                                <input 
+                                  type="text" 
+                                  className="g-input"
+                                  style={{ height: 32, fontSize: 12 }}
+                                  value={String(selectedNode.params.calibId ?? 'rgb_calib_001')}
+                                  onChange={(e) => updateSelectedParams({ calibId: e.target.value })}
+                                />
+                              </label>
+                              <label style={{ display: 'grid', gap: 4 }}>
+                                <span className="g-label" style={{ fontSize: 11 }}>Canal cible</span>
+                                <select 
+                                  className="g-select" 
+                                  style={{ height: 32, fontSize: 12 }}
+                                  value={Number(selectedNode.params.targetChannel ?? 1)}
+                                  onChange={(e) => updateSelectedParams({ targetChannel: Number(e.target.value) })}
+                                >
+                                  {Array.from({ length: 10 }, (_, i) => (
+                                    <option key={i + 1} value={i + 1}>Canal {i + 1}</option>
+                                  ))}
+                                </select>
+                              </label>
+                            </div>
+                          </>
+                        )}
+                        
+                        {selectedNode.kind === 'cs150_single_calib' && (
+                          <>
+                            <p style={{ fontSize: 12, opacity: 0.7, lineHeight: 1.5, marginBottom: 12 }}>
+                              Calibration 1 point: mesure une source blanche de référence.
+                            </p>
+                            <div style={{ display: 'grid', gap: 10 }}>
+                              <label style={{ display: 'grid', gap: 4 }}>
+                                <span className="g-label" style={{ fontSize: 11 }}>Valeur blanc Lv (cd/m²)</span>
+                                <input 
+                                  type="number" 
+                                  step="0.1"
+                                  className="g-input"
+                                  style={{ height: 32, fontSize: 12 }}
+                                  value={Number(selectedNode.params.trueLv ?? 11.0)}
+                                  onChange={(e) => updateSelectedParams({ trueLv: Number(e.target.value) })}
+                                />
+                              </label>
+                              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                                <label style={{ display: 'grid', gap: 4 }}>
+                                  <span className="g-label" style={{ fontSize: 11 }}>x</span>
+                                  <input 
+                                    type="number" 
+                                    step="0.001"
+                                    className="g-input"
+                                    style={{ height: 32, fontSize: 12 }}
+                                    value={Number(selectedNode.params.trueX ?? 0.4)}
+                                    onChange={(e) => updateSelectedParams({ trueX: Number(e.target.value) })}
+                                  />
+                                </label>
+                                <label style={{ display: 'grid', gap: 4 }}>
+                                  <span className="g-label" style={{ fontSize: 11 }}>y</span>
+                                  <input 
+                                    type="number" 
+                                    step="0.001"
+                                    className="g-input"
+                                    style={{ height: 32, fontSize: 12 }}
+                                    value={Number(selectedNode.params.trueY ?? 0.4)}
+                                    onChange={(e) => updateSelectedParams({ trueY: Number(e.target.value) })}
+                                  />
+                                </label>
+                              </div>
+                              <label style={{ display: 'grid', gap: 4 }}>
+                                <span className="g-label" style={{ fontSize: 11 }}>Canal cible</span>
+                                <select 
+                                  className="g-select" 
+                                  style={{ height: 32, fontSize: 12 }}
+                                  value={Number(selectedNode.params.targetChannel ?? 1)}
+                                  onChange={(e) => updateSelectedParams({ targetChannel: Number(e.target.value) })}
+                                >
+                                  {Array.from({ length: 10 }, (_, i) => (
+                                    <option key={i + 1} value={i + 1}>Canal {i + 1}</option>
+                                  ))}
+                                </select>
+                              </label>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                      <p style={{ fontSize: 11, opacity: 0.5, lineHeight: 1.4 }}>
+                        Utilisez le panneau CS150 dans la barre latérale pour le contrôle direct.
+                      </p>
                     </>
                   ) : (
                     <>
-                      <label className="field">
-                        <span>Dalle</span>
+                      <label style={{ display: 'grid', gap: 4 }}>
+                        <span className="g-label">Dalle</span>
                         <select
-                          className="input"
+                          className="g-select"
+                          style={{ height: 36, fontSize: 13 }}
                           value={String(Math.max(0, Math.min(tileCount - 1, Math.round(getNum(selectedNode.params, 'tileIndex', 0))))) }
                           onChange={(e) => {
                             const idx = Math.max(0, Math.min(tileCount - 1, Number(e.target.value)));
@@ -2225,111 +3254,97 @@ export default function EditeurPage() {
                         </select>
                       </label>
 
-                      <label className="field">
-                        <span>Couleur</span>
-                        <input
-                          type="color"
-                          value={getColor(selectedNode.params, 'color', '#ff2aa6')}
-                          onChange={(e) => updateSelectedParams({ color: e.target.value })}
-                          className="input"
-                        />
-                      </label>
+                      {(() => {
+                        const color = getColor(selectedNode.params, 'color', '#ff2aa6');
+                        const rgb = hexToRgb(color);
+                        const intensity = clamp01(getNum(selectedNode.params, 'intensity', 0.85));
+                        const updateColor = (r: number, g: number, b: number) => {
+                          updateSelectedParams({ color: rgbToHex(r, g, b) });
+                        };
 
-                      {/* RGB Sliders */}
-                      <div className="rgb-sliders">
-                        {(() => {
-                          const color = getColor(selectedNode.params, 'color', '#ff2aa6');
-                          const rgb = hexToRgb(color);
-                          const updateColor = (r: number, g: number, b: number) => {
-                            updateSelectedParams({ color: rgbToHex(r, g, b) });
-                          };
+                        const SliderRow = ({ label, value, max, color: c, onChange }: { label: string; value: number; max: number; color: string; onChange: (v: number) => void }) => {
+                          const pct = `${(value / max) * 100}%`;
+                          const variant = c === '#e53e3e' || c === '#ef4444' ? 'g-slider--red' : c === '#38a169' || c === '#22c55e' ? 'g-slider--green' : c === '#3182ce' || c === '#3b82f6' ? 'g-slider--blue' : '';
                           return (
-                            <>
-                              <div className="slider-row">
-                                <span className="slider-label slider-label--red">Rouge</span>
-                                <input
-                                  type="range"
-                                  className="slider-red"
-                                  min={0}
-                                  max={255}
-                                  step={1}
-                                  value={rgb.r}
-                                  style={{
-                                    ['--min' as any]: 0,
-                                    ['--max' as any]: 255,
-                                    ['--value' as any]: rgb.r,
-                                  }}
-                                  onChange={(e) => updateColor(Number(e.target.value), rgb.g, rgb.b)}
-                                />
-                                <span className="slider-value slider-value--red">{rgb.r}</span>
-                              </div>
-                              <div className="slider-row">
-                                <span className="slider-label slider-label--green">Vert</span>
-                                <input
-                                  type="range"
-                                  className="slider-green"
-                                  min={0}
-                                  max={255}
-                                  step={1}
-                                  value={rgb.g}
-                                  style={{
-                                    ['--min' as any]: 0,
-                                    ['--max' as any]: 255,
-                                    ['--value' as any]: rgb.g,
-                                  }}
-                                  onChange={(e) => updateColor(rgb.r, Number(e.target.value), rgb.b)}
-                                />
-                                <span className="slider-value slider-value--green">{rgb.g}</span>
-                              </div>
-                              <div className="slider-row">
-                                <span className="slider-label slider-label--blue">Bleu</span>
-                                <input
-                                  type="range"
-                                  className="slider-blue"
-                                  min={0}
-                                  max={255}
-                                  step={1}
-                                  value={rgb.b}
-                                  style={{
-                                    ['--min' as any]: 0,
-                                    ['--max' as any]: 255,
-                                    ['--value' as any]: rgb.b,
-                                  }}
-                                  onChange={(e) => updateColor(rgb.r, rgb.g, Number(e.target.value))}
-                                />
-                                <span className="slider-value slider-value--blue">{rgb.b}</span>
-                              </div>
-                            </>
+                            <div style={{ display: 'grid', gridTemplateColumns: '32px 1fr 36px', gap: 12, alignItems: 'center' }}>
+                              <span style={{ fontSize: 12, fontWeight: 700, color: '#1a1a1a', letterSpacing: '0.02em' }}>{label}</span>
+                              <input
+                                type="range"
+                                className={`g-slider ${variant}`}
+                                min={0}
+                                max={max}
+                                step={1}
+                                value={value}
+                                onChange={(e) => onChange(Number(e.target.value))}
+                                style={{ ['--pct' as any]: pct }}
+                              />
+                              <span style={{ fontSize: 13, fontWeight: 700, color: '#1a1a1a', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{value}</span>
+                            </div>
                           );
-                        })()}
-                      </div>
+                        };
 
-                      <label className="field">
-                        <span className="slider-label slider-label--intensity">Intensité globale</span>
-                        <div className="slider-row">
-                          <input
-                            type="range"
-                            className="slider-intensity"
-                            min={0}
-                            max={1}
-                            step={0.01}
-                            value={clamp01(getNum(selectedNode.params, 'intensity', 0.8))}
-                            style={{
-                              ['--min' as any]: 0,
-                              ['--max' as any]: 1,
-                              ['--value' as any]: clamp01(getNum(selectedNode.params, 'intensity', 0.8)),
-                            }}
-                            onChange={(e) => updateSelectedParams({ intensity: Number(e.target.value) })}
-                          />
-                          <span className="slider-value slider-value--intensity">{Math.round(clamp01(getNum(selectedNode.params, 'intensity', 0.8)) * 100)}</span>
-                        </div>
-                      </label>
+                        return (
+                          <>
+                            <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 8 }}>
+                              <div style={{
+                                width: 36, height: 36, borderRadius: 10,
+                                background: color,
+                                border: '1px solid rgba(0,0,0,0.1)',
+                                flexShrink: 0,
+                              }} />
+                              <input
+                                type="color"
+                                value={color}
+                                onChange={(e) => updateSelectedParams({ color: e.target.value })}
+                                style={{
+                                  width: '100%', height: 32, borderRadius: 8, border: '1px solid rgba(0,0,0,0.1)',
+                                  cursor: 'pointer', padding: 0, background: '#fff',
+                                }}
+                              />
+                            </div>
 
-                      <div className="muted">Astuce: clique une dalle dans le viewport pour l'assigner.</div>
+                            <div style={{
+                              padding: 16, borderRadius: 12,
+                              background: '#fff',
+                              border: '1px solid rgba(0,0,0,0.06)',
+                              display: 'grid', gap: 12,
+                            }}>
+                              <SliderRow label="R" value={rgb.r} max={255} color="#ef4444" onChange={(v) => updateColor(v, rgb.g, rgb.b)} />
+                              <SliderRow label="G" value={rgb.g} max={255} color="#22c55e" onChange={(v) => updateColor(rgb.r, v, rgb.b)} />
+                              <SliderRow label="B" value={rgb.b} max={255} color="#3b82f6" onChange={(v) => updateColor(rgb.r, rgb.g, v)} />
+                            </div>
+
+                            <div style={{
+                              padding: 16, borderRadius: 12, marginTop: 4,
+                              background: '#fff',
+                              border: '1px solid rgba(0,0,0,0.06)',
+                            }}>
+                              <div style={{ display: 'grid', gridTemplateColumns: '1fr 42px', gap: 12, alignItems: 'center' }}>
+                                <div>
+                                  <span className="g-label" style={{ marginBottom: 8, display: 'block' }}>Intensité</span>
+                                  <input
+                                    type="range" className="g-slider g-slider--accent" min={0} max={1} step={0.01} value={intensity}
+                                    onChange={(e) => updateSelectedParams({ intensity: Number(e.target.value) })}
+                                    style={{ ['--pct' as any]: `${intensity * 100}%` }}
+                                  />
+                                </div>
+                                <span style={{ fontSize: 13, fontWeight: 700, color: '#1a1a1a', textAlign: 'right' }}>{Math.round(intensity * 100)}%</span>
+                              </div>
+                            </div>
+                          </>
+                        );
+                      })()}
+
+                      <p style={{ fontSize: 11, opacity: 0.5, marginTop: 4, lineHeight: 1.4 }}>Clique une dalle dans le viewport pour l'assigner.</p>
                     </>
                   )}
                 </div>
               )}
+            </div>
+
+            {/* CS150 Colorimeter Panel */}
+            <div style={{ marginTop: 16, padding: '0 20px 20px' }}>
+              <CS150Panel />
             </div>
         </aside>
       </div>
@@ -2349,12 +3364,12 @@ export default function EditeurPage() {
           onClick={() => setModal(null)}
         >
           <div
-            className="glass"
+            className="g-glass"
             style={{
               width: 'min(520px, calc(100vw - 40px))',
               padding: 28,
               borderRadius: 24,
-              boxShadow: '0 24px 60px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.15)',
+              boxShadow: '0 24px 60px rgba(0,0,0,0.12), 0 1px 0 rgba(255,255,255,0.9) inset',
             }}
             onClick={(e) => e.stopPropagation()}
           >
@@ -2365,7 +3380,7 @@ export default function EditeurPage() {
                     width: 44,
                     height: 44,
                     borderRadius: 14,
-                    background: 'linear-gradient(135deg, #4361ee, #3a0ca3)',
+                    background: 'linear-gradient(135deg, #4361ee, #3a56d4)',
                     display: 'grid',
                     placeItems: 'center',
                   }}
@@ -2373,14 +3388,14 @@ export default function EditeurPage() {
                   <FolderPlus size={22} color="#fff" />
                 </div>
                 <div>
-                  <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800 }}>Nouveau projet</h3>
-                  <p style={{ margin: '4px 0 0', fontSize: 13, opacity: 0.7 }}>Créez un jeu lumineux interactif</p>
+                  <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800, letterSpacing: '-0.02em' }}>Nouveau projet</h3>
+                  <p style={{ margin: '4px 0 0', fontSize: 13, opacity: 0.6 }}>Créez un jeu lumineux interactif</p>
                 </div>
               </div>
               <button
-                className="btn btn--mini"
+                className="g-btn g-btn--icon"
                 onClick={() => setModal(null)}
-                style={{ borderRadius: 10, width: 36, height: 36, padding: 0 }}
+                style={{ width: 38, height: 38 }}
               >
                 <X size={18} />
               </button>
@@ -2393,7 +3408,7 @@ export default function EditeurPage() {
                 </label>
                 <input
                   type="text"
-                  className="input"
+                  className="g-input"
                   placeholder="Mon super jeu..."
                   value={newProjectName}
                   onChange={(e) => setNewProjectName(e.target.value)}
@@ -2411,24 +3426,30 @@ export default function EditeurPage() {
                 <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 12, opacity: 0.9 }}>
                   Template de départ
                 </label>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10, maxHeight: 380, overflowY: 'auto' }}>
                   {[
                     { id: 'blank', icon: Layers, label: 'Vide', desc: 'Projet vide avec événement initial' },
                     { id: 'tutorial', icon: Zap, label: 'Tutoriel', desc: 'Remplissage simple démonstratif' },
                     { id: 'animation', icon: Play, label: 'Animation', desc: 'Pulsation automatique' },
                     { id: 'interactive', icon: MousePointer2, label: 'Interactif', desc: 'Contrôle d\'une dalle' },
+                    { id: 'fluorescence', icon: Palette, label: 'Fluorescence UV', desc: 'Activation UV → Fluorescence verte' },
+                    { id: 'color-demo', icon: Palette, label: 'Démo RGB', desc: '3 dalles RGB primaires' },
+                    { id: 'pulse-advanced', icon: Clock, label: 'Pulsations', desc: 'Alternance chaud/froid' },
+                    { id: 'rainbow', icon: Palette, label: 'Arc-en-ciel', desc: 'Séquence colorée complète' },
+                    { id: 'tetris', icon: Gamepad2, label: 'Tetris Lumière', desc: 'Jeu Tetris interactif sur les dalles' },
+                    { id: 'memory', icon: Brain, label: 'Jeu de Mémoire', desc: 'Mémorisation de séquences lumineuses type Simon' },
                   ].map((t) => (
                     <button
                       key={t.id}
                       onClick={() => setNewProjectTemplate(t.id as typeof newProjectTemplate)}
+                      className="g-card"
                       style={{
                         padding: 14,
-                        borderRadius: 16,
-                        border: `2px solid ${newProjectTemplate === t.id ? '#4361ee' : 'rgba(0,0,0,0.08)'}`,
-                        background: newProjectTemplate === t.id ? 'rgba(67, 97, 238, 0.08)' : 'rgba(255,255,255,0.5)',
+                        borderRadius: 14,
+                        border: newProjectTemplate === t.id ? '2px solid #4361ee' : '1px solid rgba(255,255,255,0.6)',
+                        background: newProjectTemplate === t.id ? 'rgba(67, 97, 238, 0.06)' : 'linear-gradient(135deg, rgba(255,255,255,0.78), rgba(255,255,255,0.55))',
                         cursor: 'pointer',
                         textAlign: 'left',
-                        transition: 'all 0.15s ease',
                       }}
                     >
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
@@ -2442,19 +3463,19 @@ export default function EditeurPage() {
               </div>
             </div>
 
-            <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', marginTop: 24 }}>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 24 }}>
               <button
-                className="btn"
+                className="g-btn"
                 onClick={() => setModal(null)}
-                style={{ height: 44, padding: '0 20px' }}
+                style={{ height: 42, padding: '0 20px' }}
               >
                 Annuler
               </button>
               <button
-                className="btn btn--cta"
+                className="g-btn g-btn--accent"
                 onClick={() => void createGame(newProjectName, newProjectTemplate)}
                 disabled={dbLoading}
-                style={{ height: 44, padding: '0 24px' }}
+                style={{ height: 42, padding: '0 24px' }}
               >
                 {dbLoading ? 'Création...' : 'Créer le projet'}
               </button>
@@ -2469,8 +3490,8 @@ export default function EditeurPage() {
           style={{
             position: 'fixed',
             inset: 0,
-            background: 'rgba(0,0,0,0.45)',
-            backdropFilter: 'blur(8px)',
+            background: 'linear-gradient(180deg, rgba(255,255,255,0.26), rgba(245,247,255,0.42))',
+            backdropFilter: 'blur(18px) saturate(140%)',
             display: 'grid',
             placeItems: 'center',
             zIndex: 10000,
@@ -2484,6 +3505,10 @@ export default function EditeurPage() {
               padding: 28,
               borderRadius: 24,
               textAlign: 'center',
+              background: 'linear-gradient(135deg, rgba(255,255,255,0.88), rgba(245,247,255,0.82))',
+              border: '1px solid rgba(255,255,255,0.7)',
+              boxShadow: '0 20px 60px rgba(140, 160, 200, 0.14), 0 2px 0 rgba(255,255,255,0.8) inset',
+              backdropFilter: 'blur(28px) saturate(160%)',
             }}
             onClick={(e) => e.stopPropagation()}
           >
@@ -2492,23 +3517,35 @@ export default function EditeurPage() {
                 width: 56,
                 height: 56,
                 borderRadius: 16,
-                background: 'linear-gradient(135deg, #ef476f, #c9184a)',
+                background: 'linear-gradient(135deg, rgba(239,71,111,0.12), rgba(239,71,111,0.06))',
+                border: '1px solid rgba(0,0,0,0.08)',
                 display: 'grid',
                 placeItems: 'center',
                 margin: '0 auto 16px',
+                boxShadow: '0 8px 24px rgba(0,0,0,0.06), inset 0 1px 0 rgba(255,255,255,0.6)',
               }}
             >
-              <Trash2 size={26} color="#fff" />
+              <Trash2 size={26} color="#1a1a1a" />
             </div>
-            <h3 style={{ margin: '0 0 8px', fontSize: 18, fontWeight: 800 }}>Supprimer le projet ?</h3>
-            <p style={{ margin: '0 0 24px', fontSize: 14, opacity: 0.8 }}>
+            <h3 style={{ margin: '0 0 8px', fontSize: 18, fontWeight: 800, color: '#1a1a1a' }}>Supprimer le projet ?</h3>
+            <p style={{ margin: '0 0 24px', fontSize: 14, color: '#444', lineHeight: 1.5 }}>
               "{modal.gameName}" sera définitivement supprimé.
             </p>
             <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
               <button
                 className="btn"
                 onClick={() => setModal(null)}
-                style={{ height: 44, padding: '0 24px' }}
+                style={{
+                  height: 44,
+                  padding: '0 24px',
+                  background: 'rgba(255,255,255,0.7)',
+                  color: '#1a1a1a',
+                  border: '1px solid rgba(0,0,0,0.1)',
+                  boxShadow: '0 4px 16px rgba(0,0,0,0.06), inset 0 1px 0 rgba(255,255,255,0.8)',
+                  fontWeight: 600,
+                  borderRadius: 12,
+                  cursor: 'pointer',
+                }}
               >
                 Annuler
               </button>
@@ -2518,7 +3555,17 @@ export default function EditeurPage() {
                   void deleteActiveGame();
                   setModal(null);
                 }}
-                style={{ height: 44, padding: '0 24px', background: 'linear-gradient(135deg, #ef476f, #c9184a)', color: '#fff', border: 'none' }}
+                style={{
+                  height: 44,
+                  padding: '0 24px',
+                  background: 'linear-gradient(135deg, #ef476f, #c9184a)',
+                  color: '#fff',
+                  border: 'none',
+                  boxShadow: '0 8px 24px rgba(239, 71, 111, 0.25)',
+                  fontWeight: 600,
+                  borderRadius: 12,
+                  cursor: 'pointer',
+                }}
               >
                 Supprimer
               </button>
@@ -2536,12 +3583,12 @@ export default function EditeurPage() {
             left: '50%',
             transform: 'translateX(-50%)',
             display: 'flex',
-            gap: 8,
-            padding: '8px 12px',
-            borderRadius: 16,
-            background: 'rgba(255,255,255,0.85)',
+            gap: 6,
+            padding: '8px 14px',
+            borderRadius: 12,
+            background: '#fff',
             backdropFilter: 'blur(20px)',
-            boxShadow: '0 8px 32px rgba(0,0,0,0.15), inset 0 1px 0 rgba(255,255,255,0.5)',
+            boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
             zIndex: 100,
             border: '1px solid rgba(0,0,0,0.06)',
           }}
@@ -2550,16 +3597,16 @@ export default function EditeurPage() {
             className="btn btn--mini"
             onClick={() => setIsPlaying(!isPlaying)}
             title={isPlaying ? 'Pause' : 'Lecture'}
-            style={{ width: 36, height: 36, padding: 0 }}
+            style={{ width: 36, height: 36, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
           >
             {isPlaying ? <Pause size={16} /> : <Play size={16} />}
           </button>
-          <div style={{ width: 1, background: 'rgba(0,0,0,0.1)', margin: '4px 4px' }} />
+          <div style={{ width: 1, background: 'rgba(0, 0, 0, 0.1)', margin: '4px 4px' }} />
           <button
             className="btn btn--mini"
             onClick={() => setViewMode(viewMode === 'split' ? 'tiles-only' : viewMode === 'tiles-only' ? 'ui-only' : 'split')}
             title="Changer vue"
-            style={{ width: 36, height: 36, padding: 0 }}
+            style={{ width: 36, height: 36, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
           >
             {viewMode === 'split' ? <LayoutGrid size={16} /> : viewMode === 'tiles-only' ? <Maximize2 size={16} /> : <Minimize2 size={16} />}
           </button>
@@ -2567,11 +3614,11 @@ export default function EditeurPage() {
             className="btn btn--mini"
             onClick={() => setShowGrid(!showGrid)}
             title="Grille"
-            style={{ width: 36, height: 36, padding: 0, opacity: showGrid ? 1 : 0.5 }}
+            style={{ width: 36, height: 36, padding: 0, opacity: showGrid ? 1 : 0.5, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
           >
             <div style={{ width: 14, height: 14, border: '2px solid currentColor', borderRadius: 3 }} />
           </button>
-          <div style={{ width: 1, background: 'rgba(0,0,0,0.1)', margin: '4px 4px' }} />
+          <div style={{ width: 1, background: 'rgba(0, 0, 0, 0.1)', margin: '4px 4px' }} />
           <button
             className="btn btn--mini"
             onClick={() => {
@@ -2579,12 +3626,240 @@ export default function EditeurPage() {
               setGraphPan({ x: 0, y: 0 });
             }}
             title="Réinitialiser vue"
-            style={{ width: 36, height: 36, padding: 0 }}
+            style={{ width: 36, height: 36, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
           >
             <RotateCcw size={16} />
           </button>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '0 8px' }}>
             <span style={{ fontSize: 12, opacity: 0.7 }}>{Math.round(graphZoom * 100)}%</span>
+          </div>
+        </div>
+      )}
+
+      {/* Overlay 2D du jeu - Visuel en plein écran */}
+      {showGameOverlay && activeGame && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0, 0, 0, 0.4)',
+            backdropFilter: 'blur(8px)',
+            display: 'grid',
+            placeItems: 'center',
+            zIndex: 10001,
+            padding: 20,
+          }}
+          onClick={() => setShowGameOverlay(false)}
+        >
+          <div
+            style={{
+              width: 'min(1100px, calc(100vw - 40px))',
+              height: 'min(750px, calc(100vh - 40px))',
+              padding: 0,
+              borderRadius: 16,
+              display: 'grid',
+              gridTemplateColumns: '1fr 320px',
+              overflow: 'hidden',
+              background: '#fff',
+              boxShadow: '0 8px 32px rgba(0,0,0,0.12)',
+              border: '1px solid rgba(0,0,0,0.06)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Zone principale - Aperçu du jeu */}
+            <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+              {/* Header */}
+              <div
+                style={{
+                  padding: '18px 24px',
+                  borderBottom: '1px solid rgba(0,0,0,0.06)',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  background: '#fff',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <Eye size={20} color="#1a1a1a" />
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: '#1a1a1a' }}>Visuel 2D du Jeu</h3>
+                    <p style={{ margin: '2px 0 0', fontSize: 12, color: '#666' }}>{activeGame.name}</p>
+                  </div>
+                </div>
+                <button
+                  className="g-btn g-btn--icon"
+                  onClick={() => setShowGameOverlay(false)}
+                  style={{ width: 36, height: 36 }}
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* Game Viewport */}
+              <div
+                style={{
+                  flex: 1,
+                  display: 'grid',
+                  placeItems: 'center',
+                  padding: 32,
+                  background: '#fafafa',
+                }}
+              >
+                <div style={{ display: 'grid', gap: 20, width: '100%', maxWidth: 550 }}>
+                  {/* Grille de dalles 3x3 */}
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(3, 1fr)',
+                      gap: 12,
+                      padding: 20,
+                      background: '#fff',
+                      borderRadius: 16,
+                      border: '1px solid rgba(0,0,0,0.06)',
+                    }}
+                  >
+                    {tiles.map((tile, i) => (
+                      <div
+                        key={i}
+                        style={{
+                          aspectRatio: '1',
+                          borderRadius: 12,
+                          background: `linear-gradient(135deg, ${tile.color}${Math.round(tile.intensity * 255).toString(16).padStart(2, '0')}, ${tile.color}${Math.round(tile.intensity * 200).toString(16).padStart(2, '0')})`,
+                          boxShadow: `0 0 ${tile.intensity * 20}px ${tile.color}${Math.round(tile.intensity * 100).toString(16).padStart(2, '0')}`,
+                          border: '1px solid rgba(0,0,0,0.08)',
+                          transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                          display: 'grid',
+                          placeItems: 'center',
+                          color: '#fff',
+                          fontSize: 13,
+                          fontWeight: 700,
+                          textShadow: '0 1px 3px rgba(0,0,0,0.3)',
+                        }}
+                      >
+                        {i + 1}
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Info du jeu */}
+                  <div
+                    style={{
+                      padding: 16,
+                      background: '#fff',
+                      borderRadius: 12,
+                      border: '1px solid rgba(0,0,0,0.06)',
+                    }}
+                  >
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, textAlign: 'center' }}>
+                      <div>
+                        <div style={{ fontSize: 11, marginBottom: 4, color: '#999', fontWeight: 600 }}>Nœuds</div>
+                        <div style={{ fontSize: 18, fontWeight: 800, color: '#1a1a1a' }}>{activeGame.nodes.length}</div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 11, marginBottom: 4, color: '#999', fontWeight: 600 }}>Connexions</div>
+                        <div style={{ fontSize: 18, fontWeight: 800, color: '#1a1a1a' }}>{activeGame.edges.length}</div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 11, marginBottom: 4, color: '#999', fontWeight: 600 }}>Dalles</div>
+                        <div style={{ fontSize: 18, fontWeight: 800, color: '#1a1a1a' }}>{tileCount}</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Footer avec contrôles */}
+                  <div style={{ display: 'flex', justifyContent: 'center', gap: 10 }}>
+                    <button
+                      className="g-btn"
+                      onClick={() => setIsPlaying(!isPlaying)}
+                      style={{ height: 40, padding: '0 20px', background: isPlaying ? '#1a1a1a' : undefined, color: isPlaying ? '#fff' : undefined, borderColor: isPlaying ? '#1a1a1a' : undefined }}
+                    >
+                      {isPlaying ? <Pause size={16} /> : <Play size={16} />}
+                      <span>{isPlaying ? 'Pause' : 'Lecture'}</span>
+                    </button>
+                    <button
+                      className="g-btn"
+                      onClick={() => setShowGameOverlay(false)}
+                      style={{ height: 40, padding: '0 20px' }}
+                    >
+                      <X size={16} />
+                      <span>Fermer</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Panneau latéral - Configuration UI */}
+            <div style={{ display: 'flex', flexDirection: 'column', borderLeft: '1px solid rgba(0,0,0,0.06)', background: '#fafafa' }}>
+              <div style={{ padding: '18px 20px', borderBottom: '1px solid rgba(0,0,0,0.06)', background: '#fff' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <Layers size={16} color="#1a1a1a" />
+                  <strong style={{ fontSize: 14, fontWeight: 800, color: '#1a1a1a' }}>Configuration UI</strong>
+                </div>
+              </div>
+
+              <div style={{ flex: 1, overflowY: 'auto', padding: 20 }}>
+                <div style={{ display: 'grid', gap: 16 }}>
+                  {/* Visibilité des dalles */}
+                  <div>
+                    <label className="g-label" style={{ marginBottom: 8, display: 'block' }}>Affichage des dalles</label>
+                    <select className="g-select" style={{ height: 36, fontSize: 13 }}>
+                      <option value="all">Toutes les dalles (9)</option>
+                      <option value="3x3">Grille 3×3</option>
+                      <option value="2x2">Grille 2×2</option>
+                      <option value="1x3">Ligne 1×3</option>
+                      <option value="custom">Personnalisé</option>
+                    </select>
+                  </div>
+
+                  {/* Nombre de dalles */}
+                  <div>
+                    <label className="g-label" style={{ marginBottom: 8, display: 'block' }}>Nombre de dalles visibles</label>
+                    <input
+                      type="number"
+                      className="g-input"
+                      min={1}
+                      max={9}
+                      defaultValue={9}
+                      style={{ height: 36, fontSize: 13 }}
+                    />
+                  </div>
+
+                  <div style={{ height: 1, background: 'rgba(0,0,0,0.06)', margin: '8px 0' }} />
+
+                  {/* Composants UI */}
+                  <div>
+                    <label className="g-label" style={{ marginBottom: 8, display: 'block' }}>Composants UI du jeu</label>
+                    <p style={{ fontSize: 11, color: '#999', marginBottom: 12, lineHeight: 1.4 }}>Ajoutez des boutons et sliders pour contrôler le jeu depuis /jeux</p>
+                    
+                    <div style={{ display: 'grid', gap: 8 }}>
+                      <button className="g-btn g-btn--sm" style={{ justifyContent: 'flex-start' }}>
+                        <Plus size={14} />
+                        <span>Ajouter un bouton</span>
+                      </button>
+                      <button className="g-btn g-btn--sm" style={{ justifyContent: 'flex-start' }}>
+                        <Plus size={14} />
+                        <span>Ajouter un slider</span>
+                      </button>
+                      <button className="g-btn g-btn--sm" style={{ justifyContent: 'flex-start' }}>
+                        <Plus size={14} />
+                        <span>Ajouter un texte</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div style={{ height: 1, background: 'rgba(0,0,0,0.06)', margin: '8px 0' }} />
+
+                  {/* Liste des composants ajoutés */}
+                  <div>
+                    <label className="g-label" style={{ marginBottom: 8, display: 'block' }}>Composants ajoutés (0)</label>
+                    <div style={{ padding: 20, textAlign: 'center', color: '#999', fontSize: 12, background: '#fff', borderRadius: 12, border: '1px dashed rgba(0,0,0,0.1)' }}>
+                      Aucun composant UI pour le moment
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}

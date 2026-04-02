@@ -18,9 +18,23 @@ export default function EditorTilesViewport({
   onTileClick?: (tileIndex: number) => void;
 }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const tilesRef = useRef<TileState[]>([]);
+  const materialsRef = useRef<THREE.MeshStandardMaterial[]>([]);
+  const mirrorMaterialsRef = useRef<THREE.MeshStandardMaterial[]>([]);
+
+  // Update tiles ref without triggering re-initialization
+  useEffect(() => {
+    const newTiles = Array.isArray(tiles) ? tiles : [];
+    tilesRef.current = newTiles;
+  }, [tiles]);
+
+  // Initialize tile count once, then use refs for updates to avoid re-mounting
+  const tileCount = useMemo(() => {
+    return Array.isArray(tiles) ? Math.max(1, tiles.length) : 9;
+  }, []);
 
   const safeTiles = useMemo(() => {
-    const count = Array.isArray(tiles) ? Math.max(1, tiles.length) : 9;
+    const count = tileCount;
     const fallback: TileState[] = Array.from({ length: count }, () => ({ color: '#000000', intensity: 0 }));
     const src = Array.isArray(tiles) ? tiles : fallback;
     const out = fallback.map((t, i) => {
@@ -32,7 +46,7 @@ export default function EditorTilesViewport({
       };
     });
     return out;
-  }, [tiles]);
+  }, [tiles, tileCount]);
 
   useEffect(() => {
     const mountEl = containerRef.current;
@@ -102,6 +116,7 @@ export default function EditorTilesViewport({
         metalness: 0.02,
       });
       materials.push(base);
+      materialsRef.current.push(base);
 
       const mesh = new THREE.Mesh(tileGeo, base);
       mesh.position.x = c * step - halfW;
@@ -130,6 +145,7 @@ export default function EditorTilesViewport({
         depthWrite: false,
       });
       mirrorMaterials.push(mMat);
+      mirrorMaterialsRef.current.push(mMat);
 
       const m = new THREE.Mesh(tileGeo, mMat);
       m.position.x = mesh.position.x;
@@ -262,18 +278,22 @@ export default function EditorTilesViewport({
       root.position.y = Math.sin(t * 0.35) * 0.05;
 
       for (let i = 0; i < count; i++) {
-        const tile = safeTiles[i] ?? { color: '#000000', intensity: 0 };
+        const tile = tilesRef.current[i] ?? { color: '#000000', intensity: 0 };
         colors[i].set(tile.color);
 
         const pulse = 0.92 + Math.sin(t * 0.8 + i * 0.35) * 0.08;
         const k = Math.max(0, Math.min(1, tile.intensity));
         const intensity = k * pulse;
 
-        materials[i].emissive.copy(colors[i]);
-        materials[i].emissiveIntensity = 2.1 * intensity;
+        if (materialsRef.current[i]) {
+          materialsRef.current[i].emissive.copy(colors[i]);
+          materialsRef.current[i].emissiveIntensity = 2.1 * intensity;
+        }
 
-        mirrorMaterials[i].emissive.copy(colors[i]);
-        mirrorMaterials[i].emissiveIntensity = 1.45 * (0.75 * intensity);
+        if (mirrorMaterialsRef.current[i]) {
+          mirrorMaterialsRef.current[i].emissive.copy(colors[i]);
+          mirrorMaterialsRef.current[i].emissiveIntensity = 1.45 * (0.75 * intensity);
+        }
 
         const mat = edges[i]?.material as THREE.LineBasicMaterial | undefined;
         if (mat) {
