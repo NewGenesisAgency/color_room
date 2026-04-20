@@ -3127,7 +3127,7 @@ export default function JeuxPage() {
           style={{
             position: 'fixed',
             inset: 0,
-            background: 'rgba(0,0,0,0.35)',
+            background: 'rgba(0,0,0,0.65)',
             display: 'grid',
             placeItems: 'center',
             zIndex: 1000,
@@ -3135,22 +3135,36 @@ export default function JeuxPage() {
           onClick={() => setMpJoinPrompt({ open: false, sessionId: '' })}
         >
           <div
-            className="glass"
-            style={{ width: 'min(520px, calc(100vw - 32px))', padding: 18, borderRadius: 18 }}
+            style={{
+              width: 'min(480px, calc(100vw - 32px))',
+              background: '#1a1b2e',
+              border: '1px solid rgba(255,255,255,0.12)',
+              borderRadius: 20,
+              padding: 28,
+              boxShadow: '0 24px 60px rgba(0,0,0,0.6)',
+              fontFamily: 'system-ui, sans-serif',
+            }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-              <strong style={{ color: '#fff' }}>Session multijoueur détectée</strong>
-              <span style={{ opacity: 0.8, fontSize: 12, color: '#fff' }}>ID: {mpJoinPrompt.sessionId || '—'}</span>
+            {/* Header */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+              <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#4ade80', boxShadow: '0 0 8px #4ade80', flexShrink: 0 }} />
+              <span style={{ color: '#fff', fontWeight: 800, fontSize: 16 }}>Session multijoueur détectée</span>
             </div>
-            <div style={{ marginTop: 10, fontSize: 13, opacity: 0.9, color: '#fff' }}>
+            {/* Session ID */}
+            <code style={{ display: 'block', color: 'rgba(255,255,255,0.35)', fontSize: 11, fontFamily: 'monospace', marginBottom: 16 }}>
+              ID : {mpJoinPrompt.sessionId || '—'}
+            </code>
+            {/* Body */}
+            <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.75)', lineHeight: 1.6 }}>
               Un autre poste a lancé le jeu <strong style={{ color: '#fff' }}>Multijoueur — Teintes</strong>.
               <br />
               Voulez-vous rejoindre ? La partie démarrera automatiquement dès qu'il y aura 2 joueurs.
             </div>
-            <div style={{ marginTop: 14, display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+            {/* Buttons */}
+            <div style={{ marginTop: 24, display: 'flex', gap: 10 }}>
               <button
-                className="btn"
+                style={{ flex: 1, padding: '12px 0', borderRadius: 12, border: '1px solid rgba(255,255,255,0.18)', background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.8)', fontWeight: 600, fontSize: 14, cursor: 'pointer' }}
                 onClick={() => {
                   const sid = mpJoinPrompt.sessionId || '';
                   setMpJoinPrompt({ open: false, sessionId: '' });
@@ -3164,7 +3178,7 @@ export default function JeuxPage() {
                 Plus tard
               </button>
               <button
-                className="btn btn-primary"
+                style={{ flex: 1, padding: '12px 0', borderRadius: 12, border: 'none', background: 'linear-gradient(135deg,#4361ee,#7c3aed)', color: '#fff', fontWeight: 700, fontSize: 14, cursor: 'pointer', boxShadow: '0 4px 18px rgba(67,97,238,0.4)' }}
                 onClick={() => {
                   void (async () => {
                     const joined = await ensureMpJoined(currentUser ?? undefined);
