@@ -783,6 +783,8 @@
   align-items: baseline;
   justify-content: space-between;
   gap: 10px;
+  padding-left: 8px;
+  border-radius: 2px;
 }
 
 .bp-node__meta {

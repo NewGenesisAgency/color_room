@@ -2290,9 +2290,24 @@ export default function EditeurPage() {
                       })
                       .map((n) => {
                       const selected = n.id === selectedNodeId;
-                      const hasInput = n.kind !== 'event_begin';
-                      const inLabel = n.kind === 'fill' ? 'Entrée' : n.kind === 'pulse' ? 'Temps' : 'Entrée';
-                      const outLabel = n.kind === 'event_begin' ? 'Commencer' : 'Sortie';
+                      const hasInput = n.kind !== 'event_begin' && n.kind !== 'on_timer' && n.kind !== 'on_click';
+                      const inLabel = 'Entrée';
+                      const outLabel =
+                        n.kind === 'event_begin' ? 'Commencer' :
+                        n.kind === 'game_tetris' || n.kind === 'game_simon' || n.kind === 'game_memory' ? 'Fin du jeu' :
+                        n.kind === 'on_timer' ? 'Tick' :
+                        n.kind === 'on_click' ? 'Click' :
+                        n.kind === 'if' ? 'Alors' :
+                        n.kind === 'sequence' ? 'Exécuter' :
+                        'Sortie';
+                      const nodeAccent =
+                        ['event_begin', 'on_timer', 'on_click'].includes(n.kind) ? '#f59e0b' :
+                        ['game_tetris', 'game_simon', 'game_memory'].includes(n.kind) ? '#a855f7' :
+                        ['fill', 'pulse', 'tile', 'tile_set', 'tile_get'].includes(n.kind) ? '#22d3ee' :
+                        ['if', 'while', 'sequence', 'wait'].includes(n.kind) ? '#f97316' :
+                        ['math_add', 'math_sub', 'math_mul', 'math_div', 'math_clamp01', 'math_lerp'].includes(n.kind) ? '#4ade80' :
+                        ['compare_eq', 'compare_gt', 'compare_lt', 'logic_and', 'logic_or', 'logic_not'].includes(n.kind) ? '#60a5fa' :
+                        '#4361ee';
                       const linkingFromThis = pendingLink?.fromNodeId === n.id;
                       const seconds = Math.max(0, getNum(n.params, 'seconds', 1));
                       const fillIntensity = clamp01(getNum(n.params, 'intensity', 0.8));
@@ -2454,9 +2469,9 @@ export default function EditeurPage() {
                             }
                           }}
                         >
-                          <div className="bp-node__title">
+                          <div className="bp-node__title" style={{ borderLeft: `3px solid ${nodeAccent}` }}>
                             <span className="bp-node__name">{n.name}</span>
-                            <span className="bp-node__kind">{labelNodeKind(n.kind)}</span>
+                            <span className="bp-node__kind" style={{ color: nodeAccent, opacity: 0.9 }}>{labelNodeKind(n.kind)}</span>
                           </div>
 
                           {n.kind === 'wait' ? (
@@ -2680,6 +2695,116 @@ export default function EditeurPage() {
                                   value={tileColor}
                                   onChange={(e) => updateNodeParamsById(n.id, { color: e.target.value })}
                                 />
+                              </div>
+                            </div>
+                          ) : n.kind === 'game_tetris' ? (
+                            <div className="bp-node__vars" onPointerDown={(e) => e.stopPropagation()}>
+                              <div className="bp-node__var">
+                                <span className="bp-node__varlabel">Vitesse (ms)</span>
+                                <div className="bp-node__varctrl">
+                                  <input className="bp-node__varinput" type="number" min={200} max={2000} step={50}
+                                    value={getNum(n.params, 'speed', 500)}
+                                    onChange={(e) => updateNodeParamsById(n.id, { speed: Number(e.target.value) })} />
+                                </div>
+                              </div>
+                            </div>
+                          ) : n.kind === 'game_simon' ? (
+                            <div className="bp-node__vars" onPointerDown={(e) => e.stopPropagation()}>
+                              <div className="bp-node__varrow">
+                                <div className="bp-node__var">
+                                  <span className="bp-node__varlabel">Vitesse (ms)</span>
+                                  <div className="bp-node__varctrl">
+                                    <input className="bp-node__varinput" type="number" min={300} max={2000} step={50}
+                                      value={getNum(n.params, 'speed', 800)}
+                                      onChange={(e) => updateNodeParamsById(n.id, { speed: Number(e.target.value) })} />
+                                  </div>
+                                </div>
+                                <div className="bp-node__var">
+                                  <span className="bp-node__varlabel">Couleurs</span>
+                                  <div className="bp-node__varctrl">
+                                    <select className="bp-node__varselect"
+                                      value={String(getNum(n.params, 'colors', 4))}
+                                      onChange={(e) => updateNodeParamsById(n.id, { colors: Number(e.target.value) })}>
+                                      <option value="2">2</option>
+                                      <option value="4">4</option>
+                                    </select>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          ) : n.kind === 'game_memory' ? (
+                            <div className="bp-node__vars" onPointerDown={(e) => e.stopPropagation()}>
+                              <div className="bp-node__var">
+                                <span className="bp-node__varlabel">Paires</span>
+                                <div className="bp-node__varctrl">
+                                  <input className="bp-node__varinput" type="number" min={2} max={12} step={1}
+                                    value={getNum(n.params, 'pairs', 8)}
+                                    onChange={(e) => updateNodeParamsById(n.id, { pairs: Number(e.target.value) })} />
+                                </div>
+                              </div>
+                            </div>
+                          ) : n.kind === 'on_timer' ? (
+                            <div className="bp-node__vars" onPointerDown={(e) => e.stopPropagation()}>
+                              <div className="bp-node__var">
+                                <span className="bp-node__varlabel">Intervalle (ms)</span>
+                                <div className="bp-node__varctrl">
+                                  <input className="bp-node__varinput" type="number" min={100} max={60000} step={100}
+                                    value={getNum(n.params, 'intervalMs', 1000)}
+                                    onChange={(e) => updateNodeParamsById(n.id, { intervalMs: Number(e.target.value) })} />
+                                </div>
+                              </div>
+                            </div>
+                          ) : n.kind === 'on_click' ? (
+                            <div className="bp-node__vars" onPointerDown={(e) => e.stopPropagation()}>
+                              <div className="bp-node__var">
+                                <span className="bp-node__varlabel">Dalle</span>
+                                <div className="bp-node__varctrl">
+                                  <select className="bp-node__varselect"
+                                    value={String(Math.max(0, Math.round(getNum(n.params, 'tileIndex', 0))))}
+                                    onChange={(e) => updateNodeParamsById(n.id, { tileIndex: Number(e.target.value) })}>
+                                    {Array.from({ length: 42 }, (_, i) => <option key={i} value={i}>D{i + 1}</option>)}
+                                  </select>
+                                </div>
+                              </div>
+                            </div>
+                          ) : n.kind === 'tile_set' ? (
+                            <div className="bp-node__vars" onPointerDown={(e) => e.stopPropagation()}>
+                              <div className="bp-node__varrow">
+                                <div className="bp-node__var">
+                                  <span className="bp-node__varlabel">Dalle</span>
+                                  <div className="bp-node__varctrl">
+                                    <select className="bp-node__varselect"
+                                      value={String(Math.max(0, Math.round(getNum(n.params, 'tileIndex', 0))))}
+                                      onChange={(e) => updateNodeParamsById(n.id, { tileIndex: Number(e.target.value) })}>
+                                      {Array.from({ length: 42 }, (_, i) => <option key={i} value={i}>D{i + 1}</option>)}
+                                    </select>
+                                  </div>
+                                </div>
+                                <div className="bp-node__var">
+                                  <span className="bp-node__varlabel">Int.</span>
+                                  <div className="bp-node__varctrl">
+                                    <input className="bp-node__varrange" type="range" min={0} max={1} step={0.01}
+                                      value={clamp01(getNum(n.params, 'intensity', 1))}
+                                      style={{ ['--min' as any]: 0, ['--max' as any]: 1, ['--value' as any]: clamp01(getNum(n.params, 'intensity', 1)) }}
+                                      onChange={(e) => updateNodeParamsById(n.id, { intensity: Number(e.target.value) })} />
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="bp-node__color">
+                                <div className="bp-node__colorpreview" style={{ background: getColor(n.params, 'color', '#ffffff') }} />
+                                <input className="bp-node__colorinput" type="color"
+                                  value={getColor(n.params, 'color', '#ffffff')}
+                                  onChange={(e) => updateNodeParamsById(n.id, { color: e.target.value })} />
+                              </div>
+                            </div>
+                          ) : n.kind === 'if' ? (
+                            <div className="bp-node__vars" onPointerDown={(e) => e.stopPropagation()}>
+                              <div className="bp-node__var">
+                                <span className="bp-node__varlabel">Condition</span>
+                                <div className="bp-node__varctrl">
+                                  <input type="checkbox" checked={Boolean(n.params.condition)}
+                                    onChange={(e) => updateNodeParamsById(n.id, { condition: e.target.checked })} />
+                                </div>
                               </div>
                             </div>
                           ) : null}

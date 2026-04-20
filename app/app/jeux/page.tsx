@@ -1645,11 +1645,15 @@ export default function JeuxPage() {
   }
 
   const hudGraphRunRef = useRef<{ timers: number[]; stop: boolean }>({ timers: [], stop: false });
+  const hudGraphContinuationRef = useRef<(() => void) | null>(null);
+  const hudGraphClickHandlersRef = useRef<Map<number, () => void>>(new Map());
 
   const stopHudGraph = () => {
     hudGraphRunRef.current.stop = true;
     for (const t of hudGraphRunRef.current.timers) window.clearTimeout(t);
     hudGraphRunRef.current.timers = [];
+    hudGraphContinuationRef.current = null;
+    hudGraphClickHandlersRef.current.clear();
   };
 
   // Keep ref in sync so runHudGraphFrom can access the latest cfg without stale closure
@@ -1743,12 +1747,14 @@ export default function JeuxPage() {
 
       const params = (node.params && typeof node.params === 'object' ? node.params : {}) as Record<string, unknown>;
 
+      // ── Pass-through nodes ──
       if (node.kind === 'ui_event_click' || node.kind === 'ui_event_change' || node.kind === 'ui_event_hover' || node.kind === 'event_begin') {
         const nextId = g.out.get(node.id)?.[0];
         if (nextId) walk(nextId);
         return;
       }
 
+      // ── Wait ──
       if (node.kind === 'wait') {
         const seconds = Math.max(0, getNum(params, 'seconds', 1));
         const nextId = g.out.get(node.id)?.[0];
@@ -1759,6 +1765,83 @@ export default function JeuxPage() {
         return;
       }
 
+      // ── Sequence: walk all outputs in declaration order ──
+      if (node.kind === 'sequence') {
+        const outputs = g.out.get(node.id) ?? [];
+        outputs.forEach((nextId) => walk(nextId));
+        return;
+      }
+
+      // ── If: branch on boolean param ──
+      if (node.kind === 'if') {
+        const condition = Boolean(params.condition);
+        const outputs = g.out.get(node.id) ?? [];
+        const nextId = condition ? outputs[0] : outputs[1];
+        if (nextId) walk(nextId);
+        return;
+      }
+
+      // ── on_timer: fire connected subgraph on interval ──
+      if (node.kind === 'on_timer') {
+        const ms = Math.max(100, getNum(params, 'intervalMs', 1000));
+        const nextId = g.out.get(node.id)?.[0];
+        if (nextId) {
+          const iv = window.setInterval(() => {
+            if (hudGraphRunRef.current.stop) { window.clearInterval(iv); return; }
+            walk(nextId);
+          }, ms);
+          hudGraphRunRef.current.timers.push(iv);
+        }
+        return;
+      }
+
+      // ── on_click: register plate click handler ──
+      if (node.kind === 'on_click') {
+        const tileIndex = Math.max(0, Math.min(41, Math.round(getNum(params, 'tileIndex', 0))));
+        const nextId = g.out.get(node.id)?.[0];
+        if (nextId) hudGraphClickHandlersRef.current.set(tileIndex, () => { if (!hudGraphRunRef.current.stop) walk(nextId); });
+        return;
+      }
+
+      // ── tile_set: set individual tile color ──
+      if (node.kind === 'tile_set') {
+        const tileIndex = Math.max(0, Math.min(41, Math.round(getNum(params, 'tileIndex', 0))));
+        const color = getColor(params, 'color', '#ffffff');
+        const rawInt = typeof params.intensity === 'number' ? params.intensity : 1;
+        const intensity = intensityToMasterPercent(rawInt, masterIntensity);
+        setPlateColor(tileIndex, color, intensity > 0);
+        const nextId = g.out.get(node.id)?.[0];
+        if (nextId) walk(nextId);
+        return;
+      }
+
+      // ── game_tetris: launch Tetrix as black-box node ──
+      if (node.kind === 'game_tetris') {
+        setTetrisStandalone(false);
+        setTetrixActive(true);
+        startTetrixGame();
+        const onEndId = g.out.get(node.id)?.[0];
+        if (onEndId) hudGraphContinuationRef.current = () => { if (!hudGraphRunRef.current.stop) walk(onEndId); };
+        return;
+      }
+
+      // ── game_simon: launch Simon as black-box node ──
+      if (node.kind === 'game_simon') {
+        void startSimonGame();
+        const onEndId = g.out.get(node.id)?.[0];
+        if (onEndId) hudGraphContinuationRef.current = () => { if (!hudGraphRunRef.current.stop) walk(onEndId); };
+        return;
+      }
+
+      // ── game_memory: launch Match-Pair as black-box node ──
+      if (node.kind === 'game_memory') {
+        startMatchPairGame();
+        const onEndId = g.out.get(node.id)?.[0];
+        if (onEndId) hudGraphContinuationRef.current = () => { if (!hudGraphRunRef.current.stop) walk(onEndId); };
+        return;
+      }
+
+      // ── Render nodes (fill, tile, pulse) ──
       const nowSec = Date.now() / 1000;
       execNode(node, nowSec);
 
@@ -1766,9 +1849,7 @@ export default function JeuxPage() {
       const nextId = g.out.get(node.id)?.[0];
       if (!nextId) return;
       if (secondsAfter > 0) {
-        const t = window.setTimeout(() => {
-          walk(nextId);
-        }, Math.round(secondsAfter * 1000));
+        const t = window.setTimeout(() => { walk(nextId); }, Math.round(secondsAfter * 1000));
         hudGraphRunRef.current.timers.push(t);
       } else {
         walk(nextId);
@@ -1993,10 +2074,12 @@ export default function JeuxPage() {
   // Show game over popup with 2 second minimum display time
   function showGameOverPopup(gameName: string, score: number, message: string) {
     setGameOverPopup({ open: true, game: gameName, score, message });
-    // Ensure popup stays for at least 2 seconds before allowing close
-    window.setTimeout(() => {
-      // Popup can now be closed (user can click buttons)
-    }, 2000);
+    // Fire graph continuation if a game_* node was waiting for this
+    const cont = hudGraphContinuationRef.current;
+    if (cont) {
+      hudGraphContinuationRef.current = null;
+      window.setTimeout(cont, 2200);
+    }
   }
 
   // Tetrix Light game functions
@@ -2965,6 +3048,9 @@ export default function JeuxPage() {
   }
 
   function handlePlateClick(index: number) {
+    // Fire on_click graph handlers if registered
+    const clickHandler = hudGraphClickHandlersRef.current.get(index);
+    if (clickHandler) clickHandler();
     // Handle Simon game clicks first
     if (simonActive) {
       handleSimonPlateClick(index);
