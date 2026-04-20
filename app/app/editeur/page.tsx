@@ -2426,47 +2426,107 @@ export default function EditeurPage() {
                                 const internalEdges: GraphEdge[] = [];
                                 
                                 if (n.kind === 'game_tetris') {
-                                  // Create Tetris internal nodes
-                                  const ids = Array(8).fill(0).map(() => makeId());
+                                  // ── Tetris: 4 colonnes × 4 lignes, espacement 360 × 240 ──
+                                  const ids = Array(13).fill(0).map(() => makeId());
+                                  const dx = 360, dy = 240;
+                                  const sx = gameX + 60, sy = gameY - 100;
                                   internalNodes.push(
-                                    { id: ids[0], kind: 'fill', name: 'Fond noir', enabled: true, params: { color: '#0a0a0f', intensity: 1, mask: 'all', seconds: 0 }, pos: { x: gameX + 200, y: gameY - 150 } },
-                                    { id: ids[1], kind: 'tile', name: 'Bordure', enabled: true, params: { tileIndex: 21, color: '#444466', intensity: 0.5 }, pos: { x: gameX + 400, y: gameY - 150 } },
-                                    { id: ids[2], kind: 'sequence', name: 'Init Grille', enabled: true, params: {}, pos: { x: gameX + 200, y: gameY - 50 } },
-                                    { id: ids[3], kind: 'while', name: 'Boucle Jeu', enabled: true, params: {}, pos: { x: gameX + 200, y: gameY + 50 } },
-                                    { id: ids[4], kind: 'random_01', name: 'Nouvelle Pièce', enabled: true, params: {}, pos: { x: gameX + 400, y: gameY - 50 } },
-                                    { id: ids[5], kind: 'tile', name: 'Pièce active', enabled: true, params: { tileIndex: 10, color: '#00ffff', intensity: 0.9 }, pos: { x: gameX + 600, y: gameY - 50 } },
-                                    { id: ids[6], kind: 'wait', name: 'Attente', enabled: true, params: { seconds: 0.5 }, pos: { x: gameX + 200, y: gameY + 150 } },
-                                    { id: ids[7], kind: 'pulse', name: 'Pulse Score', enabled: true, params: { baseColor: '#00ff88', targetColor: '#88ffaa', fromIntensity: 0.3, toIntensity: 0.9, speed: 4 }, pos: { x: gameX + 600, y: gameY + 50 } },
+                                    // Ligne 0 — initialisation
+                                    { id: ids[0],  kind: 'fill',       name: 'Fond Noir',       enabled: true, params: { color: '#000000', intensity: 1, mask: 'all', seconds: 0 },                                       pos: { x: sx,          y: sy          } },
+                                    { id: ids[1],  kind: 'sequence',   name: 'Init Grille',     enabled: true, params: {},                                                                                                 pos: { x: sx + dx,     y: sy          } },
+                                    { id: ids[2],  kind: 'while',      name: 'Boucle Jeu',      enabled: true, params: {},                                                                                                 pos: { x: sx + dx * 2, y: sy          } },
+                                    { id: ids[3],  kind: 'random_01',  name: 'Nouvelle Pièce',  enabled: true, params: {},                                                                                                 pos: { x: sx + dx * 3, y: sy          } },
+                                    // Ligne 1 — rendu des pièces
+                                    { id: ids[4],  kind: 'tile',       name: 'Pièce I (cyan)',  enabled: true, params: { tileIndex: 0,  color: '#00ffff', intensity: 0.9 },                                               pos: { x: sx,          y: sy + dy     } },
+                                    { id: ids[5],  kind: 'tile',       name: 'Pièce L (orange)',enabled: true, params: { tileIndex: 1,  color: '#ff7f00', intensity: 0.9 },                                               pos: { x: sx + dx,     y: sy + dy     } },
+                                    { id: ids[6],  kind: 'tile',       name: 'Pièce T (violet)',enabled: true, params: { tileIndex: 2,  color: '#aa00ff', intensity: 0.9 },                                               pos: { x: sx + dx * 2, y: sy + dy     } },
+                                    { id: ids[7],  kind: 'math_add',   name: 'Descendre',       enabled: true, params: {},                                                                                                 pos: { x: sx + dx * 3, y: sy + dy     } },
+                                    // Ligne 2 — logique de collision
+                                    { id: ids[8],  kind: 'wait',       name: 'Attente tick',    enabled: true, params: { seconds: 0.5 },                                                                                  pos: { x: sx,          y: sy + dy * 2 } },
+                                    { id: ids[9],  kind: 'compare_eq', name: 'Collision ?',     enabled: true, params: {},                                                                                                 pos: { x: sx + dx,     y: sy + dy * 2 } },
+                                    { id: ids[10], kind: 'sequence',   name: 'Fusionner',       enabled: true, params: {},                                                                                                 pos: { x: sx + dx * 2, y: sy + dy * 2 } },
+                                    { id: ids[11], kind: 'compare_eq', name: 'Ligne complète',  enabled: true, params: {},                                                                                                 pos: { x: sx + dx * 3, y: sy + dy * 2 } },
+                                    // Ligne 3 — score
+                                    { id: ids[12], kind: 'pulse',      name: 'Score Flash',     enabled: true, params: { baseColor: '#00ff88', targetColor: '#88ffff', fromIntensity: 0.3, toIntensity: 1.0, speed: 6 }, pos: { x: sx + dx * 3, y: sy + dy * 3 } },
                                   );
                                   internalEdges.push(
-                                    { id: makeId(), from: n.id, to: ids[0] },
-                                    { id: makeId(), from: ids[0], to: ids[1] },
-                                    { id: makeId(), from: ids[1], to: ids[2] },
-                                    { id: makeId(), from: ids[2], to: ids[3] },
-                                    { id: makeId(), from: ids[3], to: ids[4] },
-                                    { id: makeId(), from: ids[4], to: ids[5] },
-                                    { id: makeId(), from: ids[3], to: ids[6] },
-                                    { id: makeId(), from: ids[6], to: ids[3] },
-                                    { id: makeId(), from: ids[5], to: ids[7] },
+                                    { id: makeId(), from: n.id,    to: ids[0]  }, // Tetris → Fond Noir
+                                    { id: makeId(), from: ids[0],  to: ids[1]  }, // Fond Noir → Init Grille
+                                    { id: makeId(), from: ids[1],  to: ids[2]  }, // Init Grille → Boucle Jeu
+                                    { id: makeId(), from: ids[2],  to: ids[3]  }, // Boucle Jeu → Nouvelle Pièce
+                                    { id: makeId(), from: ids[3],  to: ids[4]  }, // Nouvelle Pièce → Pièce I
+                                    { id: makeId(), from: ids[3],  to: ids[5]  }, // Nouvelle Pièce → Pièce L
+                                    { id: makeId(), from: ids[3],  to: ids[6]  }, // Nouvelle Pièce → Pièce T
+                                    { id: makeId(), from: ids[2],  to: ids[7]  }, // Boucle Jeu → Descendre
+                                    { id: makeId(), from: ids[2],  to: ids[8]  }, // Boucle Jeu → Attente tick
+                                    { id: makeId(), from: ids[8],  to: ids[2]  }, // Attente tick ↩ Boucle Jeu
+                                    { id: makeId(), from: ids[7],  to: ids[9]  }, // Descendre → Collision ?
+                                    { id: makeId(), from: ids[9],  to: ids[10] }, // Collision ? → Fusionner
+                                    { id: makeId(), from: ids[10], to: ids[11] }, // Fusionner → Ligne complète
+                                    { id: makeId(), from: ids[11], to: ids[12] }, // Ligne complète → Score Flash
                                   );
                                 } else if (n.kind === 'game_simon') {
-                                  // Create Simon internal nodes
-                                  const ids = Array(6).fill(0).map(() => makeId());
+                                  // ── Simon: 3 colonnes × 3 lignes, espacement 360 × 240 ──
+                                  const ids = Array(9).fill(0).map(() => makeId());
+                                  const dx = 360, dy = 240;
+                                  const sx = gameX + 60, sy = gameY - 80;
                                   internalNodes.push(
-                                    { id: ids[0], kind: 'fill', name: 'Fond noir', enabled: true, params: { color: '#0a0a0f', intensity: 1, mask: 'all', seconds: 0 }, pos: { x: gameX + 200, y: gameY - 100 } },
-                                    { id: ids[1], kind: 'sequence', name: 'Séquence Simon', enabled: true, params: {}, pos: { x: gameX + 200, y: gameY } },
-                                    { id: ids[2], kind: 'random_01', name: 'Couleur aléatoire', enabled: true, params: {}, pos: { x: gameX + 400, y: gameY - 50 } },
-                                    { id: ids[3], kind: 'tile', name: 'Rouge', enabled: true, params: { tileIndex: 0, color: '#ff0000', intensity: 0.9 }, pos: { x: gameX + 600, y: gameY - 100 } },
-                                    { id: ids[4], kind: 'tile', name: 'Bleu', enabled: true, params: { tileIndex: 1, color: '#0000ff', intensity: 0.9 }, pos: { x: gameX + 600, y: gameY } },
-                                    { id: ids[5], kind: 'tile', name: 'Vert', enabled: true, params: { tileIndex: 2, color: '#00ff00', intensity: 0.9 }, pos: { x: gameX + 600, y: gameY + 100 } },
+                                    // Ligne 0 — init + séquence
+                                    { id: ids[0], kind: 'fill',      name: 'Fond Noir',         enabled: true, params: { color: '#000000', intensity: 1, mask: 'all', seconds: 0 },                                                pos: { x: sx,          y: sy          } },
+                                    { id: ids[1], kind: 'sequence',  name: 'Séquence Simon',    enabled: true, params: {},                                                                                                          pos: { x: sx + dx,     y: sy          } },
+                                    { id: ids[2], kind: 'random_01', name: 'Couleur aléatoire', enabled: true, params: {},                                                                                                          pos: { x: sx + dx * 2, y: sy          } },
+                                    // Ligne 1 — dalles couleurs
+                                    { id: ids[3], kind: 'tile',      name: 'Dalle Rouge',       enabled: true, params: { tileIndex: 0, color: '#ff2020', intensity: 0.95 },                                                        pos: { x: sx,          y: sy + dy     } },
+                                    { id: ids[4], kind: 'tile',      name: 'Dalle Bleue',       enabled: true, params: { tileIndex: 1, color: '#2040ff', intensity: 0.95 },                                                        pos: { x: sx + dx,     y: sy + dy     } },
+                                    { id: ids[5], kind: 'tile',      name: 'Dalle Verte',       enabled: true, params: { tileIndex: 2, color: '#20cc20', intensity: 0.95 },                                                        pos: { x: sx + dx * 2, y: sy + dy     } },
+                                    // Ligne 2 — contrôle + score
+                                    { id: ids[6], kind: 'tile',      name: 'Dalle Jaune',       enabled: true, params: { tileIndex: 3, color: '#ffcc00', intensity: 0.95 },                                                        pos: { x: sx,          y: sy + dy * 2 } },
+                                    { id: ids[7], kind: 'wait',      name: 'Attente joueur',    enabled: true, params: { seconds: 0.6 },                                                                                            pos: { x: sx + dx,     y: sy + dy * 2 } },
+                                    { id: ids[8], kind: 'pulse',     name: 'Score Simon',       enabled: true, params: { baseColor: '#ffffff', targetColor: '#ffcc00', fromIntensity: 0.2, toIntensity: 1.0, speed: 4 },          pos: { x: sx + dx * 2, y: sy + dy * 2 } },
                                   );
                                   internalEdges.push(
-                                    { id: makeId(), from: n.id, to: ids[0] },
-                                    { id: makeId(), from: ids[0], to: ids[1] },
-                                    { id: makeId(), from: ids[1], to: ids[2] },
-                                    { id: makeId(), from: ids[2], to: ids[3] },
-                                    { id: makeId(), from: ids[2], to: ids[4] },
-                                    { id: makeId(), from: ids[2], to: ids[5] },
+                                    { id: makeId(), from: n.id,   to: ids[0] }, // Simon → Fond Noir
+                                    { id: makeId(), from: ids[0], to: ids[1] }, // Fond Noir → Séquence Simon
+                                    { id: makeId(), from: ids[1], to: ids[2] }, // Séquence Simon → Couleur aléatoire
+                                    { id: makeId(), from: ids[2], to: ids[3] }, // Couleur → Dalle Rouge
+                                    { id: makeId(), from: ids[2], to: ids[4] }, // Couleur → Dalle Bleue
+                                    { id: makeId(), from: ids[2], to: ids[5] }, // Couleur → Dalle Verte
+                                    { id: makeId(), from: ids[2], to: ids[6] }, // Couleur → Dalle Jaune
+                                    { id: makeId(), from: ids[1], to: ids[7] }, // Séquence → Attente joueur
+                                    { id: makeId(), from: ids[7], to: ids[1] }, // Attente ↩ Séquence (boucle)
+                                    { id: makeId(), from: ids[1], to: ids[8] }, // Séquence → Score Simon
+                                  );
+                                } else if (n.kind === 'game_memory') {
+                                  // ── Memory: 3 colonnes × 3 lignes, espacement 360 × 240 ──
+                                  const ids = Array(9).fill(0).map(() => makeId());
+                                  const dx = 360, dy = 240;
+                                  const sx = gameX + 60, sy = gameY - 80;
+                                  internalNodes.push(
+                                    // Ligne 0 — init
+                                    { id: ids[0], kind: 'fill',      name: 'Fond Noir',       enabled: true, params: { color: '#000000', intensity: 1, mask: 'all', seconds: 0 },                                                  pos: { x: sx,          y: sy          } },
+                                    { id: ids[1], kind: 'sequence',  name: 'Init Mémoire',    enabled: true, params: {},                                                                                                            pos: { x: sx + dx,     y: sy          } },
+                                    { id: ids[2], kind: 'random_01', name: 'Paire aléatoire', enabled: true, params: {},                                                                                                            pos: { x: sx + dx * 2, y: sy          } },
+                                    // Ligne 1 — dalles révélées
+                                    { id: ids[3], kind: 'tile',      name: 'Carte A',         enabled: true, params: { tileIndex: 0, color: '#ff4488', intensity: 0.95 },                                                          pos: { x: sx,          y: sy + dy     } },
+                                    { id: ids[4], kind: 'tile',      name: 'Carte B',         enabled: true, params: { tileIndex: 1, color: '#44aaff', intensity: 0.95 },                                                          pos: { x: sx + dx,     y: sy + dy     } },
+                                    { id: ids[5], kind: 'compare_eq',name: 'Paire trouvée ?', enabled: true, params: {},                                                                                                            pos: { x: sx + dx * 2, y: sy + dy     } },
+                                    // Ligne 2 — résultat
+                                    { id: ids[6], kind: 'fill',      name: 'Dos de carte',    enabled: true, params: { color: '#222244', intensity: 0.6, mask: 'all', seconds: 0.2 },                                              pos: { x: sx,          y: sy + dy * 2 } },
+                                    { id: ids[7], kind: 'wait',      name: 'Pause retour',    enabled: true, params: { seconds: 0.8 },                                                                                              pos: { x: sx + dx,     y: sy + dy * 2 } },
+                                    { id: ids[8], kind: 'pulse',     name: 'Match Flash',     enabled: true, params: { baseColor: '#ffaa00', targetColor: '#ffffff', fromIntensity: 0.4, toIntensity: 1.0, speed: 5 },             pos: { x: sx + dx * 2, y: sy + dy * 2 } },
+                                  );
+                                  internalEdges.push(
+                                    { id: makeId(), from: n.id,   to: ids[0] }, // Memory → Fond Noir
+                                    { id: makeId(), from: ids[0], to: ids[1] }, // Fond Noir → Init Mémoire
+                                    { id: makeId(), from: ids[1], to: ids[2] }, // Init → Paire aléatoire
+                                    { id: makeId(), from: ids[2], to: ids[3] }, // Paire → Carte A
+                                    { id: makeId(), from: ids[2], to: ids[4] }, // Paire → Carte B
+                                    { id: makeId(), from: ids[3], to: ids[5] }, // Carte A → Paire trouvée ?
+                                    { id: makeId(), from: ids[4], to: ids[5] }, // Carte B → Paire trouvée ?
+                                    { id: makeId(), from: ids[5], to: ids[8] }, // Paire trouvée → Match Flash
+                                    { id: makeId(), from: ids[1], to: ids[6] }, // Init → Dos de carte
+                                    { id: makeId(), from: ids[6], to: ids[7] }, // Dos de carte → Pause retour
+                                    { id: makeId(), from: ids[7], to: ids[1] }, // Pause ↩ Init Mémoire (boucle)
                                   );
                                 }
                                 
