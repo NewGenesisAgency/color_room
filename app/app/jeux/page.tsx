@@ -1365,9 +1365,6 @@ export default function JeuxPage() {
   }, [view]);
 
   useEffect(() => {
-    // Ne poll les instruments que si un jeu est actif
-    if (!gameActive) return;
-    
     let stopped = false;
     let timer = 0;
 
@@ -1420,8 +1417,7 @@ export default function JeuxPage() {
         apiLatency,
       });
 
-      // Polling instruments réduit : 2500ms au lieu de 1500ms
-      timer = window.setTimeout(poll, 2500);
+      timer = window.setTimeout(poll, 3000);
     };
 
     void poll();
@@ -1429,7 +1425,7 @@ export default function JeuxPage() {
       stopped = true;
       if (timer) window.clearTimeout(timer);
     };
-  }, [gameActive]);
+  }, []);
 
   useEffect(() => {
     if (!gameActive) return;
@@ -3358,7 +3354,7 @@ export default function JeuxPage() {
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
                       <h4>Tetris Lumière</h4>
-                      <span style={{ fontSize: 10, fontWeight: 700, color: '#a0aeff', background: 'rgba(67,97,238,0.18)', padding: '2px 7px', borderRadius: 5 }}>intégré</span>
+                      <span style={{ fontSize: 10, fontWeight: 700, color: '#a0aeff', background: 'rgba(67,97,238,0.18)', padding: '2px 7px', borderRadius: 5 }}>natif</span>
                     </div>
                     <p>Tetris interactif sur les dalles lumineuses</p>
                   </div>
@@ -3400,7 +3396,7 @@ export default function JeuxPage() {
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
                       <h4>Simon Lumière</h4>
-                      <span style={{ fontSize: 10, fontWeight: 700, color: '#ef476f', background: 'rgba(239,71,111,0.18)', padding: '2px 7px', borderRadius: 5 }}>intégré</span>
+                      <span style={{ fontSize: 10, fontWeight: 700, color: '#ef476f', background: 'rgba(239,71,111,0.18)', padding: '2px 7px', borderRadius: 5 }}>natif</span>
                     </div>
                     <p>Mémorisez et reproduisez les séquences lumineuses</p>
                   </div>
@@ -3462,12 +3458,12 @@ export default function JeuxPage() {
                       const cfg = g.config as any;
                       const nodeCount = Array.isArray(cfg?.nodes) ? cfg.nodes.length : 0;
                       const tileCount = typeof cfg?.tileCount === 'number' ? cfg.tileCount : 42;
-                      const difficulty = Math.min(5, Math.max(1, typeof cfg?.difficulty === 'number' ? cfg.difficulty : 1));
                       const iconName: string = typeof cfg?.icon === 'string' ? cfg.icon : 'Lightbulb';
                       const ICON_LOOKUP: Record<string, any> = { Lightbulb, Gamepad2, Star, Heart, Sun, Moon, Flame, Snowflake, Music, Target, Puzzle, Sparkles, Trophy, Rocket, Ghost, Palette, Zap };
                       const GIcon = ICON_LOOKUP[iconName] ?? Lightbulb;
                       const accentColor = typeof cfg?.accentColor === 'string' ? cfg.accentColor : (isEditor ? '#a0aeff' : '#c4b5fd');
-                      const iconBg = isEditor ? 'rgba(67,97,238,0.2)' : 'rgba(124,58,237,0.2)';
+                      const iconBg = typeof cfg?.bgColor === 'string' ? cfg.bgColor : (isEditor ? '#1a2045' : '#1a1040');
+                      const description = typeof cfg?.description === 'string' && cfg.description ? cfg.description : `${nodeCount} nœud${nodeCount !== 1 ? 's' : ''} · ${tileCount} dalles`;
                       return (
                         <div
                           key={g.id}
@@ -3488,18 +3484,9 @@ export default function JeuxPage() {
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
                               <h4>{g.name}</h4>
-                              <span style={{ fontSize: 10, fontWeight: 700, color: isEditor ? '#a0aeff' : '#c4b5fd', background: isEditor ? 'rgba(67,97,238,0.18)' : 'rgba(124,58,237,0.18)', padding: '2px 7px', borderRadius: 5 }}>
-                                {isEditor ? 'éditeur' : 'custom'}
-                              </span>
+                              <span style={{ fontSize: 10, fontWeight: 700, color: '#c4b5fd', background: 'rgba(124,58,237,0.18)', padding: '2px 7px', borderRadius: 5 }}>custom</span>
                             </div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 11 }}>
-                              <span style={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                {Array.from({ length: 5 }, (_, s) => (
-                                  <Star key={s} size={10} fill={s < difficulty ? '#facc15' : 'none'} color={s < difficulty ? '#facc15' : 'rgba(255,255,255,0.2)'} />
-                                ))}
-                              </span>
-                              <span style={{ color: 'rgba(232,234,240,0.45)' }}>{nodeCount} nœuds · {tileCount} dalles</span>
-                            </div>
+                            <p style={{ color: 'var(--text-2)', fontSize: 12, margin: '2px 0 0', lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{description}</p>
                           </div>
                           <button
                             className="play-btn"
