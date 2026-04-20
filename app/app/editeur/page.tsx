@@ -828,15 +828,11 @@ export default function EditeurPage() {
 
   const [t, setT] = useState<number>(0);
   useEffect(() => {
-    let raf = 0;
     const start = performance.now();
-    const tick = () => {
-      const now = performance.now();
-      setT((now - start) / 1000);
-      raf = window.requestAnimationFrame(tick);
-    };
-    raf = window.requestAnimationFrame(tick);
-    return () => window.cancelAnimationFrame(raf);
+    const id = window.setInterval(() => {
+      setT((performance.now() - start) / 1000);
+    }, 100); // 10 fps — suffisant pour l'aperçu des tuiles, évite le flood de re-renders
+    return () => window.clearInterval(id);
   }, []);
 
   useEffect(() => {
