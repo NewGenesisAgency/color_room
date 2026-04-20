@@ -3413,6 +3413,33 @@ export default function JeuxPage() {
                   </button>
                 </div>
 
+                {/* Spectre Chromatique — jeu multijoueur */}
+                <div
+                  className="game-card"
+                  style={{ marginBottom: 8 }}
+                  onClick={() => { window.location.href = '/spectre'; }}
+                  role="button"
+                  tabIndex={0}
+                >
+                  <div className="game-icon" style={{ background: 'linear-gradient(135deg, #1a0a2e, #2d1060)' }}>
+                    <Sparkles size={20} color="#a78bfa" />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
+                      <h4>Spectre Chromatique</h4>
+                      <span style={{ fontSize: 10, fontWeight: 700, color: '#a78bfa', background: 'rgba(167,139,250,0.18)', padding: '2px 7px', borderRadius: 5 }}>multijoueur</span>
+                    </div>
+                    <p>Mémorisez une couleur, reproduisez-la sur le chromographe spectral</p>
+                  </div>
+                  <button
+                    className="play-btn"
+                    style={{ background: 'rgba(167,139,250,0.2)', color: '#fff' }}
+                    onClick={(e) => { e.stopPropagation(); window.location.href = '/spectre'; }}
+                  >
+                    <Play size={15} />
+                  </button>
+                </div>
+
                 {dbGamesLoading ? (
                   <div style={{ padding: 20, textAlign: 'center', opacity: 0.75 }}>Chargement des jeux...</div>
                 ) : dbGames.length === 0 ? (
