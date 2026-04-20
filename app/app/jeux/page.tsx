@@ -805,8 +805,9 @@ export default function JeuxPage() {
     });
   }, [spectrumHeights]);
 
-  const hwTimersRef = useRef<Record<string, number>>({});
   const hwLastSentRef = useRef<Record<string, number>>({});
+  const hwBatchPendingRef = useRef<Map<number, Record<number, number>>>(new Map());
+  const hwBatchTimersRef = useRef<Map<number, number>>(new Map());
   const tetrisSnapRef = useRef<TetrisSnapshot | null>(null);
 
   const [sceneApplyScope, setSceneApplyScope] = useState<'selected' | 'all'>('selected');
@@ -862,21 +863,30 @@ export default function JeuxPage() {
     if (hwLastSentRef.current[key] === clamped) return;
     hwLastSentRef.current[key] = clamped;
 
-    const existing = hwTimersRef.current[key];
-    if (existing) window.clearTimeout(existing);
+    // Accumulate into per-plate pending batch
+    const pending = hwBatchPendingRef.current;
+    if (!pending.has(plaqueId)) pending.set(plaqueId, {});
+    pending.get(plaqueId)![canalIndex] = clamped;
 
-    hwTimersRef.current[key] = window.setTimeout(async () => {
-      try {
-        await fetch(`/api/supervision/state/plaque/${plaqueId}/cursor/${canalIndex}/${clamped}`,
-          {
-            method: 'PUT',
-            cache: 'no-store',
-          },
-        );
-      } catch {
-        // ignore
-      }
-    }, 300);
+    // (Re-)arm a single 20ms timer per plate — all 32 channels coalesce into one batch
+    const existing = hwBatchTimersRef.current.get(plaqueId);
+    if (existing) window.clearTimeout(existing);
+    hwBatchTimersRef.current.set(plaqueId, window.setTimeout(() => {
+      hwBatchTimersRef.current.delete(plaqueId);
+      const channels = pending.get(plaqueId);
+      pending.delete(plaqueId);
+      if (!channels) return;
+      const channelArray = Object.entries(channels)
+        .map(([i, v]) => ({ index: Number(i), value: v }))
+        .filter(ch => ch.value >= 0);
+      if (channelArray.length === 0) return;
+      fetch('/api/supervision/batch', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ plateId: plaqueId, channels: channelArray }),
+        cache: 'no-store',
+      }).catch(() => {});
+    }, 20));
   }
 
   function sendRgbToPlate(rgb: TargetColor, intensity100: number, plateId: number) {

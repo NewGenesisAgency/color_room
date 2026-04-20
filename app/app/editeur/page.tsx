@@ -522,58 +522,42 @@ function rgbToChannels32(rgb: { r: number; g: number; b: number }, masterIntensi
   return channels;
 }
 
-// Hardware batch timer for throttled sending
-let hwBatchTimer: ReturnType<typeof setTimeout> | null = null;
-let hwPendingBatch: Map<string, { plaqueId: number; canal: number; value: number }> = new Map();
-const hwLastSent: Map<string, number> = new Map(); // cache to skip unchanged values
-let hwFlushInFlight = false;
-
-function flushHardwareBatch() {
-  hwBatchTimer = null;
-  if (hwFlushInFlight) {
-    // Re-schedule if a flush is already in progress
-    hwBatchTimer = setTimeout(flushHardwareBatch, 300);
-    return;
-  }
-  const batch = hwPendingBatch;
-  hwPendingBatch = new Map();
-
-  // Filter out unchanged values
-  const toSend: { plaqueId: number; canal: number; value: number }[] = [];
-  for (const [key, entry] of batch) {
-    const clamped = Math.max(0, Math.min(255, Math.round(entry.value)));
-    const prev = hwLastSent.get(key);
-    if (prev === clamped) continue; // skip unchanged
-    hwLastSent.set(key, clamped);
-    toSend.push({ ...entry, value: clamped });
-  }
-
-  if (toSend.length === 0) return;
-
-  // Send in small sequential batches to avoid flooding
-  hwFlushInFlight = true;
-  const MAX_PARALLEL = 6;
-  let idx = 0;
-  function sendNext() {
-    const chunk = toSend.slice(idx, idx + MAX_PARALLEL);
-    if (chunk.length === 0) { hwFlushInFlight = false; return; }
-    idx += chunk.length;
-    Promise.all(
-      chunk.map(({ plaqueId, canal, value }) =>
-        fetch(`/api/supervision/state/plaque/${plaqueId}/cursor/${canal}/${value}`, { method: 'PUT', cache: 'no-store' }).catch(() => {})
-      )
-    ).then(sendNext).catch(() => { hwFlushInFlight = false; });
-  }
-  sendNext();
-}
+// Hardware batch: per-plate accumulator with 20ms coalescing window
+const hwLastSent: Map<string, number> = new Map();
+const hwBatchPending: Map<number, Record<number, number>> = new Map();
+const hwBatchTimers: Map<number, ReturnType<typeof setTimeout>> = new Map();
 
 function scheduleSetCanal(plaqueId: number, canalIndex: number, intensity: number) {
   const key = `${plaqueId}:${canalIndex}`;
-  hwPendingBatch.set(key, { plaqueId, canal: canalIndex, value: intensity });
+  const clamped = Math.max(0, Math.min(255, Math.round(intensity)));
+  // Skip if value unchanged
+  const prev = hwLastSent.get(key);
+  if (prev === clamped) return;
+  hwLastSent.set(key, clamped);
 
-  if (!hwBatchTimer) {
-    hwBatchTimer = setTimeout(flushHardwareBatch, 300);
-  }
+  // Accumulate into per-plate pending batch
+  if (!hwBatchPending.has(plaqueId)) hwBatchPending.set(plaqueId, {});
+  hwBatchPending.get(plaqueId)![canalIndex] = clamped;
+
+  // (Re-)arm a single 20ms timer per plate — all 32 channels coalesce into one batch
+  const existing = hwBatchTimers.get(plaqueId);
+  if (existing) clearTimeout(existing);
+  hwBatchTimers.set(plaqueId, setTimeout(() => {
+    hwBatchTimers.delete(plaqueId);
+    const channels = hwBatchPending.get(plaqueId);
+    hwBatchPending.delete(plaqueId);
+    if (!channels) return;
+    const channelArray = Object.entries(channels)
+      .map(([i, v]) => ({ index: Number(i), value: v }))
+      .filter(ch => ch.value >= 0);
+    if (channelArray.length === 0) return;
+    fetch('/api/supervision/batch', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ plateId: plaqueId, channels: channelArray }),
+      cache: 'no-store',
+    }).catch(() => {});
+  }, 20));
 }
 
 function sendChannelsToHardware(channels32: number[], plateIds: number[]) {
