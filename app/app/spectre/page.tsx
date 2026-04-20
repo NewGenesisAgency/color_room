@@ -37,18 +37,25 @@ function hslToRgb(h: number, s: number, l: number): { r: number; g: number; b: n
   };
 }
 
-function rgbToHsl(r: number, g: number, b: number): { h: number; s: number; l: number } {
-  const rn = r / 255, gn = g / 255, bn = b / 255;
-  const max = Math.max(rn, gn, bn), min = Math.min(rn, gn, bn);
-  const l = (max + min) / 2;
-  if (max === min) return { h: 0, s: 0, l: Math.round(l * 100) };
-  const d = max - min;
-  const s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
-  let h = 0;
-  if (max === rn) h = ((gn - bn) / d + (gn < bn ? 6 : 0)) / 6;
-  else if (max === gn) h = ((bn - rn) / d + 2) / 6;
-  else h = ((rn - gn) / d + 4) / 6;
-  return { h: Math.round(h * 360), s: Math.round(s * 100), l: Math.round(l * 100) };
+// Converts wavelength (nm) + saturation% + lightness% → RGB
+function wlSLToRgb(wl: number, s: number, l: number): { r: number; g: number; b: number } {
+  const [r01, g01, b01] = wavelengthToRgb01(wl);
+  const sn = s / 100;
+  const ln = l / 100;
+  // Luminance-based desaturation: mix spectral color with its own luminance value
+  const lum = 0.2126 * r01 + 0.7152 * g01 + 0.0722 * b01;
+  const sr = r01 * sn + lum * (1 - sn);
+  const sg = g01 * sn + lum * (1 - sn);
+  const sb = b01 * sn + lum * (1 - sn);
+  // Lightness: scale toward black (<0.5) or white (>0.5), neutral at 0.5
+  const c = (v: number) => Math.max(0, Math.min(255, Math.round(v * 255)));
+  if (ln <= 0.5) {
+    const f = ln * 2;
+    return { r: c(sr * f), g: c(sg * f), b: c(sb * f) };
+  } else {
+    const f = (ln - 0.5) * 2;
+    return { r: c(sr + (1 - sr) * f), g: c(sg + (1 - sg) * f), b: c(sb + (1 - sb) * f) };
+  }
 }
 
 function colorScore(tR: number, tG: number, tB: number, gR: number, gG: number, gB: number): number {
@@ -148,9 +155,9 @@ export default function SpectrePage() {
   const [sessionStatus, setSessionStatus] = useState<'active' | 'finished'>('active');
   const [players, setPlayers] = useState<Array<{ seat: number; name: string }>>([]);
 
-  const [myH, setMyH] = useState(200);
-  const [myS, setMyS] = useState(70);
-  const [myL, setMyL] = useState(45);
+  const [myH, setMyH] = useState(550); // longueur d'onde nm (380–780)
+  const [myS, setMyS] = useState(80);
+  const [myL, setMyL] = useState(50);
   const [submitted, setSubmitted] = useState(false);
   const [timeLeft, setTimeLeft] = useState(0);
 
@@ -178,7 +185,7 @@ export default function SpectrePage() {
     } catch { /* ignore */ }
   }, []);
 
-  const myRgb = useMemo(() => hslToRgb(myH, myS, myL), [myH, myS, myL]);
+  const myRgb = useMemo(() => wlSLToRgb(myH, myS, myL), [myH, myS, myL]);
 
   // ── Polling state ─────────────────────────────────────────────────────────
   const pollState = useCallback(async () => {
@@ -326,7 +333,7 @@ export default function SpectrePage() {
     if (data.ok) {
       setSessionId(data.sessionId);
       setSubmitted(false);
-      setMyH(200); setMyS(70); setMyL(45);
+      setMyH(550); setMyS(80); setMyL(50);
     }
     setLoading(false);
     await pollState();
@@ -359,20 +366,20 @@ export default function SpectrePage() {
             <input
               value={nameInput} onChange={(e) => setNameInput(e.target.value)}
               placeholder="Votre prénom"
-              style={{ padding: '14px 16px', borderRadius: 12, border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.08)', color: '#fff', fontSize: 15, outline: 'none' }}
+              style={{ padding: '14px 16px', borderRadius: 12, border: '1px solid rgba(255,255,255,0.2)', background: '#1a1a30', color: '#fff', fontSize: 15, outline: 'none' }}
             />
             {loginMode === 'join' && (
               <input
                 value={joinCodeInput} onChange={(e) => setJoinCodeInput(e.target.value)}
-                placeholder="Code de la salle (ID session)"
-                style={{ padding: '14px 16px', borderRadius: 12, border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.08)', color: '#fff', fontSize: 13, outline: 'none', fontFamily: 'monospace' }}
+                placeholder="Coller le code de la salle ici…"
+                style={{ padding: '14px 16px', borderRadius: 12, border: '1px solid rgba(167,139,250,0.4)', background: '#1a1a30', color: '#a78bfa', fontSize: 13, outline: 'none', fontFamily: 'monospace' }}
               />
             )}
             {loginMode === 'create' && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                 <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13, whiteSpace: 'nowrap' }}>Nombre de manches :</span>
                 <input type="number" min={1} max={10} value={maxRoundsInput} onChange={(e) => setMaxRoundsInput(Number(e.target.value))}
-                  style={{ flex: 1, padding: '10px 14px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.08)', color: '#fff', fontSize: 15, outline: 'none' }} />
+                  style={{ flex: 1, padding: '10px 14px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.15)', background: '#1a1a30', color: '#fff', fontSize: 15, outline: 'none' }} />
               </div>
             )}
             {error && <p style={{ color: '#ff6b6b', fontSize: 13, margin: 0 }}>⚠ {error}</p>}
@@ -481,14 +488,17 @@ export default function SpectrePage() {
   // ────────────────────────────────────────────────────────────────────────────
   if (gameState.phase === 'guess') {
     const myCss = rgb(myRgb.r, myRgb.g, myRgb.b);
-    const liveScore = colorScore(gameState.targetR, gameState.targetG, gameState.targetB, myRgb.r, myRgb.g, myRgb.b);
+    // Target is masked to -1 during guess to prevent cheating — hide live score
+    const liveScore = gameState.targetR >= 0
+      ? colorScore(gameState.targetR, gameState.targetG, gameState.targetB, myRgb.r, myRgb.g, myRgb.b)
+      : -1;
     const spectrumBars = Array.from({ length: 36 }, (_, i) => {
       const wl = 380 + i * 11;
       const [r01, g01, b01] = wavelengthToRgb01(wl);
       return `rgb(${Math.round(r01 * 255)},${Math.round(g01 * 255)},${Math.round(b01 * 255)})`;
     });
-    const hueFraction = myH / 360;
-    const markerX = Math.round(hueFraction * 100);
+    // Marker position maps wavelength (380–780nm) to gradient position (0–100%)
+    const markerX = Math.round((myH - 380) / 400 * 100);
 
     return (
       <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg,#07070f,#0d0d1e)', fontFamily: 'system-ui,sans-serif', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px 16px', boxSizing: 'border-box' }}>
@@ -516,7 +526,7 @@ export default function SpectrePage() {
               <code style={{ color: '#fff', fontSize: 12, background: 'rgba(255,255,255,0.08)', padding: '4px 8px', borderRadius: 6 }}>
                 rgb({myRgb.r},{myRgb.g},{myRgb.b})
               </code>
-              {!submitted && (
+              {!submitted && liveScore >= 0 && (
                 <div style={{ color: liveScore >= 800 ? '#44ffaa' : liveScore >= 500 ? '#ffaa44' : '#ff6b6b', fontSize: 12, fontWeight: 700 }}>
                   ≈ {liveScore} pts
                 </div>
@@ -526,11 +536,14 @@ export default function SpectrePage() {
 
           {/* Spectrum chromograph */}
           <div style={{ marginBottom: 20 }}>
-            <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', margin: '0 0 8px' }}>Chromographe spectral — Teinte</p>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', margin: 0 }}>Chromographe spectral</p>
+              <span style={{ color: '#a78bfa', fontSize: 12, fontWeight: 800, fontFamily: 'monospace' }}>{myH} nm</span>
+            </div>
             <div style={{ position: 'relative', height: 36, borderRadius: 12, overflow: 'visible', marginBottom: 8 }}>
               <div style={{ height: '100%', borderRadius: 12, background: `linear-gradient(to right, ${spectrumBars.join(',')})`, border: '1px solid rgba(255,255,255,0.1)' }} />
               <div style={{ position: 'absolute', top: -4, left: `${markerX}%`, transform: 'translateX(-50%)', width: 4, height: 44, background: '#fff', borderRadius: 4, boxShadow: '0 0 8px rgba(255,255,255,0.8)', pointerEvents: 'none' }} />
-              <input type="range" min={0} max={360} value={myH}
+              <input type="range" min={380} max={780} value={myH}
                 onChange={(e) => !submitted && setMyH(Number(e.target.value))}
                 disabled={submitted}
                 style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', opacity: 0, cursor: submitted ? 'not-allowed' : 'pointer', margin: 0 }} />
@@ -544,7 +557,7 @@ export default function SpectrePage() {
               <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: 13, fontWeight: 700 }}>{myS}%</span>
             </div>
             <div style={{ position: 'relative', height: 24, borderRadius: 12 }}>
-              <div style={{ height: '100%', borderRadius: 12, background: `linear-gradient(to right, hsl(${myH},0%,${myL}%), hsl(${myH},100%,${myL}%))`, border: '1px solid rgba(255,255,255,0.1)' }} />
+              <div style={{ height: '100%', borderRadius: 12, background: `linear-gradient(to right, ${[0, 25, 50, 75, 100].map(s => { const c = wlSLToRgb(myH, s, myL); return `rgb(${c.r},${c.g},${c.b})`; }).join(',')})`, border: '1px solid rgba(255,255,255,0.1)' }} />
               <input type="range" min={0} max={100} value={myS}
                 onChange={(e) => !submitted && setMyS(Number(e.target.value))}
                 disabled={submitted}
@@ -559,7 +572,7 @@ export default function SpectrePage() {
               <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: 13, fontWeight: 700 }}>{myL}%</span>
             </div>
             <div style={{ position: 'relative', height: 24, borderRadius: 12 }}>
-              <div style={{ height: '100%', borderRadius: 12, background: `linear-gradient(to right, #000, hsl(${myH},${myS}%,50%), #fff)`, border: '1px solid rgba(255,255,255,0.1)' }} />
+              <div style={{ height: '100%', borderRadius: 12, background: `linear-gradient(to right, ${[5, 25, 50, 75, 95].map(l => { const c = wlSLToRgb(myH, myS, l); return `rgb(${c.r},${c.g},${c.b})`; }).join(',')})`, border: '1px solid rgba(255,255,255,0.1)' }} />
               <input type="range" min={5} max={95} value={myL}
                 onChange={(e) => !submitted && setMyL(Number(e.target.value))}
                 disabled={submitted}
