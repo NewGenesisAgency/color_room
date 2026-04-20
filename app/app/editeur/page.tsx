@@ -1618,7 +1618,7 @@ export default function EditeurPage() {
 
   if (isTeacher === null) {
     return (
-      <main className="stage">
+      <main className="editeur stage">
         <div className="ue">
           <aside className="ue__left glass">
             <div className="panelhead">
@@ -1633,7 +1633,7 @@ export default function EditeurPage() {
 
   if (isTeacher === false) {
     return (
-      <main className="stage" style={{ display: 'grid', placeItems: 'center' }}>
+      <main className="editeur stage" style={{ display: 'grid', placeItems: 'center' }}>
         <div
           className="glass"
           style={{
@@ -1664,7 +1664,7 @@ export default function EditeurPage() {
   }
 
   return (
-    <main className="stage">
+    <main className="editeur stage">
       <div className="ue">
         <aside className="ue__left" style={{ borderRadius: 16, overflow: 'hidden', background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(20px)', border: '1px solid rgba(0,0,0,0.06)' }}>
             <div className="panelhead" style={{ background: '#fff', borderBottom: '1px solid rgba(0,0,0,0.06)', padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'center' }}>

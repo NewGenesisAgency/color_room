@@ -3006,12 +3006,20 @@ export default function JeuxPage() {
   // currentGameDef supprimé : les jeux viennent de la DB
 
   return (
-    <>
+    <div className="jeux" style={{ ['--tile-shadow-intensity' as any]: clamp100(masterIntensity) / 100 }}>
       {/* Navigation Menu */}
       <NavigationMenu />
-      <div style={{ padding: '28px 32px', background: '#fff', borderBottom: '1px solid rgba(0,0,0,0.06)', ['--tile-shadow-intensity' as any]: clamp100(masterIntensity) / 100 }}>
-        <h1 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: '#1a1a1a', letterSpacing: '-0.02em' }}>ColorRoomGames</h1>
-        <p style={{ margin: '4px 0 0', fontSize: 13, color: '#999' }}>Projet BTS CIEL · ENTPE/LTDS · Lycée Édouard Branly · Session 2026</p>
+      {/* Header */}
+      <div className="jeux-header">
+        <div className="jeux-header-brand">
+          <div className="jeux-header-dot">
+            <Lightbulb size={18} color="#fff" />
+          </div>
+          <div>
+            <h1>ColorRoomGames</h1>
+            <p>Projet BTS CIEL · ENTPE/LTDS · Session 2026</p>
+          </div>
+        </div>
       </div>
 
       {view === 'main' && mpJoinPrompt.open ? (
@@ -3149,9 +3157,10 @@ export default function JeuxPage() {
       ) : null}
 
       {view === 'login' ? (
-        <div className="container">
+        <div className="login-wrap">
           <div className="login-box glass">
             <h2>Connexion</h2>
+            <p className="login-sub">Identifiez-vous pour accéder aux jeux</p>
             <div className="form-group">
               <label>Type d'utilisateur</label>
               <select value={userType} onChange={(e) => setUserType(e.target.value as UserType)}>
@@ -3186,7 +3195,7 @@ export default function JeuxPage() {
         </div>
       ) : (
         <div className="container">
-          <div className="dashboard">
+          <div className="dashboard" style={{ paddingTop: 4 }}>
             <div className="panel glass">
               <div className="section">
                 <h3>
@@ -3226,18 +3235,8 @@ export default function JeuxPage() {
 
                 {/* Tetris Lumière — toujours disponible */}
                 <div
-                  style={{
-                    padding: '18px 20px',
-                    borderRadius: 14,
-                    cursor: 'pointer',
-                    transition: 'all 0.18s ease',
-                    border: tetrisStandalone ? '2px solid #4361ee' : '1px solid rgba(0,0,0,0.08)',
-                    background: tetrisStandalone ? 'rgba(67,97,238,0.04)' : '#fff',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 16,
-                    marginBottom: 12,
-                  }}
+                  className={`game-card${tetrisStandalone ? ' selected' : ''}`}
+                  style={{ marginBottom: 8 }}
                   onClick={() => {
                     setTetrisStandalone(true);
                     setCustomRun(null);
@@ -3246,31 +3245,22 @@ export default function JeuxPage() {
                     setGameActive(true);
                     setMessage('Tetris Lumière: ← → déplacer, ↑ tourner, Espace drop');
                   }}
-                  onMouseEnter={(e) => { if (!tetrisStandalone) { (e.currentTarget as HTMLDivElement).style.borderColor = 'rgba(0,0,0,0.18)'; (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-1px)'; (e.currentTarget as HTMLDivElement).style.boxShadow = '0 4px 16px rgba(0,0,0,0.08)'; } }}
-                  onMouseLeave={(e) => { if (!tetrisStandalone) { (e.currentTarget as HTMLDivElement).style.borderColor = 'rgba(0,0,0,0.08)'; (e.currentTarget as HTMLDivElement).style.transform = 'none'; (e.currentTarget as HTMLDivElement).style.boxShadow = 'none'; } }}
                   role="button"
                   tabIndex={0}
                 >
-                  <div style={{ width: 44, height: 44, borderRadius: 12, background: 'linear-gradient(135deg, #0a0a1a, #1a1a2e)', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+                  <div className="game-icon" style={{ background: 'linear-gradient(135deg, #1a1d2e, #2a2d4e)' }}>
                     <Gamepad2 size={20} color="#4361ee" />
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-                      <h4 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#1a1a1a' }}>Tetris Lumière</h4>
-                      <span style={{ fontSize: 11, fontWeight: 600, color: '#4361ee', background: 'rgba(67,97,238,0.08)', padding: '2px 8px', borderRadius: 6 }}>
-                        Jeu intégré
-                      </span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
+                      <h4>Tetris Lumière</h4>
+                      <span style={{ fontSize: 10, fontWeight: 700, color: '#a0aeff', background: 'rgba(67,97,238,0.18)', padding: '2px 7px', borderRadius: 5 }}>intégré</span>
                     </div>
-                    <div style={{ fontSize: 12, color: '#999' }}>
-                      Tetris interactif sur les dalles lumineuses
-                    </div>
+                    <p>Tetris interactif sur les dalles lumineuses</p>
                   </div>
                   <button
-                    style={{
-                      width: 40, height: 40, borderRadius: 10, border: 'none',
-                      background: tetrisStandalone ? '#4361ee' : '#1a1a1a', color: '#fff', display: 'grid', placeItems: 'center',
-                      cursor: 'pointer', flexShrink: 0, transition: 'background 0.15s',
-                    }}
+                    className="play-btn"
+                    style={{ background: tetrisStandalone ? '#4361ee' : 'rgba(67,97,238,0.2)', color: '#fff' }}
                     onClick={(e) => {
                       e.stopPropagation();
                       setTetrisStandalone(true);
@@ -3281,24 +3271,14 @@ export default function JeuxPage() {
                       setMessage('Tetris Lumière: ← → déplacer, ↑ tourner, Espace drop');
                     }}
                   >
-                    <Play size={16} />
+                    <Play size={15} />
                   </button>
                 </div>
 
                 {/* Simon — jeu de mémoire */}
                 <div
-                  style={{
-                    padding: '18px 20px',
-                    borderRadius: 14,
-                    cursor: 'pointer',
-                    transition: 'all 0.18s ease',
-                    border: simonActive ? '2px solid #ef476f' : '1px solid rgba(0,0,0,0.08)',
-                    background: simonActive ? 'rgba(239,71,111,0.04)' : '#fff',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 16,
-                    marginBottom: 12,
-                  }}
+                  className={`game-card${simonActive ? ' selected' : ''}`}
+                  style={{ marginBottom: 8 }}
                   onClick={() => {
                     setTetrisStandalone(false);
                     setCustomRun(null);
@@ -3307,31 +3287,22 @@ export default function JeuxPage() {
                     setGameActive(true);
                     startSimonGame();
                   }}
-                  onMouseEnter={(e) => { if (!simonActive) { (e.currentTarget as HTMLDivElement).style.borderColor = 'rgba(0,0,0,0.18)'; (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-1px)'; (e.currentTarget as HTMLDivElement).style.boxShadow = '0 4px 16px rgba(0,0,0,0.08)'; } }}
-                  onMouseLeave={(e) => { if (!simonActive) { (e.currentTarget as HTMLDivElement).style.borderColor = 'rgba(0,0,0,0.08)'; (e.currentTarget as HTMLDivElement).style.transform = 'none'; (e.currentTarget as HTMLDivElement).style.boxShadow = 'none'; } }}
                   role="button"
                   tabIndex={0}
                 >
-                  <div style={{ width: 44, height: 44, borderRadius: 12, background: 'linear-gradient(135deg, #ff6b6b, #feca57, #48dbfb, #1dd1a1)', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+                  <div className="game-icon" style={{ background: 'linear-gradient(135deg, #ef476f, #f72585)' }}>
                     <Brain size={20} color="#fff" />
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-                      <h4 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#1a1a1a' }}>Simon Lumière</h4>
-                      <span style={{ fontSize: 11, fontWeight: 600, color: '#ef476f', background: 'rgba(239,71,111,0.08)', padding: '2px 8px', borderRadius: 6 }}>
-                        Jeu intégré
-                      </span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
+                      <h4>Simon Lumière</h4>
+                      <span style={{ fontSize: 10, fontWeight: 700, color: '#ef476f', background: 'rgba(239,71,111,0.18)', padding: '2px 7px', borderRadius: 5 }}>intégré</span>
                     </div>
-                    <div style={{ fontSize: 12, color: '#999' }}>
-                      Mémorisez les séquences lumineuses et reproduisez-les
-                    </div>
+                    <p>Mémorisez et reproduisez les séquences lumineuses</p>
                   </div>
                   <button
-                    style={{
-                      width: 40, height: 40, borderRadius: 10, border: 'none',
-                      background: simonActive ? '#ef476f' : '#1a1a1a', color: '#fff', display: 'grid', placeItems: 'center',
-                      cursor: 'pointer', flexShrink: 0, transition: 'background 0.15s',
-                    }}
+                    className="play-btn"
+                    style={{ background: simonActive ? '#ef476f' : 'rgba(239,71,111,0.2)', color: '#fff' }}
                     onClick={(e) => {
                       e.stopPropagation();
                       setTetrisStandalone(false);
@@ -3342,7 +3313,7 @@ export default function JeuxPage() {
                       startSimonGame();
                     }}
                   >
-                    <Play size={16} />
+                    <Play size={15} />
                   </button>
                 </div>
 
@@ -3354,7 +3325,7 @@ export default function JeuxPage() {
                     <p style={{ margin: '8px 0 0', fontSize: 13, opacity: 0.6 }}>Créez votre premier jeu dans l'éditeur !</p>
                   </div>
                 ) : (
-                  <div style={{ display: 'grid', gap: 12 }}>
+                  <div style={{ display: 'grid', gap: 8 }}>
                     {dbGames.map((g) => {
                       const isEditor = String(g.kind) === 'editor';
                       const cfg = g.config as any;
@@ -3364,21 +3335,12 @@ export default function JeuxPage() {
                       const iconName: string = typeof cfg?.icon === 'string' ? cfg.icon : 'Lightbulb';
                       const ICON_LOOKUP: Record<string, any> = { Lightbulb, Gamepad2, Star, Heart, Sun, Moon, Flame, Snowflake, Music, Target, Puzzle, Sparkles, Trophy, Rocket, Ghost, Palette, Zap };
                       const GIcon = ICON_LOOKUP[iconName] ?? Lightbulb;
-                      const accentColor = typeof cfg?.accentColor === 'string' ? cfg.accentColor : (isEditor ? '#1a1a1a' : '#7c3aed');
+                      const accentColor = typeof cfg?.accentColor === 'string' ? cfg.accentColor : (isEditor ? '#a0aeff' : '#c4b5fd');
+                      const iconBg = isEditor ? 'rgba(67,97,238,0.2)' : 'rgba(124,58,237,0.2)';
                       return (
                         <div
                           key={g.id}
-                          style={{
-                            padding: '18px 20px',
-                            borderRadius: 14,
-                            cursor: 'pointer',
-                            transition: 'all 0.18s ease',
-                            border: '1px solid rgba(0,0,0,0.08)',
-                            background: '#fff',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 16,
-                          }}
+                          className="game-card"
                           onClick={() => {
                             if (isEditor) {
                               startHudFromDb({ id: g.id, name: g.name, config: g.config });
@@ -3386,39 +3348,31 @@ export default function JeuxPage() {
                               startCustomFromDb({ id: g.id, name: g.name, config: g.config });
                             }
                           }}
-                          onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = 'rgba(0,0,0,0.18)'; (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-1px)'; (e.currentTarget as HTMLDivElement).style.boxShadow = '0 4px 16px rgba(0,0,0,0.08)'; }}
-                          onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = 'rgba(0,0,0,0.08)'; (e.currentTarget as HTMLDivElement).style.transform = 'none'; (e.currentTarget as HTMLDivElement).style.boxShadow = 'none'; }}
                           role="button"
                           tabIndex={0}
                         >
-                          <div style={{ width: 44, height: 44, borderRadius: 12, background: isEditor ? '#f0f0f0' : '#f5f0ff', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+                          <div className="game-icon" style={{ background: iconBg }}>
                             <GIcon size={20} color={accentColor} />
                           </div>
                           <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-                              <h4 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#1a1a1a' }}>{g.name}</h4>
-                              <span style={{ fontSize: 11, fontWeight: 600, color: '#999', background: '#f5f5f5', padding: '2px 8px', borderRadius: 6 }}>
-                                {isEditor ? 'Éditeur' : 'Custom'}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
+                              <h4>{g.name}</h4>
+                              <span style={{ fontSize: 10, fontWeight: 700, color: isEditor ? '#a0aeff' : '#c4b5fd', background: isEditor ? 'rgba(67,97,238,0.18)' : 'rgba(124,58,237,0.18)', padding: '2px 7px', borderRadius: 5 }}>
+                                {isEditor ? 'éditeur' : 'custom'}
                               </span>
                             </div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 12, color: '#999' }}>
-                              <span style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 11 }}>
+                              <span style={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                                 {Array.from({ length: 5 }, (_, s) => (
-                                  <Star key={s} size={12} fill={s < difficulty ? '#facc15' : 'none'} color={s < difficulty ? '#facc15' : '#ddd'} />
+                                  <Star key={s} size={10} fill={s < difficulty ? '#facc15' : 'none'} color={s < difficulty ? '#facc15' : 'rgba(255,255,255,0.2)'} />
                                 ))}
                               </span>
-                              <span>{nodeCount} nœuds</span>
-                              <span>{tileCount} dalles</span>
+                              <span style={{ color: 'rgba(232,234,240,0.45)' }}>{nodeCount} nœuds · {tileCount} dalles</span>
                             </div>
                           </div>
                           <button
-                            style={{
-                              width: 40, height: 40, borderRadius: 10, border: 'none',
-                              background: '#1a1a1a', color: '#fff', display: 'grid', placeItems: 'center',
-                              cursor: 'pointer', flexShrink: 0, transition: 'background 0.15s',
-                            }}
-                            onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#333'; }}
-                            onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#1a1a1a'; }}
+                            className="play-btn"
+                            style={{ background: 'rgba(255,255,255,0.08)', color: '#fff' }}
                             onClick={(e) => {
                               e.stopPropagation();
                               if (isEditor) {
@@ -3428,7 +3382,7 @@ export default function JeuxPage() {
                               }
                             }}
                           >
-                            <Play size={16} />
+                            <Play size={15} />
                           </button>
                         </div>
                       );
@@ -4571,7 +4525,7 @@ export default function JeuxPage() {
           `}</style>
         </div>
       )}
-    </>
+    </div>
   );
 }
 

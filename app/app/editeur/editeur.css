@@ -69,7 +69,7 @@
 
 .editeur * {
   margin: 0;
-  padding: 0.25vw;
+  padding: 0;
   box-sizing: border-box;
 }
 
@@ -246,7 +246,7 @@
   padding: 20px;
   height: 100vh;
   overflow: hidden;
-  background: #fafafa;
+  background: var(--c-bg, #f0f1f4);
 }
 
 .ue {
@@ -1092,6 +1092,88 @@ input[type='checkbox']:focus-visible {
     0 0 0 3px color-mix(in srgb, var(--c-action) 18%, transparent),
     0 12px 22px color-mix(in srgb, var(--c-dark) 12%, transparent);
 }
+
+/* ---- g-btn system ---- */
+.g-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 36px;
+  padding: 0 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(0,0,0,0.12);
+  background: rgba(255,255,255,0.88);
+  color: var(--c-content, #2d3142);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 650;
+  cursor: pointer;
+  transition: background 140ms, border-color 140ms, transform 100ms;
+  white-space: nowrap;
+  text-decoration: none;
+}
+
+.g-btn:hover:not(:disabled) {
+  background: rgba(255,255,255,1);
+  border-color: rgba(0,0,0,0.2);
+}
+
+.g-btn:active:not(:disabled) { transform: scale(0.97); }
+
+.g-btn:disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+}
+
+.g-btn--sm {
+  height: 30px;
+  padding: 0 10px;
+  font-size: 12px;
+  border-radius: 8px;
+  gap: 5px;
+}
+
+.g-btn--icon {
+  padding: 0;
+  width: 36px;
+  justify-content: center;
+}
+
+.g-btn--icon.g-btn--sm {
+  width: 30px;
+  height: 30px;
+}
+
+.g-btn--accent {
+  background: linear-gradient(135deg, #4361ee, #3a0ca3);
+  color: #fff;
+  border-color: transparent;
+  box-shadow: 0 3px 12px rgba(67,97,238,0.3);
+}
+
+.g-btn--accent:hover:not(:disabled) {
+  background: linear-gradient(135deg, #5272f2, #4a1eb3);
+  border-color: transparent;
+  box-shadow: 0 5px 18px rgba(67,97,238,0.42);
+}
+
+.g-btn--success {
+  background: rgba(6,214,160,0.12);
+  color: #059669;
+  border-color: rgba(6,214,160,0.3);
+}
+
+.g-btn--success:hover:not(:disabled) { background: rgba(6,214,160,0.2); }
+
+.g-btn--danger {
+  background: rgba(239,71,111,0.1);
+  color: #be123c;
+  border-color: rgba(239,71,111,0.28);
+}
+
+.g-btn--danger:hover:not(:disabled) { background: rgba(239,71,111,0.18); }
+
+/* ---- end g-btn ---- */
 
 /* Styles améliorés pour l'interface moderne */
 .btn--primary {
