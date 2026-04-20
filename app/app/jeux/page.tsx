@@ -1851,6 +1851,14 @@ export default function JeuxPage() {
         return;
       }
 
+      // ── game_spectrum: ouvre Spectre Chromatique dans un nouvel onglet ──
+      if (node.kind === 'game_spectrum') {
+        window.open('/spectre', '_blank');
+        const onEndId = g.out.get(node.id)?.[0];
+        if (onEndId) setTimeout(() => { if (!hudGraphRunRef.current.stop) walk(onEndId); }, 500);
+        return;
+      }
+
       // ── Render nodes (fill, tile, pulse) ──
       const nowSec = Date.now() / 1000;
       execNode(node, nowSec);

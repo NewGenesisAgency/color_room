@@ -158,6 +158,26 @@ export default function SpectrePage() {
   const lastPhaseRef = useRef<SpPhase | null>(null);
   const hardwareSentRef = useRef(false);
 
+  // ── Restauration de session depuis localStorage ───────────────────────────
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const saved = window.localStorage.getItem('sp_session');
+      if (!saved) return;
+      const parsed = JSON.parse(saved) as { token: string; seat: number; sessionId: string; savedAt: number };
+      if (!parsed.token || !parsed.sessionId) return;
+      // Expire après 2h
+      if (Date.now() - parsed.savedAt > 2 * 60 * 60 * 1000) {
+        window.localStorage.removeItem('sp_session');
+        return;
+      }
+      setToken(parsed.token);
+      setSeat(parsed.seat);
+      setSessionId(parsed.sessionId);
+      setView('game');
+    } catch { /* ignore */ }
+  }, []);
+
   const myRgb = useMemo(() => hslToRgb(myH, myS, myL), [myH, myS, myL]);
 
   // ── Polling state ─────────────────────────────────────────────────────────
@@ -241,6 +261,7 @@ export default function SpectrePage() {
       setToken(data.token);
       setSeat(data.seat);
       setSessionId(data.sessionId);
+      window.localStorage.setItem('sp_session', JSON.stringify({ token: data.token, seat: data.seat, sessionId: data.sessionId, savedAt: Date.now() }));
       setView('game');
     } catch { setError('Erreur réseau'); } finally { setLoading(false); }
   }
@@ -260,6 +281,7 @@ export default function SpectrePage() {
       setToken(data.token);
       setSeat(data.seat);
       setSessionId(joinCodeInput.trim());
+      window.localStorage.setItem('sp_session', JSON.stringify({ token: data.token, seat: data.seat, sessionId: joinCodeInput.trim(), savedAt: Date.now() }));
       setView('game');
     } catch { setError('Erreur réseau'); } finally { setLoading(false); }
   }
@@ -680,7 +702,7 @@ export default function SpectrePage() {
             <div style={{ textAlign: 'center', color: 'rgba(255,255,255,0.3)', fontSize: 14 }}>En attente de l&apos;hôte pour rejouer…</div>
           )}
 
-          <button onClick={() => { setView('login'); setToken(''); setGameState(null); setSeat(null); setSessionId(''); }}
+          <button onClick={() => { window.localStorage.removeItem('sp_session'); setView('login'); setToken(''); setGameState(null); setSeat(null); setSessionId(''); }}
             style={{ marginTop: 12, width: '100%', padding: '14px', borderRadius: 14, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontWeight: 600, fontSize: 15 }}>
             Quitter
           </button>

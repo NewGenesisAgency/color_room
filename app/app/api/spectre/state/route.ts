@@ -31,6 +31,14 @@ export async function GET(req: Request) {
       name: p.name,
     }));
 
+    // Mask target color during guess phase to prevent cheating via network inspection
+    const safeState = { ...latest.state };
+    if (safeState.phase === 'guess') {
+      safeState.targetR = -1;
+      safeState.targetG = -1;
+      safeState.targetB = -1;
+    }
+
     return NextResponse.json({
       ok: true,
       sessionId: latest.session.id,
@@ -38,7 +46,7 @@ export async function GET(req: Request) {
       updatedAt: latest.session.updated_at,
       players,
       you,
-      state: latest.state,
+      state: safeState,
     });
   } catch (e) {
     return NextResponse.json({ ok: false, error: e instanceof Error ? e.message : 'state_failed' }, { status: 500 });

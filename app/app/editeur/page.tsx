@@ -47,6 +47,7 @@ type EditorNodeKind =
   | 'game_tetris'
   | 'game_simon'
   | 'game_memory'
+  | 'game_spectrum'
   | 'on_timer'
   | 'on_click'
   // CS150 Colorimeter nodes
@@ -140,6 +141,7 @@ const NODE_CATALOG: NodeCatalogItem[] = [
   { kind: 'game_tetris', category: 'Jeux', title: 'Tetris Lumière', defaults: { speed: 500, bgColor: '#0a0a0f', borderColor: '#222233' } },
   { kind: 'game_simon', category: 'Jeux', title: 'Simon', defaults: { speed: 800, colors: 4 } },
   { kind: 'game_memory', category: 'Jeux', title: 'Mémoire', defaults: { pairs: 8 } },
+  { kind: 'game_spectrum', category: 'Jeux', title: 'Spectre Chromatique', defaults: { maxRounds: 5, revealMs: 5000, guessMs: 30000 } },
   { kind: 'on_timer', category: 'Évènements', title: 'Timer', defaults: { intervalMs: 1000 } },
   { kind: 'on_click', category: 'Évènements', title: 'On Click', defaults: { tileIndex: 0 } },
   // CS150 Colorimeter nodes
@@ -2875,6 +2877,27 @@ export default function EditeurPage() {
                                   <input className="bp-node__varinput" type="number" min={2} max={12} step={1}
                                     value={getNum(n.params, 'pairs', 8)}
                                     onChange={(e) => updateNodeParamsById(n.id, { pairs: Number(e.target.value) })} />
+                                </div>
+                              </div>
+                            </div>
+                          ) : n.kind === 'game_spectrum' ? (
+                            <div className="bp-node__vars" onPointerDown={(e) => e.stopPropagation()}>
+                              <div className="bp-node__varrow">
+                                <div className="bp-node__var">
+                                  <span className="bp-node__varlabel">Manches</span>
+                                  <div className="bp-node__varctrl">
+                                    <input className="bp-node__varinput" type="number" min={1} max={10} step={1}
+                                      value={getNum(n.params, 'maxRounds', 5)}
+                                      onChange={(e) => updateNodeParamsById(n.id, { maxRounds: Number(e.target.value) })} />
+                                  </div>
+                                </div>
+                                <div className="bp-node__var">
+                                  <span className="bp-node__varlabel">Révélation (ms)</span>
+                                  <div className="bp-node__varctrl">
+                                    <input className="bp-node__varinput" type="number" min={2000} max={15000} step={500}
+                                      value={getNum(n.params, 'revealMs', 5000)}
+                                      onChange={(e) => updateNodeParamsById(n.id, { revealMs: Number(e.target.value) })} />
+                                  </div>
                                 </div>
                               </div>
                             </div>
