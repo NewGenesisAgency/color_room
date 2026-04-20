@@ -45,6 +45,8 @@ type EditorNodeKind =
   | 'tile_get'
   | 'tile_set'
   | 'game_tetris'
+  | 'game_simon'
+  | 'game_memory'
   | 'on_timer'
   | 'on_click'
   // CS150 Colorimeter nodes
@@ -136,6 +138,8 @@ const NODE_CATALOG: NodeCatalogItem[] = [
   { kind: 'time_seconds', category: 'Temps', title: 'Secondes', defaults: {} },
   { kind: 'random_01', category: 'Aléatoire', title: 'Aléatoire 0..1', defaults: {} },
   { kind: 'game_tetris', category: 'Jeux', title: 'Tetris Lumière', defaults: { speed: 500, bgColor: '#0a0a0f', borderColor: '#222233' } },
+  { kind: 'game_simon', category: 'Jeux', title: 'Simon', defaults: { speed: 800, colors: 4 } },
+  { kind: 'game_memory', category: 'Jeux', title: 'Mémoire', defaults: { pairs: 8 } },
   { kind: 'on_timer', category: 'Évènements', title: 'Timer', defaults: { intervalMs: 1000 } },
   { kind: 'on_click', category: 'Évènements', title: 'On Click', defaults: { tileIndex: 0 } },
   // CS150 Colorimeter nodes
@@ -221,7 +225,7 @@ type LegacyJsonlNodeSpec = {
 
 type EditorSnapshot = {
   games: GameDoc[];
-  activeGameId: string;
+  activeGameId: string | null;
   selectedNodeId: string | null;
   drillDownFrom?: string;
   expandedGameNodeId?: string;
@@ -650,7 +654,7 @@ export default function EditeurPage() {
     q: string;
   }>({ open: false, x: 0, y: 0, gx: 0, gy: 0, q: '' });
 
-  const [editor, setEditor] = useState<EditorSnapshot>(() => ({ games: [], activeGameId: '', selectedNodeId: null }));
+  const [editor, setEditor] = useState<EditorSnapshot>(() => ({ games: [], activeGameId: null, selectedNodeId: null }));
   const [history, setHistory] = useState<{ past: EditorSnapshot[]; future: EditorSnapshot[] }>({ past: [], future: [] });
 
   const editorRef = useRef<EditorSnapshot>(editor);
@@ -659,7 +663,7 @@ export default function EditeurPage() {
   }, [editor]);
 
   const games = editor.games;
-  const activeGameId = editor.activeGameId;
+  const activeGameId = editor.activeGameId ?? null;
   const selectedNodeId = editor.selectedNodeId;
 
   const commit = (recipe: (cur: EditorSnapshot) => EditorSnapshot) => {
@@ -1025,17 +1029,41 @@ export default function EditeurPage() {
   }, [selectedTileIndex, tileCount]);
 
   const serializeGameConfig = (g: GameDoc): unknown => {
-    return { version: 1, tileCount: g.tileCount ?? tiles.length, nodes: g.nodes, edges: g.edges };
+    return {
+      version: 1,
+      tileCount: g.tileCount ?? tiles.length,
+      icon: g.icon,
+      difficulty: g.difficulty,
+      description: g.description,
+      bgColor: g.bgColor,
+      accentColor: g.accentColor,
+      nodes: g.nodes,
+      edges: g.edges,
+    };
   };
 
-  const parseGameConfig = (config: unknown): { tileCount?: number; nodes: EditorNode[]; edges: GraphEdge[] } | null => {
+  const parseGameConfig = (config: unknown): {
+    tileCount?: number;
+    icon?: GameIconName;
+    difficulty?: GameDifficulty;
+    description?: string;
+    bgColor?: string;
+    accentColor?: string;
+    nodes: EditorNode[];
+    edges: GraphEdge[];
+  } | null => {
     if (!config || typeof config !== 'object') return null;
     const o = config as any;
     const tileCount = typeof o.tileCount === 'number' && Number.isFinite(o.tileCount) ? o.tileCount : undefined;
     const nodes = Array.isArray(o.nodes) ? (o.nodes as EditorNode[]) : null;
     const edges = Array.isArray(o.edges) ? (o.edges as GraphEdge[]) : null;
     if (!nodes || !edges) return null;
-    return { tileCount, nodes, edges };
+    const icon = typeof o.icon === 'string' ? (o.icon as GameIconName) : undefined;
+    const difficulty = [1,2,3,4,5].includes(Number(o.difficulty)) ? (Number(o.difficulty) as GameDifficulty) : undefined;
+    const description = typeof o.description === 'string' ? o.description : undefined;
+    const bgColor = typeof o.bgColor === 'string' ? o.bgColor : undefined;
+    const accentColor = typeof o.accentColor === 'string' ? o.accentColor : undefined;
+    return { tileCount, icon, difficulty, description, bgColor, accentColor, nodes, edges };
   };
 
   const createDbGame = async (name: string, initialGame: GameDoc): Promise<string | null> => {
@@ -1377,6 +1405,11 @@ export default function EditeurPage() {
               id: String(r.id),
               name: String(r.name),
               tileCount: cfg.tileCount,
+              icon: cfg.icon,
+              difficulty: cfg.difficulty,
+              description: cfg.description,
+              bgColor: cfg.bgColor,
+              accentColor: cfg.accentColor,
               nodes: cfg.nodes,
               edges: cfg.edges,
             } satisfies GameDoc;
@@ -1442,24 +1475,27 @@ export default function EditeurPage() {
 
   const deleteActiveGame = async () => {
     if (!activeGame) return;
-    const ok = await deleteDbGame(activeGame.id);
+    const deletedId = activeGame.id;
+    const ok = await deleteDbGame(deletedId);
     if (!ok) {
       setStatus('Suppression impossible');
       return;
     }
-
-    commit((cur) => {
-      const nextGames = cur.games.filter((g) => g.id !== activeGame.id);
-      const nextActive = nextGames[0];
+    // Use setEditor directly (not commit) to avoid setting dirty=true on a deleted game
+    setEditor((cur) => {
+      const nextGames = cur.games.filter((g) => g.id !== deletedId);
+      const nextActive = nextGames[0] ?? null;
       return {
-        ...cur,
         games: nextGames,
         activeGameId: nextActive?.id ?? null,
         selectedNodeId: nextActive?.nodes[0]?.id ?? null,
+        expandedGameNodeId: undefined,
+        visibleNodeIds: undefined,
       };
     });
+    setHistory({ past: [], future: [] });
     setDirty(false);
-    setStatus('Jeu supprimé');
+    setStatus('Jeu supprimé ✓');
   };
 
   const addNode = (kind: EditorNodeKind, pos?: { x: number; y: number }): string | null => {

@@ -21,23 +21,26 @@ export default function EditorTilesViewport({
   const tilesRef = useRef<TileState[]>([]);
   const materialsRef = useRef<THREE.MeshStandardMaterial[]>([]);
   const mirrorMaterialsRef = useRef<THREE.MeshStandardMaterial[]>([]);
+  const selectedTileIndexRef = useRef<number | null>(selectedTileIndex ?? null);
+  const onTileClickRef = useRef(onTileClick);
 
-  // Update tiles ref without triggering re-initialization
-  useEffect(() => {
-    const newTiles = Array.isArray(tiles) ? tiles : [];
-    tilesRef.current = newTiles;
-  }, [tiles]);
+  // Update refs on every render — no scene re-init needed
+  tilesRef.current = Array.isArray(tiles) ? tiles : [];
+  selectedTileIndexRef.current = selectedTileIndex ?? null;
+  onTileClickRef.current = onTileClick;
 
-  // Initialize tile count once, then use refs for updates to avoid re-mounting
+  // Stable tile count — computed once from initial tiles length
   const tileCount = useMemo(() => {
     return Array.isArray(tiles) ? Math.max(1, tiles.length) : 9;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Initial tile snapshot used only for Three.js scene creation
   const safeTiles = useMemo(() => {
     const count = tileCount;
     const fallback: TileState[] = Array.from({ length: count }, () => ({ color: '#000000', intensity: 0 }));
     const src = Array.isArray(tiles) ? tiles : fallback;
-    const out = fallback.map((t, i) => {
+    return fallback.map((t, i) => {
       const v = src[i];
       if (!v) return t;
       return {
@@ -45,8 +48,8 @@ export default function EditorTilesViewport({
         intensity: Number.isFinite(v.intensity) ? Math.max(0, Math.min(1, Number(v.intensity))) : 0,
       };
     });
-    return out;
-  }, [tiles, tileCount]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     const mountEl = containerRef.current;
@@ -197,7 +200,7 @@ export default function EditorTilesViewport({
       if (!hit) return;
       const idx = meshes.indexOf(hit.object as any);
       if (idx < 0) return;
-      onTileClick?.(idx);
+      onTileClickRef.current?.(idx);
       isDown = true;
       moved = false;
       lastX = e.clientX;
@@ -228,7 +231,7 @@ export default function EditorTilesViewport({
       const first = hits[0]?.object;
       const tileIndex = typeof first?.userData?.tileIndex === 'number' ? (first.userData.tileIndex as number) : null;
       if (tileIndex === null) return;
-      onTileClick?.(tileIndex);
+      onTileClickRef.current?.(tileIndex);
     };
 
     const onPointerUp = (e: PointerEvent) => {
@@ -297,7 +300,7 @@ export default function EditorTilesViewport({
 
         const mat = edges[i]?.material as THREE.LineBasicMaterial | undefined;
         if (mat) {
-          const selected = typeof selectedTileIndex === 'number' && selectedTileIndex === i;
+          const selected = typeof selectedTileIndexRef.current === 'number' && selectedTileIndexRef.current === i;
           mat.opacity = selected ? 0.95 : 0.55;
           mat.color.set(selected ? 0xffffff : 0x000000);
         }
@@ -330,7 +333,9 @@ export default function EditorTilesViewport({
       const canvas = renderer.domElement;
       if (canvas.parentElement) canvas.parentElement.removeChild(canvas);
     };
-  }, [onTileClick, safeTiles, selectedTileIndex]);
+  // Empty deps: scene is created ONCE. Tile colors/selection update via refs in the animate loop.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return <div ref={containerRef} className="editeur-viewport" aria-hidden />;
 }

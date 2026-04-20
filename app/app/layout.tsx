@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 
 import './globals.css';
 import 'reactflow/dist/style.css';
+import NavigationMenu from './_components/NavigationMenu';
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'),
@@ -46,7 +47,10 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="fr">
-      <body style={{ margin: 0 }}>{children}</body>
+      <body style={{ margin: 0 }}>
+        <NavigationMenu />
+        {children}
+      </body>
     </html>
   );
 }

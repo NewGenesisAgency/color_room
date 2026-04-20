@@ -114,11 +114,132 @@ async function runNode(node: Node, msg: RuntimeMsg, logger: Logger): Promise<Run
     const code = String(d?.code || 'return msg;');
     const context = vm.createContext({ msg: { ...msg } });
     const wrapped = `(function(){\n${code}\n})()`;
-    const script = new vm.Script(wrapped);
-    const result = script.runInContext(context, { timeout: 1000 }) as unknown;
-    if (result === null || result === undefined) return null;
-    if (typeof result === 'object') return result as RuntimeMsg;
-    return { ...msg, payload: result };
+    try {
+      const result = vm.runInContext(wrapped, context, { timeout: 5000 });
+      return { ...msg, payload: result };
+    } catch (e) {
+      logger.error('function-js error', { error: String(e) });
+      return msg;
+    }
+  }
+
+  // Game nodes
+  if (k === 'game_tetris') {
+    logger.info('game_tetris: starting Tetris game', { msg });
+    // Trigger Tetris game via API call to the game runtime
+    try {
+      const res = await fetch('/api/game/tetris/start', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ config: d?.config || {} }),
+      });
+      const payload = await res.json();
+      return { ...msg, payload, statusCode: res.status };
+    } catch {
+      logger.warn('game_tetris: failed to start');
+      return msg;
+    }
+  }
+
+  // Event nodes
+  if (k === 'on_timer') {
+    const interval = Number(d?.interval || 1000);
+    logger.info('on_timer: scheduling timer', { interval });
+    // Timer events are handled by the runtime scheduler
+    return { ...msg, _timerInterval: interval };
+  }
+
+  if (k === 'on_click') {
+    const target = String(d?.target || 'any');
+    logger.info('on_click: registering click handler', { target });
+    // Click events are handled by the UI runtime
+    return { ...msg, _clickTarget: target };
+  }
+
+  // CS150 Colorimeter nodes
+  if (k === 'cs150_connect') {
+    try {
+      const res = await fetch('/api/cs150', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ action: 'connect' }),
+      });
+      const payload = await res.json();
+      logger.info('cs150_connect', { payload });
+      return { ...msg, payload };
+    } catch {
+      logger.warn('cs150_connect: failed');
+      return msg;
+    }
+  }
+
+  if (k === 'cs150_disconnect') {
+    try {
+      const res = await fetch('/api/cs150', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ action: 'disconnect' }),
+      });
+      const payload = await res.json();
+      logger.info('cs150_disconnect', { payload });
+      return { ...msg, payload };
+    } catch {
+      logger.warn('cs150_disconnect: failed');
+      return msg;
+    }
+  }
+
+  if (k === 'cs150_measure') {
+    try {
+      const res = await fetch('/api/cs150', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ action: 'measure' }),
+      });
+      const payload = await res.json();
+      logger.info('cs150_measure', { payload });
+      return { ...msg, payload };
+    } catch {
+      logger.warn('cs150_measure: failed');
+      return msg;
+    }
+  }
+
+  if (k === 'cs150_samples') {
+    try {
+      const res = await fetch('/api/cs150', {
+        method: 'GET',
+        cache: 'no-store',
+      });
+      const payload = await res.json();
+      logger.info('cs150_samples', { payload });
+      return { ...msg, payload };
+    } catch {
+      logger.warn('cs150_samples: failed');
+      return msg;
+    }
+  }
+
+  if (k === 'cs150_status') {
+    try {
+      const res = await fetch('/api/cs150', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ action: 'status' }),
+      });
+      const payload = await res.json();
+      logger.info('cs150_status', { payload });
+      return { ...msg, payload };
+    } catch {
+      logger.warn('cs150_status: failed');
+      return msg;
+    }
+  }
+
+  // Render nodes (fill, pulse, tile) - handled by editeur page preview
+  if (k === 'fill' || k === 'pulse' || k === 'tile') {
+    logger.info(`render node: ${k}`, { params: d?.params });
+    return { ...msg, _renderNode: k, _renderParams: d?.params };
   }
 
   logger.warn(`unknown node kind: ${k}`, { nodeId: node.id });

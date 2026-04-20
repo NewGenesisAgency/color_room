@@ -1,24 +1,40 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import TetrisGame from '@/app/_components/TetrisGame';
+import type { TetrisSnapshot } from '@/app/_components/TetrisGame';
+import NavigationMenu from '@/app/_components/NavigationMenu';
 import {
   Activity,
   AlertTriangle,
   Award,
+  Brain,
   CheckCircle2,
   DoorOpen,
+  Flame,
   Gamepad2,
+  Ghost,
+  Heart,
   Lightbulb,
   LogIn,
   LogOut,
+  Moon,
+  Music,
+  Palette,
   Play,
+  Puzzle,
   RefreshCcw,
+  Rocket,
   Settings2,
+  Snowflake,
   Sparkles,
   Star,
   StopCircle,
+  Sun,
+  Target,
   Thermometer,
   Timer,
+  Trophy,
   XCircle,
   Zap,
 } from 'lucide-react';
@@ -27,22 +43,7 @@ type UserType = 'apprenant' | 'enseignant';
 
 type Niveau = 'college' | 'lycee' | 'universite' | 'grand-public';
 
-type GameId =
-  | 'fluorescence'
-  | 'beginner-control'
-  | 'color-cancel'
-  | 'color-match'
-  | 'white-balance'
-  | 'spectrum-challenge'
-  | 'escape-game'
-  | 'multiplayer-split';
-
-type GameDef = {
-  id: GameId;
-  name: string;
-  description: string;
-  difficulty: number;
-};
+// Types supprimés : les jeux sont maintenant gérés par la base de données
 
 type CustomGameVarValue = number | string | boolean;
 
@@ -135,60 +136,11 @@ type TargetColor = { r: number; g: number; b: number };
 
 type TargetTemp = { name: string; temp: number };
 
-const PLATE_ID_BY_INDEX: number[] = [1, 1, 1, 1, 1, 1, 1, 1, 1];
+const PLATE_ID_BY_INDEX: number[] = Array.from({ length: 42 }, (_, i) => i + 1);
 const INSTRUMENT_PLATE_ID = 1;
 const SPECTRUM_GRAPH_MAX = 100;
 
-const games: GameDef[] = [
-  {
-    id: 'fluorescence',
-    name: 'Découverte par Fluorescence',
-    description: 'Découvrez un texte invisible en activant la fluorescence UV',
-    difficulty: 1,
-  },
-  {
-    id: 'beginner-control',
-    name: 'Niveau débutant — Contrôle complet',
-    description: 'Pilotez la dalle avec 3 curseurs RGB + une intensité (conversion automatique vers les 32 canaux)',
-    difficulty: 1,
-  },
-  {
-    id: 'color-cancel',
-    name: 'Annulation de Couleur',
-    description: 'Faites disparaître un motif en annulant la distinction entre couleurs',
-    difficulty: 2,
-  },
-  {
-    id: 'color-match',
-    name: 'Reproduction de Couleur',
-    description: 'Reproduisez une couleur RGB de référence avec précision',
-    difficulty: 2,
-  },
-  {
-    id: 'white-balance',
-    name: 'Balance des Blancs',
-    description: 'Créez différents types de blanc selon température',
-    difficulty: 3,
-  },
-  {
-    id: 'spectrum-challenge',
-    name: 'Défi Spectral',
-    description: 'Composez un spectre lumineux avec 32 types de LED',
-    difficulty: 3,
-  },
-  {
-    id: 'escape-game',
-    name: 'Escape Game Lumineux',
-    description: 'Résolvez une série d\'énigmes pour vous échapper',
-    difficulty: 4,
-  },
-  {
-    id: 'multiplayer-split',
-    name: 'Multijoueur — Écran scindé',
-    description: 'Deux joueurs (2 postes) doivent afficher 2 couleurs primaires aléatoires en même temps',
-    difficulty: 3,
-  },
-];
+// Les jeux sont maintenant créés dans l'éditeur et chargés depuis la base de données
 
 type MpSeat = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 type MpRgb = { r: number; g: number; b: number };
@@ -615,7 +567,18 @@ function rgbToChannels32(rgb: TargetColor, masterIntensity: number): number[] {
     }
   }
 
-  channels[bestIdx] = clamp100(energy * 100 * scale);
+  const mainValue = clamp100(energy * 100 * scale);
+  channels[bestIdx] = mainValue;
+
+  // Boost intensity with white channels (COULEURS.md canaux 25-28)
+  const whiteBoost = Math.round(mainValue * 0.4);
+  if (whiteBoost > 0) {
+    channels[24] = Math.round(whiteBoost * 0.5);  // Canal 25: Blanc un peu jaunis
+    channels[25] = whiteBoost;                      // Canal 26: Blanc
+    channels[26] = Math.round(whiteBoost * 0.7);   // Canal 27: Blanc un peu moins lumineux
+    channels[27] = Math.round(whiteBoost * 0.4);   // Canal 28: Blanc encore moins lumineux
+  }
+
   return channels;
 }
 
@@ -708,6 +671,7 @@ export default function JeuxPage() {
   const [dbGamesLoading, setDbGamesLoading] = useState(false);
   const [customRun, setCustomRun] = useState<{ gameId: string; name: string; cfg: CustomGameConfigV1 } | null>(null);
   const [hudRun, setHudRun] = useState<{ gameId: string; name: string; cfg: EditorGameConfigV1; showHud: boolean } | null>(null);
+  const hudRunRef = useRef<{ gameId: string; name: string; cfg: EditorGameConfigV1; showHud: boolean } | null>(null);
   const [view, setView] = useState<'login' | 'main'>('login');
   const [userType, setUserType] = useState<UserType>('apprenant');
   const [username, setUsername] = useState<string>('Apprenant1');
@@ -718,11 +682,12 @@ export default function JeuxPage() {
   const [gamesCompleted, setGamesCompleted] = useState<number>(0);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
 
-  const [currentGame, setCurrentGame] = useState<GameId | null>(null);
+  const [currentGame, setCurrentGame] = useState<string | null>(null);
   const [gameActive, setGameActive] = useState<boolean>(false);
+  const [tetrisStandalone, setTetrisStandalone] = useState(false);
 
-  const [plateColors, setPlateColors] = useState<string[]>(Array(9).fill('#000000'));
-  const [plateActive, setPlateActive] = useState<boolean[]>(Array(9).fill(false));
+  const [plateColors, setPlateColors] = useState<string[]>(Array(42).fill('#000000'));
+  const [plateActive, setPlateActive] = useState<boolean[]>(Array(42).fill(false));
 
   const [hardwarePreviewCss, setHardwarePreviewCss] = useState<string>('rgb(0,0,0)');
 
@@ -772,8 +737,48 @@ export default function JeuxPage() {
   const [mpCenterAnimKey, setMpCenterAnimKey] = useState<number>(0);
   const [mpThemeIndex, setMpThemeIndex] = useState<number>(0);
 
+  // Tetrix Light game states
+  const [tetrixGrid, setTetrixGrid] = useState<(string | null)[]>(Array(42).fill(null));
+  const [tetrixScore, setTetrixScore] = useState<number>(0);
+  const [tetrixGameOver, setTetrixGameOver] = useState<boolean>(false);
+  const [tetrixCurrentPiece, setTetrixCurrentPiece] = useState<{ color: string; positions: number[] } | null>(null);
+  const [tetrixNextPiece, setTetrixNextPiece] = useState<{ color: string; shape: 'I' | 'L' | 'T' | 'O' } | null>(null);
+  const [tetrixLevel, setTetrixLevel] = useState<number>(1);
+  const [tetrixLines, setTetrixLines] = useState<number>(0);
+  const tetrixTimerRef = useRef<number>(0);
+  const tetrixColors = ['#00d4ff', '#ff3d71', '#ffc700', '#00ff88', '#b829dd', '#ff5e3a', '#4facfe'];
+
   const [scorePlusAnimKey, setScorePlusAnimKey] = useState<number>(0);
   const [scorePlusValue, setScorePlusValue] = useState<number>(0);
+
+  // Simon game states
+  const [simonActive, setSimonActive] = useState<boolean>(false);
+  const [simonSequence, setSimonSequence] = useState<number[]>([]);
+  const [simonPlayerInput, setSimonPlayerInput] = useState<number[]>([]);
+  const [simonLevel, setSimonLevel] = useState<number>(1);
+  const simonLevelRef = useRef<number>(1); // Track current level for timing calculations
+  const [simonPhase, setSimonPhase] = useState<'showing' | 'input' | 'gameover'>('showing');
+  const [simonLitPlate, setSimonLitPlate] = useState<number | null>(null);
+  const simonTimerRef = useRef<number>(0);
+  const isShowingSequenceRef = useRef<boolean>(false); // Prevent overlapping sequences
+
+  // Other game active states (for game over popup restart)
+  const [spectralActive, setSpectralActive] = useState<boolean>(false);
+  const [chaseActive, setChaseActive] = useState<boolean>(false);
+  const [mpActive, setMpActive] = useState<boolean>(false);
+  const [snakeActive, setSnakeActive] = useState<boolean>(false);
+  const [tetrixActive, setTetrixActive] = useState<boolean>(false);
+
+  const SIMON_PLATES = [0, 5, 36, 41]; // 4 coins: HG, HD, BG, BD
+  const SIMON_COLORS = ['#ff0000', '#00ff00', '#0000ff', '#ffff00']; // R, V, B, J
+
+  // Game Over popup state
+  const [gameOverPopup, setGameOverPopup] = useState<{
+    open: boolean;
+    game: string;
+    score: number;
+    message: string;
+  }>({ open: false, game: '', score: 0, message: '' });
 
   const mpThemes = useMemo(() => {
     return [
@@ -801,6 +806,8 @@ export default function JeuxPage() {
   }, [spectrumHeights]);
 
   const hwTimersRef = useRef<Record<string, number>>({});
+  const hwLastSentRef = useRef<Record<string, number>>({});
+  const tetrisSnapRef = useRef<TetrisSnapshot | null>(null);
 
   const [sceneApplyScope, setSceneApplyScope] = useState<'selected' | 'all'>('selected');
 
@@ -814,10 +821,10 @@ export default function JeuxPage() {
     setPlateActive((prev) => {
       const next = [...prev];
       // Reset all first
-      for (let i = 0; i < 9; i++) next[i] = false;
+      for (let i = 0; i < 42; i++) next[i] = false;
       // Set selected
       for (const i of indexes) {
-        if (i >= 0 && i < 9) next[i] = active;
+        if (i >= 0 && i < 42) next[i] = active;
       }
       return next;
     });
@@ -850,12 +857,17 @@ export default function JeuxPage() {
 
   function scheduleSetCanal(plaqueId: number, canalIndex: number, intensity: number) {
     const key = `${plaqueId}:${canalIndex}`;
+    const clamped = Math.max(0, Math.min(255, Math.round(intensity)));
+    // Skip if value unchanged
+    if (hwLastSentRef.current[key] === clamped) return;
+    hwLastSentRef.current[key] = clamped;
+
     const existing = hwTimersRef.current[key];
     if (existing) window.clearTimeout(existing);
 
     hwTimersRef.current[key] = window.setTimeout(async () => {
       try {
-        await fetch(`/api/supervision/state/plaque/${plaqueId}/cursor/${canalIndex}/${Math.max(0, Math.min(255, Math.round(intensity)))}`,
+        await fetch(`/api/supervision/state/plaque/${plaqueId}/cursor/${canalIndex}/${clamped}`,
           {
             method: 'PUT',
             cache: 'no-store',
@@ -864,22 +876,23 @@ export default function JeuxPage() {
       } catch {
         // ignore
       }
-    }, 60);
+    }, 300);
+  }
+
+  function sendRgbToPlate(rgb: TargetColor, intensity100: number, plateId: number) {
+    const channels32 = rgbToChannels32(rgb, intensity100);
+    for (let i = 0; i < 32; i++) {
+      const v = clamp255(channels32[i] ?? 0);
+      if (v > 0) scheduleSetCanal(plateId, i, v);
+    }
   }
 
   function sendRgbToHardware(rgb: TargetColor) {
     const targets = getTargetPlateIds();
-    const channels32: number[] = [];
+    const channels32 = rgbToChannels32(rgb, masterIntensity);
+
     for (const plaqueId of targets) {
-      for (let canalIndex = 0; canalIndex < 32; canalIndex++) {
-        const wavelength = 380 + canalIndex * 10;
-        let v = 0;
-        if (wavelength < 450) v = rgb.b;
-        else if (wavelength < 550) v = rgb.g;
-        else v = rgb.r;
-        if (!channels32[canalIndex]) channels32[canalIndex] = v;
-        scheduleSetCanal(plaqueId, canalIndex, v);
-      }
+      for (let i = 0; i < 32; i++) scheduleSetCanal(plaqueId, i, clamp255(channels32[i] ?? 0));
     }
 
     setLedValues(() => {
@@ -888,7 +901,7 @@ export default function JeuxPage() {
       return next;
     });
 
-    const preview = channels32ToPreviewRgb255(channels32, 255);
+    const preview = channels32ToPreviewRgb255(channels32, 100);
     const css = rgbToCss(preview);
     setHardwarePreviewCss(css);
     setSelectedPlatesColor(css, true);
@@ -912,6 +925,104 @@ export default function JeuxPage() {
     setSelectedPlatesColor(css, true);
   }
 
+  // Send Kelvin color temperature using specific LED channels from COULEURS.md
+  function sendKelvinToHardware(kelvin: number) {
+    const targets = getTargetPlateIds();
+    const channels32 = Array(32).fill(0);
+
+    switch (kelvin) {
+      case 1900: // Lumière de bougie - Orange clair/chaud (Canaux 19-24: Jaune Orange clair)
+        channels32[18] = 180; // Canal 19: Jaune Orange
+        channels32[19] = 200; // Canal 20: Jaune Orange clair
+        channels32[20] = 220; // Canal 21: Jaune Orange clair
+        channels32[21] = 200; // Canal 22: Jaune Orange clair
+        channels32[22] = 150; // Canal 23: Jaune Orange clair
+        channels32[23] = 100; // Canal 24: Jaune Orange blanc très clair
+        break;
+      case 2700: // Blanc chaud - Jaune Orange doux (Canaux 20-25)
+        channels32[19] = 150; // Canal 20: Jaune Orange clair
+        channels32[20] = 200; // Canal 21: Jaune Orange clair
+        channels32[21] = 220; // Canal 22: Jaune Orange clair
+        channels32[22] = 200; // Canal 23: Jaune Orange clair
+        channels32[23] = 180; // Canal 24: Jaune Orange blanc très clair
+        channels32[24] = 120; // Canal 25: Blanc un peu jaunis
+        break;
+      case 3000: // Blanc doux - Jaune très clair vers blanc (Canaux 23-27)
+        channels32[22] = 120; // Canal 23: Jaune Orange clair
+        channels32[23] = 180; // Canal 24: Jaune Orange blanc très clair
+        channels32[24] = 200; // Canal 25: Blanc un peu jaunis
+        channels32[25] = 220; // Canal 26: Blanc
+        channels32[26] = 180; // Canal 27: Blanc un peu moins lumineux
+        break;
+      case 5000: // Blanc froid - Blanc légèrement bleuté (Canaux 25-28 + touche bleu)
+        channels32[24] = 200; // Canal 25: Blanc
+        channels32[25] = 255; // Canal 26: Blanc pur
+        channels32[26] = 220; // Canal 27: Blanc
+        channels32[27] = 180; // Canal 28: Blanc
+        channels32[4] = 40;   // Canal 5: Bleu turquoise (touche froide)
+        break;
+      case 6500: // Lumière du jour - Blanc pur neutre (Canaux 25-28)
+        channels32[24] = 220; // Canal 25: Blanc
+        channels32[25] = 255; // Canal 26: Blanc pur
+        channels32[26] = 240; // Canal 27: Blanc
+        channels32[27] = 200; // Canal 28: Blanc
+        break;
+      case 10000: // Ciel bleu - Blanc bleu nuancé #ccdcff
+        channels32[3] = 80;   // Canal 4: Bleu marine (très réduit)
+        channels32[4] = 140;  // Canal 5: Bleu turquoise (modéré)
+        channels32[5] = 60;   // Canal 6: Vert clair (adoucir)
+        channels32[25] = 255; // Canal 26: Blanc pur (dominant)
+        channels32[26] = 240; // Canal 27: Blanc
+        channels32[24] = 220; // Canal 25: Blanc
+        channels32[27] = 200; // Canal 28: Blanc
+        break;
+      default:
+        // Default to daylight
+        channels32[25] = 255;
+    }
+
+    // Send to hardware
+    for (const plaqueId of targets) {
+      for (let i = 0; i < 32; i++) {
+        scheduleSetCanal(plaqueId, i, channels32[i]);
+      }
+    }
+
+    setLedValues(() => {
+      const next: Record<number, number> = {};
+      for (let i = 0; i < 32; i++) next[i] = channels32[i];
+      return next;
+    });
+
+    // For Kelvin scenes, use a fixed CSS color that matches the expected output
+    // rather than converting from channels which doesn't reflect the real LED appearance
+    let css: string;
+    switch (kelvin) {
+      case 1900:
+        css = '#ffaa5c';
+        break;
+      case 2700:
+        css = '#ffc88a';
+        break;
+      case 3000:
+        css = '#ffe4c4';
+        break;
+      case 5000:
+        css = '#fff8f0';
+        break;
+      case 6500:
+        css = '#ffffff';
+        break;
+      case 10000:
+        css = '#ccdcff'; // Blanc bleu nuancé
+        break;
+      default:
+        css = '#ffffff';
+    }
+    setHardwarePreviewCss(css);
+    setSelectedPlatesColor(css, true);
+  }
+
   async function blackoutHardware() {
     try {
       await fetch('/api/supervision/', { method: 'PUT', cache: 'no-store' });
@@ -919,6 +1030,97 @@ export default function JeuxPage() {
       // ignore
     }
   }
+
+  function hexToRgb255(hex: string): TargetColor {
+    const m = /^#([0-9a-fA-F]{6})$/.exec(hex);
+    if (!m) return { r: 0, g: 0, b: 0 };
+    const n = parseInt(m[1], 16);
+    return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
+  }
+
+  // Sync Tetris grid → 42 physical LED plates via API (32 canaux/dalle, COULEURS.md)
+  const hasEditorTetris = useMemo(() => {
+    if (!hudRun) return false;
+    const nodes = Array.isArray(hudRun.cfg.nodes) ? hudRun.cfg.nodes : [];
+    return nodes.some((n: any) => n.kind === 'game_tetris' && n.enabled !== false);
+  }, [hudRun]);
+
+  useEffect(() => {
+    if (!gameActive) return;
+    if (!tetrisStandalone && !hasEditorTetris) return;
+
+    function syncTetrisToHardware() {
+      const snap = tetrisSnapRef.current;
+      if (!snap) return;
+      const { grid, piece } = snap;
+      if (!grid || grid.length === 0) return;
+
+      // Merge current piece onto a copy of the grid for display
+      const GRID_ROWS = grid.length;     // 12
+      const GRID_COLS = grid[0]?.length ?? 6;
+      const merged: (string | null)[][] = grid.map(row => [...row]);
+      if (piece) {
+        const { shape, x: px, y: py, color: pColor } = piece;
+        for (let r = 0; r < shape.length; r++) {
+          for (let c = 0; c < shape[r].length; c++) {
+            if (shape[r][c]) {
+              const gr = py + r;
+              const gc = px + c;
+              if (gr >= 0 && gr < GRID_ROWS && gc >= 0 && gc < GRID_COLS) {
+                merged[gr][gc] = pColor;
+              }
+            }
+          }
+        }
+      }
+
+      const TOTAL_PLATES = 42;
+      const HW_COLS = 6;  // 6 columns of plates
+      const HW_ROWS = 7;  // 7 rows of plates
+
+      // Map Tetris rows 1:1 to HW rows by showing the bottom HW_ROWS of the grid
+      // This preserves piece shapes exactly (no compression)
+      const gridOffset = Math.max(0, GRID_ROWS - HW_ROWS); // skip top rows
+
+      const nextColors: string[] = Array(TOTAL_PLATES).fill('#000000');
+      const nextActive: boolean[] = Array(TOTAL_PLATES).fill(false);
+
+      for (let hr = 0; hr < HW_ROWS; hr++) {
+        const gridRow = gridOffset + hr;
+        for (let hc = 0; hc < HW_COLS; hc++) {
+          const tileIdx = hr * HW_COLS + hc;
+          if (tileIdx >= TOTAL_PLATES) continue;
+          const plateId = PLATE_ID_BY_INDEX[tileIdx];
+          if (!plateId) continue;
+
+          const cellColor = merged[gridRow]?.[hc] ?? null;
+
+          if (cellColor) {
+            const rgb = hexToRgb255(cellColor);
+            sendRgbToPlate(rgb, 90, plateId);
+            nextColors[tileIdx] = cellColor;
+            nextActive[tileIdx] = true;
+          } else {
+            for (let ch = 0; ch < 32; ch++) scheduleSetCanal(plateId, ch, 0);
+            nextColors[tileIdx] = '#000000';
+            nextActive[tileIdx] = false;
+          }
+        }
+      }
+
+      // Update UI plate grid to reflect Tetris state
+      setPlateColors(nextColors);
+      setPlateActive(nextActive);
+    }
+
+    syncTetrisToHardware(); // sync initial
+    const iv = setInterval(syncTetrisToHardware, 300); // poll toutes les 300ms pour fluidité
+    return () => {
+      clearInterval(iv);
+      // Blackout quand on quitte le Tetris
+      void blackoutHardware();
+    };
+  }, [gameActive, tetrisStandalone, hasEditorTetris]);
 
   function inferColorTempK(r: number, g: number, b: number): number {
     const denom = Math.max(1, r + g);
@@ -1021,10 +1223,32 @@ export default function JeuxPage() {
 
     const snoozed = window.localStorage.getItem('crg_mp_snooze_session') ?? '';
     if (snoozed) setMpSnoozedSessionId(snoozed);
+
+    // Load user with expiration check
+    const savedUser = window.localStorage.getItem('crg_user');
+    if (savedUser) {
+      try {
+        const parsed = JSON.parse(savedUser);
+        if (parsed.expiresAt && Date.now() > parsed.expiresAt) {
+          window.localStorage.removeItem('crg_user');
+          window.localStorage.removeItem('crg_user_type');
+        } else {
+          setCurrentUser(parsed.name);
+          if (parsed.role) setUserType(parsed.role);
+        }
+      } catch {
+        // ignore parse errors
+      }
+    }
   }, []);
 
   useEffect(() => {
     if (view !== 'main') return;
+    
+    // Ne poll que si un token MP existe OU si le status est actif OU si une session existe
+    const shouldPoll = mpToken || mpStatus === 'active' || mpSessionId;
+    if (!shouldPoll) return;
+    
     let alive = true;
     let timer = 0;
 
@@ -1077,19 +1301,20 @@ export default function JeuxPage() {
             // Only auto-follow if user has previously joined this session
             // Don't auto-start just because a session exists
             if (mpAutoFollow && mpToken && youSeat) {
-              if (currentGame !== 'multiplayer-split') setCurrentGame('multiplayer-split');
+              // Auto-follow multijoueur
               if (!gameActive) setGameActive(true);
             }
           }
         }
 
         if (isMp && status === 'finished') {
-          if (currentGame === 'multiplayer-split' && gameActive && !mpEndPrompt && mpSeat === 1) setMpEndPrompt(true);
+          if (mpStatus === 'active' && gameActive && !mpEndPrompt && mpSeat === 1) setMpEndPrompt(true);
         }
       } catch {
         // ignore
       } finally {
-        const nextDelay = currentGame === 'multiplayer-split' || mpStatus === 'active' ? 350 : 700;
+        // Polling plus espacé : 500ms si actif, 2000ms sinon
+        const nextDelay = mpStatus === 'active' ? 500 : 2000;
         timer = window.setTimeout(tick, nextDelay);
       }
     };
@@ -1099,7 +1324,7 @@ export default function JeuxPage() {
       alive = false;
       if (timer) window.clearTimeout(timer);
     };
-  }, [view, mpToken, currentGame, gameActive, mpSnoozedSessionId]);
+  }, [view, mpToken, mpStatus, mpSessionId, currentGame, gameActive, mpSnoozedSessionId]);
 
   useEffect(() => {
     if (view !== 'main') return;
@@ -1116,7 +1341,8 @@ export default function JeuxPage() {
         if (alive) setDbGames(json.games);
       } finally {
         if (alive) {
-          timer = window.setTimeout(tick, 30000);
+          // Polling DB réduit : 60s au lieu de 30s
+          timer = window.setTimeout(tick, 60000);
         }
       }
     };
@@ -1129,6 +1355,9 @@ export default function JeuxPage() {
   }, [view]);
 
   useEffect(() => {
+    // Ne poll les instruments que si un jeu est actif
+    if (!gameActive) return;
+    
     let stopped = false;
     let timer = 0;
 
@@ -1181,7 +1410,8 @@ export default function JeuxPage() {
         apiLatency,
       });
 
-      timer = window.setTimeout(poll, 1500);
+      // Polling instruments réduit : 2500ms au lieu de 1500ms
+      timer = window.setTimeout(poll, 2500);
     };
 
     void poll();
@@ -1189,7 +1419,7 @@ export default function JeuxPage() {
       stopped = true;
       if (timer) window.clearTimeout(timer);
     };
-  }, []);
+  }, [gameActive]);
 
   useEffect(() => {
     if (!gameActive) return;
@@ -1262,6 +1492,38 @@ export default function JeuxPage() {
 
     void fetchCurrentColors();
   }, [gameActive, currentGame]);
+
+  // Tetrix keyboard controls
+  useEffect(() => {
+    if (!gameActive || currentGame !== 'tetrix-light') return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (tetrixGameOver) return;
+      
+      switch (e.key) {
+        case 'ArrowLeft':
+          e.preventDefault();
+          moveTetrixPiece('left');
+          break;
+        case 'ArrowRight':
+          e.preventDefault();
+          moveTetrixPiece('right');
+          break;
+        case 'ArrowDown':
+          e.preventDefault();
+          moveTetrixPiece('down');
+          break;
+        case 'ArrowUp':
+        case ' ':
+          e.preventDefault();
+          rotateTetrixPiece();
+          break;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [gameActive, currentGame, tetrixGameOver, tetrixCurrentPiece, tetrixGrid]);
 
   async function ensureMpJoined(name?: string): Promise<{ token: string; seat: MpSeat } | null> {
     if (mpToken && mpSeat != null && mpSeat >= 1 && mpSeat <= 8) return { token: mpToken, seat: mpSeat };
@@ -1378,8 +1640,8 @@ export default function JeuxPage() {
   }
 
   function setAllPlates(color: string, active = true) {
-    setPlateColors(Array(9).fill(color));
-    setPlateActive(Array(9).fill(active));
+    setPlateColors(Array(42).fill(color));
+    setPlateActive(Array(42).fill(active));
   }
 
   const hudGraphRunRef = useRef<{ timers: number[]; stop: boolean }>({ timers: [], stop: false });
@@ -1390,12 +1652,16 @@ export default function JeuxPage() {
     hudGraphRunRef.current.timers = [];
   };
 
+  // Keep ref in sync so runHudGraphFrom can access the latest cfg without stale closure
+  hudRunRef.current = hudRun;
+
   const runHudGraphFrom = (startNodeId: string) => {
-    if (!hudRun?.cfg) return;
+    const run = hudRunRef.current;
+    if (!run?.cfg) return;
     stopHudGraph();
     hudGraphRunRef.current.stop = false;
 
-    const g = buildGraph(hudRun.cfg);
+    const g = buildGraph(run.cfg);
     const start = g.byId.get(String(startNodeId));
     if (!start || start.enabled === false) return;
 
@@ -1420,18 +1686,24 @@ export default function JeuxPage() {
         if (mask === 'all') {
           setAllPlates(color, intensity > 0);
         } else if (mask === 'border' || mask === 'borders') {
+          // Border = first/last row or first/last column in 6x7 grid
+          const isBorder = (idx: number) => {
+            const row = Math.floor(idx / 6);
+            const col = idx % 6;
+            return row === 0 || row === 6 || col === 0 || col === 5;
+          };
           setPlateColors((prev) => {
             const next = [...prev];
-            for (let i = 0; i < 9; i++) {
-              if (i === 4) continue;
+            for (let i = 0; i < 42; i++) {
+              if (!isBorder(i)) continue;
               next[i] = color;
             }
             return next;
           });
           setPlateActive((prev) => {
             const next = [...prev];
-            for (let i = 0; i < 9; i++) {
-              if (i === 4) continue;
+            for (let i = 0; i < 42; i++) {
+              if (!isBorder(i)) continue;
               next[i] = intensity > 0;
             }
             return next;
@@ -1442,7 +1714,7 @@ export default function JeuxPage() {
       }
 
       if (node.kind === 'tile') {
-        const tileIndex = Math.max(0, Math.min(8, Math.round(getNum(params, 'tileIndex', 0))));
+        const tileIndex = Math.max(0, Math.min(41, Math.round(getNum(params, 'tileIndex', 0))));
         const color = getColor(params, 'color', '#4361ee');
         const intensity = intensityToMasterPercent(params.intensity, masterIntensity);
         setMasterIntensity(intensity);
@@ -1454,7 +1726,7 @@ export default function JeuxPage() {
         const targetColor = getColor(params, 'targetColor', getColor(params, 'color', '#ff2aa6'));
         const speed = Math.max(0.01, getNum(params, 'speed', 1));
         const phase = getNum(params, 'phase', 0);
-        const t01 = Math.max(0, Math.min(1, 0.5 + 0.5 * Math.sin(tSeconds * speed + phase)));
+        const t01 = Math.max(0, Math.min(1, 0.5 + 0.5 * Math.sin(tSeconds * speed * 2 * Math.PI + phase)));
 
         const fromIntensity = Math.max(0, Math.min(1, getNum(params, 'fromIntensity', 0.15)));
         const toIntensity = Math.max(0, Math.min(1, getNum(params, 'toIntensity', 0.8)));
@@ -1507,8 +1779,8 @@ export default function JeuxPage() {
   };
 
   function resetScene() {
-    setPlateColors(Array(9).fill('#000000'));
-    setPlateActive(Array(9).fill(false));
+    setPlateColors(Array(42).fill('#000000'));
+    setPlateActive(Array(42).fill(false));
     setLedValues({});
     setMasterIntensity(80);
     setBeginnerRgb({ r: 0, g: 0, b: 0 });
@@ -1522,14 +1794,22 @@ export default function JeuxPage() {
       return;
     }
 
-    setCurrentUser(username.trim());
+    const trimmedUsername = username.trim();
+    setCurrentUser(trimmedUsername);
     if (typeof window !== 'undefined') {
       window.localStorage.setItem('crg_user_type', userType);
+      // Save user with 30-day expiration
+      const userData = {
+        name: trimmedUsername,
+        role: userType,
+        expiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000, // 30 days
+      };
+      window.localStorage.setItem('crg_user', JSON.stringify(userData));
     }
     setView('main');
     setScore(0);
     setGamesCompleted(0);
-    updateLeaderboard(0, niveau, username.trim());
+    updateLeaderboard(0, niveau, trimmedUsername);
   }
 
   function logout() {
@@ -1539,6 +1819,7 @@ export default function JeuxPage() {
     setCurrentGame(null);
     if (typeof window !== 'undefined') {
       window.localStorage.removeItem('crg_user_type');
+      window.localStorage.removeItem('crg_user');
     }
     setScore(0);
     setGamesCompleted(0);
@@ -1564,7 +1845,9 @@ export default function JeuxPage() {
     }
 
     const showHud = Boolean(cfg.ui && Array.isArray(cfg.ui.widgets) && cfg.ui.widgets.length > 0);
-    setHudRun({ gameId: game.id, name: game.name, cfg, showHud });
+    const newRun = { gameId: game.id, name: game.name, cfg, showHud };
+    hudRunRef.current = newRun;
+    setHudRun(newRun);
     setCustomRun(null);
     setCurrentGame(null);
     setGameActive(true);
@@ -1575,7 +1858,8 @@ export default function JeuxPage() {
       const g = buildGraph(cfg);
       const begin = g.nodes.find((n) => n.kind === 'event_begin' && n.enabled !== false);
       if (begin?.id) {
-        setTimeout(() => runHudGraphFrom(String(begin.id)), 0);
+        // hudRunRef.current is already set above, so runHudGraphFrom works immediately
+        runHudGraphFrom(String(begin.id));
       }
     } catch {
       // ignore
@@ -1589,14 +1873,16 @@ export default function JeuxPage() {
     });
   }
 
-  function selectGame(id: GameId) {
-    setCurrentGame(id);
-    const game = games.find((g) => g.id === id);
-    if (game) setMessage(`Jeu sélectionné: ${game.name}. Cliquez sur "Démarrer le Jeu".`);
-  }
+  // Fonction selectGame supprimée : les jeux sont lancés directement depuis la DB
+
+  function startSpectralChallenge() { setSpectralActive(true); }
+  function startChaseGame() { setChaseActive(true); }
+  function startMatchPairGame() { setMpActive(true); }
+  function startSnakeGame() { setSnakeActive(true); }
 
   function stopGame() {
-    if (currentGame === 'multiplayer-split' && gameActive) {
+    // Arrêter le jeu multijoueur si actif
+    if (mpStatus === 'active') {
       if (mpSeat !== 1) {
         setMessage('Seul le joueur 1 peut arrêter la partie multijoueur.');
         return;
@@ -1610,6 +1896,8 @@ export default function JeuxPage() {
     setGameActive(false);
     setCustomRun(null);
     setHudRun(null);
+    setTetrisStandalone(false);
+    setSimonActive(false);
     setSecretRevealed(false);
     setTargetColor(null);
     setTargetTemp(null);
@@ -1619,6 +1907,8 @@ export default function JeuxPage() {
     setMessage('Jeu arrêté.');
     resetScene();
     stopHudGraph();
+    stopTetrixGame();
+    stopSimonGame();
   }
 
   function startGame() {
@@ -1635,68 +1925,18 @@ export default function JeuxPage() {
     }
 
     setGameActive(true);
+    setMessage('Jeu démarré !');
+    resetScene();
 
-    if (currentGame === 'fluorescence') {
-      setSecretRevealed(false);
-      setMessage('Activez l\'éclairage UV pour révéler le message secret.');
-      resetScene();
+    // Les jeux sont maintenant gérés par la DB (custom ou editor)
+    if (customRun || hudRun) {
       return;
     }
 
-    if (currentGame === 'beginner-control') {
-      setMessage('Pilotez la dalle en RGB + intensité (conversion automatique vers les 32 canaux). Cliquez sur une dalle (P1..P9) pour choisir la/les plaques à contrôler.');
-      resetScene();
-      setAllPlates('rgb(0,0,0)', true);
-      return;
-    }
+    // Tous les jeux sont désormais créés dans l'éditeur
 
-    if (currentGame === 'color-cancel') {
-      setMessage('Faites disparaître le motif en ajustant l\'éclairage.');
-      const pattern = new Set([0, 2, 4, 6, 8]);
-      for (let i = 0; i < 9; i++) {
-        setPlateColor(i, pattern.has(i) ? '#ff0000' : '#00ff00', true);
-      }
-      setCancelColor({ r: 0, g: 0 });
-      return;
-    }
-
-    if (currentGame === 'color-match') {
-      const t: TargetColor = {
-        r: Math.floor(Math.random() * 256),
-        g: Math.floor(Math.random() * 256),
-        b: Math.floor(Math.random() * 256),
-      };
-      setTargetColor(t);
-      setUserColor({ r: 0, g: 0, b: 0 });
-      setMessage('Reproduisez la couleur de référence avec les curseurs RGB.');
-      resetScene();
-      for (let i = 0; i < 3; i++) setPlateColor(i, rgbToCss(t), true);
-      for (let i = 3; i < 6; i++) setPlateColor(i, 'rgb(0,0,0)', true);
-      return;
-    }
-
-    if (currentGame === 'white-balance') {
-      setMessage('Créez différents types de blanc en ajustant la température.');
-      const targets: TargetTemp[] = [
-        { name: 'Blanc froid (6500K)', temp: 6500 },
-        { name: 'Blanc neutre (5000K)', temp: 5000 },
-        { name: 'Blanc chaud (3000K)', temp: 3000 },
-      ];
-      const pick = targets[Math.floor(Math.random() * targets.length)];
-      setTargetTemp(pick);
-      setCurrentTemp(5000);
-      resetScene();
-      setAllPlates('rgb(255,240,220)', true);
-      return;
-    }
-
-    if (currentGame === 'spectrum-challenge') {
-      setMessage('Composez un spectre lumineux avec les 32 types de LED.');
-      resetScene();
-      return;
-    }
-
-    if (currentGame === 'multiplayer-split') {
+    // Logique multijoueur reste disponible via API
+    if (mpStatus === 'active') {
       setMessage('Multijoueur: rejoins une partie existante ou démarre la session sur ce poste.');
       resetScene();
       setMpEndPrompt(false);
@@ -1726,15 +1966,9 @@ export default function JeuxPage() {
       return;
     }
 
-    if (currentGame === 'escape-game') {
-      setEscapeProgress(0);
-      setEscapeError('');
-      setMessage('Escape Game: Résolvez 3 énigmes lumineuses.');
-      resetScene();
-      // Only select first plate for the escape game (single plate mode)
-      setSelectedPlates([0], true);
-      return;
-    }
+    // Escape game sera recréé dans l'éditeur
+
+    // Tetrix sera recréé dans l'éditeur
   }
 
   function awardPoints(points: number, text: string) {
@@ -1754,6 +1988,651 @@ export default function JeuxPage() {
   function award(points: number, text: string) {
     awardPoints(points, text);
     setGamesCompleted((v) => v + 1);
+  }
+
+  // Show game over popup with 2 second minimum display time
+  function showGameOverPopup(gameName: string, score: number, message: string) {
+    setGameOverPopup({ open: true, game: gameName, score, message });
+    // Ensure popup stays for at least 2 seconds before allowing close
+    window.setTimeout(() => {
+      // Popup can now be closed (user can click buttons)
+    }, 2000);
+  }
+
+  // Tetrix Light game functions
+  function stopTetrixGame() {
+    if (tetrixTimerRef.current) {
+      window.clearInterval(tetrixTimerRef.current);
+      tetrixTimerRef.current = 0;
+    }
+    setTetrixGrid(Array(42).fill(null));
+    setTetrixScore(0);
+    setTetrixGameOver(false);
+    setTetrixCurrentPiece(null);
+    setTetrixNextPiece(null);
+    setTetrixLevel(1);
+    setTetrixLines(0);
+  }
+
+  function startTetrixGame() {
+    stopTetrixGame();
+    setMessage('Tetrix Light: Alignez 3 dalles de même couleur pour les faire disparaître!');
+    resetScene();
+    setAllPlates('#000000', true);
+
+    // Initialize game
+    setTetrixGrid(Array(42).fill(null));
+    setTetrixScore(0);
+    setTetrixLevel(1);
+    setTetrixLines(0);
+    setTetrixGameOver(false);
+
+    // Spawn first piece
+    spawnTetrixPiece();
+
+    // Start game loop
+    const speed = Math.max(800, 2000 - (tetrixLevel * 200));
+    tetrixTimerRef.current = window.setInterval(() => {
+      gameLoop();
+    }, speed);
+  }
+
+  const TETRIX_COLS = 6;
+  const TETRIX_ROWS = 7;
+
+  function spawnTetrixPiece() {
+    const shapes: ('I' | 'L' | 'T' | 'O')[] = ['I', 'L', 'T', 'O'];
+    const shape = shapes[Math.floor(Math.random() * shapes.length)];
+    const color = tetrixColors[Math.floor(Math.random() * tetrixColors.length)];
+
+    // Generate initial positions based on shape (6-wide grid)
+    let positions: number[] = [];
+    switch (shape) {
+      case 'I': // Horizontal 4-wide at top, centered
+        positions = [1, 2, 3, 4];
+        break;
+      case 'L': // L shape: vertical 3 + 1 right
+        positions = [1, 7, 13, 14]; // col1 rows 0-2, then col2 row2
+        break;
+      case 'T': // T shape: 3 wide + 1 below center
+        positions = [1, 2, 3, 8]; // row0 cols 1-3, row1 col2
+        break;
+      case 'O': // 2x2 square
+        positions = [2, 3, 8, 9]; // row0 cols 2-3, row1 cols 2-3
+        break;
+    }
+
+    const piece = { color, positions };
+    setTetrixCurrentPiece(piece);
+    setTetrixNextPiece({ color: tetrixColors[Math.floor(Math.random() * tetrixColors.length)], shape });
+    updateTetrixDisplay(piece, tetrixGrid);
+  }
+
+  function updateTetrixDisplay(piece: { color: string; positions: number[] } | null, grid: (string | null)[]) {
+    const displayColors: string[] = Array(42).fill('#000000');
+
+    // Draw locked pieces from grid
+    for (let i = 0; i < 42; i++) {
+      const gridValue = grid[i];
+      if (gridValue !== null && gridValue !== undefined) {
+        displayColors[i] = gridValue;
+      }
+    }
+
+    // Draw current piece
+    if (piece) {
+      for (const pos of piece.positions) {
+        if (pos >= 0 && pos < 42) {
+          displayColors[pos] = piece.color;
+        }
+      }
+    }
+
+    // Update visual plates + send to hardware API
+    const nextColors: string[] = [];
+    const nextActive: boolean[] = [];
+    for (let i = 0; i < 42; i++) {
+      const color = displayColors[i];
+      const isOn = color !== '#000000';
+      nextColors.push(color);
+      nextActive.push(isOn);
+
+      const plateId = PLATE_ID_BY_INDEX[i];
+      if (!plateId) continue;
+      if (isOn) {
+        const rgb = hexToRgb255(color);
+        sendRgbToPlate(rgb, 80, plateId);
+      } else {
+        for (let ch = 0; ch < 32; ch++) scheduleSetCanal(plateId, ch, 0);
+      }
+    }
+    setPlateColors(nextColors);
+    setPlateActive(nextActive);
+  }
+
+  function moveTetrixPiece(direction: 'left' | 'right' | 'down') {
+    if (!tetrixCurrentPiece || tetrixGameOver) return;
+
+    const newPositions = tetrixCurrentPiece.positions.map((pos) => {
+      switch (direction) {
+        case 'left':
+          return pos % TETRIX_COLS === 0 ? pos : pos - 1;
+        case 'right':
+          return pos % TETRIX_COLS === (TETRIX_COLS - 1) ? pos : pos + 1;
+        case 'down':
+          return pos + TETRIX_COLS;
+        default:
+          return pos;
+      }
+    });
+
+    // Check collision
+    if (isValidMove(newPositions, tetrixGrid)) {
+      const newPiece = { ...tetrixCurrentPiece, positions: newPositions };
+      setTetrixCurrentPiece(newPiece);
+      updateTetrixDisplay(newPiece, tetrixGrid);
+    } else if (direction === 'down') {
+      lockTetrixPiece();
+    }
+  }
+
+  function rotateTetrixPiece() {
+    if (!tetrixCurrentPiece || tetrixGameOver) return;
+
+    const pivot = tetrixCurrentPiece.positions[0];
+    const pivotRow = Math.floor(pivot / TETRIX_COLS);
+    const pivotCol = pivot % TETRIX_COLS;
+
+    const newPositions = tetrixCurrentPiece.positions.map((pos) => {
+      const row = Math.floor(pos / TETRIX_COLS);
+      const col = pos % TETRIX_COLS;
+      // Rotate 90° clockwise around pivot
+      const newRow = pivotRow + (col - pivotCol);
+      const newCol = pivotCol - (row - pivotRow);
+      return newRow * TETRIX_COLS + newCol;
+    });
+
+    if (isValidMove(newPositions, tetrixGrid)) {
+      const newPiece = { ...tetrixCurrentPiece, positions: newPositions };
+      setTetrixCurrentPiece(newPiece);
+      updateTetrixDisplay(newPiece, tetrixGrid);
+    }
+  }
+
+  function isValidMove(positions: number[], grid: (string | null)[]): boolean {
+    for (const pos of positions) {
+      if (pos < 0 || pos >= TETRIX_COLS * TETRIX_ROWS) return false;
+      if (grid[pos]) return false;
+    }
+    return true;
+  }
+
+  function lockTetrixPiece() {
+    if (!tetrixCurrentPiece) return;
+
+    const newGrid = [...tetrixGrid];
+    for (const pos of tetrixCurrentPiece.positions) {
+      newGrid[pos] = tetrixCurrentPiece.color;
+    }
+
+    // Check for completed rows (bottom-up so gravity works)
+    let linesCleared = 0;
+    for (let row = TETRIX_ROWS - 1; row >= 0; row--) {
+      const rowStart = row * TETRIX_COLS;
+      let isComplete = true;
+      for (let col = 0; col < TETRIX_COLS; col++) {
+        if (!newGrid[rowStart + col]) { isComplete = false; break; }
+      }
+
+      if (isComplete) {
+        // Shift everything above down by one row
+        for (let r = row; r > 0; r--) {
+          for (let c = 0; c < TETRIX_COLS; c++) {
+            newGrid[r * TETRIX_COLS + c] = newGrid[(r - 1) * TETRIX_COLS + c];
+          }
+        }
+        // Clear top row
+        for (let c = 0; c < TETRIX_COLS; c++) newGrid[c] = null;
+        linesCleared++;
+        row++; // re-check this row since rows shifted down
+      }
+    }
+
+    // Update score
+    if (linesCleared > 0) {
+      const points = linesCleared * 100 * tetrixLevel;
+      setTetrixScore((s) => s + points);
+      setTetrixLines((l) => {
+        const newLines = l + linesCleared;
+        if (newLines >= tetrixLevel * 5) {
+          setTetrixLevel((lvl) => lvl + 1);
+        }
+        return newLines;
+      });
+    }
+
+    setTetrixGrid(newGrid);
+
+    // Check game over (top row has locked pieces)
+    const topRowHasPieces = newGrid.slice(0, TETRIX_COLS).some(c => c !== null);
+    if (topRowHasPieces) {
+      setTetrixGameOver(true);
+      if (tetrixTimerRef.current) {
+        window.clearInterval(tetrixTimerRef.current);
+        tetrixTimerRef.current = 0;
+      }
+      const finalScore = tetrixScore + (linesCleared * 100 * tetrixLevel);
+      setMessage(`Game Over! Score: ${finalScore}`);
+      awardPoints(finalScore, `Tetrix terminé! Score: ${finalScore}`);
+      showGameOverPopup('Tetrix Light', finalScore, `Niveau ${tetrixLevel} atteint`);
+      return;
+    }
+
+    // Spawn new piece
+    spawnTetrixPiece();
+  }
+
+  function gameLoop() {
+    moveTetrixPiece('down');
+  }
+
+  // Simon game functions - ENHANCED VERSION
+  const [simonScore, setSimonScore] = useState<number>(0);
+  const [simonHighScore, setSimonHighScore] = useState<number>(0);
+  const [simonStrictMode, setSimonStrictMode] = useState<boolean>(false);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+
+  // Sound frequencies for each color (red, green, blue, yellow)
+  const SIMON_FREQUENCIES = [261.63, 329.63, 392.00, 523.25]; // C4, E4, G4, C5
+
+  function initAudio() {
+    if (!audioCtxRef.current) {
+      audioCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+    }
+  }
+
+  function playTone(frequency: number, duration: number) {
+    initAudio();
+    const ctx = audioCtxRef.current;
+    if (!ctx) return;
+    
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    
+    osc.frequency.value = frequency;
+    osc.type = 'sine';
+    
+    gain.gain.setValueAtTime(0.3, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + duration);
+    
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + duration);
+  }
+
+  function playErrorSound() {
+    initAudio();
+    const ctx = audioCtxRef.current;
+    if (!ctx) return;
+    
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    
+    osc.frequency.setValueAtTime(150, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(80, ctx.currentTime + 0.3);
+    osc.type = 'sawtooth';
+    
+    gain.gain.setValueAtTime(0.4, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
+    
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.3);
+  }
+
+  function playWinSound() {
+    initAudio();
+    const ctx = audioCtxRef.current;
+    if (!ctx) return;
+    
+    const freqs = [523.25, 659.25, 783.99, 1046.50];
+    freqs.forEach((f, i) => {
+      setTimeout(() => playTone(f, 0.15), i * 100);
+    });
+  }
+
+  function stopSimonGame() {
+    if (simonTimerRef.current) {
+      window.clearTimeout(simonTimerRef.current);
+      simonTimerRef.current = 0;
+    }
+    setSimonActive(false);
+    setSimonSequence([]);
+    setSimonPlayerInput([]);
+    setSimonLevel(1);
+    setSimonPhase('showing');
+    setSimonLitPlate(null);
+    setSimonScore(0);
+  }
+
+  async function animateAllPlates(color: string, duration: number, times: number) {
+    for (let t = 0; t < times; t++) {
+      // Light up
+      setPlateColors(Array(42).fill(color));
+      setPlateActive(Array(42).fill(true));
+      
+      // Light up hardware - batch all 42 plates in one request
+      const rgb = hexToRgb255(color);
+      const platesData = PLATE_ID_BY_INDEX.map((plateId) => ({
+        plateId,
+        rgb,
+        intensity: 80,
+      }));
+      sendColorsToPlates(platesData);
+      
+      await new Promise(r => setTimeout(r, duration));
+      
+      // Turn off
+      setPlateColors(Array(42).fill('#000000'));
+      setPlateActive(Array(42).fill(true));
+      
+      // Turn off hardware - batch all 42 plates in one request
+      const offPlatesData = PLATE_ID_BY_INDEX.map((plateId) => ({
+        plateId,
+        rgb: { r: 0, g: 0, b: 0 },
+        intensity: 0,
+      }));
+      sendColorsToPlates(offPlatesData);
+      
+      await new Promise(r => setTimeout(r, duration / 2));
+    }
+  }
+
+  async function startSimonGame() {
+    // Clear any existing timers
+    if (simonTimerRef.current) {
+      window.clearTimeout(simonTimerRef.current);
+      simonTimerRef.current = 0;
+    }
+    isShowingSequenceRef.current = false;
+    
+    stopSimonGame();
+    setSimonActive(true);
+    setSimonSequence([]);
+    setSimonPlayerInput([]);
+    setSimonLevel(1);
+    simonLevelRef.current = 1; // Reset level ref
+    setSimonScore(0);
+    setSimonPhase('showing');
+    setMessage('Simon: Préparez-vous!');
+    resetScene();
+    
+    // Countdown animation with all plates
+    await animateAllPlates('#ffffff', 200, 3);
+    
+    // Colorful startup sequence
+    for (let i = 0; i < 4; i++) {
+      const plateIdx = SIMON_PLATES[i];
+      const color = SIMON_COLORS[i];
+      const plateId = PLATE_ID_BY_INDEX[plateIdx] ?? 1;
+      
+      setPlateColor(plateIdx, color, true);
+      void sendColorToPlateImmediate(hexToRgb255(color), 90, plateId);
+      playTone(SIMON_FREQUENCIES[i], 200);
+      
+      await new Promise(r => setTimeout(r, 200));
+      
+      setPlateColor(plateIdx, '#000000', true);
+      void turnOffPlateImmediate(plateId);
+      await new Promise(r => setTimeout(r, 100));
+    }
+    
+    setMessage('Simon: Mémorisez la séquence!');
+    
+    // Start first level after delay
+    window.setTimeout(() => {
+      simonNextLevel();
+    }, 800);
+  }
+
+  function simonNextLevel() {
+    // Clear any pending timers first
+    if (simonTimerRef.current) {
+      window.clearTimeout(simonTimerRef.current);
+      simonTimerRef.current = 0;
+    }
+    
+    setSimonSequence(prev => {
+      const nextPlate = Math.floor(Math.random() * 4);
+      const newSequence = [...prev, nextPlate];
+      
+      // Small delay before showing sequence
+      window.setTimeout(() => {
+        setSimonPlayerInput([]);
+        setSimonPhase('showing');
+        setMessage(`Niveau ${simonLevelRef.current + 1} - Observez ${newSequence.length} coups...`);
+        
+        // Show sequence after brief pause
+        window.setTimeout(() => {
+          showSimonSequence(newSequence, 0);
+        }, 400);
+      }, 300);
+      
+      return newSequence;
+    });
+    
+    // Update level ref immediately for timing calculations
+    setSimonLevel(prev => {
+      const newLevel = prev + 1;
+      simonLevelRef.current = newLevel;
+      return newLevel;
+    });
+  }
+
+  // Send color to a specific plate with batch API - OPTIMIZED: only non-zero channels
+  function sendColorToPlateImmediate(rgb: TargetColor, intensity100: number, plateId: number) {
+    const channels32 = rgbToChannels32(rgb, intensity100);
+    
+    // Only send channels with non-zero values (typically ~5 instead of 32)
+    const channels = channels32
+      .map((v, i) => ({ index: i, value: clamp255(v ?? 0) }))
+      .filter(ch => ch.value > 0);
+
+    // Fire-and-forget with short timeout for games
+    fetch('/api/supervision/batch', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ plateId, channels }),
+      cache: 'no-store',
+    }).catch(() => {});
+  }
+
+  // Turn off a specific plate completely using batch API
+  function turnOffPlateImmediate(plateId: number) {
+    const channels = Array.from({ length: 32 }, (_, i) => ({
+      index: i,
+      value: 0,
+    }));
+
+    // Fire-and-forget
+    fetch('/api/supervision/batch', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ plateId, channels }),
+      cache: 'no-store',
+    }).catch(() => {});
+  }
+
+  // Send colors to multiple plates at once (optimized for animations)
+  function sendColorsToPlates(platesData: { plateId: number; rgb: TargetColor; intensity: number }[]) {
+    const plates = platesData.map(({ plateId, rgb, intensity }) => {
+      const channels32 = rgbToChannels32(rgb, intensity);
+      const channels = channels32
+        .map((v, i) => ({ index: i, value: clamp255(v ?? 0) }))
+        .filter(ch => ch.value > 0);
+      return { plateId, channels };
+    });
+
+    // Fire-and-forget with fast mode for games
+    fetch('/api/supervision/batch', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ plates, fast: true }),
+      cache: 'no-store',
+    }).catch(() => {});
+  }
+
+  // Exponential difficulty: base * (rate ^ level)
+  // Level 1: 600ms, Level 5: ~350ms, Level 10: ~200ms, Level 15: ~100ms
+  function getSimonFlashDuration(level: number): number {
+    const base = 600;
+    const rate = 0.88; // 12% reduction per level
+    return Math.max(150, Math.round(base * Math.pow(rate, level - 1)));
+  }
+
+  function getSimonPauseDuration(level: number): number {
+    const base = 350;
+    const rate = 0.85; // 15% reduction per level
+    return Math.max(100, Math.round(base * Math.pow(rate, level - 1)));
+  }
+
+  function showSimonSequence(sequence: number[], index: number) {
+    // Prevent multiple overlapping sequences
+    if (isShowingSequenceRef.current && index === 0) {
+      console.log('[Simon] Sequence already playing, ignoring duplicate call');
+      return;
+    }
+    
+    if (index === 0) {
+      isShowingSequenceRef.current = true;
+    }
+    
+    if (index >= sequence.length) {
+      isShowingSequenceRef.current = false;
+      setSimonPhase('input');
+      setMessage(`Niveau ${simonLevelRef.current} - À vous! (${sequence.length} coups)`);
+      return;
+    }
+
+    const plateIdx = SIMON_PLATES[sequence[index]];
+    const color = SIMON_COLORS[sequence[index]];
+    const plateId = PLATE_ID_BY_INDEX[plateIdx] ?? 1;
+    const rgb = hexToRgb255(color);
+    
+    // Use ref to get current level (avoids stale closure)
+    const currentLevel = simonLevelRef.current;
+
+    // Light up plate with animation
+    setSimonLitPlate(plateIdx);
+    setPlateColor(plateIdx, color, true);
+    
+    // Play sound
+    playTone(SIMON_FREQUENCIES[sequence[index]], getSimonFlashDuration(currentLevel));
+    
+    // Send to hardware immediately
+    void sendColorToPlateImmediate(rgb, 100, plateId);
+
+    // Turn off after delay - exponential difficulty
+    const flashDuration = getSimonFlashDuration(currentLevel);
+    
+    simonTimerRef.current = window.setTimeout(() => {
+      setSimonLitPlate(null);
+      setPlateColor(plateIdx, '#000000', true);
+      void turnOffPlateImmediate(plateId);
+
+      // Pause before next flash - exponential difficulty
+      const pauseDuration = getSimonPauseDuration(currentLevel);
+      
+      simonTimerRef.current = window.setTimeout(() => {
+        showSimonSequence(sequence, index + 1);
+      }, pauseDuration);
+    }, flashDuration);
+  }
+
+  async function handleSimonPlateClick(plateIndex: number) {
+    if (!simonActive || simonPhase !== 'input') return;
+
+    const simonPlateIndex = SIMON_PLATES.indexOf(plateIndex);
+    if (simonPlateIndex === -1) return;
+
+    const color = SIMON_COLORS[simonPlateIndex];
+    const plateId = PLATE_ID_BY_INDEX[plateIndex] ?? 1;
+    const rgb = hexToRgb255(color);
+
+    // Visual feedback - brighter and longer
+    setPlateColor(plateIndex, color, true);
+    void sendColorToPlateImmediate(rgb, 100, plateId);
+    playTone(SIMON_FREQUENCIES[simonPlateIndex], 300);
+
+    // Keep lit for feedback
+    await new Promise(r => setTimeout(r, 250));
+    
+    setPlateColor(plateIndex, '#000000', true);
+    void turnOffPlateImmediate(plateId);
+
+    // Check input
+    const newInput = [...simonPlayerInput, simonPlateIndex];
+    setSimonPlayerInput(newInput);
+
+    // Validate against sequence
+    const expected = simonSequence[newInput.length - 1];
+    if (simonPlateIndex !== expected) {
+      // Wrong! Play error sound
+      playErrorSound();
+      
+      // Flash red on wrong plate
+      setPlateColor(plateIndex, '#ff0000', true);
+      void sendColorToPlateImmediate({ r: 255, g: 0, b: 0 }, 100, plateId);
+      
+      await new Promise(r => setTimeout(r, 300));
+      void turnOffPlateImmediate(plateId);
+      
+      // Show game over animation
+      await animateAllPlates('#ff0000', 200, 2);
+      
+      setSimonPhase('gameover');
+      const finalScore = simonScore + (simonLevel * 10);
+      setMessage(`Game Over! Score: ${finalScore}`);
+      awardPoints(finalScore, `Simon terminé! Niveau ${simonLevel} — +${finalScore} points.`);
+      
+      // Update high score
+      if (finalScore > simonHighScore) {
+        setSimonHighScore(finalScore);
+      }
+      
+      // Show game over popup
+      showGameOverPopup('Simon Memory', finalScore, `Niveau ${simonLevel} atteint`);
+      return;
+    }
+
+    // Correct input - add points
+    setSimonScore(prev => prev + 5);
+
+    // Check if sequence complete
+    if (newInput.length === simonSequence.length) {
+      // Level complete! Play win sound
+      playWinSound();
+      
+      // Success animation
+      await animateAllPlates('#00ff00', 150, 2);
+      
+      const bonus = simonLevel * 15;
+      const newScore = simonScore + bonus + (simonLevel * 10);
+      setSimonScore(newScore);
+      awardPoints(bonus, `Niveau ${simonLevel} réussi! +${bonus} points.`);
+      
+      setSimonLevel(simonLevel + 1);
+      setMessage(`Niveau ${simonLevel + 1}...`);
+
+      // Next level after delay
+      window.setTimeout(() => {
+        simonNextLevel();
+      }, 1200);
+    }
   }
 
   function extractRgbFromCss(css: string): { r: number; g: number; b: number } {
@@ -1842,7 +2721,7 @@ export default function JeuxPage() {
     const next = { ...cancelColor, [channel]: value };
     setCancelColor(next);
     const color = `rgb(${next.r}, ${next.g}, 0)`;
-    for (let i = 0; i < 9; i++) setPlateColor(i, color, true);
+    for (let i = 0; i < 42; i++) setPlateColor(i, color, true);
     sendRgbToHardware({ r: next.r, g: next.g, b: 0 });
   }
 
@@ -2033,11 +2912,12 @@ export default function JeuxPage() {
     if (!sceneName) return;
 
     const scenes: Record<string, string> = {
-      daylight: '#ffffff',
-      warmwhite: '#ffebcd',
-      coolwhite: '#e0f0ff',
-      sunset: '#ff6b4a',
-      fluorescent: '#8b00ff',
+      candlelight: '#ff8c00',
+      warmwhite: '#ffaa6b',
+      softwhite: '#ffc58f',
+      coolwhite: '#ffffff',
+      daylight: '#f0f8ff',
+      bluesky: '#cce0ff',
     };
 
     if (sceneName === 'special') {
@@ -2053,7 +2933,7 @@ export default function JeuxPage() {
         '#000000',
       ];
 
-      const targetIndexes = sceneApplyScope === 'all' ? Array.from({ length: 9 }, (_, i) => i) : getTargetPlateIndexes();
+      const targetIndexes = sceneApplyScope === 'all' ? Array.from({ length: 42 }, (_, i) => i) : getTargetPlateIndexes();
       setPlateColors((prev) => {
         const next = [...prev];
         for (const i of targetIndexes) next[i] = pattern[i] ?? '#ffffff';
@@ -2075,15 +2955,22 @@ export default function JeuxPage() {
     else setSelectedPlatesColor(color, true);
     setMessage(`Scène "${sceneName}" chargée.`);
 
-    if (sceneName === 'daylight') sendRgbToHardware({ r: 255, g: 255, b: 255 });
-    else if (sceneName === 'warmwhite') sendRgbToHardware({ r: 255, g: 235, b: 205 });
-    else if (sceneName === 'coolwhite') sendRgbToHardware({ r: 224, g: 240, b: 255 });
-    else if (sceneName === 'sunset') sendRgbToHardware({ r: 255, g: 107, b: 74 });
-    else if (sceneName === 'fluorescent') sendRgbToHardware({ r: 139, g: 0, b: 255 });
+    if (sceneName === 'candlelight') sendKelvinToHardware(1900);
+    else if (sceneName === 'warmwhite') sendKelvinToHardware(2700);
+    else if (sceneName === 'softwhite') sendKelvinToHardware(3000);
+    else if (sceneName === 'coolwhite') sendKelvinToHardware(5000);
+    else if (sceneName === 'daylight') sendKelvinToHardware(6500);
+    else if (sceneName === 'bluesky') sendKelvinToHardware(10000);
     else sendRgbToHardware({ r: 255, g: 255, b: 255 });
   }
 
   function handlePlateClick(index: number) {
+    // Handle Simon game clicks first
+    if (simonActive) {
+      handleSimonPlateClick(index);
+      return;
+    }
+
     if (!gameActive) return;
 
     setPlateActive((prev) => {
@@ -2116,13 +3003,15 @@ export default function JeuxPage() {
     });
   }
 
-  const currentGameDef = useMemo(() => games.find((g) => g.id === currentGame) || null, [currentGame]);
+  // currentGameDef supprimé : les jeux viennent de la DB
 
   return (
     <>
-      <div className="header" style={{ ['--tile-shadow-intensity' as any]: clamp100(masterIntensity) / 100 }}>
-        <h1>ColorRoomGames</h1>
-        <p>Projet BTS CIEL · ENTPE/LTDS · Lycée Édouard Branly · Session 2026</p>
+      {/* Navigation Menu */}
+      <NavigationMenu />
+      <div style={{ padding: '28px 32px', background: '#fff', borderBottom: '1px solid rgba(0,0,0,0.06)', ['--tile-shadow-intensity' as any]: clamp100(masterIntensity) / 100 }}>
+        <h1 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: '#1a1a1a', letterSpacing: '-0.02em' }}>ColorRoomGames</h1>
+        <p style={{ margin: '4px 0 0', fontSize: 13, color: '#999' }}>Projet BTS CIEL · ENTPE/LTDS · Lycée Édouard Branly · Session 2026</p>
       </div>
 
       {view === 'main' && mpJoinPrompt.open ? (
@@ -2334,75 +3223,218 @@ export default function JeuxPage() {
                 <h3>
                   <Gamepad2 size={18} /> Sélection du Jeu
                 </h3>
-                <div className="game-list">
-                  {games.map((g) => (
-                    <div
-                      key={g.id}
-                      className={`game-card ${g.id === currentGame ? 'selected' : ''}`}
-                      onClick={() => selectGame(g.id)}
-                      role="button"
-                      tabIndex={0}
-                    >
-                      <h4>{g.name}</h4>
-                      <p>{g.description}</p>
-                      <div className="stars" aria-label={`Difficulté ${g.difficulty}/4`}>
-                        {Array.from({ length: g.difficulty }).map((_, i) => (
-                          <Star key={i} size={14} fill="currentColor" />
-                        ))}
-                        {Array.from({ length: Math.max(0, 4 - g.difficulty) }).map((_, i) => (
-                          <Star key={`e_${i}`} size={14} />
-                        ))}
-                      </div>
+
+                {/* Tetris Lumière — toujours disponible */}
+                <div
+                  style={{
+                    padding: '18px 20px',
+                    borderRadius: 14,
+                    cursor: 'pointer',
+                    transition: 'all 0.18s ease',
+                    border: tetrisStandalone ? '2px solid #4361ee' : '1px solid rgba(0,0,0,0.08)',
+                    background: tetrisStandalone ? 'rgba(67,97,238,0.04)' : '#fff',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 16,
+                    marginBottom: 12,
+                  }}
+                  onClick={() => {
+                    setTetrisStandalone(true);
+                    setCustomRun(null);
+                    setHudRun(null);
+                    setCurrentGame(null);
+                    setGameActive(true);
+                    setMessage('Tetris Lumière: ← → déplacer, ↑ tourner, Espace drop');
+                  }}
+                  onMouseEnter={(e) => { if (!tetrisStandalone) { (e.currentTarget as HTMLDivElement).style.borderColor = 'rgba(0,0,0,0.18)'; (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-1px)'; (e.currentTarget as HTMLDivElement).style.boxShadow = '0 4px 16px rgba(0,0,0,0.08)'; } }}
+                  onMouseLeave={(e) => { if (!tetrisStandalone) { (e.currentTarget as HTMLDivElement).style.borderColor = 'rgba(0,0,0,0.08)'; (e.currentTarget as HTMLDivElement).style.transform = 'none'; (e.currentTarget as HTMLDivElement).style.boxShadow = 'none'; } }}
+                  role="button"
+                  tabIndex={0}
+                >
+                  <div style={{ width: 44, height: 44, borderRadius: 12, background: 'linear-gradient(135deg, #0a0a1a, #1a1a2e)', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+                    <Gamepad2 size={20} color="#4361ee" />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+                      <h4 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#1a1a1a' }}>Tetris Lumière</h4>
+                      <span style={{ fontSize: 11, fontWeight: 600, color: '#4361ee', background: 'rgba(67,97,238,0.08)', padding: '2px 8px', borderRadius: 6 }}>
+                        Jeu intégré
+                      </span>
                     </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="section">
-                <h3>
-                  <Gamepad2 size={18} /> Jeux (base de données)
-                </h3>
-
-                <div className="glass" style={{ padding: 12, borderRadius: 16 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                    <div style={{ fontSize: 12, opacity: 0.8 }}>Liste</div>
-                    {dbGamesLoading ? <div style={{ fontSize: 12, opacity: 0.75 }}>Chargement…</div> : null}
+                    <div style={{ fontSize: 12, color: '#999' }}>
+                      Tetris interactif sur les dalles lumineuses
+                    </div>
                   </div>
-
-                  {!dbGamesLoading && dbGames.length <= 0 ? <div style={{ marginTop: 8, opacity: 0.75 }}>Aucun jeu.</div> : null}
-
-                  <div style={{ display: 'grid', gap: 8, marginTop: 10 }}>
-                    {dbGames.map((g) => (
-                      <div
-                        key={g.id}
-                        className="glass"
-                        style={{ padding: 10, borderRadius: 14, display: 'flex', justifyContent: 'space-between', gap: 12 }}
-                      >
-                        <div style={{ minWidth: 0 }}>
-                          <div style={{ fontWeight: 800, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                            {g.name}
-                          </div>
-                          <div style={{ fontSize: 12, opacity: 0.75 }}>
-                            Type: {g.kind}
-                          </div>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          {String(g.kind) === 'custom' ? (
-                            <button className="btn" onClick={() => startCustomFromDb({ id: g.id, name: g.name, config: g.config })}>
-                              <Play size={18} />
-                            </button>
-                          ) : null}
-                          {String(g.kind) === 'editor' ? (
-                            <button className="btn" onClick={() => startHudFromDb({ id: g.id, name: g.name, config: g.config })}>
-                              <Play size={18} />
-                            </button>
-                          ) : null}
-                          <div style={{ fontSize: 12, opacity: 0.65, whiteSpace: 'nowrap' }}>{g.updatedAt}</div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                  <button
+                    style={{
+                      width: 40, height: 40, borderRadius: 10, border: 'none',
+                      background: tetrisStandalone ? '#4361ee' : '#1a1a1a', color: '#fff', display: 'grid', placeItems: 'center',
+                      cursor: 'pointer', flexShrink: 0, transition: 'background 0.15s',
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setTetrisStandalone(true);
+                      setCustomRun(null);
+                      setHudRun(null);
+                      setCurrentGame(null);
+                      setGameActive(true);
+                      setMessage('Tetris Lumière: ← → déplacer, ↑ tourner, Espace drop');
+                    }}
+                  >
+                    <Play size={16} />
+                  </button>
                 </div>
+
+                {/* Simon — jeu de mémoire */}
+                <div
+                  style={{
+                    padding: '18px 20px',
+                    borderRadius: 14,
+                    cursor: 'pointer',
+                    transition: 'all 0.18s ease',
+                    border: simonActive ? '2px solid #ef476f' : '1px solid rgba(0,0,0,0.08)',
+                    background: simonActive ? 'rgba(239,71,111,0.04)' : '#fff',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 16,
+                    marginBottom: 12,
+                  }}
+                  onClick={() => {
+                    setTetrisStandalone(false);
+                    setCustomRun(null);
+                    setHudRun(null);
+                    setCurrentGame(null);
+                    setGameActive(true);
+                    startSimonGame();
+                  }}
+                  onMouseEnter={(e) => { if (!simonActive) { (e.currentTarget as HTMLDivElement).style.borderColor = 'rgba(0,0,0,0.18)'; (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-1px)'; (e.currentTarget as HTMLDivElement).style.boxShadow = '0 4px 16px rgba(0,0,0,0.08)'; } }}
+                  onMouseLeave={(e) => { if (!simonActive) { (e.currentTarget as HTMLDivElement).style.borderColor = 'rgba(0,0,0,0.08)'; (e.currentTarget as HTMLDivElement).style.transform = 'none'; (e.currentTarget as HTMLDivElement).style.boxShadow = 'none'; } }}
+                  role="button"
+                  tabIndex={0}
+                >
+                  <div style={{ width: 44, height: 44, borderRadius: 12, background: 'linear-gradient(135deg, #ff6b6b, #feca57, #48dbfb, #1dd1a1)', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+                    <Brain size={20} color="#fff" />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+                      <h4 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#1a1a1a' }}>Simon Lumière</h4>
+                      <span style={{ fontSize: 11, fontWeight: 600, color: '#ef476f', background: 'rgba(239,71,111,0.08)', padding: '2px 8px', borderRadius: 6 }}>
+                        Jeu intégré
+                      </span>
+                    </div>
+                    <div style={{ fontSize: 12, color: '#999' }}>
+                      Mémorisez les séquences lumineuses et reproduisez-les
+                    </div>
+                  </div>
+                  <button
+                    style={{
+                      width: 40, height: 40, borderRadius: 10, border: 'none',
+                      background: simonActive ? '#ef476f' : '#1a1a1a', color: '#fff', display: 'grid', placeItems: 'center',
+                      cursor: 'pointer', flexShrink: 0, transition: 'background 0.15s',
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setTetrisStandalone(false);
+                      setCustomRun(null);
+                      setHudRun(null);
+                      setCurrentGame(null);
+                      setGameActive(true);
+                      startSimonGame();
+                    }}
+                  >
+                    <Play size={16} />
+                  </button>
+                </div>
+
+                {dbGamesLoading ? (
+                  <div style={{ padding: 20, textAlign: 'center', opacity: 0.75 }}>Chargement des jeux...</div>
+                ) : dbGames.length === 0 ? (
+                  <div className="glass" style={{ padding: 24, borderRadius: 18, textAlign: 'center' }}>
+                    <p style={{ margin: 0, opacity: 0.8 }}>Aucun jeu disponible.</p>
+                    <p style={{ margin: '8px 0 0', fontSize: 13, opacity: 0.6 }}>Créez votre premier jeu dans l'éditeur !</p>
+                  </div>
+                ) : (
+                  <div style={{ display: 'grid', gap: 12 }}>
+                    {dbGames.map((g) => {
+                      const isEditor = String(g.kind) === 'editor';
+                      const cfg = g.config as any;
+                      const nodeCount = Array.isArray(cfg?.nodes) ? cfg.nodes.length : 0;
+                      const tileCount = typeof cfg?.tileCount === 'number' ? cfg.tileCount : 42;
+                      const difficulty = Math.min(5, Math.max(1, typeof cfg?.difficulty === 'number' ? cfg.difficulty : 1));
+                      const iconName: string = typeof cfg?.icon === 'string' ? cfg.icon : 'Lightbulb';
+                      const ICON_LOOKUP: Record<string, any> = { Lightbulb, Gamepad2, Star, Heart, Sun, Moon, Flame, Snowflake, Music, Target, Puzzle, Sparkles, Trophy, Rocket, Ghost, Palette, Zap };
+                      const GIcon = ICON_LOOKUP[iconName] ?? Lightbulb;
+                      const accentColor = typeof cfg?.accentColor === 'string' ? cfg.accentColor : (isEditor ? '#1a1a1a' : '#7c3aed');
+                      return (
+                        <div
+                          key={g.id}
+                          style={{
+                            padding: '18px 20px',
+                            borderRadius: 14,
+                            cursor: 'pointer',
+                            transition: 'all 0.18s ease',
+                            border: '1px solid rgba(0,0,0,0.08)',
+                            background: '#fff',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 16,
+                          }}
+                          onClick={() => {
+                            if (isEditor) {
+                              startHudFromDb({ id: g.id, name: g.name, config: g.config });
+                            } else {
+                              startCustomFromDb({ id: g.id, name: g.name, config: g.config });
+                            }
+                          }}
+                          onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = 'rgba(0,0,0,0.18)'; (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-1px)'; (e.currentTarget as HTMLDivElement).style.boxShadow = '0 4px 16px rgba(0,0,0,0.08)'; }}
+                          onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = 'rgba(0,0,0,0.08)'; (e.currentTarget as HTMLDivElement).style.transform = 'none'; (e.currentTarget as HTMLDivElement).style.boxShadow = 'none'; }}
+                          role="button"
+                          tabIndex={0}
+                        >
+                          <div style={{ width: 44, height: 44, borderRadius: 12, background: isEditor ? '#f0f0f0' : '#f5f0ff', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+                            <GIcon size={20} color={accentColor} />
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+                              <h4 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#1a1a1a' }}>{g.name}</h4>
+                              <span style={{ fontSize: 11, fontWeight: 600, color: '#999', background: '#f5f5f5', padding: '2px 8px', borderRadius: 6 }}>
+                                {isEditor ? 'Éditeur' : 'Custom'}
+                              </span>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 12, color: '#999' }}>
+                              <span style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                                {Array.from({ length: 5 }, (_, s) => (
+                                  <Star key={s} size={12} fill={s < difficulty ? '#facc15' : 'none'} color={s < difficulty ? '#facc15' : '#ddd'} />
+                                ))}
+                              </span>
+                              <span>{nodeCount} nœuds</span>
+                              <span>{tileCount} dalles</span>
+                            </div>
+                          </div>
+                          <button
+                            style={{
+                              width: 40, height: 40, borderRadius: 10, border: 'none',
+                              background: '#1a1a1a', color: '#fff', display: 'grid', placeItems: 'center',
+                              cursor: 'pointer', flexShrink: 0, transition: 'background 0.15s',
+                            }}
+                            onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#333'; }}
+                            onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#1a1a1a'; }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (isEditor) {
+                                startHudFromDb({ id: g.id, name: g.name, config: g.config });
+                              } else {
+                                startCustomFromDb({ id: g.id, name: g.name, config: g.config });
+                              }
+                            }}
+                          >
+                            <Play size={16} />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
 
               <div className="section">
@@ -2432,19 +3464,20 @@ export default function JeuxPage() {
               <div className="message-box">{message}</div>
 
               <div className="light-plates-grid">
-                {Array.from({ length: 9 }).map((_, i) => (
+                {Array.from({ length: 42 }).map((_, i) => (
                   <div
                     key={i}
                     className={`light-plate ${plateActive[i] ? 'active' : ''}`}
                     style={{
                       backgroundColor: plateActive[i] ? plateColors[i] : '#1a1a1a',
                       color: plateColors[i],
+                      ['--plate-color' as any]: plateColors[i],
                     }}
                     onClick={() => handlePlateClick(i)}
                     role="button"
                     tabIndex={0}
                   >
-                    <span className="plate-label">P{i + 1}</span>
+                    <span className="plate-label">{i + 1}</span>
                   </div>
                 ))}
               </div>
@@ -2567,18 +3600,37 @@ export default function JeuxPage() {
                   </div>
                 ) : null}
 
-                {gameActive && currentGame === 'fluorescence' ? (
-                  <>
-                    <div className={`fluorescence-text ${secretRevealed ? 'revealed-text' : 'hidden-text'}`}>
-                      LA LUMIÈRE EST ONDE ET PARTICULE
-                    </div>
-                    <button className="btn btn-primary" onClick={activateUV}>
-                      <Sparkles size={18} /> Activer UV (380-400nm)
-                    </button>
-                  </>
-                ) : null}
+                {/* Tetris Lumière standalone — toujours dispo */}
+                {gameActive && tetrisStandalone && (
+                  <div style={{ marginTop: 12, borderRadius: 18, overflow: 'hidden', border: '1px solid rgba(0,0,0,0.08)' }}>
+                    <TetrisGame
+                      params={{ speed: 500, bgColor: '#0a0a0f', borderColor: '#222233' }}
+                      isPlaying={gameActive}
+                      onSnapshot={(snap) => { tetrisSnapRef.current = snap; }}
+                    />
+                  </div>
+                )}
 
-                {gameActive && currentGame === 'multiplayer-split' ? (
+                {/* Tetris Lumière - si le jeu éditeur contient un noeud game_tetris */}
+                {gameActive && !tetrisStandalone && hudRun && (() => {
+                  const nodes = Array.isArray(hudRun.cfg.nodes) ? (hudRun.cfg.nodes as EditorNode[]) : [];
+                  const tetrisNode = nodes.find((n) => n.kind === 'game_tetris' && n.enabled !== false);
+                  if (!tetrisNode) return null;
+                  const speed = typeof tetrisNode.params?.speed === 'number' ? tetrisNode.params.speed : 500;
+                  const bgColor = typeof tetrisNode.params?.bgColor === 'string' ? tetrisNode.params.bgColor : '#0a0a0f';
+                  const borderColor = typeof tetrisNode.params?.borderColor === 'string' ? tetrisNode.params.borderColor : '#222233';
+                  return (
+                    <div style={{ marginTop: 12, borderRadius: 18, overflow: 'hidden', border: '1px solid rgba(0,0,0,0.08)' }}>
+                      <TetrisGame
+                        params={{ speed: Math.max(50, speed), bgColor, borderColor }}
+                        isPlaying={gameActive}
+                        onSnapshot={(snap) => { tetrisSnapRef.current = snap; }}
+                      />
+                    </div>
+                  );
+                })()}
+
+                {gameActive && mpStatus === 'active' ? (
                   <div
                     className="mp-area"
                     style={
@@ -2749,7 +3801,7 @@ export default function JeuxPage() {
                   </div>
                 ) : null}
 
-                {gameActive && currentGame === 'multiplayer-split' && mpPlusValue > 0 ? (
+                {gameActive && mpStatus === 'active' && mpPlusValue > 0 ? (
                   <div className="mp-center-overlay" aria-hidden="true">
                     <div key={mpCenterAnimKey} className="mp-center-plusone">
                       <span className="mp-center-plusone-text">+{mpPlusValue}</span>
@@ -2757,7 +3809,7 @@ export default function JeuxPage() {
                   </div>
                 ) : null}
 
-                {gameActive && currentGame === 'beginner-control' ? (
+                {gameActive && customRun ? (
                   <>
                     <div style={{ margin: '20px 0' }}>
                       <div className="led-slider led-slider--intensity">
@@ -3075,14 +4127,178 @@ export default function JeuxPage() {
                   </>
                 ) : null}
 
-                {!gameActive && currentGameDef ? (
-                  <div style={{ marginTop: 16, fontSize: 12, opacity: 0.75 }}>
-                    <AlertTriangle size={14} style={{ verticalAlign: 'text-bottom' }} />
-                    <span style={{ marginLeft: 6 }}>
-                      Jeu sélectionné: <strong>{currentGameDef.name}</strong>. Clique “Démarrer le Jeu”.
-                    </span>
-                  </div>
+                {/* Tetrix sera recréé dans l'éditeur */}
+                {false ? (
+                  <>
+                    <div 
+                      className="glass"
+                      style={{ 
+                        padding: '24px', 
+                        borderRadius: 24, 
+                        marginBottom: 20,
+                        background: 'linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%)',
+                        border: '1px solid rgba(255,255,255,0.2)',
+                        boxShadow: '0 8px 32px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.1)'
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+                        <div>
+                          <h3 style={{ fontWeight: 800, fontSize: '1.4rem', marginBottom: 4 }}>Tetrix Light</h3>
+                          <p style={{ fontSize: 13, opacity: 0.7 }}>Alignez 3 dalles pour les faire disparaître</p>
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                          <div style={{ fontSize: 12, opacity: 0.6, textTransform: 'uppercase', letterSpacing: 1 }}>Score</div>
+                          <div style={{ fontSize: 32, fontWeight: 800, fontFamily: 'SF Pro Display, -apple-system, sans-serif' }}>{tetrixScore}</div>
+                        </div>
+                      </div>
+
+                      {/* Stats row */}
+                      <div style={{ 
+                        display: 'flex', 
+                        gap: 16, 
+                        marginBottom: 24,
+                        padding: '12px 16px',
+                        background: 'rgba(0,0,0,0.2)',
+                        borderRadius: 16,
+                        backdropFilter: 'blur(10px)'
+                      }}>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: 11, opacity: 0.5, textTransform: 'uppercase' }}>Niveau</div>
+                          <div style={{ fontSize: 20, fontWeight: 700 }}>{tetrixLevel}</div>
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: 11, opacity: 0.5, textTransform: 'uppercase' }}>Lignes</div>
+                          <div style={{ fontSize: 20, fontWeight: 700 }}>{tetrixLines}</div>
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: 11, opacity: 0.5, textTransform: 'uppercase' }}>Prochaine</div>
+                          <div style={{ 
+                            width: 24, 
+                            height: 24, 
+                            borderRadius: 6, 
+                            background: tetrixNextPiece?.color || '#666',
+                            boxShadow: `0 0 12px ${tetrixNextPiece?.color || '#666'}`
+                          }} />
+                        </div>
+                      </div>
+
+                      {/* Game status */}
+                      {tetrixGameOver ? (
+                        <div style={{ 
+                          padding: '20px', 
+                          borderRadius: 16, 
+                          background: 'rgba(255, 59, 92, 0.2)',
+                          border: '1px solid rgba(255, 59, 92, 0.4)',
+                          textAlign: 'center',
+                          marginBottom: 20
+                        }}>
+                          <div style={{ fontSize: 24, fontWeight: 700, marginBottom: 8 }}>Game Over!</div>
+                          <div style={{ fontSize: 14, opacity: 0.8 }}>Score final: {tetrixScore}</div>
+                        </div>
+                      ) : null}
+
+                      {/* Controls - Glass Liquid Style */}
+                      <div style={{ 
+                        display: 'grid', 
+                        gridTemplateColumns: 'repeat(3, 1fr)', 
+                        gap: 12,
+                        maxWidth: 200,
+                        margin: '0 auto 20px'
+                      }}>
+                        <div />
+                        <button
+                          onClick={() => rotateTetrixPiece()}
+                          className="btn btn--glass"
+                          style={{
+                            aspectRatio: '1',
+                            borderRadius: 16,
+                            background: 'linear-gradient(135deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.05) 100%)',
+                            border: '1px solid rgba(255,255,255,0.25)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: 20,
+                            cursor: 'pointer',
+                            backdropFilter: 'blur(10px)',
+                            boxShadow: '0 4px 16px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.2)'
+                          }}
+                        >
+                          ↻
+                        </button>
+                        <div />
+                        <button
+                          onClick={() => moveTetrixPiece('left')}
+                          className="btn btn--glass"
+                          style={{
+                            aspectRatio: '1',
+                            borderRadius: 16,
+                            background: 'linear-gradient(135deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.05) 100%)',
+                            border: '1px solid rgba(255,255,255,0.25)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: 20,
+                            cursor: 'pointer',
+                            backdropFilter: 'blur(10px)',
+                            boxShadow: '0 4px 16px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.2)'
+                          }}
+                        >
+                          ←
+                        </button>
+                        <button
+                          onClick={() => moveTetrixPiece('down')}
+                          className="btn btn--glass"
+                          style={{
+                            aspectRatio: '1',
+                            borderRadius: 16,
+                            background: 'linear-gradient(135deg, rgba(255,255,255,0.2) 0%, rgba(255,255,255,0.1) 100%)',
+                            border: '1px solid rgba(255,255,255,0.3)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: 20,
+                            cursor: 'pointer',
+                            backdropFilter: 'blur(10px)',
+                            boxShadow: '0 4px 16px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.3)'
+                          }}
+                        >
+                          ↓
+                        </button>
+                        <button
+                          onClick={() => moveTetrixPiece('right')}
+                          className="btn btn--glass"
+                          style={{
+                            aspectRatio: '1',
+                            borderRadius: 16,
+                            background: 'linear-gradient(135deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.05) 100%)',
+                            border: '1px solid rgba(255,255,255,0.25)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: 20,
+                            cursor: 'pointer',
+                            backdropFilter: 'blur(10px)',
+                            boxShadow: '0 4px 16px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.2)'
+                          }}
+                        >
+                          →
+                        </button>
+                      </div>
+
+                      {/* Keyboard hint */}
+                      <div style={{ 
+                        textAlign: 'center', 
+                        fontSize: 12, 
+                        opacity: 0.5,
+                        fontFamily: 'SF Pro Text, -apple-system, sans-serif'
+                      }}>
+                        Utilisez les flèches ou les boutons pour contrôler
+                      </div>
+                    </div>
+                  </>
                 ) : null}
+
+                {/* Message de sélection supprimé : les jeux sont lancés directement */}
               </div>
             </div>
 
@@ -3178,12 +4394,13 @@ export default function JeuxPage() {
                 </div>
                 <select className="scene-selector" defaultValue="" onChange={(e) => loadScene(e.target.value)}>
                   <option value="">Sélectionner...</option>
-                  <option value="daylight">Lumière du jour</option>
-                  <option value="warmwhite">Blanc chaud</option>
-                  <option value="coolwhite">Blanc froid</option>
-                  <option value="sunset">Coucher de soleil</option>
-                  <option value="fluorescent">Fluorescence UV</option>
-                  <option value="special">Spéciale (par dalle)</option>
+                  <option value="candlelight">1900K - Lumière de bougie</option>
+                  <option value="warmwhite">2700K - Blanc chaud</option>
+                  <option value="softwhite">3000K - Blanc doux</option>
+                  <option value="coolwhite">5000K - Blanc froid</option>
+                  <option value="daylight">6500K - Lumière du jour</option>
+                  <option value="bluesky">10000K - Ciel bleu</option>
+                  <option value="special">Spéciale (damier)</option>
                 </select>
 
                 <div style={{ marginTop: 12, fontSize: 12, opacity: 0.75, display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -3207,6 +4424,151 @@ export default function JeuxPage() {
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Game Over Popup Modal */}
+      {gameOverPopup.open && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0, left: 0, right: 0, bottom: 0,
+            background: 'rgba(0,0,0,0.8)',
+            backdropFilter: 'blur(8px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            animation: 'fadeIn 0.3s ease-out'
+          }}
+        >
+          <div
+            style={{
+              background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
+              borderRadius: 24,
+              padding: '40px 48px',
+              textAlign: 'center',
+              border: '2px solid rgba(255,255,255,0.1)',
+              boxShadow: '0 25px 50px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.05)',
+              animation: 'slideUp 0.4s ease-out',
+              maxWidth: 400,
+              width: '90%'
+            }}
+          >
+            <div style={{ fontSize: 48, marginBottom: 16 }}>🏆</div>
+            <h2 style={{
+              fontSize: 28,
+              fontWeight: 800,
+              marginBottom: 12,
+              background: 'linear-gradient(135deg, #667eea, #f093fb)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent'
+            }}>
+              Jeu Terminé!
+            </h2>
+            <p style={{ fontSize: 16, color: '#a0a0a0', marginBottom: 8 }}>
+              {gameOverPopup.game}
+            </p>
+            <div style={{
+              fontSize: 42,
+              fontWeight: 800,
+              color: '#fff',
+              marginBottom: 8,
+              fontFamily: 'SF Pro Display, -apple-system, sans-serif'
+            }}>
+              {gameOverPopup.score} pts
+            </div>
+            <p style={{ fontSize: 14, color: '#888', marginBottom: 32 }}>
+              {gameOverPopup.message}
+            </p>
+
+            <div style={{ display: 'flex', gap: 16, justifyContent: 'center' }}>
+              <button
+                onClick={() => {
+                  setGameOverPopup(prev => ({ ...prev, open: false }));
+                  // Restart current game based on which one was active
+                  if (spectralActive) startSpectralChallenge();
+                  else if (chaseActive) startChaseGame();
+                  else if (mpActive) startMatchPairGame();
+                  else if (snakeActive) startSnakeGame();
+                  else if (tetrixActive) startTetrixGame();
+                  else if (simonActive) startSimonGame();
+                }}
+                style={{
+                  padding: '14px 28px',
+                  borderRadius: 12,
+                  border: 'none',
+                  background: 'linear-gradient(135deg, #22c55e, #16a34a)',
+                  color: '#fff',
+                  fontSize: 16,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  transition: 'transform 0.2s, box-shadow 0.2s',
+                  boxShadow: '0 4px 15px rgba(34, 197, 94, 0.3)'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'scale(1.05)';
+                  e.currentTarget.style.boxShadow = '0 6px 20px rgba(34, 197, 94, 0.4)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'scale(1)';
+                  e.currentTarget.style.boxShadow = '0 4px 15px rgba(34, 197, 94, 0.3)';
+                }}
+              >
+                🔄 Relancer
+              </button>
+              <button
+                onClick={() => {
+                  setGameOverPopup(prev => ({ ...prev, open: false }));
+                  stopGame();
+                }}
+                style={{
+                  padding: '14px 28px',
+                  borderRadius: 12,
+                  border: '1px solid rgba(255,255,255,0.2)',
+                  background: 'rgba(255,255,255,0.05)',
+                  color: '#fff',
+                  fontSize: 16,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  transition: 'transform 0.2s, background 0.2s'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'scale(1.05)';
+                  e.currentTarget.style.background = 'rgba(255,255,255,0.1)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'scale(1)';
+                  e.currentTarget.style.background = 'rgba(255,255,255,0.05)';
+                }}
+              >
+                ✕ Quitter
+              </button>
+            </div>
+          </div>
+
+          <style jsx>{`
+            @keyframes fadeIn {
+              from { opacity: 0; }
+              to { opacity: 1; }
+            }
+            @keyframes slideUp {
+              from {
+                opacity: 0;
+                transform: translateY(30px) scale(0.95);
+              }
+              to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+              }
+            }
+          `}</style>
         </div>
       )}
     </>

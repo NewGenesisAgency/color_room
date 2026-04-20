@@ -17,8 +17,8 @@ type ApiResponse =
   | { ok: true; game: { id: string; createdAt: string; updatedAt: string; name: string; kind: string; config: unknown } }
   | { ok: false; error: string };
 
-export async function GET(_req: Request, ctx: { params: { id: string } }) {
-  const { id } = ctx.params;
+export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> }) {
+  const { id } = await ctx.params;
   const db = getDb();
   const row = db
     .prepare('SELECT id, created_at, updated_at, name, kind, config_json FROM crg_games WHERE id = ?;')
@@ -39,8 +39,8 @@ export async function GET(_req: Request, ctx: { params: { id: string } }) {
   } satisfies ApiResponse);
 }
 
-export async function PATCH(req: Request, ctx: { params: { id: string } }) {
-  const { id } = ctx.params;
+export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
+  const { id } = await ctx.params;
   const body = (await req.json().catch(() => ({}))) as PatchGameRequest;
 
   const name = body.name !== undefined ? String(body.name).trim() : undefined;
@@ -87,8 +87,8 @@ export async function PATCH(req: Request, ctx: { params: { id: string } }) {
   } satisfies ApiResponse);
 }
 
-export async function DELETE(_req: Request, ctx: { params: { id: string } }) {
-  const { id } = ctx.params;
+export async function DELETE(_req: Request, ctx: { params: Promise<{ id: string }> }) {
+  const { id } = await ctx.params;
   const db = getDb();
 
   const info = db.prepare('DELETE FROM crg_games WHERE id = ?;').run(id);

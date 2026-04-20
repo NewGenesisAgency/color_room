@@ -58,27 +58,32 @@ async function forward(req: Request, path: string) {
   }
 }
 
-export async function GET(req: Request, ctx: { params: { path?: string[] } }) {
-  const path = (ctx.params.path || []).join('/');
+export async function GET(req: Request, ctx: { params: Promise<{ path?: string[] }> }) {
+  const params = await ctx.params;
+  const path = (params.path || []).join('/');
   return forward(req, path);
 }
 
-export async function PUT(req: Request, ctx: { params: { path?: string[] } }) {
-  const path = (ctx.params.path || []).join('/');
+export async function PUT(req: Request, ctx: { params: Promise<{ path?: string[] }> }) {
+  const params = await ctx.params;
+  const path = (params.path || []).join('/');
   return forward(req, path);
 }
 
-export async function POST(req: Request, ctx: { params: { path?: string[] } }) {
-  const path = (ctx.params.path || []).join('/');
+export async function POST(req: Request, ctx: { params: Promise<{ path?: string[] }> }) {
+  const params = await ctx.params;
+  const path = (params.path || []).join('/');
   return forward(req, path);
 }
 
-export async function PATCH(req: Request, ctx: { params: { path?: string[] } }) {
-  const path = (ctx.params.path || []).join('/');
+export async function PATCH(req: Request, ctx: { params: Promise<{ path?: string[] }> }) {
+  const params = await ctx.params;
+  const path = (params.path || []).join('/');
   return forward(req, path);
 }
 
-export async function DELETE(req: Request, ctx: { params: { path?: string[] } }) {
-  const path = (ctx.params.path || []).join('/');
+export async function DELETE(req: Request, ctx: { params: Promise<{ path?: string[] }> }) {
+  const params = await ctx.params;
+  const path = (params.path || []).join('/');
   return forward(req, path);
 }
