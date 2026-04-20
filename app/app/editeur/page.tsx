@@ -7,7 +7,7 @@ import TetrisGame from '@/app/_components/TetrisGame';
 import CS150Panel from '@/app/_components/CS150Panel';
 import type { TetrisSnapshot } from '@/app/_components/TetrisGame';
 
-import { Boxes, Gamepad2, Plus, Play, Pause, RotateCcw, Save, Trash2, FolderPlus, X, Lightbulb, Layers, Zap, Palette, Clock, MousePointer2, LayoutGrid, Maximize2, Minimize2, Eye, Star, Heart, Sun, Moon, Flame, Snowflake, Music, Target, Puzzle, Sparkles, Trophy, Rocket, Ghost, Dice1, Brain, type LucideIcon } from 'lucide-react';
+import { Boxes, Gamepad2, Plus, Play, Pause, RotateCcw, Save, Trash2, FolderPlus, X, Lightbulb, Layers, Zap, Palette, Clock, MousePointer2, LayoutGrid, Maximize2, Minimize2, Eye, Star, Heart, Sun, Moon, Flame, Snowflake, Music, Target, Puzzle, Sparkles, Trophy, Rocket, Ghost, Dice1, Brain, Check, GitBranch, Hash, Settings2, Shuffle, type LucideIcon } from 'lucide-react';
 
 type IdFactory = () => string;
 
@@ -164,6 +164,38 @@ const NODE_CATALOG: NodeCatalogItem[] = [
 function labelNodeKind(kind: EditorNodeKind): string {
   return NODE_CATALOG.find((x) => x.kind === kind)?.title ?? kind;
 }
+
+function categoryOfKind(kind: EditorNodeKind): string {
+  return NODE_CATALOG.find((x) => x.kind === kind)?.category ?? '';
+}
+
+const NODE_CATEGORY_ICONS: Record<string, LucideIcon> = {
+  'Évènements': Zap,
+  'Flux': GitBranch,
+  'Rendu': Palette,
+  'Jeux': Gamepad2,
+  'Maths': Hash,
+  'Logique': Brain,
+  'Temps': Clock,
+  'Constantes': Hash,
+  'Dalles': LayoutGrid,
+  'Aléatoire': Shuffle,
+  'Colorimètre': Lightbulb,
+};
+
+const NODE_CATEGORY_COLORS: Record<string, string> = {
+  'Évènements': '#f59e0b',
+  'Flux': '#f97316',
+  'Rendu': '#22d3ee',
+  'Jeux': '#a855f7',
+  'Maths': '#4ade80',
+  'Logique': '#60a5fa',
+  'Temps': '#fb7185',
+  'Constantes': '#a1a1aa',
+  'Dalles': '#06d6a0',
+  'Aléatoire': '#34d399',
+  'Colorimètre': '#fbbf24',
+};
 
 function clamp255(v: number): number {
   if (!Number.isFinite(v)) return 0;
@@ -1529,6 +1561,22 @@ export default function EditeurPage() {
     return nextId;
   };
 
+  const removeNodeById = (nodeId: string) => {
+    commit((cur) => {
+      const nextGames = cur.games.map((g) => {
+        if (g.id !== cur.activeGameId) return g;
+        return {
+          ...g,
+          nodes: g.nodes.filter((nd) => nd.id !== nodeId),
+          edges: g.edges.filter((e) => e.from !== nodeId && e.to !== nodeId),
+        };
+      });
+      const nextSelectedId = cur.selectedNodeId === nodeId ? null : cur.selectedNodeId;
+      return { ...cur, games: nextGames, selectedNodeId: nextSelectedId };
+    });
+    setStatus('Nœud supprimé');
+  };
+
   const renameActiveGame = (name: string) => {
     if (!activeGameId) return;
     commit((cur) => ({
@@ -1671,7 +1719,7 @@ export default function EditeurPage() {
                       title="Sauvegarder"
                     >
                       <Save size={14} />
-                      <span>{dirty ? '❌' : '✓'}</span>
+                      <span>{dirty ? <X size={10} /> : <Check size={10} />}</span>
                     </button>
                     <button 
                       className="g-btn g-btn--sm g-btn--danger" 
@@ -1977,7 +2025,7 @@ export default function EditeurPage() {
                 ) : (
                   <div className="bp-empty" style={{ height: '100%', display: 'grid', placeItems: 'center' }}>
                     <div style={{ display: 'grid', gap: 16, textAlign: 'center', maxWidth: 320 }}>
-                      <div style={{ fontSize: 48, opacity: 0.3 }}>💡</div>
+                      <Lightbulb size={48} style={{ opacity: 0.3, color: '#4361ee', margin: '0 auto' }} />
                       <div>
                         <h3 style={{ margin: '0 0 8px', fontSize: 18 }}>Aucun projet</h3>
                         <p style={{ margin: 0, fontSize: 13, opacity: 0.7, lineHeight: 1.5 }}>
@@ -2139,7 +2187,7 @@ export default function EditeurPage() {
                     {games.length === 0 ? (
                       <div className="bp-empty">
                         <div style={{ textAlign: 'center', padding: 40 }}>
-                          <div style={{ fontSize: 48, opacity: 0.3, marginBottom: 16 }}>🎮</div>
+                          <Gamepad2 size={48} style={{ opacity: 0.3, color: '#4361ee', marginBottom: 16 }} />
                           <p style={{ margin: '0 0 20px', fontSize: 14, opacity: 0.7 }}>Commencez par créer votre premier jeu</p>
                           <button 
                             className="g-btn g-btn--accent" 
@@ -2170,29 +2218,45 @@ export default function EditeurPage() {
                         </div>
 
                         <div className="bp-menu__list">
-                          {NODE_CATALOG.filter((n) => {
+                          {(() => {
                             const q = contextMenu.q.trim().toLowerCase();
-                            if (!q) return true;
-                            return `${n.category} ${n.title} ${n.kind} ${labelNodeKind(n.kind)}`.toLowerCase().includes(q);
-                          }).map((n) => (
-                            <button
-                              key={n.kind}
-                              className="bp-menu__item"
-                              onClick={() => {
-                                const createdId = addNode(n.kind, { x: contextMenu.gx, y: contextMenu.gy });
-                                if (createdId && pendingAutoConnect?.fromNodeId) {
-                                  addEdge(pendingAutoConnect.fromNodeId, createdId);
-                                  setPendingLink(null);
-                                  setPendingAutoConnect(null);
-                                }
-                                setContextMenu((p) => ({ ...p, open: false }));
-                                setStatus('Noeud ajouté');
-                              }}
-                            >
-                              <span className="bp-menu__cat">{n.category}</span>
-                              <span className="bp-menu__title">{n.title}</span>
-                            </button>
-                          ))}
+                            const filtered = NODE_CATALOG.filter((n) => {
+                              if (!q) return true;
+                              return `${n.category} ${n.title} ${n.kind}`.toLowerCase().includes(q);
+                            });
+                            const categories = [...new Set(filtered.map((n) => n.category))];
+                            return categories.map((cat) => {
+                              const CatIcon = NODE_CATEGORY_ICONS[cat] ?? Boxes;
+                              const catColor = NODE_CATEGORY_COLORS[cat] ?? '#999';
+                              return (
+                                <div key={cat}>
+                                  <div className="bp-menu__cathead" style={{ borderLeft: `3px solid ${catColor}` }}>
+                                    <CatIcon size={11} style={{ color: catColor, flexShrink: 0 }} />
+                                    <span>{cat}</span>
+                                  </div>
+                                  {filtered.filter((n) => n.category === cat).map((n) => (
+                                    <button
+                                      key={n.kind}
+                                      className="bp-menu__item"
+                                      onClick={() => {
+                                        const createdId = addNode(n.kind, { x: contextMenu.gx, y: contextMenu.gy });
+                                        if (createdId && pendingAutoConnect?.fromNodeId) {
+                                          addEdge(pendingAutoConnect.fromNodeId, createdId);
+                                          setPendingLink(null);
+                                          setPendingAutoConnect(null);
+                                        }
+                                        setContextMenu((p) => ({ ...p, open: false }));
+                                        setStatus('Noeud ajouté');
+                                      }}
+                                    >
+                                      <span className="bp-menu__title">{n.title}</span>
+                                      <span className="bp-menu__meta" style={{ color: catColor, opacity: 0.7, fontSize: 11 }}>{n.kind.startsWith('cs150') ? 'CS150' : ''}</span>
+                                    </button>
+                                  ))}
+                                </div>
+                              );
+                            });
+                          })()}
                         </div>
                       </div>
                     ) : null}
@@ -2312,7 +2376,11 @@ export default function EditeurPage() {
                       return (
                         <div
                           key={n.id}
-                          className={selected ? 'bp-node bp-node--active' : 'bp-node'}
+                          className={[
+                            'bp-node',
+                            selected ? 'bp-node--active' : '',
+                            !n.enabled ? 'bp-node--disabled' : '',
+                          ].filter(Boolean).join(' ')}
                           style={{ left: n.pos.x, top: n.pos.y }}
                           data-nodeid={n.id}
                           onPointerDown={(e) => {
@@ -2453,9 +2521,43 @@ export default function EditeurPage() {
                             }
                           }}
                         >
-                          <div className="bp-node__title" style={{ borderLeft: `3px solid ${nodeAccent}` }}>
-                            <span className="bp-node__name">{n.name}</span>
-                            <span className="bp-node__kind" style={{ color: nodeAccent, opacity: 0.9 }}>{labelNodeKind(n.kind)}</span>
+                          <div className="bp-node__header" style={{
+                            background: `linear-gradient(135deg, ${nodeAccent}20, ${nodeAccent}0a)`,
+                            borderBottom: `2px solid ${nodeAccent}35`,
+                          }}>
+                            <div className="bp-node__header-left">
+                              {(() => { const CatIcon = NODE_CATEGORY_ICONS[categoryOfKind(n.kind)] ?? Boxes; return <CatIcon size={13} style={{ color: nodeAccent, flexShrink: 0 }} />; })()}
+                              <span className="bp-node__name">{n.name}</span>
+                            </div>
+                            <div className="bp-node__header-right">
+                              <button
+                                className="bp-node__hbtn"
+                                title={n.enabled ? 'Désactiver' : 'Activer'}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  commit((cur) => ({
+                                    ...cur,
+                                    games: cur.games.map((g) => {
+                                      if (g.id !== cur.activeGameId) return g;
+                                      return { ...g, nodes: g.nodes.map((nd) => nd.id === n.id ? { ...nd, enabled: !nd.enabled } : nd) };
+                                    }),
+                                  }));
+                                }}
+                                style={{ color: n.enabled ? '#22d3ee' : '#ef4444' }}
+                              >
+                                {n.enabled ? <Check size={11} /> : <X size={11} />}
+                              </button>
+                              <button
+                                className="bp-node__hbtn bp-node__hbtn--del"
+                                title="Supprimer le nœud"
+                                onClick={(e) => { e.stopPropagation(); removeNodeById(n.id); }}
+                              >
+                                <Trash2 size={11} />
+                              </button>
+                            </div>
+                          </div>
+                          <div className="bp-node__kind-bar" style={{ color: nodeAccent }}>
+                            {labelNodeKind(n.kind)}
                           </div>
 
                           {n.kind === 'wait' ? (
@@ -2521,24 +2623,25 @@ export default function EditeurPage() {
                                 />
                               </div>
 
-                              <div className="bp-node__var">
-                                <span className="bp-node__varlabel">Masque</span>
-                                <div className="bp-node__varctrl">
-                                  <div className="bp-node__seg" role="group" aria-label="Masque">
-                                    <button
-                                      type="button"
-                                      className={fillMask === 'all' ? 'bp-node__segbtn bp-node__segbtn--active' : 'bp-node__segbtn'}
-                                      onClick={() => updateNodeParamsById(n.id, { mask: 'all' })}
-                                    >
-                                      Tous
-                                    </button>
-                                    <button
-                                      type="button"
-                                      className={fillMask === 'borders' ? 'bp-node__segbtn bp-node__segbtn--active' : 'bp-node__segbtn'}
-                                      onClick={() => updateNodeParamsById(n.id, { mask: 'borders' })}
-                                    >
-                                      Bordures
-                                    </button>
+                              <div className="bp-node__varrow">
+                                <div className="bp-node__var">
+                                  <span className="bp-node__varlabel">Masque</span>
+                                  <div className="bp-node__varctrl">
+                                    <select className="bp-node__varselect"
+                                      value={String(n.params.mask ?? 'all')}
+                                      onChange={(e) => updateNodeParamsById(n.id, { mask: e.target.value })}>
+                                      <option value="all">Tous</option>
+                                      <option value="border">Bords</option>
+                                      <option value="corners">Coins</option>
+                                      <option value="center">Centre</option>
+                                    </select>
+                                  </div>
+                                </div>
+                                <div className="bp-node__var">
+                                  <span className="bp-node__varlabel">Boucle</span>
+                                  <div className="bp-node__varctrl">
+                                    <input type="checkbox" checked={Boolean(n.params.loop)}
+                                      onChange={(e) => updateNodeParamsById(n.id, { loop: e.target.checked })} />
                                   </div>
                                 </div>
                               </div>
@@ -2683,12 +2786,22 @@ export default function EditeurPage() {
                             </div>
                           ) : n.kind === 'game_tetris' ? (
                             <div className="bp-node__vars" onPointerDown={(e) => e.stopPropagation()}>
-                              <div className="bp-node__var">
-                                <span className="bp-node__varlabel">Vitesse (ms)</span>
-                                <div className="bp-node__varctrl">
-                                  <input className="bp-node__varinput" type="number" min={200} max={2000} step={50}
-                                    value={getNum(n.params, 'speed', 500)}
-                                    onChange={(e) => updateNodeParamsById(n.id, { speed: Number(e.target.value) })} />
+                              <div className="bp-node__varrow">
+                                <div className="bp-node__var">
+                                  <span className="bp-node__varlabel">Vitesse (ms)</span>
+                                  <div className="bp-node__varctrl">
+                                    <input className="bp-node__varinput" type="number" min={200} max={2000} step={50}
+                                      value={getNum(n.params, 'speed', 500)}
+                                      onChange={(e) => updateNodeParamsById(n.id, { speed: Number(e.target.value) })} />
+                                  </div>
+                                </div>
+                                <div className="bp-node__var">
+                                  <span className="bp-node__varlabel">Niveau départ</span>
+                                  <div className="bp-node__varctrl">
+                                    <input className="bp-node__varinput" type="number" min={1} max={10} step={1}
+                                      value={getNum(n.params, 'startLevel', 1)}
+                                      onChange={(e) => updateNodeParamsById(n.id, { startLevel: Number(e.target.value) })} />
+                                  </div>
                                 </div>
                               </div>
                             </div>
@@ -2729,12 +2842,22 @@ export default function EditeurPage() {
                             </div>
                           ) : n.kind === 'on_timer' ? (
                             <div className="bp-node__vars" onPointerDown={(e) => e.stopPropagation()}>
-                              <div className="bp-node__var">
-                                <span className="bp-node__varlabel">Intervalle (ms)</span>
-                                <div className="bp-node__varctrl">
-                                  <input className="bp-node__varinput" type="number" min={100} max={60000} step={100}
-                                    value={getNum(n.params, 'intervalMs', 1000)}
-                                    onChange={(e) => updateNodeParamsById(n.id, { intervalMs: Number(e.target.value) })} />
+                              <div className="bp-node__varrow">
+                                <div className="bp-node__var">
+                                  <span className="bp-node__varlabel">Intervalle (ms)</span>
+                                  <div className="bp-node__varctrl">
+                                    <input className="bp-node__varinput" type="number" min={100} max={60000} step={100}
+                                      value={getNum(n.params, 'intervalMs', 1000)}
+                                      onChange={(e) => updateNodeParamsById(n.id, { intervalMs: Number(e.target.value) })} />
+                                  </div>
+                                </div>
+                                <div className="bp-node__var">
+                                  <span className="bp-node__varlabel">Répétitions</span>
+                                  <div className="bp-node__varctrl">
+                                    <input className="bp-node__varinput" type="number" min={-1} max={9999} step={1}
+                                      value={getNum(n.params, 'repeat', -1)}
+                                      onChange={(e) => updateNodeParamsById(n.id, { repeat: Number(e.target.value) })} />
+                                  </div>
                                 </div>
                               </div>
                             </div>
@@ -2901,8 +3024,8 @@ export default function EditeurPage() {
           <aside className="ue__right" style={{ borderRadius: 16, overflow: 'hidden', background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(20px)', border: '1px solid rgba(0,0,0,0.06)' }}>
             <div className="panelhead" style={{ background: '#fff', borderBottom: '1px solid rgba(0,0,0,0.06)', padding: '18px 20px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <Layers size={16} color="#1a1a1a" />
-                <strong style={{ fontSize: 14, fontWeight: 800, letterSpacing: '-0.02em', color: '#1a1a1a' }}>Détails</strong>
+                <Settings2 size={16} color="#1a1a1a" />
+                <strong style={{ fontSize: 14, fontWeight: 800, letterSpacing: '-0.02em', color: '#1a1a1a' }}>Paramètres</strong>
               </div>
               <span style={{ fontSize: 12, fontWeight: 600, color: '#666' }}>{selectedNode ? labelNodeKind(selectedNode.kind) : '—'}</span>
             </div>
@@ -3132,6 +3255,19 @@ export default function EditeurPage() {
                             />
                           </div>
                           <span style={{ fontSize: 13, fontWeight: 700, color: '#1a1a1a', textAlign: 'right' }}>{Math.round(getNum(selectedNode.params, 'speed', 500))}ms</span>
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 60px', gap: 10, alignItems: 'center' }}>
+                          <div>
+                            <span className="g-label" style={{ marginBottom: 6, display: 'block' }}>Niveau de départ</span>
+                            <input
+                              type="range" className="g-slider g-slider--accent" min={1} max={10} step={1}
+                              value={getNum(selectedNode.params, 'startLevel', 1)}
+                              onChange={(e) => updateSelectedParams({ startLevel: Number(e.target.value) })}
+                              style={{ ['--pct' as any]: `${((getNum(selectedNode.params, 'startLevel', 1) - 1) / 9) * 100}%` }}
+                            />
+                          </div>
+                          <span style={{ fontSize: 13, fontWeight: 700, color: '#1a1a1a', textAlign: 'right' }}>Niv.{Math.round(getNum(selectedNode.params, 'startLevel', 1))}</span>
                         </div>
 
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
