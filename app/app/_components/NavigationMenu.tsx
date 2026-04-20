@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Menu, X, Home, Gamepad2, Palette, Ruler, LogIn, LogOut, User } from 'lucide-react';
+import { Menu, X, Home, Gamepad2, Palette, Ruler, LogIn, LogOut, User, Sparkles } from 'lucide-react';
 
 interface UserInfo {
   name: string;
@@ -67,6 +67,7 @@ export default function NavigationMenu() {
   const navItems = [
     { href: '/', label: 'Accueil', icon: Home },
     { href: '/jeux', label: 'Jeux', icon: Gamepad2 },
+    { href: '/spectre', label: 'Spectre Chromatique', icon: Sparkles },
     { href: '/mesure', label: 'Mesure', icon: Ruler },
     { href: '/editeur', label: 'Éditeur', icon: Palette },
     { href: '/creer', label: 'Créer', icon: User },
