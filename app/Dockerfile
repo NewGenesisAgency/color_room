@@ -25,6 +25,13 @@ FROM node:20-slim AS runner
 WORKDIR /app
  
 ENV NODE_ENV=production
+
+# --- MODIFICATION ICI ---
+# On réinstalle curl dans l'étape finale pour que le Healthcheck Docker fonctionne
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
+# ------------------------
  
 COPY --from=builder /app/package.json /app/package.json
 COPY --from=builder /app/next.config.mjs /app/next.config.mjs

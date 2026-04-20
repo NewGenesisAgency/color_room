@@ -1,0 +1,23 @@
+# Ignorer les documents PDF
+*.pdf
+
+# Ignorer les dossiers de documentation lourds
+docs/
+Documentation/
+
+# Ignorer les fichiers temporaires
+*.tmp
+*.temp
+*.log
+
+# Ignorer les dossiers node_modules (déjà là normalement)
+node_modules/
+
+# Ignorer les builds Next.js
+.next/
+out/
+
+# Ignorer les fichiers d'environnement
+.env
+.env.local
+.env.production
