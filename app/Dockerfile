@@ -7,7 +7,7 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
  
 COPY package.json /app/package.json
-RUN npm install
+RUN npm install --legacy-peer-deps
  
  
 FROM node:20-slim AS builder
