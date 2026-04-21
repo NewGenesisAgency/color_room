@@ -3,6 +3,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import TetrisGame from '@/app/_components/TetrisGame';
 import type { TetrisSnapshot } from '@/app/_components/TetrisGame';
+import GameColorSpeed from '@/app/_components/GameColorSpeed';
+import GameMaitreDuBlanc from '@/app/_components/GameMaitreDuBlanc';
+import GamePuissance4 from '@/app/_components/GamePuissance4';
+import GameChasseurGamut from '@/app/_components/GameChasseurGamut';
 import NavigationMenu from '@/app/_components/NavigationMenu';
 import {
   Activity,
@@ -753,6 +757,9 @@ export default function JeuxPage() {
 
   // Simon game states
   const [simonActive, setSimonActive] = useState<boolean>(false);
+
+  // Nouveaux jeux natifs
+  const [activeBuiltinGame, setActiveBuiltinGame] = useState<'color-speed' | 'maitre-blanc' | 'puissance4' | 'chasseur-gamut' | null>(null);
   const [simonSequence, setSimonSequence] = useState<number[]>([]);
   const [simonPlayerInput, setSimonPlayerInput] = useState<number[]>([]);
   const [simonLevel, setSimonLevel] = useState<number>(1);
@@ -1452,6 +1459,20 @@ export default function JeuxPage() {
     };
   }, [gameActive, currentGame, mpState?.endsAtMs]);
 
+  // Auto-stop multiplayer game if no players for 15 seconds
+  useEffect(() => {
+    if (!gameActive) return;
+    if (currentGame !== 'multiplayer-split') return;
+    if (mpPlayers.length > 0) return;
+    const t = window.setTimeout(() => {
+      setGameActive(false);
+      setCurrentGame(null);
+      setMpEndPrompt(false);
+      setMessage('Partie multijoueur arrêtée : aucun joueur connecté.');
+    }, 15_000);
+    return () => window.clearTimeout(t);
+  }, [gameActive, currentGame, mpPlayers.length]);
+
   // Fetch current colors when beginner-control game starts
   useEffect(() => {
     if (!gameActive) return;
@@ -1993,6 +2014,7 @@ export default function JeuxPage() {
     setHudRun(null);
     setTetrisStandalone(false);
     setSimonActive(false);
+    setActiveBuiltinGame(null);
     setSecretRevealed(false);
     setTargetColor(null);
     setTargetTemp(null);
@@ -3458,6 +3480,58 @@ export default function JeuxPage() {
                   </button>
                 </div>
 
+                {/* Color Speed */}
+                {(['color-speed', 'maitre-blanc', 'puissance4', 'chasseur-gamut'] as const).map((gameId) => {
+                  const META: Record<string, { title: string; desc: string; icon: string; grad: string; accent: string }> = {
+                    'color-speed':    { title: 'Color Speed',        desc: "Cliquez la dalle qui s'allume — réflexes !",       icon: '⚡', grad: 'linear-gradient(135deg,#4361ee,#7c3aed)', accent: '#7c3aed' },
+                    'maitre-blanc':   { title: 'Le Maître du Blanc', desc: 'Recreez la teinte cible en dosant R, G, B',          icon: '🔆', grad: 'linear-gradient(135deg,#f59e0b,#ef4444)', accent: '#f59e0b' },
+                    'puissance4':     { title: 'Puissance 4',        desc: 'Alignez 4 couleurs sur la matrice 6x7',              icon: '🔴', grad: 'linear-gradient(135deg,#ff2828,#2850ff)', accent: '#ff2828' },
+                    'chasseur-gamut': { title: 'Chasseur de Gamut',  desc: 'Localisez la couleur sur le diagramme CIE 1931',    icon: '🎯', grad: 'linear-gradient(135deg,#06d6a0,#4361ee)', accent: '#06d6a0' },
+                  };
+                  const m = META[gameId];
+                  const isSelected = activeBuiltinGame === gameId;
+                  return (
+                    <div key={gameId}
+                      className={`game-card${isSelected ? ' selected' : ''}`}
+                      style={{ marginBottom: 8 }}
+                      onClick={() => {
+                        setTetrisStandalone(false);
+                        setCustomRun(null);
+                        setHudRun(null);
+                        setCurrentGame(null);
+                        setSimonActive(false);
+                        setActiveBuiltinGame(gameId);
+                        setGameActive(true);
+                        setMessage(m.title + " — c'est parti !");
+                      }}
+                      role="button" tabIndex={0}
+                    >
+                      <div className="game-icon" style={{ background: m.grad, fontSize: 20 }}>{m.icon}</div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
+                          <h4>{m.title}</h4>
+                          <span style={{ fontSize: 10, fontWeight: 700, color: m.accent, background: `${m.accent}22`, padding: '2px 7px', borderRadius: 5 }}>natif</span>
+                        </div>
+                        <p>{m.desc}</p>
+                      </div>
+                      <button className="play-btn"
+                        style={{ background: isSelected ? m.accent : `${m.accent}33`, color: '#fff' }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setTetrisStandalone(false);
+                          setCustomRun(null);
+                          setHudRun(null);
+                          setCurrentGame(null);
+                          setSimonActive(false);
+                          setActiveBuiltinGame(gameId);
+                          setGameActive(true);
+                          setMessage(m.title + " — c'est parti !");
+                        }}
+                      ><Play size={15} /></button>
+                    </div>
+                  );
+                })}
+
                 {dbGamesLoading ? (
                   <div style={{ padding: 20, textAlign: 'center', opacity: 0.75 }}>Chargement des jeux...</div>
                 ) : dbGames.length === 0 ? (
@@ -3696,6 +3770,33 @@ export default function JeuxPage() {
                     />
                   </div>
                 )}
+
+                {/* Nouveaux jeux natifs */}
+                {gameActive && activeBuiltinGame && (() => {
+                  const tileActions = {
+                    onSendColor: (idx: number, r: number, g: number, b: number, intensity = 80) => {
+                      const plateId = PLATE_ID_BY_INDEX[idx];
+                      if (plateId) sendRgbToPlate({ r, g, b }, intensity, plateId);
+                    },
+                    onTurnOff: (idx: number) => {
+                      const plateId = PLATE_ID_BY_INDEX[idx];
+                      if (plateId) turnOffPlateImmediate(plateId);
+                    },
+                    onTurnOffAll: () => {
+                      PLATE_ID_BY_INDEX.forEach((id) => turnOffPlateImmediate(id));
+                    },
+                    onQuit: () => { setActiveBuiltinGame(null); setGameActive(false); },
+                    tileCount: 42,
+                  };
+                  return (
+                    <div style={{ marginTop: 12, borderRadius: 18, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(10,10,18,0.95)' }}>
+                      {activeBuiltinGame === 'color-speed'    && <GameColorSpeed    {...tileActions} />}
+                      {activeBuiltinGame === 'maitre-blanc'   && <GameMaitreDuBlanc {...tileActions} />}
+                      {activeBuiltinGame === 'puissance4'     && <GamePuissance4    {...tileActions} />}
+                      {activeBuiltinGame === 'chasseur-gamut' && <GameChasseurGamut {...tileActions} />}
+                    </div>
+                  );
+                })()}
 
                 {/* Tetris Lumière - si le jeu éditeur contient un noeud game_tetris */}
                 {gameActive && !tetrisStandalone && hudRun && (() => {

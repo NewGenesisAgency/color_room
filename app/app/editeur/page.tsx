@@ -7,7 +7,7 @@ import TetrisGame from '@/app/_components/TetrisGame';
 import CS150Panel from '@/app/_components/CS150Panel';
 import type { TetrisSnapshot } from '@/app/_components/TetrisGame';
 
-import { Boxes, Gamepad2, Plus, Play, Pause, RotateCcw, Save, Trash2, FolderPlus, X, Lightbulb, Layers, Zap, Palette, Clock, MousePointer2, LayoutGrid, Maximize2, Minimize2, Eye, Star, Heart, Sun, Moon, Flame, Snowflake, Music, Target, Puzzle, Sparkles, Trophy, Rocket, Ghost, Dice1, Brain, Check, GitBranch, Hash, Settings2, Shuffle, type LucideIcon } from 'lucide-react';
+import { Boxes, Gamepad2, Plus, Play, Pause, RotateCcw, Save, Trash2, FolderPlus, X, Lightbulb, Layers, Zap, Palette, Clock, MousePointer2, LayoutGrid, Maximize2, Minimize2, Eye, Star, Heart, Sun, Moon, Flame, Snowflake, Music, Target, Puzzle, Sparkles, Trophy, Rocket, Ghost, Dice1, Brain, Check, GitBranch, Hash, Settings2, Shuffle, Search, Users, Film, Thermometer, type LucideIcon } from 'lucide-react';
 
 type IdFactory = () => string;
 
@@ -48,6 +48,10 @@ type EditorNodeKind =
   | 'game_simon'
   | 'game_memory'
   | 'game_spectrum'
+  | 'game_color_speed'
+  | 'game_maitre_blanc'
+  | 'game_puissance4'
+  | 'game_chasseur_gamut'
   | 'on_timer'
   | 'on_click'
   // CS150 Colorimeter nodes
@@ -58,7 +62,24 @@ type EditorNodeKind =
   | 'cs150_set_backlight'
   | 'cs150_set_calib_ch'
   | 'cs150_rgb_calib'
-  | 'cs150_single_calib';
+  | 'cs150_single_calib'
+  // Multijoueur
+  | 'mp_session'
+  | 'mp_wait_players'
+  | 'mp_broadcast'
+  | 'mp_player_input'
+  // Couleur
+  | 'color_mix'
+  | 'color_hsl'
+  | 'color_complement'
+  | 'color_temperature'
+  // Animation
+  | 'anim_fade'
+  | 'anim_strobe'
+  | 'anim_rainbow'
+  | 'anim_wave'
+  // Flux étendu
+  | 'loop_count';
 
 type EditorNode = {
   id: string;
@@ -88,6 +109,8 @@ type GameDoc = {
   description?: string;
   bgColor?: string;
   accentColor?: string;
+  maxPlayers?: number;
+  gameMode?: 'solo' | 'coop' | 'versus';
   nodes: EditorNode[];
   edges: GraphEdge[];
 };
@@ -142,8 +165,28 @@ const NODE_CATALOG: NodeCatalogItem[] = [
   { kind: 'game_simon', category: 'Jeux', title: 'Simon', defaults: { speed: 800, colors: 4 } },
   { kind: 'game_memory', category: 'Jeux', title: 'Mémoire', defaults: { pairs: 8 } },
   { kind: 'game_spectrum', category: 'Jeux', title: 'Spectre Chromatique', defaults: { maxRounds: 5, revealMs: 5000, guessMs: 30000 } },
+  { kind: 'game_color_speed', category: 'Jeux', title: 'Color Speed', defaults: { tileCount: 42, gameDuration: 60 } },
+  { kind: 'game_maitre_blanc', category: 'Jeux', title: 'Le Maître du Blanc', defaults: { rounds: 10, threshold: 0.025 } },
+  { kind: 'game_puissance4', category: 'Jeux', title: 'Puissance 4 Chromatique', defaults: { mode: 'pvp' } },
+  { kind: 'game_chasseur_gamut', category: 'Jeux', title: 'Chasseur de Gamut', defaults: { rounds: 8 } },
+  { kind: 'loop_count', category: 'Flux', title: 'Répéter N fois', defaults: { count: 3 } },
   { kind: 'on_timer', category: 'Évènements', title: 'Timer', defaults: { intervalMs: 1000 } },
   { kind: 'on_click', category: 'Évènements', title: 'On Click', defaults: { tileIndex: 0 } },
+  // Multijoueur
+  { kind: 'mp_session', category: 'Multijoueur', title: 'Session MP', defaults: { maxPlayers: 4, timeoutSec: 300, gameMode: 'versus' } },
+  { kind: 'mp_wait_players', category: 'Multijoueur', title: 'Attendre joueurs', defaults: { minPlayers: 2 } },
+  { kind: 'mp_broadcast', category: 'Multijoueur', title: 'Diffuser couleur', defaults: { color: '#00d7ff', intensity: 0.8 } },
+  { kind: 'mp_player_input', category: 'Multijoueur', title: 'Action joueur', defaults: { seat: 1, timeoutSec: 30 } },
+  // Couleur
+  { kind: 'color_mix', category: 'Couleur', title: 'Mélange couleurs', defaults: { colorA: '#ff0000', colorB: '#0000ff', t: 0.5 } },
+  { kind: 'color_hsl', category: 'Couleur', title: 'Couleur HSL', defaults: { hue: 200, saturation: 80, lightness: 50 } },
+  { kind: 'color_complement', category: 'Couleur', title: 'Complémentaire', defaults: { color: '#ff2200' } },
+  { kind: 'color_temperature', category: 'Couleur', title: 'Température K', defaults: { kelvin: 5500, intensity: 0.8 } },
+  // Animation
+  { kind: 'anim_fade', category: 'Animation', title: 'Fondu', defaults: { fromIntensity: 0, toIntensity: 1, durationMs: 1000, easing: 'linear' } },
+  { kind: 'anim_strobe', category: 'Animation', title: 'Stroboscope', defaults: { color: '#ffffff', hz: 4, durationMs: 2000 } },
+  { kind: 'anim_rainbow', category: 'Animation', title: 'Arc-en-ciel', defaults: { speed: 1.0, durationMs: 5000 } },
+  { kind: 'anim_wave', category: 'Animation', title: 'Vague', defaults: { color: '#00d7ff', direction: 'left', speed: 1.0, durationMs: 3000 } },
   // CS150 Colorimeter nodes
   { kind: 'cs150_connect', category: 'Colorimètre', title: 'CS150 Connect', defaults: {} },
   { kind: 'cs150_measure', category: 'Colorimètre', title: 'CS150 Mesurer', defaults: {} },
@@ -183,6 +226,9 @@ const NODE_CATEGORY_ICONS: Record<string, LucideIcon> = {
   'Dalles': LayoutGrid,
   'Aléatoire': Shuffle,
   'Colorimètre': Lightbulb,
+  'Multijoueur': Users,
+  'Couleur': Layers,
+  'Animation': Film,
 };
 
 const NODE_CATEGORY_COLORS: Record<string, string> = {
@@ -197,6 +243,9 @@ const NODE_CATEGORY_COLORS: Record<string, string> = {
   'Dalles': '#06d6a0',
   'Aléatoire': '#34d399',
   'Colorimètre': '#fbbf24',
+  'Multijoueur': '#38bdf8',
+  'Couleur': '#e879f9',
+  'Animation': '#fb923c',
 };
 
 function clamp255(v: number): number {
@@ -1583,7 +1632,7 @@ export default function EditeurPage() {
     }));
   };
 
-  const updateActiveGameMeta = (patch: Partial<Pick<GameDoc, 'icon' | 'difficulty' | 'description' | 'bgColor' | 'accentColor' | 'tileCount'>>) => {
+  const updateActiveGameMeta = (patch: Partial<Pick<GameDoc, 'icon' | 'difficulty' | 'description' | 'bgColor' | 'accentColor' | 'tileCount' | 'maxPlayers' | 'gameMode'>>) => {
     if (!activeGameId) return;
     commit((cur) => ({
       ...cur,
@@ -1593,6 +1642,9 @@ export default function EditeurPage() {
 
   const [dragBaseSnapshot, setDragBaseSnapshot] = useState<EditorSnapshot | null>(null);
   const [dragDidMove, setDragDidMove] = useState<boolean>(false);
+
+  // Recherche catalogue nœuds
+  const [catalogSearch, setCatalogSearch] = useState<string>('');
 
   const moveNode = (nodeId: string, dx: number, dy: number) => {
     setEditor((cur) => {
@@ -1841,6 +1893,33 @@ export default function EditeurPage() {
                       </div>
                     </div>
 
+                    {/* Mode multijoueur */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                      <label style={{ display: 'grid', gap: 4 }}>
+                        <span className="g-label" style={{ fontSize: 11 }}>Mode</span>
+                        <select
+                          className="g-input"
+                          style={{ height: 36 }}
+                          value={activeGame.gameMode ?? 'solo'}
+                          onChange={(e) => { updateActiveGameMeta({ gameMode: e.target.value as any }); void saveActiveGame(); }}
+                        >
+                          <option value="solo">Solo</option>
+                          <option value="coop">Coop</option>
+                          <option value="versus">Versus</option>
+                        </select>
+                      </label>
+                      <label style={{ display: 'grid', gap: 4 }}>
+                        <span className="g-label" style={{ fontSize: 11 }}>Joueurs max</span>
+                        <input
+                          type="number" min={1} max={8} step={1}
+                          className="g-input"
+                          style={{ height: 36 }}
+                          value={activeGame.maxPlayers ?? 1}
+                          onChange={(e) => { updateActiveGameMeta({ maxPlayers: Number(e.target.value) }); void saveActiveGame(); }}
+                        />
+                      </label>
+                    </div>
+
                     <div>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
                         <span className="g-label">Dalles cibles</span>
@@ -1921,22 +2000,55 @@ export default function EditeurPage() {
                   </button>
                 </div>
 
-                <div className="list panelsection__list">
+                {/* Barre de recherche catalogue */}
+                <div style={{ padding: '10px 14px', borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
+                  <div style={{ position: 'relative' }}>
+                    <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#888', pointerEvents: 'none' }} />
+                    <input
+                      type="text"
+                      placeholder="Rechercher nœud..."
+                      value={catalogSearch}
+                      onChange={(e) => setCatalogSearch(e.target.value)}
+                      style={{ width: '100%', height: 34, paddingLeft: 32, paddingRight: 10, fontSize: 12, border: '1px solid rgba(0,0,0,0.1)', borderRadius: 8, background: '#fff' }}
+                    />
+                    {catalogSearch && (
+                      <button
+                        onClick={() => setCatalogSearch('')}
+                        style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', padding: 2 }}
+                      >
+                        <X size={12} color="#888" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="list panelsection__list" style={{ maxHeight: 320, overflowY: 'auto' }}>
                   {!activeGame ? (
                     <div className="muted">Crée un jeu pour commencer.</div>
                   ) : activeGame.nodes.length === 0 ? (
                     <div className="muted">Aucun noeud. Ajoute un bloc (clic droit) ou double clic pour "Remplissage".</div>
                   ) : (
-                    activeGame.nodes.map((n) => (
-                      <button
-                        key={n.id}
-                        className={n.id === selectedNodeId ? 'list__item list__item--active' : 'list__item'}
-                        onClick={() => commit((cur) => ({ ...cur, selectedNodeId: n.id }))}
-                      >
-                        <span className="list__title">{n.name}</span>
-                        <span className="list__meta">{labelNodeKind(n.kind)}</span>
-                      </button>
-                    ))
+                    (() => {
+                      const q = catalogSearch.trim().toLowerCase();
+                      const filtered = q
+                        ? activeGame.nodes.filter((n) =>
+                            `${n.name} ${labelNodeKind(n.kind)} ${n.kind}`.toLowerCase().includes(q)
+                          )
+                        : activeGame.nodes;
+                      if (filtered.length === 0 && q) {
+                        return <div className="muted" style={{ padding: '12px 14px' }}>Aucun nœud trouvé.</div>;
+                      }
+                      return filtered.map((n) => (
+                        <button
+                          key={n.id}
+                          className={n.id === selectedNodeId ? 'list__item list__item--active' : 'list__item'}
+                          onClick={() => commit((cur) => ({ ...cur, selectedNodeId: n.id }))}
+                        >
+                          <span className="list__title">{n.name}</span>
+                          <span className="list__meta">{labelNodeKind(n.kind)}</span>
+                        </button>
+                      ));
+                    })()
                   )}
                 </div>
               </div>
@@ -2973,6 +3085,207 @@ export default function EditeurPage() {
                                   <input type="checkbox" checked={Boolean(n.params.condition)}
                                     onChange={(e) => updateNodeParamsById(n.id, { condition: e.target.checked })} />
                                 </div>
+                              </div>
+                            </div>
+                          ) : n.kind === 'mp_session' ? (
+                            <div className="bp-node__vars" onPointerDown={(e) => e.stopPropagation()}>
+                              <div className="bp-node__varrow">
+                                <div className="bp-node__var">
+                                  <span className="bp-node__varlabel">Mode</span>
+                                  <div className="bp-node__varctrl">
+                                    <select className="bp-node__varselect" value={String(n.params.gameMode ?? 'versus')}
+                                      onChange={(e) => updateNodeParamsById(n.id, { gameMode: e.target.value })}>
+                                      <option value="versus">Versus</option>
+                                      <option value="coop">Coop</option>
+                                    </select>
+                                  </div>
+                                </div>
+                                <div className="bp-node__var">
+                                  <span className="bp-node__varlabel">Joueurs max</span>
+                                  <div className="bp-node__varctrl">
+                                    <input className="bp-node__varinput" type="number" min={1} max={8} step={1}
+                                      value={getNum(n.params, 'maxPlayers', 4)}
+                                      onChange={(e) => updateNodeParamsById(n.id, { maxPlayers: Number(e.target.value) })} />
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          ) : n.kind === 'mp_wait_players' ? (
+                            <div className="bp-node__vars" onPointerDown={(e) => e.stopPropagation()}>
+                              <div className="bp-node__var">
+                                <span className="bp-node__varlabel">Min joueurs</span>
+                                <div className="bp-node__varctrl">
+                                  <input className="bp-node__varinput" type="number" min={1} max={8} step={1}
+                                    value={getNum(n.params, 'minPlayers', 2)}
+                                    onChange={(e) => updateNodeParamsById(n.id, { minPlayers: Number(e.target.value) })} />
+                                </div>
+                              </div>
+                            </div>
+                          ) : n.kind === 'mp_broadcast' ? (
+                            <div className="bp-node__vars" onPointerDown={(e) => e.stopPropagation()}>
+                              <div className="bp-node__varrow">
+                                <div className="bp-node__var">
+                                  <span className="bp-node__varlabel">Int.</span>
+                                  <div className="bp-node__varctrl">
+                                    <input className="bp-node__varrange" type="range" min={0} max={1} step={0.01}
+                                      value={clamp01(getNum(n.params, 'intensity', 0.8))}
+                                      onChange={(e) => updateNodeParamsById(n.id, { intensity: Number(e.target.value) })} />
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="bp-node__color">
+                                <div className="bp-node__colorpreview" style={{ background: getColor(n.params, 'color', '#00d7ff') }} />
+                                <input className="bp-node__colorinput" type="color"
+                                  value={getColor(n.params, 'color', '#00d7ff')}
+                                  onChange={(e) => updateNodeParamsById(n.id, { color: e.target.value })} />
+                              </div>
+                            </div>
+                          ) : n.kind === 'mp_player_input' ? (
+                            <div className="bp-node__vars" onPointerDown={(e) => e.stopPropagation()}>
+                              <div className="bp-node__varrow">
+                                <div className="bp-node__var">
+                                  <span className="bp-node__varlabel">Siège</span>
+                                  <div className="bp-node__varctrl">
+                                    <select className="bp-node__varselect" value={Math.max(1, Math.round(getNum(n.params, 'seat', 1)))}
+                                      onChange={(e) => updateNodeParamsById(n.id, { seat: Number(e.target.value) })}>
+                                      {Array.from({ length: 8 }, (_, i) => <option key={i} value={i + 1}>J{i + 1}</option>)}
+                                    </select>
+                                  </div>
+                                </div>
+                                <div className="bp-node__var">
+                                  <span className="bp-node__varlabel">Timeout (s)</span>
+                                  <div className="bp-node__varctrl">
+                                    <input className="bp-node__varinput" type="number" min={5} max={300} step={5}
+                                      value={getNum(n.params, 'timeoutSec', 30)}
+                                      onChange={(e) => updateNodeParamsById(n.id, { timeoutSec: Number(e.target.value) })} />
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          ) : n.kind === 'color_mix' ? (
+                            <div className="bp-node__vars" onPointerDown={(e) => e.stopPropagation()}>
+                              <div className="bp-node__varrow">
+                                <div className="bp-node__var">
+                                  <span className="bp-node__varlabel">Mix (0-1)</span>
+                                  <div className="bp-node__varctrl">
+                                    <input className="bp-node__varrange" type="range" min={0} max={1} step={0.01}
+                                      value={clamp01(getNum(n.params, 't', 0.5))}
+                                      onChange={(e) => updateNodeParamsById(n.id, { t: Number(e.target.value) })} />
+                                  </div>
+                                </div>
+                              </div>
+                              <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                                <div className="bp-node__color" style={{ flex: 1 }}>
+                                  <div className="bp-node__colorpreview" style={{ background: getColor(n.params, 'colorA', '#ff0000') }} />
+                                  <input className="bp-node__colorinput" type="color"
+                                    value={getColor(n.params, 'colorA', '#ff0000')}
+                                    onChange={(e) => updateNodeParamsById(n.id, { colorA: e.target.value })} />
+                                </div>
+                                <div className="bp-node__color" style={{ flex: 1 }}>
+                                  <div className="bp-node__colorpreview" style={{ background: getColor(n.params, 'colorB', '#0000ff') }} />
+                                  <input className="bp-node__colorinput" type="color"
+                                    value={getColor(n.params, 'colorB', '#0000ff')}
+                                    onChange={(e) => updateNodeParamsById(n.id, { colorB: e.target.value })} />
+                                </div>
+                              </div>
+                            </div>
+                          ) : n.kind === 'color_hsl' ? (
+                            <div className="bp-node__vars" onPointerDown={(e) => e.stopPropagation()}>
+                              <div className="bp-node__varrow">
+                                <div className="bp-node__var">
+                                  <span className="bp-node__varlabel">Teinte</span>
+                                  <div className="bp-node__varctrl">
+                                    <input className="bp-node__varinput" type="number" min={0} max={360} step={1}
+                                      value={getNum(n.params, 'hue', 200)}
+                                      onChange={(e) => updateNodeParamsById(n.id, { hue: Number(e.target.value) })} />
+                                  </div>
+                                </div>
+                                <div className="bp-node__var">
+                                  <span className="bp-node__varlabel">Saturation %</span>
+                                  <div className="bp-node__varctrl">
+                                    <input className="bp-node__varinput" type="number" min={0} max={100} step={1}
+                                      value={getNum(n.params, 'saturation', 80)}
+                                      onChange={(e) => updateNodeParamsById(n.id, { saturation: Number(e.target.value) })} />
+                                  </div>
+                                </div>
+                                <div className="bp-node__var">
+                                  <span className="bp-node__varlabel">Luminosité %</span>
+                                  <div className="bp-node__varctrl">
+                                    <input className="bp-node__varinput" type="number" min={0} max={100} step={1}
+                                      value={getNum(n.params, 'lightness', 50)}
+                                      onChange={(e) => updateNodeParamsById(n.id, { lightness: Number(e.target.value) })} />
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          ) : n.kind === 'anim_fade' ? (
+                            <div className="bp-node__vars" onPointerDown={(e) => e.stopPropagation()}>
+                              <div className="bp-node__varrow">
+                                <div className="bp-node__var">
+                                  <span className="bp-node__varlabel">De</span>
+                                  <div className="bp-node__varctrl">
+                                    <input className="bp-node__varrange" type="range" min={0} max={1} step={0.01}
+                                      value={clamp01(getNum(n.params, 'fromIntensity', 0))}
+                                      onChange={(e) => updateNodeParamsById(n.id, { fromIntensity: Number(e.target.value) })} />
+                                  </div>
+                                </div>
+                                <div className="bp-node__var">
+                                  <span className="bp-node__varlabel">À</span>
+                                  <div className="bp-node__varctrl">
+                                    <input className="bp-node__varrange" type="range" min={0} max={1} step={0.01}
+                                      value={clamp01(getNum(n.params, 'toIntensity', 1))}
+                                      onChange={(e) => updateNodeParamsById(n.id, { toIntensity: Number(e.target.value) })} />
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="bp-node__varrow">
+                                <div className="bp-node__var">
+                                  <span className="bp-node__varlabel">Durée (ms)</span>
+                                  <div className="bp-node__varctrl">
+                                    <input className="bp-node__varinput" type="number" min={100} max={30000} step={100}
+                                      value={getNum(n.params, 'durationMs', 1000)}
+                                      onChange={(e) => updateNodeParamsById(n.id, { durationMs: Number(e.target.value) })} />
+                                  </div>
+                                </div>
+                                <div className="bp-node__var">
+                                  <span className="bp-node__varlabel">Easing</span>
+                                  <div className="bp-node__varctrl">
+                                    <select className="bp-node__varselect" value={String(n.params.easing ?? 'linear')}
+                                      onChange={(e) => updateNodeParamsById(n.id, { easing: e.target.value })}>
+                                      <option value="linear">Linear</option>
+                                      <option value="easeIn">Ease In</option>
+                                      <option value="easeOut">Ease Out</option>
+                                      <option value="easeInOut">Ease In-Out</option>
+                                    </select>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          ) : n.kind === 'anim_strobe' ? (
+                            <div className="bp-node__vars" onPointerDown={(e) => e.stopPropagation()}>
+                              <div className="bp-node__varrow">
+                                <div className="bp-node__var">
+                                  <span className="bp-node__varlabel">Hz</span>
+                                  <div className="bp-node__varctrl">
+                                    <input className="bp-node__varinput" type="number" min={1} max={30} step={1}
+                                      value={getNum(n.params, 'hz', 4)}
+                                      onChange={(e) => updateNodeParamsById(n.id, { hz: Number(e.target.value) })} />
+                                  </div>
+                                </div>
+                                <div className="bp-node__var">
+                                  <span className="bp-node__varlabel">Durée (ms)</span>
+                                  <div className="bp-node__varctrl">
+                                    <input className="bp-node__varinput" type="number" min={500} max={30000} step={500}
+                                      value={getNum(n.params, 'durationMs', 2000)}
+                                      onChange={(e) => updateNodeParamsById(n.id, { durationMs: Number(e.target.value) })} />
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="bp-node__color">
+                                <div className="bp-node__colorpreview" style={{ background: getColor(n.params, 'color', '#ffffff') }} />
+                                <input className="bp-node__colorinput" type="color"
+                                  value={getColor(n.params, 'color', '#ffffff')}
+                                  onChange={(e) => updateNodeParamsById(n.id, { color: e.target.value })} />
                               </div>
                             </div>
                           ) : null}
