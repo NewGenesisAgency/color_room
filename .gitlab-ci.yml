@@ -1,7 +1,48 @@
 stages:
+  - pretest
+  - test
+  - build
   - deploy
 
-deploy:
+
+# 1. PRETEST : Vérification de la qualité du code (Linting)
+pretest_job:
+  stage: pretest
+  tags:
+    - raspberry
+  only:
+    - ux-app
+  script:
+    - echo "Vérification de la syntaxe et du formatage du code..."
+    # - insérer ici ta commande de linter (ex: npm run lint, flake8, etc.)
+
+
+# 2. TEST : Lancement des tests unitaires
+test_job:
+  stage: test
+  tags:
+    - raspberry
+  only:
+    - ux-app
+  script:
+    - echo "Lancement des tests automatisés..."
+    # - insérer ici ta commande de test (ex: npm test, pytest, dotnet test, etc.)
+
+# 3. BUILD : Construction des images Docker
+build_job:
+  stage: build
+  tags:
+    - raspberry
+  only:
+    - ux-app
+  script:
+    - echo "Construction des images Docker..."
+    - cd $CI_PROJECT_DIR
+    # On construit l'image ici, mais on ne lance pas les conteneurs
+    - docker compose build
+
+# 4. DEPLOY : Lancement de l'application
+deploy_job:
   stage: deploy
   tags:
     - raspberry
@@ -11,5 +52,6 @@ deploy:
     - echo "Début du déploiement sur le Raspberry Pi..."
     - cd $CI_PROJECT_DIR
     - docker compose down --remove-orphans
-    - docker compose up --build -d
+    # Plus besoin de --build ici, l'étape précédente s'en est chargée !
+    - docker compose up -d
     - echo "Déploiement terminé - App disponible sur http://localhost:8080"
