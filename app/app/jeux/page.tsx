@@ -705,7 +705,7 @@ export default function JeuxPage() {
   const [hardwarePreviewCss, setHardwarePreviewCss] = useState<string>('rgb(0,0,0)');
 
   const [ledValues, setLedValues] = useState<Record<number, number>>({});
-  const [message, setMessage] = useState<string>('Sélectionnez un jeu et cliquez sur "Démarrer le Jeu"');
+  const [message, setMessage] = useState<string>('');
 
   const [masterIntensity, setMasterIntensity] = useState<number>(80);
   const [beginnerRgb, setBeginnerRgb] = useState<TargetColor>({ r: 0, g: 0, b: 0 });
