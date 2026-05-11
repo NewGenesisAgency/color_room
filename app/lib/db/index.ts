@@ -55,6 +55,16 @@ function migrate(db: Database.Database) {
     "CREATE TABLE IF NOT EXISTS crg_games (id TEXT PRIMARY KEY, created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now')), name TEXT NOT NULL, kind TEXT NOT NULL, config_json TEXT NOT NULL DEFAULT '{}');",
   );
   db.exec('CREATE INDEX IF NOT EXISTS idx_crg_games_updated ON crg_games(updated_at);');
+
+  db.exec(
+    "CREATE TABLE IF NOT EXISTS crg_users (id TEXT PRIMARY KEY, username TEXT NOT NULL UNIQUE, role TEXT NOT NULL, password_hash TEXT, niveau TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')));",
+  );
+  db.exec('CREATE INDEX IF NOT EXISTS idx_crg_users_role ON crg_users(role);');
+
+  db.exec(
+    "CREATE TABLE IF NOT EXISTS crg_sessions (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, token TEXT NOT NULL UNIQUE, expires_at TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now')), FOREIGN KEY(user_id) REFERENCES crg_users(id));",
+  );
+  db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_crg_sessions_token ON crg_sessions(token);');
 }
 
 export function getDb(): Database.Database {

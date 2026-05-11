@@ -7,7 +7,9 @@ import GameColorSpeed from '@/app/_components/GameColorSpeed';
 import GameMaitreDuBlanc from '@/app/_components/GameMaitreDuBlanc';
 import GamePuissance4 from '@/app/_components/GamePuissance4';
 import GameChasseurGamut from '@/app/_components/GameChasseurGamut';
+import GameMetamerisme from '@/app/_components/GameMetamerisme';
 import NavigationMenu from '@/app/_components/NavigationMenu';
+import LoginScreen from '@/app/_components/LoginScreen';
 import {
   Activity,
   AlertTriangle,
@@ -41,6 +43,8 @@ import {
   Trophy,
   XCircle,
   Zap,
+  Grid,
+  Crosshair,
 } from 'lucide-react';
 
 type UserType = 'apprenant' | 'enseignant';
@@ -678,8 +682,13 @@ export default function JeuxPage() {
   const hudRunRef = useRef<{ gameId: string; name: string; cfg: EditorGameConfigV1; showHud: boolean } | null>(null);
   const [view, setView] = useState<'login' | 'main'>('login');
   const [userType, setUserType] = useState<UserType>('apprenant');
-  const [username, setUsername] = useState<string>('Apprenant1');
+  const [username, setUsername] = useState<string>('');
   const [niveau, setNiveau] = useState<Niveau>('lycee');
+  const [password, setPassword] = useState<string>('');
+  const [loginStep, setLoginStep] = useState<'role' | 'form' | 'setup'>('role');
+  const [loginLoading, setLoginLoading] = useState(false);
+  const [hasTeacher, setHasTeacher] = useState(true);
+  const [sessionChecked, setSessionChecked] = useState(false);
 
   const [currentUser, setCurrentUser] = useState<string | null>(null);
   const [score, setScore] = useState<number>(0);
@@ -759,7 +768,7 @@ export default function JeuxPage() {
   const [simonActive, setSimonActive] = useState<boolean>(false);
 
   // Nouveaux jeux natifs
-  const [activeBuiltinGame, setActiveBuiltinGame] = useState<'color-speed' | 'maitre-blanc' | 'puissance4' | 'chasseur-gamut' | null>(null);
+  const [activeBuiltinGame, setActiveBuiltinGame] = useState<'color-speed' | 'maitre-blanc' | 'puissance4' | 'chasseur-gamut' | 'metamere' | null>(null);
   const [simonSequence, setSimonSequence] = useState<number[]>([]);
   const [simonPlayerInput, setSimonPlayerInput] = useState<number[]>([]);
   const [simonLevel, setSimonLevel] = useState<number>(1);
@@ -890,7 +899,7 @@ export default function JeuxPage() {
       fetch('/api/supervision/batch', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ plateId: plaqueId, channels: channelArray }),
+        body: JSON.stringify({ plateId: plaqueId, channels: channelArray, fast: true }),
         cache: 'no-store',
       }).catch(() => {});
     }, 20));
@@ -899,8 +908,7 @@ export default function JeuxPage() {
   function sendRgbToPlate(rgb: TargetColor, intensity100: number, plateId: number) {
     const channels32 = rgbToChannels32(rgb, intensity100);
     for (let i = 0; i < 32; i++) {
-      const v = clamp255(channels32[i] ?? 0);
-      if (v > 0) scheduleSetCanal(plateId, i, v);
+      scheduleSetCanal(plateId, i, clamp255(channels32[i] ?? 0));
     }
   }
 
@@ -1040,12 +1048,28 @@ export default function JeuxPage() {
     setSelectedPlatesColor(css, true);
   }
 
+  // Cancel all pending scheduleSetCanal debounce timers so they can't re-light
+  // plates after a blackout/stop.
+  function cancelPendingHardware() {
+    hwBatchTimersRef.current.forEach(id => window.clearTimeout(id));
+    hwBatchTimersRef.current.clear();
+    hwBatchPendingRef.current.clear();
+    hwLastSentRef.current = {}; // reset cache so future commands always go through
+  }
+
   async function blackoutHardware() {
-    try {
-      await fetch('/api/supervision/', { method: 'PUT', cache: 'no-store' });
-    } catch {
-      // ignore
-    }
+    cancelPendingHardware();
+    const OFF = Array.from({ length: 32 }, (_, i) => ({ index: i, value: 0 }));
+    await Promise.all(
+      PLATE_ID_BY_INDEX.map(plateId =>
+        fetch('/api/supervision/batch', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ plateId, channels: OFF }),
+          cache: 'no-store',
+        }).catch(() => {})
+      )
+    );
   }
 
   function hexToRgb255(hex: string): TargetColor {
@@ -1131,7 +1155,7 @@ export default function JeuxPage() {
     }
 
     syncTetrisToHardware(); // sync initial
-    const iv = setInterval(syncTetrisToHardware, 300); // poll toutes les 300ms pour fluidité
+    const iv = setInterval(syncTetrisToHardware, 80); // poll toutes les 80ms pour fluidité
     return () => {
       clearInterval(iv);
       // Blackout quand on quitte le Tetris
@@ -1241,22 +1265,25 @@ export default function JeuxPage() {
     const snoozed = window.localStorage.getItem('crg_mp_snooze_session') ?? '';
     if (snoozed) setMpSnoozedSessionId(snoozed);
 
-    // Load user with expiration check
-    const savedUser = window.localStorage.getItem('crg_user');
-    if (savedUser) {
-      try {
-        const parsed = JSON.parse(savedUser);
-        if (parsed.expiresAt && Date.now() > parsed.expiresAt) {
-          window.localStorage.removeItem('crg_user');
-          window.localStorage.removeItem('crg_user_type');
-        } else {
-          setCurrentUser(parsed.name);
-          if (parsed.role) setUserType(parsed.role);
+    // Restore session from server cookie
+    void fetch('/api/auth/me', { cache: 'no-store' })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.user) {
+          setCurrentUser(data.user.username);
+          setUserType(data.user.role as UserType);
+          if (data.user.niveau) setNiveau(data.user.niveau as Niveau);
+          setView('main');
         }
-      } catch {
-        // ignore parse errors
-      }
-    }
+        setSessionChecked(true);
+      })
+      .catch(() => setSessionChecked(true));
+
+    // Check if teacher account exists (for setup)
+    void fetch('/api/auth/setup', { cache: 'no-store' })
+      .then((r) => r.json())
+      .then((data) => setHasTeacher(data.hasTeacher ?? true))
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -1895,6 +1922,7 @@ export default function JeuxPage() {
   };
 
   function resetScene() {
+    cancelPendingHardware(); // annule les debounce en vol avant le blackout
     setPlateColors(Array(42).fill('#000000'));
     setPlateActive(Array(42).fill(false));
     setLedValues({});
@@ -1904,39 +1932,71 @@ export default function JeuxPage() {
     void blackoutHardware();
   }
 
-  function login() {
+  async function login() {
     if (!username.trim()) {
       setMessage('Veuillez entrer votre nom');
       return;
     }
-
-    const trimmedUsername = username.trim();
-    setCurrentUser(trimmedUsername);
-    if (typeof window !== 'undefined') {
-      window.localStorage.setItem('crg_user_type', userType);
-      // Save user with 30-day expiration
-      const userData = {
-        name: trimmedUsername,
-        role: userType,
-        expiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000, // 30 days
-      };
-      window.localStorage.setItem('crg_user', JSON.stringify(userData));
+    setLoginLoading(true);
+    setMessage('');
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ username: username.trim(), password, niveau, role: userType }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        setMessage(data.error ?? 'Erreur de connexion');
+        return;
+      }
+      setCurrentUser(data.user.username);
+      setUserType(data.user.role as UserType);
+      if (data.user.niveau) setNiveau(data.user.niveau as Niveau);
+      setView('main');
+      setScore(0);
+      setGamesCompleted(0);
+      updateLeaderboard(0, niveau, data.user.username);
+    } catch {
+      setMessage('Erreur réseau');
+    } finally {
+      setLoginLoading(false);
     }
-    setView('main');
-    setScore(0);
-    setGamesCompleted(0);
-    updateLeaderboard(0, niveau, trimmedUsername);
+  }
+
+  async function setupTeacher(setupUsername: string, setupPassword: string) {
+    setLoginLoading(true);
+    setMessage('');
+    try {
+      const res = await fetch('/api/auth/setup', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ username: setupUsername, password: setupPassword }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        setMessage(data.error ?? 'Erreur création compte');
+        return;
+      }
+      setHasTeacher(true);
+      setLoginStep('form');
+      setMessage('Compte créé ! Vous pouvez vous connecter.');
+    } catch {
+      setMessage('Erreur réseau');
+    } finally {
+      setLoginLoading(false);
+    }
   }
 
   function logout() {
+    void fetch('/api/auth/logout', { method: 'POST' }).catch(() => {});
     setCurrentUser(null);
     setView('login');
+    setLoginStep('role');
+    setUsername('');
+    setPassword('');
     setGameActive(false);
     setCurrentGame(null);
-    if (typeof window !== 'undefined') {
-      window.localStorage.removeItem('crg_user_type');
-      window.localStorage.removeItem('crg_user');
-    }
     setScore(0);
     setGamesCompleted(0);
     setMessage('Sélectionnez un jeu et cliquez sur "Démarrer le Jeu"');
@@ -2009,6 +2069,14 @@ export default function JeuxPage() {
         body: JSON.stringify({ token: mpToken || undefined }),
       }).catch(() => null);
     }
+
+    // Annuler tous les timers hardware en attente AVANT de changer les états React
+    // (évite que les debounce 20ms rallument des dalles après le blackout)
+    cancelPendingHardware();
+
+    // Éteindre immédiatement toutes les dalles des jeux natifs
+    PLATE_ID_BY_INDEX.forEach(id => turnOffPlateImmediate(id));
+
     setGameActive(false);
     setCustomRun(null);
     setHudRun(null);
@@ -2555,17 +2623,11 @@ export default function JeuxPage() {
   // Send color to a specific plate with batch API - OPTIMIZED: only non-zero channels
   function sendColorToPlateImmediate(rgb: TargetColor, intensity100: number, plateId: number) {
     const channels32 = rgbToChannels32(rgb, intensity100);
-    
-    // Only send channels with non-zero values (typically ~5 instead of 32)
-    const channels = channels32
-      .map((v, i) => ({ index: i, value: clamp255(v ?? 0) }))
-      .filter(ch => ch.value > 0);
-
-    // Fire-and-forget with short timeout for games
+    const channels = channels32.map((v, i) => ({ index: i, value: clamp255(v ?? 0) }));
     fetch('/api/supervision/batch', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ plateId, channels }),
+      body: JSON.stringify({ plateId, channels, fast: true }),
       cache: 'no-store',
     }).catch(() => {});
   }
@@ -2591,8 +2653,7 @@ export default function JeuxPage() {
     const plates = platesData.map(({ plateId, rgb, intensity }) => {
       const channels32 = rgbToChannels32(rgb, intensity);
       const channels = channels32
-        .map((v, i) => ({ index: i, value: clamp255(v ?? 0) }))
-        .filter(ch => ch.value > 0);
+        .map((v, i) => ({ index: i, value: clamp255(v ?? 0) }));
       return { plateId, channels };
     });
 
@@ -3293,42 +3354,24 @@ export default function JeuxPage() {
       ) : null}
 
       {view === 'login' ? (
-        <div className="login-wrap">
-          <div className="login-box glass">
-            <h2>Connexion</h2>
-            <p className="login-sub">Identifiez-vous pour accéder aux jeux</p>
-            <div className="form-group">
-              <label>Type d'utilisateur</label>
-              <select value={userType} onChange={(e) => setUserType(e.target.value as UserType)}>
-                <option value="apprenant">Apprenant</option>
-                <option value="enseignant">Enseignant</option>
-              </select>
-            </div>
-
-            <div className="form-group">
-              <label>Nom d'utilisateur</label>
-              <input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="Votre nom" />
-            </div>
-
-            {userType === 'apprenant' ? (
-              <div className="form-group">
-                <label>Niveau</label>
-                <select value={niveau} onChange={(e) => setNiveau(e.target.value as Niveau)}>
-                  <option value="college">Collège</option>
-                  <option value="lycee">Lycée</option>
-                  <option value="universite">Université</option>
-                  <option value="grand-public">Grand Public</option>
-                </select>
-              </div>
-            ) : null}
-
-            <button className="btn btn-success" onClick={login}>
-              <LogIn size={18} /> Se connecter
-            </button>
-
-            <div style={{ marginTop: 16, fontSize: 12, opacity: 0.75, textAlign: 'center' }}>{message}</div>
-          </div>
-        </div>
+        <LoginScreen
+          loginStep={loginStep}
+          setLoginStep={setLoginStep}
+          userType={userType}
+          setUserType={setUserType}
+          username={username}
+          setUsername={setUsername}
+          password={password}
+          setPassword={setPassword}
+          niveau={niveau}
+          setNiveau={setNiveau}
+          message={message}
+          loginLoading={loginLoading}
+          hasTeacher={hasTeacher}
+          sessionChecked={sessionChecked}
+          onLogin={login}
+          onSetup={setupTeacher}
+        />
       ) : (
         <div className="container">
           <div className="dashboard" style={{ paddingTop: 4 }}>
@@ -3481,12 +3524,13 @@ export default function JeuxPage() {
                 </div>
 
                 {/* Color Speed */}
-                {(['color-speed', 'maitre-blanc', 'puissance4', 'chasseur-gamut'] as const).map((gameId) => {
-                  const META: Record<string, { title: string; desc: string; icon: string; grad: string; accent: string }> = {
-                    'color-speed':    { title: 'Color Speed',        desc: "Cliquez la dalle qui s'allume — réflexes !",       icon: '⚡', grad: 'linear-gradient(135deg,#4361ee,#7c3aed)', accent: '#7c3aed' },
-                    'maitre-blanc':   { title: 'Le Maître du Blanc', desc: 'Recreez la teinte cible en dosant R, G, B',          icon: '🔆', grad: 'linear-gradient(135deg,#f59e0b,#ef4444)', accent: '#f59e0b' },
-                    'puissance4':     { title: 'Puissance 4',        desc: 'Alignez 4 couleurs sur la matrice 6x7',              icon: '🔴', grad: 'linear-gradient(135deg,#ff2828,#2850ff)', accent: '#ff2828' },
-                    'chasseur-gamut': { title: 'Chasseur de Gamut',  desc: 'Localisez la couleur sur le diagramme CIE 1931',    icon: '🎯', grad: 'linear-gradient(135deg,#06d6a0,#4361ee)', accent: '#06d6a0' },
+                {(['color-speed', 'maitre-blanc', 'puissance4', 'chasseur-gamut', 'metamere'] as const).map((gameId) => {
+                  const META: Record<string, { title: string; desc: string; Icon: React.ComponentType<{ size?: number; color?: string }>; grad: string; accent: string }> = {
+                    'color-speed':    { title: 'Color Speed',        desc: "Cliquez la dalle qui s'allume — réflexes !",      Icon: Zap,        grad: 'linear-gradient(135deg,#4361ee,#7c3aed)', accent: '#7c3aed' },
+                    'maitre-blanc':   { title: 'Le Maître du Blanc', desc: 'Recréez la teinte cible en dosant R, G, B',        Icon: Sun,        grad: 'linear-gradient(135deg,#f59e0b,#ef4444)', accent: '#f59e0b' },
+                    'puissance4':     { title: 'Puissance 4',        desc: 'Alignez 4 couleurs sur la matrice 6×7',             Icon: Grid,    grad: 'linear-gradient(135deg,#ff2828,#2850ff)', accent: '#ff2828' },
+                    'chasseur-gamut': { title: 'Chasseur de Gamut',  desc: 'Localisez la couleur sur le diagramme CIE 1931',  Icon: Crosshair,  grad: 'linear-gradient(135deg,#06d6a0,#4361ee)', accent: '#06d6a0' },
+                    'metamere':       { title: 'Métamérie',           desc: 'Trouvez l\'éclairage qui cache ou révèle le texte', Icon: Sparkles,   grad: 'linear-gradient(135deg,#7c3aed,#06d6a0)', accent: '#06d6a0' },
                   };
                   const m = META[gameId];
                   const isSelected = activeBuiltinGame === gameId;
@@ -3506,7 +3550,7 @@ export default function JeuxPage() {
                       }}
                       role="button" tabIndex={0}
                     >
-                      <div className="game-icon" style={{ background: m.grad, fontSize: 20 }}>{m.icon}</div>
+                      <div className="game-icon" style={{ background: m.grad }}><m.Icon size={20} color="#fff" /></div>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
                           <h4>{m.title}</h4>
@@ -3531,6 +3575,29 @@ export default function JeuxPage() {
                     </div>
                   );
                 })}
+
+                {/* Spectre Chromatique — opens in new tab */}
+                <div
+                  className="game-card"
+                  style={{ marginBottom: 8 }}
+                  onClick={() => window.open('/spectre', '_blank')}
+                  role="button" tabIndex={0}
+                >
+                  <div className="game-icon" style={{ background: 'linear-gradient(135deg,#8b5cf6,#06d6a0)' }}>
+                    <Palette size={20} color="#fff" />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
+                      <h4>Spectre Chromatique</h4>
+                      <span style={{ fontSize: 10, fontWeight: 700, color: '#8b5cf6', background: '#8b5cf622', padding: '2px 7px', borderRadius: 5 }}>multi</span>
+                    </div>
+                    <p>Mémorisez et reproduisez une couleur — jusqu'à 8 joueurs</p>
+                  </div>
+                  <button className="play-btn"
+                    style={{ background: '#8b5cf633', color: '#fff' }}
+                    onClick={(e) => { e.stopPropagation(); window.open('/spectre', '_blank'); }}
+                  ><Play size={15} /></button>
+                </div>
 
                 {dbGamesLoading ? (
                   <div style={{ padding: 20, textAlign: 'center', opacity: 0.75 }}>Chargement des jeux...</div>
@@ -3776,7 +3843,7 @@ export default function JeuxPage() {
                   const tileActions = {
                     onSendColor: (idx: number, r: number, g: number, b: number, intensity = 80) => {
                       const plateId = PLATE_ID_BY_INDEX[idx];
-                      if (plateId) sendRgbToPlate({ r, g, b }, intensity, plateId);
+                      if (plateId) sendColorToPlateImmediate({ r, g, b }, intensity, plateId);
                     },
                     onTurnOff: (idx: number) => {
                       const plateId = PLATE_ID_BY_INDEX[idx];
@@ -3794,6 +3861,7 @@ export default function JeuxPage() {
                       {activeBuiltinGame === 'maitre-blanc'   && <GameMaitreDuBlanc {...tileActions} />}
                       {activeBuiltinGame === 'puissance4'     && <GamePuissance4    {...tileActions} />}
                       {activeBuiltinGame === 'chasseur-gamut' && <GameChasseurGamut {...tileActions} />}
+                      {activeBuiltinGame === 'metamere'       && <GameMetamerisme   {...tileActions} />}
                     </div>
                   );
                 })()}
