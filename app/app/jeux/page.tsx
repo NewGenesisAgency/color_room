@@ -825,6 +825,9 @@ export default function JeuxPage() {
   const hwBatchPendingRef = useRef<Map<number, Record<number, number>>>(new Map());
   const hwBatchTimersRef = useRef<Map<number, number>>(new Map());
   const tetrisSnapRef = useRef<TetrisSnapshot | null>(null);
+  // Tile batching refs for game components (8ms window → single multi-plate request)
+  const tileColorBatchRef = useRef<Map<number, { r: number; g: number; b: number; intensity: number }>>(new Map());
+  const tileColorFlushRef = useRef<number>(0);
 
   const [sceneApplyScope, setSceneApplyScope] = useState<'selected' | 'all'>('selected');
 
@@ -3843,14 +3846,33 @@ export default function JeuxPage() {
                   const tileActions = {
                     onSendColor: (idx: number, r: number, g: number, b: number, intensity = 80) => {
                       const plateId = PLATE_ID_BY_INDEX[idx];
-                      if (plateId) sendColorToPlateImmediate({ r, g, b }, intensity, plateId);
+                      if (!plateId) return;
+                      // Buffer calls for 8 ms then flush as a single multi-plate batch
+                      tileColorBatchRef.current.set(plateId, { r, g, b, intensity });
+                      window.clearTimeout(tileColorFlushRef.current);
+                      tileColorFlushRef.current = window.setTimeout(() => {
+                        const entries = Array.from(tileColorBatchRef.current.entries());
+                        tileColorBatchRef.current.clear();
+                        if (entries.length === 0) return;
+                        if (entries.length === 1) {
+                          const [pid, col] = entries[0];
+                          sendColorToPlateImmediate({ r: col.r, g: col.g, b: col.b }, col.intensity, pid);
+                        } else {
+                          sendColorsToPlates(entries.map(([pid, col]) => ({
+                            plateId: pid, rgb: { r: col.r, g: col.g, b: col.b }, intensity: col.intensity,
+                          })));
+                        }
+                      }, 8);
                     },
                     onTurnOff: (idx: number) => {
                       const plateId = PLATE_ID_BY_INDEX[idx];
                       if (plateId) turnOffPlateImmediate(plateId);
                     },
                     onTurnOffAll: () => {
-                      PLATE_ID_BY_INDEX.forEach((id) => turnOffPlateImmediate(id));
+                      // Cancel any pending batch and send global blackout (single PUT /)
+                      tileColorBatchRef.current.clear();
+                      window.clearTimeout(tileColorFlushRef.current);
+                      fetch('/api/supervision/', { method: 'PUT', cache: 'no-store' }).catch(() => {});
                     },
                     onQuit: () => { setActiveBuiltinGame(null); setGameActive(false); },
                     tileCount: 42,
