@@ -9,16 +9,16 @@ export async function GET(req: NextRequest) {
     const db = getDb();
     const row = db
       .prepare(
-        `SELECT s.user_id, u.username, u.role, u.niveau
+        `SELECT s.user_id, u.name, u.user_type, u.niveau
          FROM crg_sessions s
          JOIN crg_users u ON u.id = s.user_id
          WHERE s.token = ? AND s.expires_at > datetime('now')`,
       )
-      .get(token) as { user_id: string; username: string; role: string; niveau: string | null } | undefined;
+      .get(token) as { user_id: string; name: string; user_type: string; niveau: string | null } | undefined;
 
     if (!row) return NextResponse.json({ user: null });
     return NextResponse.json({
-      user: { id: row.user_id, username: row.username, role: row.role, niveau: row.niveau },
+      user: { id: row.user_id, username: row.name, role: row.user_type, niveau: row.niveau },
     });
   } catch {
     return NextResponse.json({ user: null });

@@ -30,8 +30,8 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Mot de passe requis' }, { status: 400 });
       }
       const user = db
-        .prepare("SELECT * FROM crg_users WHERE username = ? AND role = 'enseignant'")
-        .get(username.trim()) as { id: string; username: string; role: string; password_hash: string } | undefined;
+        .prepare("SELECT * FROM crg_users WHERE name = ? AND user_type = 'enseignant'")
+        .get(username.trim()) as { id: string; name: string; user_type: string; password_hash: string } | undefined;
 
       if (!user || !verifyPassword(password, user.password_hash)) {
         return NextResponse.json({ error: 'Identifiants incorrects' }, { status: 401 });
@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
 
       const res = NextResponse.json({
         ok: true,
-        user: { id: user.id, username: user.username, role: 'enseignant', niveau: null },
+        user: { id: user.id, username: user.name, role: 'enseignant', niveau: null },
       });
       res.cookies.set('crg_session', token, {
         httpOnly: true, maxAge: 7 * 24 * 3600, path: '/', sameSite: 'lax',
@@ -56,12 +56,12 @@ export async function POST(req: NextRequest) {
 
     // Apprenant — no password, session only
     let user = db
-      .prepare("SELECT * FROM crg_users WHERE username = ? AND role = 'apprenant'")
-      .get(username.trim()) as { id: string; username: string; role: string; niveau: string } | undefined;
+      .prepare("SELECT * FROM crg_users WHERE name = ? AND user_type = 'apprenant'")
+      .get(username.trim()) as { id: string; name: string; user_type: string; niveau: string } | undefined;
 
     if (!user) {
       const userId = randomBytes(16).toString('hex');
-      db.prepare('INSERT INTO crg_users (id, username, role, niveau) VALUES (?, ?, ?, ?)').run(
+      db.prepare('INSERT INTO crg_users (id, name, user_type, niveau) VALUES (?, ?, ?, ?)').run(
         userId, username.trim(), 'apprenant', niveau ?? 'lycee',
       );
       user = db.prepare('SELECT * FROM crg_users WHERE id = ?').get(userId) as typeof user;
@@ -76,7 +76,7 @@ export async function POST(req: NextRequest) {
 
     const res = NextResponse.json({
       ok: true,
-      user: { id: user!.id, username: user!.username, role: 'apprenant', niveau: user!.niveau },
+      user: { id: user!.id, username: user!.name, role: 'apprenant', niveau: user!.niveau },
     });
     res.cookies.set('crg_session', token, {
       httpOnly: true, maxAge: 7 * 24 * 3600, path: '/', sameSite: 'lax',
