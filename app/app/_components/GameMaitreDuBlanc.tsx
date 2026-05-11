@@ -95,7 +95,7 @@ export default function GameMaitreDuBlanc({ onSendColor, onTurnOff, onTurnOffAll
     if (which === 'b') setPb(val);
 
     const now = Date.now();
-    if (now - lastSendRef.current < 80) return;
+    if (now - lastSendRef.current < 30) return;
     lastSendRef.current = now;
     if (order.length === 0) return;
     const target = TARGETS[order[roundIdx]];
@@ -141,9 +141,9 @@ export default function GameMaitreDuBlanc({ onSendColor, onTurnOff, onTurnOffAll
   useEffect(() => { return () => onTurnOffAll(); }, []);
 
   if (phase === 'ready') return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20, padding: 40 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20, padding: 40, color: '#e8eaf0' }}>
       <div style={{ fontSize: 48 }}>🔆</div>
-      <h2 style={{ fontSize: 22, fontWeight: 800, margin: 0 }}>Le Maître du Blanc</h2>
+      <h2 style={{ fontSize: 22, fontWeight: 800, margin: 0, color: '#e8eaf0' }}>Le Maître du Blanc</h2>
       <p style={{ textAlign: 'center', color: 'rgba(255,255,255,0.7)', maxWidth: 420, lineHeight: 1.6 }}>
         La moitié gauche des dalles affiche un <strong>blanc cible</strong>.<br />
         Réglez vos curseurs R, G, B pour reproduire exactement la même teinte sur la moitié droite.<br />
@@ -160,9 +160,9 @@ export default function GameMaitreDuBlanc({ onSendColor, onTurnOff, onTurnOffAll
   if (phase === 'finished') {
     const total = totalScore + roundScore;
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20, padding: 40 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20, padding: 40, color: '#e8eaf0' }}>
         <div style={{ fontSize: 48 }}>{total >= 7000 ? '🏆' : total >= 4000 ? '🥈' : '🥉'}</div>
-        <h2 style={{ fontSize: 22, fontWeight: 800 }}>Terminé !</h2>
+        <h2 style={{ fontSize: 22, fontWeight: 800, color: '#e8eaf0' }}>Terminé !</h2>
         <div style={{ fontSize: 48, fontWeight: 800, color: '#f59e0b' }}>{total}</div>
         <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.6)' }}>/{TOTAL_ROUNDS * 1000} points</div>
         <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>
@@ -171,6 +171,11 @@ export default function GameMaitreDuBlanc({ onSendColor, onTurnOff, onTurnOffAll
         </div>
       </div>
     );
+  }
+
+  function adaptiveTextColor(r: number, g: number, b: number): string {
+    const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+    return lum > 128 ? 'rgba(0,0,0,0.75)' : 'rgba(255,255,255,0.85)';
   }
 
   const target = order.length > 0 ? TARGETS[order[roundIdx]] : TARGETS[0];
@@ -182,12 +187,12 @@ export default function GameMaitreDuBlanc({ onSendColor, onTurnOff, onTurnOffAll
   const targetxyY = xyzToxyY(targetXYZ);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16, padding: '20px 24px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16, padding: '20px 24px', color: '#e8eaf0' }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div>
           <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>Manche </span>
-          <span style={{ fontWeight: 800 }}>{roundIdx + 1}/{TOTAL_ROUNDS}</span>
+          <span style={{ fontWeight: 800, color: '#e8eaf0' }}>{roundIdx + 1}/{TOTAL_ROUNDS}</span>
         </div>
         <div style={{ textAlign: 'center' }}>
           <span style={{ fontWeight: 800, fontSize: 18, color: '#f59e0b' }}>{totalScore}</span>
@@ -199,13 +204,13 @@ export default function GameMaitreDuBlanc({ onSendColor, onTurnOff, onTurnOffAll
       {/* Color preview comparison */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, borderRadius: 14, overflow: 'hidden' }}>
         <div style={{ padding: 14, background: targetCss, borderRadius: 12, minHeight: 80 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(0,0,0,0.5)', marginBottom: 4 }}>CIBLE</div>
-          <div style={{ fontSize: 13, fontWeight: 800, color: 'rgba(0,0,0,0.7)' }}>{target.name}</div>
-          <div style={{ fontSize: 11, color: 'rgba(0,0,0,0.5)', marginTop: 4 }}>R{target.r} G{target.g} B{target.b}</div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: adaptiveTextColor(target.r, target.g, target.b), marginBottom: 4 }}>CIBLE</div>
+          <div style={{ fontSize: 13, fontWeight: 800, color: adaptiveTextColor(target.r, target.g, target.b) }}>{target.name}</div>
+          <div style={{ fontSize: 11, color: adaptiveTextColor(target.r, target.g, target.b), marginTop: 4 }}>R{target.r} G{target.g} B{target.b}</div>
         </div>
         <div style={{ padding: 14, background: playerCss, borderRadius: 12, minHeight: 80 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(0,0,0,0.5)', marginBottom: 4 }}>VOTRE RÉPONSE</div>
-          <div style={{ fontSize: 13, fontWeight: 800, color: 'rgba(0,0,0,0.7)' }}>R{pr} G{pg} B{pb}</div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: adaptiveTextColor(pr, pg, pb), marginBottom: 4 }}>VOTRE RÉPONSE</div>
+          <div style={{ fontSize: 13, fontWeight: 800, color: adaptiveTextColor(pr, pg, pb) }}>R{pr} G{pg} B{pb}</div>
         </div>
       </div>
 
@@ -254,7 +259,7 @@ export default function GameMaitreDuBlanc({ onSendColor, onTurnOff, onTurnOffAll
             {roundScore >= 800 ? '🎯 Parfait !' : roundScore >= 500 ? '✅ Bien !' : '🎨 Continuez à pratiquer'}
           </div>
           <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)' }}>Distance XYZ : <strong>{dist}</strong> (seuil : {WIN_THRESHOLD})</div>
-          <div style={{ fontSize: 18, fontWeight: 800 }}>+{roundScore} pts</div>
+          <div style={{ fontSize: 18, fontWeight: 800, color: '#e8eaf0' }}>+{roundScore} pts</div>
           <button onClick={nextRound}
             style={{ marginTop: 4, padding: '10px 24px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg,#4361ee,#7c3aed)', color: '#fff', fontWeight: 700, cursor: 'pointer', alignSelf: 'flex-start' }}>
             {roundIdx + 1 < TOTAL_ROUNDS ? 'Manche suivante →' : 'Voir les résultats'}

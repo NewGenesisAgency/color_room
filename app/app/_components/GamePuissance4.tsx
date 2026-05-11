@@ -98,6 +98,15 @@ export default function GamePuissance4({ onSendColor, onTurnOff, onTurnOffAll, o
     }
   }
 
+  function animateDrop(col: number, finalGrid: Grid) {
+    for (let r = 0; r < ROWS; r++) {
+      const idx = tileIdx(r, col);
+      if (idx >= 42) continue;
+      onSendColor(idx, 255, 255, 255, 50);
+    }
+    window.setTimeout(() => syncTilesToHardware(finalGrid), 80);
+  }
+
   function makeMove(col: number) {
     const player = currentPlayerRef.current;
     const next = dropPiece(gridRef.current, col, player);
@@ -105,7 +114,7 @@ export default function GamePuissance4({ onSendColor, onTurnOff, onTurnOffAll, o
 
     gridRef.current = next;
     setGrid([...next.map(r => [...r])] as Grid);
-    syncTilesToHardware(next);
+    animateDrop(col, next);
 
     const w = checkWin(next);
     if (w) {
@@ -177,9 +186,9 @@ export default function GamePuissance4({ onSendColor, onTurnOff, onTurnOffAll, o
   const playerLabel = (p: Cell) => mode === 'pvp' ? `Joueur ${p}` : p === P1 ? 'Vous' : 'IA';
 
   if (phase === 'ready') return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20, padding: 40 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20, padding: 40, color: '#e8eaf0' }}>
       <div style={{ fontSize: 48 }}>🔴🔵</div>
-      <h2 style={{ fontSize: 22, fontWeight: 800, margin: 0 }}>Puissance 4 Chromatique</h2>
+      <h2 style={{ fontSize: 22, fontWeight: 800, margin: 0, color: '#e8eaf0' }}>Puissance 4 Chromatique</h2>
       <p style={{ textAlign: 'center', color: 'rgba(255,255,255,0.7)', maxWidth: 400, lineHeight: 1.6 }}>
         Grille 6×7 sur les dalles Lumen. Alignez 4 couleurs !<br />
         <strong>Flèches</strong> pour choisir la colonne, <strong>Espace</strong> pour valider.
@@ -200,9 +209,9 @@ export default function GamePuissance4({ onSendColor, onTurnOff, onTurnOffAll, o
   );
 
   if (phase === 'finished') return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20, padding: 40 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20, padding: 40, color: '#e8eaf0' }}>
       <div style={{ fontSize: 48 }}>{winner ? '🏆' : '🤝'}</div>
-      <h2 style={{ fontSize: 22, fontWeight: 800 }}>{winMsg}</h2>
+      <h2 style={{ fontSize: 22, fontWeight: 800, color: '#e8eaf0' }}>{winMsg}</h2>
       <div style={{ display: 'flex', gap: 12 }}>
         <button onClick={startGame} style={{ padding: '12px 28px', borderRadius: 12, border: 'none', background: 'linear-gradient(135deg,#ff2828,#2850ff)', color: '#fff', fontWeight: 700, cursor: 'pointer' }}>Rejouer</button>
         <button onClick={onQuit} style={{ padding: '12px 20px', borderRadius: 12, border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.08)', color: '#fff', fontWeight: 600, cursor: 'pointer' }}>Menu</button>
@@ -211,7 +220,7 @@ export default function GamePuissance4({ onSendColor, onTurnOff, onTurnOffAll, o
   );
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '16px 20px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '16px 20px', color: '#e8eaf0' }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>

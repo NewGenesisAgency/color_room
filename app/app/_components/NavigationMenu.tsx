@@ -68,6 +68,7 @@ export default function NavigationMenu() {
     { href: '/', label: 'Accueil', icon: Home },
     { href: '/jeux', label: 'Jeux', icon: Gamepad2 },
     { href: '/spectre', label: 'Spectre Chromatique', icon: Sparkles },
+    { href: '/chromaticite', label: 'Chromaticité CIE', icon: Palette },
     { href: '/mesure', label: 'Mesure', icon: Ruler },
     { href: '/editeur', label: 'Éditeur', icon: Palette },
     { href: '/creer', label: 'Créer', icon: User },

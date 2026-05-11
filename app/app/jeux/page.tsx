@@ -1119,15 +1119,13 @@ export default function JeuxPage() {
       }
 
       const TOTAL_PLATES = 42;
-      const HW_COLS = 6;  // 6 columns of plates
-      const HW_ROWS = 7;  // 7 rows of plates
-
-      // Map Tetris rows 1:1 to HW rows by showing the bottom HW_ROWS of the grid
-      // This preserves piece shapes exactly (no compression)
-      const gridOffset = Math.max(0, GRID_ROWS - HW_ROWS); // skip top rows
+      const HW_COLS = 6;
+      const HW_ROWS = 7;
+      const gridOffset = Math.max(0, GRID_ROWS - HW_ROWS);
 
       const nextColors: string[] = Array(TOTAL_PLATES).fill('#000000');
       const nextActive: boolean[] = Array(TOTAL_PLATES).fill(false);
+      const platesData: { plateId: number; rgb: TargetColor; intensity: number }[] = [];
 
       for (let hr = 0; hr < HW_ROWS; hr++) {
         const gridRow = gridOffset + hr;
@@ -1138,21 +1136,17 @@ export default function JeuxPage() {
           if (!plateId) continue;
 
           const cellColor = merged[gridRow]?.[hc] ?? null;
-
           if (cellColor) {
-            const rgb = hexToRgb255(cellColor);
-            sendRgbToPlate(rgb, 90, plateId);
+            platesData.push({ plateId, rgb: hexToRgb255(cellColor), intensity: 90 });
             nextColors[tileIdx] = cellColor;
             nextActive[tileIdx] = true;
           } else {
-            for (let ch = 0; ch < 32; ch++) scheduleSetCanal(plateId, ch, 0);
-            nextColors[tileIdx] = '#000000';
-            nextActive[tileIdx] = false;
+            platesData.push({ plateId, rgb: { r: 0, g: 0, b: 0 }, intensity: 0 });
           }
         }
       }
 
-      // Update UI plate grid to reflect Tetris state
+      if (platesData.length > 0) sendColorsToPlates(platesData);
       setPlateColors(nextColors);
       setPlateActive(nextActive);
     }
@@ -3602,6 +3596,29 @@ export default function JeuxPage() {
                   ><Play size={15} /></button>
                 </div>
 
+                {/* Diagramme Chromaticité CIE 1931 — outil solo */}
+                <div
+                  className="game-card"
+                  style={{ marginBottom: 8 }}
+                  onClick={() => window.open('/chromaticite', '_blank')}
+                  role="button" tabIndex={0}
+                >
+                  <div className="game-icon" style={{ background: 'linear-gradient(135deg,#0f172a,#1e3a5f)' }}>
+                    <Crosshair size={20} color="#38bdf8" />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
+                      <h4>Chromaticité CIE 1931</h4>
+                      <span style={{ fontSize: 10, fontWeight: 700, color: '#38bdf8', background: '#38bdf822', padding: '2px 7px', borderRadius: 5 }}>outil</span>
+                    </div>
+                    <p>Diagramme xy interactif — cliquez pour projeter une couleur sur les dalles</p>
+                  </div>
+                  <button className="play-btn"
+                    style={{ background: '#38bdf833', color: '#fff' }}
+                    onClick={(e) => { e.stopPropagation(); window.open('/chromaticite', '_blank'); }}
+                  ><Play size={15} /></button>
+                </div>
+
                 {dbGamesLoading ? (
                   <div style={{ padding: 20, textAlign: 'center', opacity: 0.75 }}>Chargement des jeux...</div>
                 ) : dbGames.length === 0 ? (
@@ -3838,6 +3855,79 @@ export default function JeuxPage() {
                       isPlaying={gameActive}
                       onSnapshot={(snap) => { tetrisSnapRef.current = snap; }}
                     />
+                  </div>
+                )}
+
+                {/* Simon Lumière — panneau de jeu dédié */}
+                {gameActive && simonActive && (
+                  <div style={{ marginTop: 12, borderRadius: 18, padding: 20, background: 'rgba(10,10,20,0.95)', border: '1px solid rgba(239,71,111,0.25)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                      <div style={{ display: 'flex', gap: 16 }}>
+                        <div style={{ background: 'rgba(255,255,255,0.07)', borderRadius: 10, padding: '6px 14px', textAlign: 'center' }}>
+                          <div style={{ fontSize: 10, color: '#888', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Niveau</div>
+                          <div style={{ fontSize: 22, fontWeight: 900, color: '#ef476f' }}>{simonLevel}</div>
+                        </div>
+                        <div style={{ background: 'rgba(255,255,255,0.07)', borderRadius: 10, padding: '6px 14px', textAlign: 'center' }}>
+                          <div style={{ fontSize: 10, color: '#888', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Score</div>
+                          <div style={{ fontSize: 22, fontWeight: 900, color: '#fff' }}>{simonScore}</div>
+                        </div>
+                        {simonHighScore > 0 && (
+                          <div style={{ background: 'rgba(255,215,0,0.08)', borderRadius: 10, padding: '6px 14px', textAlign: 'center' }}>
+                            <div style={{ fontSize: 10, color: '#888', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Record</div>
+                            <div style={{ fontSize: 22, fontWeight: 900, color: '#ffd700' }}>{simonHighScore}</div>
+                          </div>
+                        )}
+                      </div>
+                      <div style={{
+                        padding: '6px 14px', borderRadius: 20, fontSize: 13, fontWeight: 700,
+                        background: simonPhase === 'showing' ? 'rgba(255,165,0,0.2)' : simonPhase === 'input' ? 'rgba(68,255,170,0.15)' : 'rgba(239,71,111,0.2)',
+                        color: simonPhase === 'showing' ? '#ffa500' : simonPhase === 'input' ? '#44ffaa' : '#ef476f',
+                        border: `1px solid ${simonPhase === 'showing' ? 'rgba(255,165,0,0.4)' : simonPhase === 'input' ? 'rgba(68,255,170,0.4)' : 'rgba(239,71,111,0.4)'}`,
+                      }}>
+                        {simonPhase === 'showing' ? `Mémorisez… (${simonSequence.length} coups)` : simonPhase === 'input' ? `À vous ! ${simonPlayerInput.length}/${simonSequence.length}` : 'Game Over'}
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                      {([0, 1, 2, 3] as const).map((ci) => {
+                        const plateIdx = SIMON_PLATES[ci];
+                        const color = SIMON_COLORS[ci];
+                        const isLit = simonLitPlate === plateIdx;
+                        const canClick = simonPhase === 'input';
+                        const names = ['Rouge', 'Vert', 'Bleu', 'Jaune'];
+                        return (
+                          <button
+                            key={ci}
+                            onClick={() => { if (canClick) void handleSimonPlateClick(plateIdx); }}
+                            style={{
+                              height: 88,
+                              borderRadius: 16,
+                              border: `2px solid ${isLit ? color : color + '55'}`,
+                              background: isLit ? color : color + '22',
+                              cursor: canClick ? 'pointer' : 'default',
+                              boxShadow: isLit ? `0 0 32px ${color}99, inset 0 0 20px ${color}44` : 'none',
+                              transition: 'all 0.08s',
+                              color: '#fff',
+                              fontSize: 15,
+                              fontWeight: 800,
+                              letterSpacing: '0.03em',
+                              transform: isLit ? 'scale(1.04)' : 'scale(1)',
+                            }}
+                          >
+                            {names[ci]}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {simonPhase === 'gameover' && (
+                      <button
+                        onClick={() => startSimonGame()}
+                        style={{ marginTop: 14, width: '100%', padding: '12px', borderRadius: 12, border: 'none', background: 'linear-gradient(135deg,#ef476f,#f72585)', color: '#fff', fontSize: 15, fontWeight: 800, cursor: 'pointer' }}
+                      >
+                        Rejouer
+                      </button>
+                    )}
                   </div>
                 )}
 

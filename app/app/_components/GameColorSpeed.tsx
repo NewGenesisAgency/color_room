@@ -10,6 +10,31 @@ export interface GameTileProps {
   tileCount?: number;
 }
 
+function flashTiles(
+  numTiles: number,
+  onSendColor: GameTileProps['onSendColor'],
+  r: number, g: number, b: number,
+) {
+  for (let i = 0; i < numTiles; i++) onSendColor(i, r, g, b, 55);
+}
+
+function flashTilesThenRestore(
+  numTiles: number,
+  onSendColor: GameTileProps['onSendColor'],
+  onTurnOffAll: GameTileProps['onTurnOffAll'],
+  r: number, g: number, b: number,
+  restoreActiveTile: number | null,
+  restoreColor: { r: number; g: number; b: number } | null,
+) {
+  for (let i = 0; i < numTiles; i++) onSendColor(i, r, g, b, 55);
+  window.setTimeout(() => {
+    onTurnOffAll();
+    if (restoreActiveTile !== null && restoreColor) {
+      window.setTimeout(() => onSendColor(restoreActiveTile, restoreColor.r, restoreColor.g, restoreColor.b, 90), 20);
+    }
+  }, 200);
+}
+
 const GAME_DURATION = 60;
 const COLORS = [
   { r: 255, g: 30,  b: 30,  css: '#ff1e1e', label: 'Rouge' },
@@ -33,6 +58,7 @@ export default function GameColorSpeed({ onSendColor, onTurnOff, onTurnOffAll, o
   });
 
   const activeTileRef = useRef<number | null>(null);
+  const activeColorRef = useRef<{ r: number; g: number; b: number } | null>(null);
   const speedRef = useRef(1500);
   const comboRef = useRef(0);
   const tileTimerRef = useRef<number>(0);
@@ -44,6 +70,7 @@ export default function GameColorSpeed({ onSendColor, onTurnOff, onTurnOffAll, o
     const idx = Math.floor(Math.random() * numTiles);
     const col = COLORS[Math.floor(Math.random() * COLORS.length)];
     activeTileRef.current = idx;
+    activeColorRef.current = { r: col.r, g: col.g, b: col.b };
     setActiveTile(idx);
     setActiveCss(col.css);
     onSendColor(idx, col.r, col.g, col.b, 90);
@@ -54,7 +81,8 @@ export default function GameColorSpeed({ onSendColor, onTurnOff, onTurnOffAll, o
       setCombo(0);
       setMissed(m => m + 1);
       triggerFlash('bad');
-      lightNextTile();
+      flashTilesThenRestore(numTiles, onSendColor, onTurnOffAll, 200, 20, 20, null, null);
+      window.setTimeout(() => lightNextTile(), 250);
     }, speedRef.current);
   }
 
@@ -111,12 +139,14 @@ export default function GameColorSpeed({ onSendColor, onTurnOff, onTurnOffAll, o
       setScore(s => s + 10 + bonusSpeed + bonusCombo);
       triggerFlash('good');
       window.clearTimeout(tileTimerRef.current);
-      lightNextTile();
+      flashTiles(numTiles, onSendColor, 20, 200, 60);
+      window.setTimeout(() => lightNextTile(), 160);
     } else {
       comboRef.current = 0;
       setCombo(0);
       setMissed(m => m + 1);
       triggerFlash('bad');
+      flashTilesThenRestore(numTiles, onSendColor, onTurnOffAll, 200, 20, 20, activeTileRef.current, activeColorRef.current);
     }
   }
 
@@ -132,9 +162,9 @@ export default function GameColorSpeed({ onSendColor, onTurnOff, onTurnOffAll, o
   const timerColor = timeLeft > 20 ? '#4ade80' : timeLeft > 10 ? '#fbbf24' : '#ef4444';
 
   if (phase === 'ready') return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 24, padding: 40 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 24, padding: 40, background: 'linear-gradient(160deg, #080c14 0%, #0c1020 100%)', fontFamily: 'system-ui, sans-serif', color: '#e8eaf0' }}>
       <div style={{ fontSize: 48 }}>⚡</div>
-      <h2 style={{ fontSize: 24, fontWeight: 800, margin: 0 }}>Color Speed</h2>
+      <h2 style={{ fontSize: 24, fontWeight: 800, margin: 0, color: '#e8eaf0' }}>Color Speed</h2>
       <p style={{ textAlign: 'center', color: 'rgba(255,255,255,0.7)', maxWidth: 380, lineHeight: 1.6 }}>
         Une dalle s'allume — cliquez dessus le plus vite possible !<br />
         La vitesse augmente toutes les 8 secondes. Combos = bonus de points.<br />
@@ -149,9 +179,9 @@ export default function GameColorSpeed({ onSendColor, onTurnOff, onTurnOffAll, o
   );
 
   if (phase === 'finished') return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20, padding: 40 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20, padding: 40, background: 'linear-gradient(160deg, #080c14 0%, #0c1020 100%)', fontFamily: 'system-ui, sans-serif', color: '#e8eaf0' }}>
       <div style={{ fontSize: 48 }}>🏁</div>
-      <h2 style={{ fontSize: 24, fontWeight: 800, margin: 0 }}>Partie terminée !</h2>
+      <h2 style={{ fontSize: 24, fontWeight: 800, margin: 0, color: '#e8eaf0' }}>Partie terminée !</h2>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, width: '100%', maxWidth: 360 }}>
         {[['Score', score], ['Manqués', missed], ['Meilleur', bestScore], ['Vitesse min', `${speedRef.current}ms`]].map(([k, v]) => (
           <div key={String(k)} style={{ background: 'rgba(255,255,255,0.06)', borderRadius: 12, padding: '14px 18px', textAlign: 'center' }}>
@@ -168,8 +198,7 @@ export default function GameColorSpeed({ onSendColor, onTurnOff, onTurnOffAll, o
   );
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16, padding: '20px 24px' }}>
-      {/* HUD */}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16, padding: '20px 24px', background: 'linear-gradient(160deg, #080c14 0%, #0c1020 100%)', fontFamily: 'system-ui, sans-serif', color: '#e8eaf0', borderRadius: 18 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
         <div style={{ flex: 1 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 4, color: 'rgba(255,255,255,0.5)' }}>
@@ -187,12 +216,10 @@ export default function GameColorSpeed({ onSendColor, onTurnOff, onTurnOffAll, o
         <button onClick={() => { window.clearInterval(gameTimerRef.current); window.clearTimeout(tileTimerRef.current); onTurnOffAll(); onQuit(); }} style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.7)', fontSize: 12, cursor: 'pointer' }}>⏹</button>
       </div>
 
-      {/* Active tile indicator */}
       <div style={{ textAlign: 'center', fontSize: 13, color: 'rgba(255,255,255,0.6)' }}>
         {activeTile !== null && <>Dalle <span style={{ fontWeight: 800, color: activeCss }}>{activeTile + 1}</span> — cliquez vite !</>}
       </div>
 
-      {/* Tile grid 6x7 */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 6, maxWidth: 560, margin: '0 auto', width: '100%' }}>
         {Array.from({ length: numTiles }, (_, i) => {
           const isActive = i === activeTile;
@@ -210,7 +237,7 @@ export default function GameColorSpeed({ onSendColor, onTurnOff, onTurnOffAll, o
                 alignItems: 'center',
                 justifyContent: 'center',
                 fontSize: 10,
-                color: isActive ? activeCss : 'rgba(255,255,255,0.2)',
+                color: isActive ? activeCss : 'rgba(255,255,255,0.35)',
                 fontWeight: isActive ? 800 : 400,
                 boxShadow: isActive ? `0 0 12px ${activeCss}88` : 'none',
                 transition: 'all 0.1s',
@@ -223,7 +250,7 @@ export default function GameColorSpeed({ onSendColor, onTurnOff, onTurnOffAll, o
         })}
       </div>
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>
         <span>Vitesse : {speedRef.current}ms</span>
         <span>Manqués : {missed}</span>
       </div>
