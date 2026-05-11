@@ -57,9 +57,16 @@ function migrate(db: Database.Database) {
   db.exec('CREATE INDEX IF NOT EXISTS idx_crg_games_updated ON crg_games(updated_at);');
 
   db.exec(
-    "CREATE TABLE IF NOT EXISTS crg_users (id TEXT PRIMARY KEY, username TEXT NOT NULL UNIQUE, role TEXT NOT NULL, password_hash TEXT, niveau TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')));",
+    "CREATE TABLE IF NOT EXISTS crg_users (id TEXT PRIMARY KEY, username TEXT NOT NULL UNIQUE, role TEXT NOT NULL DEFAULT 'apprenant', password_hash TEXT, niveau TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')));",
   );
   db.exec('CREATE INDEX IF NOT EXISTS idx_crg_users_role ON crg_users(role);');
+
+  // Migrations pour colonnes ajoutées après création initiale
+  const userCols = (db.pragma('table_info(crg_users)') as { name: string }[]).map(c => c.name);
+  if (!userCols.includes('role'))          db.exec("ALTER TABLE crg_users ADD COLUMN role TEXT NOT NULL DEFAULT 'apprenant';");
+  if (!userCols.includes('password_hash')) db.exec('ALTER TABLE crg_users ADD COLUMN password_hash TEXT;');
+  if (!userCols.includes('niveau'))        db.exec('ALTER TABLE crg_users ADD COLUMN niveau TEXT;');
+  if (!userCols.includes('created_at'))    db.exec("ALTER TABLE crg_users ADD COLUMN created_at TEXT NOT NULL DEFAULT (datetime('now'));");
 
   db.exec(
     "CREATE TABLE IF NOT EXISTS crg_sessions (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, token TEXT NOT NULL UNIQUE, expires_at TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now')), FOREIGN KEY(user_id) REFERENCES crg_users(id));",
