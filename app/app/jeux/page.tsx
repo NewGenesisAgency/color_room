@@ -3307,7 +3307,10 @@ export default function JeuxPage() {
               <span style={{ opacity: 0.8, fontSize: 12, color: '#fff' }}>Score: {mpState?.score ?? 0}</span>
             </div>
             <div style={{ marginTop: 10, fontSize: 13, opacity: 0.9, color: '#fff' }}>
-              Le temps est écoulé. Voulez-vous relancer une nouvelle partie ou quitter le mode multijoueur ?
+              {(mpState as any)?.endsAtMs === 0
+                ? 'Aucun joueur n\'a rejoint dans les 5 minutes. La session a été supprimée.'
+                : 'Le temps est écoulé.'}
+              {' '}Voulez-vous relancer une nouvelle partie ou quitter le mode multijoueur ?
             </div>
             <div style={{ marginTop: 14, display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
               <button
