@@ -4,7 +4,6 @@ stages:
   - build
   - deploy
 
-
 # 1. PRETEST : Vérification de la qualité du code (Linting)
 pretest_job:
   stage: pretest
@@ -15,7 +14,6 @@ pretest_job:
   script:
     - echo "Vérification de la syntaxe et du formatage du code..."
     # - insérer ici ta commande de linter (ex: npm run lint, flake8, etc.)
-
 
 # 2. TEST : Lancement des tests unitaires
 test_job:
@@ -28,7 +26,7 @@ test_job:
     - echo "Lancement des tests automatisés..."
     # - insérer ici ta commande de test (ex: npm test, pytest, dotnet test, etc.)
 
-# 3. BUILD : Construction des images Docker
+# 3. BUILD : Copie des fichiers et construction des images Docker
 build_job:
   stage: build
   tags:
@@ -36,9 +34,12 @@ build_job:
   only:
     - ux-app
   script:
-    - echo "Construction des images Docker..."
-    - cd $CI_PROJECT_DIR
-    # On construit l'image ici, mais on ne lance pas les conteneurs
+    - echo "Création du dossier cible s'il n'existe pas..."
+    - mkdir -p /home/maxime/color-room/ux-app
+    - echo "Copie des fichiers téléchargés par GitLab vers ton dossier..."
+    - cp -r . /home/maxime/color-room/ux-app/
+    - echo "Construction des images Docker depuis ton dossier..."
+    - cd /home/maxime/color-room/ux-app
     - docker compose build
 
 # 4. DEPLOY : Lancement de l'application
@@ -50,8 +51,8 @@ deploy_job:
     - ux-app
   script:
     - echo "Début du déploiement sur le Raspberry Pi..."
-    - cd $CI_PROJECT_DIR
+    - cd /home/maxime/color-room/ux-app
     - docker compose down --remove-orphans
-    # Plus besoin de --build ici, l'étape précédente s'en est chargée !
+    # On lance les conteneurs (ils utiliseront l'image fraîchement créée à l'étape "build")
     - docker compose up -d
-    - echo "Déploiement terminé - App disponible sur http://localhost:8080"
+    - echo "Déploiement terminé - App disponible sur le port configuré !"
