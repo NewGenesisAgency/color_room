@@ -34,7 +34,9 @@ build_job:
   only:
     - ux-app
   script:
-    - echo "Création du dossier cible s'il n'existe pas..."
+    - echo "Nettoyage de l'ancienne version..."
+    - rm -rf /home/serge/color-room/ux-app
+    - echo "Création du dossier cible..."
     - mkdir -p /home/serge/color-room/ux-app
     - echo "Copie des fichiers téléchargés par GitLab vers ton dossier..."
     - cp -r . /home/serge/color-room/ux-app/
