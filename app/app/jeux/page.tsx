@@ -3522,7 +3522,7 @@ export default function JeuxPage() {
 
                 {/* Color Speed */}
                 {(['color-speed', 'maitre-blanc', 'puissance4', 'chasseur-gamut', 'metamere'] as const).map((gameId) => {
-                  const META: Record<string, { title: string; desc: string; Icon: React.ComponentType<{ size?: number; color?: string }>; grad: string; accent: string }> = {
+                  const META: Record<string, { title: string; desc: string; Icon: any; grad: string; accent: string }> = {
                     'color-speed':    { title: 'Color Speed',        desc: "Cliquez la dalle qui s'allume — réflexes !",      Icon: Zap,        grad: 'linear-gradient(135deg,#4361ee,#7c3aed)', accent: '#7c3aed' },
                     'maitre-blanc':   { title: 'Le Maître du Blanc', desc: 'Recréez la teinte cible en dosant R, G, B',        Icon: Sun,        grad: 'linear-gradient(135deg,#f59e0b,#ef4444)', accent: '#f59e0b' },
                     'puissance4':     { title: 'Puissance 4',        desc: 'Alignez 4 couleurs sur la matrice 6×7',             Icon: Grid,    grad: 'linear-gradient(135deg,#ff2828,#2850ff)', accent: '#ff2828' },
