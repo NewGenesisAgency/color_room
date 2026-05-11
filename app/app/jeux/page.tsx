@@ -3152,8 +3152,6 @@ export default function JeuxPage() {
       return;
     }
 
-    if (!gameActive) return;
-
     setPlateActive((prev) => {
       const next = [...prev];
       next[index] = !prev[index];
@@ -3166,16 +3164,26 @@ export default function JeuxPage() {
       });
 
       const plaqueId = PLATE_ID_BY_INDEX[index] ?? 1;
-      const value = isOn ? 255 : 0;
-      const channels32: number[] = [];
-      for (let canalIndex = 0; canalIndex < 32; canalIndex++) {
-        channels32[canalIndex] = value;
-        scheduleSetCanal(plaqueId, canalIndex, value);
+      if (isOn) {
+        // Utilise le profil blanc (canal 26) via rgbToChannels32 — valeurs 0-100
+        const channels32 = rgbToChannels32({ r: 255, g: 255, b: 255 }, masterIntensity);
+        for (let canalIndex = 0; canalIndex < 32; canalIndex++) {
+          scheduleSetCanal(plaqueId, canalIndex, channels32[canalIndex] ?? 0);
+        }
+      } else {
+        for (let canalIndex = 0; canalIndex < 32; canalIndex++) {
+          scheduleSetCanal(plaqueId, canalIndex, 0);
+        }
       }
 
       setLedValues(() => {
         const next: Record<number, number> = {};
-        for (let i = 0; i < 32; i++) next[i] = value;
+        if (isOn) {
+          const ch = rgbToChannels32({ r: 255, g: 255, b: 255 }, masterIntensity);
+          for (let i = 0; i < 32; i++) next[i] = ch[i] ?? 0;
+        } else {
+          for (let i = 0; i < 32; i++) next[i] = 0;
+        }
         return next;
       });
       setHardwarePreviewCss(isOn ? 'rgb(255,255,255)' : 'rgb(0,0,0)');
