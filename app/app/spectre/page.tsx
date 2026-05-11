@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState, useMemo } from 'react';
+import { Palette, CheckCircle2, Crown, Trophy, RotateCcw } from 'lucide-react';
 
 // ── Types (miroir de lib/spectre.ts) ────────────────────────────────────────
 type SpSeat = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
@@ -16,6 +17,22 @@ type SpState = {
   revealDurationMs: number; guessDurationMs: number; phaseEndsAtMs: number;
   players: Partial<Record<SpSeat, SpPlayer>>; createdAt: string;
 };
+
+// ── CIE 1931 helpers (diagramme chromatique) ────────────────────────────────
+const CIE_HS: [number,number][] = [
+  [0.1741,0.0050],[0.1740,0.0050],[0.1738,0.0049],[0.1736,0.0050],[0.1730,0.0048],
+  [0.1721,0.0048],[0.1714,0.0051],[0.1689,0.0082],[0.1644,0.0139],[0.1566,0.0214],
+  [0.1440,0.0297],[0.1241,0.0578],[0.0913,0.1327],[0.0454,0.2950],[0.0082,0.5384],
+  [0.0139,0.7502],[0.0743,0.8338],[0.1547,0.8059],[0.2296,0.7543],[0.3016,0.6923],
+  [0.3731,0.6245],[0.4441,0.5547],[0.5125,0.4866],[0.5752,0.4242],[0.6270,0.3725],
+  [0.6658,0.3340],[0.7006,0.2993],[0.7301,0.2700],[0.7548,0.2452],[0.7800,0.2200],
+  [0.8000,0.2000],[0.8210,0.1790],[0.8507,0.1493],
+];
+const CDW=380,CDH=340,CXN=0,CXX=0.85,CYN=0,CYX=0.92,CPL=26,CPR=12,CPT=8,CPB=20;
+function cXyToSvg(x:number,y:number){return{px:CPL+(x-CXN)/(CXX-CXN)*(CDW-CPL-CPR),py:(CDH-CPB)-(y-CYN)/(CYX-CYN)*(CDH-CPT-CPB)};}
+function cSvgToXy(px:number,py:number){return{x:(px-CPL)/(CDW-CPL-CPR)*(CXX-CXN)+CXN,y:((CDH-CPB)-py)/(CDH-CPT-CPB)*(CYX-CYN)+CYN};}
+function cInHS(cx:number,cy:number):boolean{let inside=false;for(let i=0,j=CIE_HS.length-1;i<CIE_HS.length;j=i++){const[xi,yi]=CIE_HS[i],[xj,yj]=CIE_HS[j];if((yi>cy)!==(yj>cy)&&cx<(xj-xi)*(cy-yi)/(yj-yi)+xi)inside=!inside;}return inside;}
+function cXyToRgb(x:number,y:number):{r:number,g:number,b:number}|null{if(y<1e-8||x<0||x+y>1)return null;const X=x/y,Y=1,Z=(1-x-y)/y;let r=3.2406*X-1.5372*Y-0.4986*Z,g=-0.9689*X+1.8758*Y+0.0415*Z,b=0.0557*X-0.2040*Y+1.0570*Z;const mn=Math.min(r,g,b);if(mn<0){r-=mn;g-=mn;b-=mn;}const mx=Math.max(r,g,b,1e-9);r/=mx;g/=mx;b/=mx;const gm=(c:number)=>c<=0.0031308?12.92*c:1.055*Math.pow(c,1/2.4)-0.055;return{r:Math.round(Math.min(1,Math.max(0,gm(r)))*255),g:Math.round(Math.min(1,Math.max(0,gm(g)))*255),b:Math.round(Math.min(1,Math.max(0,gm(b)))*255)};}
 
 // ── Utilitaires couleur ──────────────────────────────────────────────────────
 function hslToRgb(h: number, s: number, l: number): { r: number; g: number; b: number } {
@@ -106,9 +123,7 @@ function rgbToChannels32(r: number, g: number, b: number, intensity: number): nu
 
 async function sendColorToAllPlates(r: number, g: number, b: number, intensity = 85) {
   const channels = rgbToChannels32(r, g, b, intensity);
-  const channelArray = channels
-    .map((v, i) => ({ index: i, value: v }))
-    .filter((c) => c.value > 0);
+  const channelArray = channels.map((v, i) => ({ index: i, value: v }));
   for (let plateId = 1; plateId <= 42; plateId++) {
     fetch('/api/supervision/batch', {
       method: 'POST',
@@ -155,15 +170,16 @@ export default function SpectrePage() {
   const [sessionStatus, setSessionStatus] = useState<'active' | 'finished'>('active');
   const [players, setPlayers] = useState<Array<{ seat: number; name: string }>>([]);
 
-  const [myH, setMyH] = useState(550); // longueur d'onde nm (380–780)
-  const [myS, setMyS] = useState(80);
-  const [myL, setMyL] = useState(50);
+  const [myX, setMyX] = useState(0.3127); // CIE x (D65 default)
+  const [myY, setMyY] = useState(0.3290); // CIE y
   const [submitted, setSubmitted] = useState(false);
   const [timeLeft, setTimeLeft] = useState(0);
 
   const pollRef = useRef<number>(0);
   const lastPhaseRef = useRef<SpPhase | null>(null);
   const hardwareSentRef = useRef(false);
+  const cieCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const lastAutoRef = useRef('');
 
   // ── Restauration de session depuis localStorage ───────────────────────────
   useEffect(() => {
@@ -185,7 +201,7 @@ export default function SpectrePage() {
     } catch { /* ignore */ }
   }, []);
 
-  const myRgb = useMemo(() => wlSLToRgb(myH, myS, myL), [myH, myS, myL]);
+  const myRgb = useMemo(() => cXyToRgb(myX, myY) ?? { r: 200, g: 200, b: 200 }, [myX, myY]);
 
   // ── Polling state ─────────────────────────────────────────────────────────
   const pollState = useCallback(async () => {
@@ -253,7 +269,47 @@ export default function SpectrePage() {
     return () => window.clearTimeout(liveHwTimerRef.current);
   }, [myRgb, gameState?.phase, submitted]);
 
-  // ── Actions ──────────────────────────────────────────────────────────────
+  // ── CIE canvas draw (fires on entering guess phase) ─────────────────────
+  useEffect(() => {
+    if (gameState?.phase !== 'guess') return;
+    const canvas = cieCanvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    const iw = canvas.width, ih = canvas.height;
+    const img = ctx.createImageData(iw, ih);
+    for (let py = 0; py < ih; py++) {
+      for (let px = 0; px < iw; px++) {
+        const { x, y } = cSvgToXy(px * (CDW / iw), py * (CDH / ih));
+        const idx = (py * iw + px) * 4;
+        if (!cInHS(x, y) || x < CXN || y < CYN || x > CXX || y > CYX) {
+          img.data[idx] = 8; img.data[idx + 1] = 8; img.data[idx + 2] = 18; img.data[idx + 3] = 255;
+          continue;
+        }
+        const c = cXyToRgb(x, y);
+        if (c) {
+          img.data[idx] = c.r; img.data[idx + 1] = c.g; img.data[idx + 2] = c.b; img.data[idx + 3] = 255;
+        } else {
+          img.data[idx] = 8; img.data[idx + 1] = 8; img.data[idx + 2] = 18; img.data[idx + 3] = 255;
+        }
+      }
+    }
+    ctx.putImageData(img, 0, 0);
+  }, [gameState?.phase]);
+
+  // ── Auto-advance when all players submitted (host only) ─────────────────
+  useEffect(() => {
+    if (!gameState || gameState.phase !== 'guess' || seat !== 1) return;
+    const allP = Object.values(gameState.players).filter(Boolean) as SpPlayer[];
+    const key = `guess-${gameState.round}`;
+    if (allP.length > 0 && allP.every(p => p.submitted) && lastAutoRef.current !== key) {
+      lastAutoRef.current = key;
+      void handleAdvance();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gameState]);
+
+  // ── Actions ────────────────────────────────────────────────────
   async function handleCreate() {
     if (!nameInput.trim()) { setError('Entrez votre prénom'); return; }
     setLoading(true); setError('');
@@ -333,7 +389,7 @@ export default function SpectrePage() {
     if (data.ok) {
       setSessionId(data.sessionId);
       setSubmitted(false);
-      setMyH(550); setMyS(80); setMyL(50);
+      setMyX(0.3127); setMyY(0.3290);
     }
     setLoading(false);
     await pollState();
@@ -349,7 +405,7 @@ export default function SpectrePage() {
       <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg,#0a0a1a 0%,#111133 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'system-ui,sans-serif' }}>
         <div style={{ width: 420, padding: 40, borderRadius: 24, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', backdropFilter: 'blur(20px)' }}>
           <div style={{ textAlign: 'center', marginBottom: 32 }}>
-            <div style={{ fontSize: 48, marginBottom: 8 }}>🌈</div>
+            <div style={{ marginBottom: 8 }}><Palette size={48} color="#a78bfa" /></div>
             <h1 style={{ color: '#fff', fontSize: 28, fontWeight: 800, margin: 0 }}>Spectre Chromatique</h1>
             <p style={{ color: 'rgba(255,255,255,0.5)', marginTop: 8, fontSize: 14 }}>Reproduisez la couleur cible sur le spectre lumineux</p>
           </div>
@@ -357,7 +413,7 @@ export default function SpectrePage() {
           <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
             {(['create', 'join'] as const).map((m) => (
               <button key={m} onClick={() => setLoginMode(m)} style={{ flex: 1, padding: '10px 0', borderRadius: 12, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 14, background: loginMode === m ? 'linear-gradient(135deg,#667eea,#764ba2)' : 'rgba(255,255,255,0.08)', color: loginMode === m ? '#fff' : 'rgba(255,255,255,0.5)', transition: 'all 0.2s' }}>
-                {m === 'create' ? '✦ Créer une salle' : '→ Rejoindre'}
+                {m === 'create' ? 'Créer une salle' : 'Rejoindre'}
               </button>
             ))}
           </div>
@@ -385,7 +441,7 @@ export default function SpectrePage() {
             {error && <p style={{ color: '#ff6b6b', fontSize: 13, margin: 0 }}>⚠ {error}</p>}
             <button onClick={loginMode === 'create' ? handleCreate : handleJoin} disabled={loading}
               style={{ padding: '16px', borderRadius: 14, border: 'none', cursor: loading ? 'not-allowed' : 'pointer', fontWeight: 800, fontSize: 16, background: 'linear-gradient(135deg,#667eea,#764ba2)', color: '#fff', opacity: loading ? 0.7 : 1, transition: 'all 0.2s' }}>
-              {loading ? '…' : loginMode === 'create' ? '✦ Créer la salle' : '→ Rejoindre'}
+              {loading ? '…' : loginMode === 'create' ? 'Créer la salle' : 'Rejoindre'}
             </button>
           </div>
         </div>
@@ -414,7 +470,7 @@ export default function SpectrePage() {
       <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg,#0a0a1a,#111133)', fontFamily: 'system-ui,sans-serif', padding: 40, boxSizing: 'border-box' }}>
         <div style={{ maxWidth: 560, margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: 40 }}>
-            <div style={{ fontSize: 48, marginBottom: 8 }}>🌈</div>
+            <div style={{ marginBottom: 8 }}><Palette size={48} color="#a78bfa" /></div>
             <h1 style={{ color: '#fff', fontSize: 26, fontWeight: 800, margin: 0 }}>Spectre Chromatique</h1>
             <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 14, marginTop: 8 }}>Salle d&apos;attente · Manche {gameState.maxRounds} ×</p>
           </div>
@@ -437,7 +493,7 @@ export default function SpectrePage() {
                   <div key={p.seat} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', borderRadius: 12, background: p.seat === seat ? 'rgba(102,126,234,0.15)' : 'rgba(255,255,255,0.04)', border: p.seat === seat ? '1px solid rgba(102,126,234,0.4)' : '1px solid transparent' }}>
                     <div style={{ width: 10, height: 10, borderRadius: '50%', background: SEAT_COLORS[(p.seat - 1) % 8] }} />
                     <span style={{ color: '#fff', fontWeight: 600, fontSize: 15 }}>{p.name}</span>
-                    {p.seat === 1 && <span style={{ marginLeft: 'auto', fontSize: 12, color: '#ffd700' }}>👑 Hôte</span>}
+                    {p.seat === 1 && <span style={{ marginLeft: 'auto', fontSize: 12, color: '#ffd700', display: 'flex', alignItems: 'center', gap: 4 }}><Crown size={13} color="#ffd700" /> Hôte</span>}
                     {p.seat === seat && p.seat !== 1 && <span style={{ marginLeft: 'auto', fontSize: 12, color: 'rgba(255,255,255,0.4)' }}>← Vous</span>}
                   </div>
                 ))}
@@ -448,7 +504,7 @@ export default function SpectrePage() {
           {isHost ? (
             <button onClick={handleAdvance} disabled={players.length < 1}
               style={{ width: '100%', padding: '18px', borderRadius: 16, border: 'none', cursor: players.length < 1 ? 'not-allowed' : 'pointer', fontWeight: 800, fontSize: 17, background: players.length < 1 ? 'rgba(255,255,255,0.1)' : 'linear-gradient(135deg,#667eea,#764ba2)', color: '#fff', opacity: players.length < 1 ? 0.5 : 1, transition: 'all 0.2s' }}>
-              🚀 Lancer la partie
+              Lancer la partie
             </button>
           ) : (
             <div style={{ textAlign: 'center', color: 'rgba(255,255,255,0.4)', fontSize: 14 }}>En attente que l&apos;hôte lance la partie…</div>
@@ -483,130 +539,105 @@ export default function SpectrePage() {
     );
   }
 
-  // ────────────────────────────────────────────────────────────────────────────
-  // GUESS — Chromographe spectral
-  // ────────────────────────────────────────────────────────────────────────────
+  // ───────────────────────────────────────────────────────────────────────────
+  // GUESS — Diagramme chromatique CIE 1931
+  // ───────────────────────────────────────────────────────────────────────────
   if (gameState.phase === 'guess') {
     const myCss = rgb(myRgb.r, myRgb.g, myRgb.b);
-    // Target is masked to -1 during guess to prevent cheating — hide live score
-    const liveScore = gameState.targetR >= 0
-      ? colorScore(gameState.targetR, gameState.targetG, gameState.targetB, myRgb.r, myRgb.g, myRgb.b)
-      : -1;
-    const spectrumBars = Array.from({ length: 36 }, (_, i) => {
-      const wl = 380 + i * 11;
-      const [r01, g01, b01] = wavelengthToRgb01(wl);
-      return `rgb(${Math.round(r01 * 255)},${Math.round(g01 * 255)},${Math.round(b01 * 255)})`;
-    });
-    // Marker position maps wavelength (380–780nm) to gradient position (0–100%)
-    const markerX = Math.round((myH - 380) / 400 * 100);
+    const curSvg = cXyToSvg(myX, myY);
+    const isInGamut = cInHS(myX, myY);
+    const horsePath = CIE_HS.map(([x, y], i) => { const { px, py } = cXyToSvg(x, y); return `${i === 0 ? 'M' : 'L'}${px.toFixed(1)},${py.toFixed(1)}`; }).join(' ') + ' Z';
+    const srgbPts = [[0.64, 0.33], [0.30, 0.60], [0.15, 0.06]].map(([x, y]) => cXyToSvg(x, y));
+    const srgbPath = srgbPts.map(({ px, py }, i) => `${i === 0 ? 'M' : 'L'}${px.toFixed(1)},${py.toFixed(1)}`).join(' ') + ' Z';
+
+    function handleDiagMove(e: React.MouseEvent<SVGSVGElement>) {
+      if (submitted) return;
+      const rect = e.currentTarget.getBoundingClientRect();
+      const px = (e.clientX - rect.left) * (CDW / rect.width);
+      const py = (e.clientY - rect.top) * (CDH / rect.height);
+      const { x, y } = cSvgToXy(px, py);
+      setMyX(Math.max(CXN, Math.min(CXX, x)));
+      setMyY(Math.max(CYN, Math.min(CYX, y)));
+    }
 
     return (
-      <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg,#07070f,#0d0d1e)', fontFamily: 'system-ui,sans-serif', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px 16px', boxSizing: 'border-box' }}>
+      <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg,#07070f,#0d0d1e)', fontFamily: 'system-ui,sans-serif', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '16px', boxSizing: 'border-box' }}>
         {/* Header */}
-        <div style={{ width: '100%', maxWidth: 540, marginBottom: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase' }}>Manche {gameState.round}/{gameState.maxRounds} · Reproduction</span>
-          </div>
-          <div style={{ background: timeLeft <= 10 ? 'rgba(255,70,70,0.2)' : 'rgba(255,255,255,0.08)', border: `1px solid ${timeLeft <= 10 ? 'rgba(255,70,70,0.5)' : 'rgba(255,255,255,0.15)'}`, borderRadius: 20, padding: '6px 16px', color: timeLeft <= 10 ? '#ff6b6b' : '#fff', fontWeight: 800, fontSize: 20, fontVariantNumeric: 'tabular-nums' }}>
+        <div style={{ width: '100%', maxWidth: 540, marginBottom: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase' }}>Manche {gameState.round}/{gameState.maxRounds} · Reproduction</span>
+          <div style={{ background: timeLeft <= 10 ? 'rgba(255,70,70,0.2)' : 'rgba(255,255,255,0.08)', border: `1px solid ${timeLeft <= 10 ? 'rgba(255,70,70,0.5)' : 'rgba(255,255,255,0.15)'}`, borderRadius: 20, padding: '6px 14px', color: timeLeft <= 10 ? '#ff6b6b' : '#fff', fontWeight: 800, fontSize: 18, fontVariantNumeric: 'tabular-nums' }}>
             {String(Math.floor(timeLeft / 60)).padStart(2, '0')}:{String(timeLeft % 60).padStart(2, '0')}
           </div>
         </div>
 
-        {/* Main card */}
-        <div style={{ width: '100%', maxWidth: 540, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 24, padding: 28, boxSizing: 'border-box' }}>
-          <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13, margin: '0 0 20px', textAlign: 'center' }}>
-            Reproduisez la couleur que vous venez de voir
-          </p>
-
-          {/* Color preview */}
-          <div style={{ display: 'flex', gap: 16, marginBottom: 24, alignItems: 'stretch' }}>
-            <div style={{ flex: 1, minHeight: 100, borderRadius: 16, background: myCss, border: '2px solid rgba(255,255,255,0.15)', boxShadow: `0 0 40px ${myCss}44`, transition: 'background 0.15s, box-shadow 0.15s' }} />
-            <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 6, minWidth: 100 }}>
-              <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Votre couleur</div>
-              <code style={{ color: '#fff', fontSize: 12, background: 'rgba(255,255,255,0.08)', padding: '4px 8px', borderRadius: 6 }}>
-                rgb({myRgb.r},{myRgb.g},{myRgb.b})
-              </code>
-              {!submitted && liveScore >= 0 && (
-                <div style={{ color: liveScore >= 800 ? '#44ffaa' : liveScore >= 500 ? '#ffaa44' : '#ff6b6b', fontSize: 12, fontWeight: 700 }}>
-                  ≈ {liveScore} pts
-                </div>
-              )}
-            </div>
+        {/* Color preview */}
+        <div style={{ width: '100%', maxWidth: 540, marginBottom: 10, display: 'flex', gap: 10, alignItems: 'center', padding: '10px 14px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 14, boxSizing: 'border-box' }}>
+          <div style={{ width: 40, height: 40, borderRadius: 10, background: myCss, border: '2px solid rgba(255,255,255,0.15)', boxShadow: `0 0 20px ${myCss}55`, flexShrink: 0, transition: 'background 0.1s, box-shadow 0.1s' }} />
+          <div>
+            <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Votre couleur</div>
+            <code style={{ color: '#fff', fontSize: 12 }}>x={myX.toFixed(3)}, y={myY.toFixed(3)}</code>
           </div>
-
-          {/* Spectrum chromograph */}
-          <div style={{ marginBottom: 20 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-              <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', margin: 0 }}>Chromographe spectral</p>
-              <span style={{ color: '#a78bfa', fontSize: 12, fontWeight: 800, fontFamily: 'monospace' }}>{myH} nm</span>
+          {submitted && (
+            <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6, color: '#44ffaa', fontWeight: 700, fontSize: 13 }}>
+              <CheckCircle2 size={16} /> Soumis
             </div>
-            <div style={{ position: 'relative', height: 36, borderRadius: 12, overflow: 'visible', marginBottom: 8 }}>
-              <div style={{ height: '100%', borderRadius: 12, background: `linear-gradient(to right, ${spectrumBars.join(',')})`, border: '1px solid rgba(255,255,255,0.1)' }} />
-              <div style={{ position: 'absolute', top: -4, left: `${markerX}%`, transform: 'translateX(-50%)', width: 4, height: 44, background: '#fff', borderRadius: 4, boxShadow: '0 0 8px rgba(255,255,255,0.8)', pointerEvents: 'none' }} />
-              <input type="range" min={380} max={780} value={myH}
-                onChange={(e) => !submitted && setMyH(Number(e.target.value))}
-                disabled={submitted}
-                style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', opacity: 0, cursor: submitted ? 'not-allowed' : 'pointer', margin: 0 }} />
-            </div>
-          </div>
-
-          {/* Saturation slider */}
-          <div style={{ marginBottom: 16 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-              <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', margin: 0 }}>Saturation</p>
-              <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: 13, fontWeight: 700 }}>{myS}%</span>
-            </div>
-            <div style={{ position: 'relative', height: 24, borderRadius: 12 }}>
-              <div style={{ height: '100%', borderRadius: 12, background: `linear-gradient(to right, ${[0, 25, 50, 75, 100].map(s => { const c = wlSLToRgb(myH, s, myL); return `rgb(${c.r},${c.g},${c.b})`; }).join(',')})`, border: '1px solid rgba(255,255,255,0.1)' }} />
-              <input type="range" min={0} max={100} value={myS}
-                onChange={(e) => !submitted && setMyS(Number(e.target.value))}
-                disabled={submitted}
-                style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', opacity: 0, cursor: submitted ? 'not-allowed' : 'pointer', margin: 0 }} />
-            </div>
-          </div>
-
-          {/* Lightness slider */}
-          <div style={{ marginBottom: 24 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-              <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', margin: 0 }}>Luminosité</p>
-              <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: 13, fontWeight: 700 }}>{myL}%</span>
-            </div>
-            <div style={{ position: 'relative', height: 24, borderRadius: 12 }}>
-              <div style={{ height: '100%', borderRadius: 12, background: `linear-gradient(to right, ${[5, 25, 50, 75, 95].map(l => { const c = wlSLToRgb(myH, myS, l); return `rgb(${c.r},${c.g},${c.b})`; }).join(',')})`, border: '1px solid rgba(255,255,255,0.1)' }} />
-              <input type="range" min={5} max={95} value={myL}
-                onChange={(e) => !submitted && setMyL(Number(e.target.value))}
-                disabled={submitted}
-                style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', opacity: 0, cursor: submitted ? 'not-allowed' : 'pointer', margin: 0 }} />
-            </div>
-          </div>
-
-          {/* Submit */}
-          {submitted ? (
-            <div style={{ textAlign: 'center', padding: '16px', borderRadius: 14, background: 'rgba(68,255,170,0.1)', border: '1px solid rgba(68,255,170,0.3)', color: '#44ffaa', fontWeight: 700, fontSize: 15 }}>
-              ✓ Réponse soumise — En attente des autres joueurs…
-            </div>
-          ) : (
-            <button onClick={handleSubmitGuess} style={{ width: '100%', padding: '16px', borderRadius: 14, border: 'none', cursor: 'pointer', fontWeight: 800, fontSize: 16, background: 'linear-gradient(135deg,#667eea,#764ba2)', color: '#fff', boxShadow: `0 8px 30px ${myCss}55`, transition: 'all 0.2s' }}>
-              ✓ Soumettre ma couleur
-            </button>
           )}
         </div>
 
-        {/* Player status strip */}
-        <div style={{ marginTop: 16, display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
+        {/* CIE 1931 diagram */}
+        <div style={{ width: '100%', maxWidth: 540, position: 'relative', borderRadius: 12, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)', marginBottom: 10 }}>
+          <canvas ref={cieCanvasRef} width={CDW} height={CDH} style={{ display: 'block', width: '100%', height: 'auto' }} />
+          <svg
+            viewBox={`0 0 ${CDW} ${CDH}`}
+            width="100%"
+            style={{ position: 'absolute', top: 0, left: 0, cursor: submitted ? 'default' : 'none' }}
+            onMouseMove={handleDiagMove}
+            onClick={() => { if (!submitted) void handleSubmitGuess(); }}
+          >
+            <path d={horsePath} fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="1.5" />
+            <path d={srgbPath} fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth="1" strokeDasharray="5,4" />
+            {[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7].map(v => { const { px } = cXyToSvg(v, 0); return <text key={v} x={px} y={CDH - 4} fill="rgba(255,255,255,0.3)" fontSize="8" textAnchor="middle">{v.toFixed(1)}</text>; })}
+            {[0.2, 0.4, 0.6, 0.8].map(v => { const { py } = cXyToSvg(0, v); return <text key={v} x={CPL - 3} y={py + 3} fill="rgba(255,255,255,0.3)" fontSize="8" textAnchor="end">{v.toFixed(1)}</text>; })}
+            <text x={CDW / 2} y={CDH - 2} fill="rgba(255,255,255,0.35)" fontSize="9" textAnchor="middle" fontStyle="italic">x</text>
+            <text x={7} y={CDH / 2} fill="rgba(255,255,255,0.35)" fontSize="9" textAnchor="middle" fontStyle="italic" transform={`rotate(-90 7 ${CDH / 2})`}>y</text>
+            {(() => { const { px, py } = cXyToSvg(0.3127, 0.3290); return <><circle cx={px} cy={py} r={4} fill="#fff" opacity={0.6} /><text x={px + 5} y={py + 3} fill="rgba(255,255,255,0.45)" fontSize="7">D65</text></>; })()}
+            {!submitted && (
+              <g>
+                <line x1={curSvg.px - 14} y1={curSvg.py} x2={curSvg.px + 14} y2={curSvg.py} stroke="#fff" strokeWidth={1.5} />
+                <line x1={curSvg.px} y1={curSvg.py - 14} x2={curSvg.px} y2={curSvg.py + 14} stroke="#fff" strokeWidth={1.5} />
+                <circle cx={curSvg.px} cy={curSvg.py} r={7} fill="none" stroke="#fff" strokeWidth={1.5} />
+                {isInGamut && <circle cx={curSvg.px} cy={curSvg.py} r={3} fill={myCss} />}
+              </g>
+            )}
+            {submitted && (
+              <g>
+                <circle cx={curSvg.px} cy={curSvg.py} r={9} fill="none" stroke="#44ffaa" strokeWidth={2} />
+                <circle cx={curSvg.px} cy={curSvg.py} r={3} fill="#44ffaa" />
+              </g>
+            )}
+          </svg>
+        </div>
+
+        {/* Submit / waiting */}
+        {submitted ? (
+          <div style={{ width: '100%', maxWidth: 540, textAlign: 'center', padding: '14px', borderRadius: 14, background: 'rgba(68,255,170,0.1)', border: '1px solid rgba(68,255,170,0.3)', color: '#44ffaa', fontWeight: 700, fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, boxSizing: 'border-box' }}>
+            <CheckCircle2 size={18} /> Réponse soumise — en attente des autres joueurs…
+          </div>
+        ) : (
+          <div style={{ width: '100%', maxWidth: 540, textAlign: 'center', color: 'rgba(255,255,255,0.4)', fontSize: 13, boxSizing: 'border-box' }}>
+            Déplacez le curseur sur le diagramme · <strong style={{ color: '#a78bfa' }}>Cliquez pour confirmer</strong>
+          </div>
+        )}
+
+        {/* Player status */}
+        <div style={{ marginTop: 12, display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
           {Object.values(gameState.players).filter(Boolean).map((p) => (
-            <div key={p!.seat} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 20, background: 'rgba(255,255,255,0.06)', border: `1px solid ${p!.submitted ? 'rgba(68,255,170,0.4)' : 'rgba(255,255,255,0.1)'}` }}>
-              <div style={{ width: 8, height: 8, borderRadius: '50%', background: p!.submitted ? '#44ffaa' : 'rgba(255,255,255,0.3)' }} />
+            <div key={p!.seat} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 10px', borderRadius: 20, background: 'rgba(255,255,255,0.06)', border: `1px solid ${p!.submitted ? 'rgba(68,255,170,0.4)' : 'rgba(255,255,255,0.1)'}` }}>
+              <div style={{ width: 7, height: 7, borderRadius: '50%', background: p!.submitted ? '#44ffaa' : 'rgba(255,255,255,0.3)' }} />
               <span style={{ color: p!.submitted ? '#44ffaa' : 'rgba(255,255,255,0.5)', fontSize: 13, fontWeight: 600 }}>{p!.name}</span>
             </div>
           ))}
         </div>
-
-        {isHost && (
-          <button onClick={handleAdvance} style={{ marginTop: 16, padding: '10px 24px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: 13 }}>
-            Forcer la correction →
-          </button>
-        )}
       </div>
     );
   }
@@ -633,7 +664,7 @@ export default function SpectrePage() {
               const accuracy = Math.round((p.roundScore / 1000) * 100);
               return (
                 <div key={p.seat} style={{ background: 'rgba(255,255,255,0.05)', border: `1px solid ${i === 0 ? 'rgba(255,215,0,0.4)' : 'rgba(255,255,255,0.08)'}`, borderRadius: 18, padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 16 }}>
-                  <div style={{ fontSize: 20 }}>{i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}.`}</div>
+                  <div style={{ fontSize: 14, fontWeight: 800, minWidth: 22, textAlign: 'center', color: i === 0 ? '#fbbf24' : i === 1 ? '#94a3b8' : i === 2 ? '#cd7c3a' : 'rgba(255,255,255,0.4)' }}>{i + 1}</div>
                   <div style={{ flex: 1 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                       <span style={{ color: '#fff', fontWeight: 700, fontSize: 15 }}>{p.name}</span>
@@ -665,7 +696,7 @@ export default function SpectrePage() {
 
           {isHost && (
             <button onClick={handleAdvance} style={{ width: '100%', padding: '16px', borderRadius: 14, border: 'none', cursor: 'pointer', fontWeight: 800, fontSize: 16, background: 'linear-gradient(135deg,#667eea,#764ba2)', color: '#fff' }}>
-              {gameState.round >= gameState.maxRounds ? '🏆 Voir le classement final →' : `Manche suivante →`}
+              {gameState.round >= gameState.maxRounds ? 'Voir le classement final →' : 'Manche suivante →'}
             </button>
           )}
           {!isHost && (
@@ -685,7 +716,7 @@ export default function SpectrePage() {
       <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg,#07070f,#0d0d1e)', fontFamily: 'system-ui,sans-serif', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 16px', boxSizing: 'border-box' }}>
         <div style={{ width: '100%', maxWidth: 520 }}>
           <div style={{ textAlign: 'center', marginBottom: 32 }}>
-            <div style={{ fontSize: 64, marginBottom: 12 }}>🏆</div>
+            <div style={{ marginBottom: 12 }}><Trophy size={64} color="#ffd700" /></div>
             <h1 style={{ color: '#fff', fontSize: 30, fontWeight: 900, margin: '0 0 8px' }}>Partie terminée !</h1>
             {winner && <p style={{ color: '#ffd700', fontSize: 18, fontWeight: 700, margin: 0 }}>Vainqueur : {winner.name}</p>}
           </div>
@@ -693,7 +724,7 @@ export default function SpectrePage() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 32 }}>
             {sortedPlayers.map((p, i) => (
               <div key={p.seat} style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '18px 24px', borderRadius: 18, background: i === 0 ? 'linear-gradient(135deg,rgba(255,215,0,0.15),rgba(255,165,0,0.1))' : 'rgba(255,255,255,0.05)', border: `1px solid ${i === 0 ? 'rgba(255,215,0,0.4)' : 'rgba(255,255,255,0.08)'}` }}>
-                <div style={{ fontSize: 28, minWidth: 40, textAlign: 'center' }}>{i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}`}</div>
+                <div style={{ fontSize: 16, fontWeight: 900, minWidth: 40, textAlign: 'center', color: i === 0 ? '#ffd700' : i === 1 ? '#94a3b8' : i === 2 ? '#cd7c3a' : 'rgba(255,255,255,0.4)' }}>{i + 1}</div>
                 <div style={{ flex: 1 }}>
                   <div style={{ color: '#fff', fontWeight: 700, fontSize: 17 }}>{p.name}</div>
                   <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13 }}>Siège {p.seat}</div>
@@ -708,7 +739,7 @@ export default function SpectrePage() {
 
           {isHost && (
             <button onClick={handleRestart} disabled={loading} style={{ width: '100%', padding: '18px', borderRadius: 16, border: 'none', cursor: 'pointer', fontWeight: 800, fontSize: 17, background: 'linear-gradient(135deg,#667eea,#764ba2)', color: '#fff', opacity: loading ? 0.7 : 1 }}>
-              🔄 Rejouer
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><RotateCcw size={17} /> Rejouer</span>
             </button>
           )}
           {!isHost && (

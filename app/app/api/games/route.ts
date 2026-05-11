@@ -2,6 +2,13 @@ import { NextResponse } from 'next/server';
 
 import { getDb } from '@/lib/db';
 
+export async function DELETE() {
+  const db = getDb();
+  db.prepare('DELETE FROM crg_games;').run();
+  db.prepare('DELETE FROM crg_flows;').run();
+  return NextResponse.json({ ok: true, deleted: true });
+}
+
 type GameRow = {
   id: string;
   created_at: string;

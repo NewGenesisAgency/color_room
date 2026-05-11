@@ -22,7 +22,7 @@ export async function POST(req: Request) {
       // Send all plate updates in parallel
       const platePromises = plates.map(async (plate: { plateId: number; channels: { index: number; value: number }[] }) => {
         const channelPromises = plate.channels.map(async (ch: { index: number; value: number }) => {
-          const url = `${baseUrl}/state/plaque/${plate.plateId}/cursor/${ch.index}/${ch.value}`;
+          const url = `${baseUrl}/state/plaque/${plate.plateId}/canal/${ch.index}/${ch.value}`;
           const controller = new AbortController();
           const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
@@ -75,7 +75,7 @@ export async function POST(req: Request) {
 
     // Send all channel updates in parallel for maximum speed
     const promises = channels.map(async (ch: { index: number; value: number }) => {
-      const url = `${baseUrl}/state/plaque/${plateId}/cursor/${ch.index}/${ch.value}`;
+      const url = `${baseUrl}/state/plaque/${plateId}/canal/${ch.index}/${ch.value}`;
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), timeoutMs);
 

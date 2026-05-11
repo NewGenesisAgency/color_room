@@ -1779,13 +1779,28 @@ export default function EditeurPage() {
                     >
                       <Trash2 size={14} />
                     </button>
-                    <button 
-                      className="g-btn g-btn--sm g-btn--accent" 
-                      disabled={dbLoading} 
+                    <button
+                      className="g-btn g-btn--sm g-btn--accent"
+                      disabled={dbLoading}
                       onClick={() => setModal({ type: 'create-project' })}
                     >
                       <FolderPlus size={14} />
                       <span>{dbLoading ? '...' : 'Nouveau'}</span>
+                    </button>
+                    <button
+                      className="g-btn g-btn--sm g-btn--danger"
+                      disabled={dbLoading || games.length === 0}
+                      title="Vider la bibliothèque (supprime tous les jeux)"
+                      onClick={async () => {
+                        if (!confirm('Supprimer TOUS les jeux de la bibliothèque ?')) return;
+                        await fetch('/api/games', { method: 'DELETE' });
+                        setEditor({ games: [], activeGameId: null, selectedNodeId: null });
+                        editorRef.current = { games: [], activeGameId: null, selectedNodeId: null };
+                        setStatus('Bibliothèque vidée');
+                      }}
+                    >
+                      <Trash2 size={14} />
+                      <span>Vider</span>
                     </button>
                   </div>
                 </div>
