@@ -1944,7 +1944,8 @@ export default function JeuxPage() {
       });
       const data = await res.json();
       if (!res.ok || !data.ok) {
-        setMessage(data.error ?? 'Erreur de connexion');
+        const detail = data.detail ? ` (${data.detail})` : '';
+        setMessage((data.error ?? 'Erreur de connexion') + detail);
         return;
       }
       setCurrentUser(data.user.username);

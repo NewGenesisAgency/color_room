@@ -82,7 +82,9 @@ export async function POST(req: NextRequest) {
       httpOnly: true, maxAge: 7 * 24 * 3600, path: '/', sameSite: 'lax',
     });
     return res;
-  } catch {
-    return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error('[login] error:', msg);
+    return NextResponse.json({ error: 'Erreur serveur', detail: msg }, { status: 500 });
   }
 }
