@@ -97,55 +97,100 @@ function xyToRgb255(x: number, y: number): { r: number; g: number; b: number } |
 const SRGB_PRIMARIES = [[0.64, 0.33], [0.30, 0.60], [0.15, 0.06]];
 
 // ── Hardware API ─────────────────────────────────────────────────────────────
+// Profils LED à 32 canaux — valeurs normalisées (0–1), identiques à editeur/page.tsx
+const CHANNEL_PROFILES: { rgb: [number, number, number]; strength: number }[] = [
+  { rgb: [0.30, 0.00, 0.50], strength: 1.0 },
+  { rgb: [0.55, 0.10, 0.85], strength: 1.0 },
+  { rgb: [0.25, 0.05, 0.95], strength: 1.0 },
+  { rgb: [0.05, 0.05, 0.40], strength: 1.0 },
+  { rgb: [0.00, 0.65, 1.00], strength: 1.0 },
+  { rgb: [0.25, 1.00, 0.35], strength: 1.0 },
+  { rgb: [0.00, 0.55, 0.12], strength: 1.0 },
+  { rgb: [1.00, 1.00, 0.40], strength: 1.0 },
+  { rgb: [1.00, 0.55, 0.00], strength: 1.0 },
+  { rgb: [0.75, 0.25, 0.00], strength: 1.0 },
+  { rgb: [0.55, 0.00, 0.00], strength: 1.0 },
+  { rgb: [1.00, 0.05, 0.05], strength: 1.0 },
+  { rgb: [0.95, 0.00, 0.20], strength: 1.0 },
+  { rgb: [0.90, 0.00, 0.22], strength: 1.0 },
+  { rgb: [0.35, 0.00, 0.00], strength: 1.0 },
+  { rgb: [0.20, 0.00, 0.00], strength: 0.25 },
+  { rgb: [0.10, 0.00, 0.00], strength: 0.15 },
+  { rgb: [0.10, 0.00, 0.00], strength: 0.15 },
+  { rgb: [1.00, 0.58, 0.00], strength: 1.0 },
+  { rgb: [1.00, 0.70, 0.10], strength: 1.0 },
+  { rgb: [1.00, 0.78, 0.15], strength: 0.55 },
+  { rgb: [1.00, 0.80, 0.20], strength: 0.45 },
+  { rgb: [1.00, 0.82, 0.22], strength: 0.35 },
+  { rgb: [1.00, 0.92, 0.78], strength: 1.0 },
+  { rgb: [1.00, 0.97, 0.90], strength: 1.0 },
+  { rgb: [1.00, 1.00, 1.00], strength: 1.0 },
+  { rgb: [0.90, 0.90, 0.90], strength: 0.75 },
+  { rgb: [0.80, 0.80, 0.80], strength: 0.60 },
+  { rgb: [0.55, 0.55, 0.55], strength: 0.45 },
+  { rgb: [0.40, 0.40, 0.40], strength: 0.40 },
+  { rgb: [0.78, 0.78, 0.78], strength: 0.55 },
+  { rgb: [0.92, 0.92, 0.92], strength: 0.70 },
+];
+
+function clamp(v: number, lo: number, hi: number) { return Math.max(lo, Math.min(hi, v)); }
+
+// Produit des valeurs 0–100 (cohérent avec jeux/page.tsx et editeur/page.tsx)
 function rgbToChannels32(r: number, g: number, b: number, intensity: number): number[] {
-  const rn = r / 255, gn = g / 255, bn = b / 255;
-  const sc = intensity / 100;
-  const y = Math.min(rn, gn), w = (rn + gn + bn) / 3;
-  const ch = Array(32).fill(0);
-  ch[0] = Math.round(bn * 255 * 1.0 * sc);
-  ch[1] = Math.round(bn * 255 * 0.85 * sc);
-  ch[4] = Math.round(bn * 255 * 0.8 * sc);
-  ch[5] = Math.round(gn * 255 * 1.0 * sc);
-  ch[6] = Math.round(gn * 255 * 0.75 * sc);
-  ch[7] = Math.round(y * 255 * 1.0 * sc);
-  ch[8] = Math.round(y * 255 * 0.85 * sc);
-  ch[10] = Math.round(rn * 255 * 0.7 * sc);
-  ch[11] = Math.round(rn * 255 * 1.0 * sc);
-  ch[12] = Math.round(rn * 255 * 0.9 * sc);
-  ch[18] = Math.round(y * 255 * 0.9 * sc);
-  ch[19] = Math.round(y * 255 * 0.75 * sc);
-  ch[25] = Math.round(w * 255 * 1.0 * sc);
-  ch[26] = Math.round(w * 255 * 0.85 * sc);
-  return ch.map(v => Math.max(0, Math.min(255, v)));
+  const rn = clamp(r, 0, 255) / 255;
+  const gn = clamp(g, 0, 255) / 255;
+  const bn = clamp(b, 0, 255) / 255;
+  const scale = clamp(intensity, 0, 100) / 100;
+  const energy = Math.max(rn, gn, bn);
+  const channels = Array(32).fill(0);
+  if (energy <= 1e-6 || scale <= 1e-6) return channels;
+
+  const norm = Math.max(1e-6, Math.sqrt(rn * rn + gn * gn + bn * bn));
+  const tr = rn / norm, tg = gn / norm, tb = bn / norm;
+
+  let bestIdx = 25; // blanc par défaut
+  let bestScore = -1;
+  for (let i = 0; i < 32; i++) {
+    const p = CHANNEL_PROFILES[i];
+    if (!p || p.strength <= 0.05) continue;
+    const pn = Math.max(1e-6, Math.sqrt(p.rgb[0] ** 2 + p.rgb[1] ** 2 + p.rgb[2] ** 2));
+    const score = (p.rgb[0] / pn) * tr + (p.rgb[1] / pn) * tg + (p.rgb[2] / pn) * tb;
+    if (score > bestScore) { bestScore = score; bestIdx = i; }
+  }
+
+  const mainValue = Math.round(energy * 100 * scale);
+  channels[bestIdx] = mainValue;
+  const whiteBoost = Math.round(mainValue * 0.4);
+  if (whiteBoost > 0) {
+    channels[24] = Math.round(whiteBoost * 0.5);
+    channels[25] = whiteBoost;
+    channels[26] = Math.round(whiteBoost * 0.7);
+    channels[27] = Math.round(whiteBoost * 0.4);
+  }
+  return channels.map(v => clamp(Math.round(v), 0, 100));
 }
 
+// Envoi en une seule requête multi-plates (plus efficace que 42 requêtes)
 async function sendColorToAllPlates(r: number, g: number, b: number, intensity = 85) {
-  const channels = rgbToChannels32(r, g, b, intensity);
-  const channelArray = channels.map((v, i) => ({ index: i, value: v }));
-  const sends: Promise<void>[] = [];
-  for (let plateId = 1; plateId <= 42; plateId++) {
-    sends.push(
-      fetch('/api/supervision/batch', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ plateId, channels: channelArray, fast: true }),
-        cache: 'no-store',
-      }).then(() => {}).catch(() => {})
-    );
-  }
-  await Promise.all(sends);
+  const channelArray = rgbToChannels32(r, g, b, intensity).map((v, i) => ({ index: i, value: v }));
+  const plates = Array.from({ length: 42 }, (_, i) => ({ plateId: i + 1, channels: channelArray }));
+  await fetch('/api/supervision/batch', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ plates, fast: true }),
+    cache: 'no-store',
+  }).catch(() => {});
 }
 
-async function clearAllPlates() {
+function clearAllPlates() {
   const channels = Array.from({ length: 32 }, (_, i) => ({ index: i, value: 0 }));
-  for (let plateId = 1; plateId <= 42; plateId++) {
-    fetch('/api/supervision/batch', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ plateId, channels }),
-      cache: 'no-store',
-    }).catch(() => {});
-  }
+  const plates = Array.from({ length: 42 }, (_, i) => ({ plateId: i + 1, channels }));
+  fetch('/api/supervision/batch', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ plates }),
+    cache: 'no-store',
+  }).catch(() => {});
 }
 
 // ── Component ────────────────────────────────────────────────────────────────
@@ -310,6 +355,7 @@ export default function ChromaticitePage() {
                 ref={svgRef}
                 viewBox={`0 0 ${DW} ${DH}`}
                 width="100%"
+                height="100%"
                 style={{ position: 'absolute', top: 0, left: 0, cursor: 'crosshair' }}
                 onMouseMove={handleMouseMove}
                 onMouseLeave={() => setCursor(null)}
