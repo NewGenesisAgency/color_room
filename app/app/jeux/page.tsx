@@ -9,7 +9,10 @@ import GamePuissance4 from '@/app/_components/GamePuissance4';
 import GameChasseurGamut from '@/app/_components/GameChasseurGamut';
 import GameMetamerisme from '@/app/_components/GameMetamerisme';
 import NavigationMenu from '@/app/_components/NavigationMenu';
+import Room3D from '@/app/_components/Room3D';
 import LoginScreen from '@/app/_components/LoginScreen';
+import SpectrePage from '@/app/spectre/page';
+import ChromaticitePage from '@/app/chromaticite/page';
 import {
   Activity,
   AlertTriangle,
@@ -581,10 +584,10 @@ function rgbToChannels32(rgb: TargetColor, masterIntensity: number): number[] {
   // Boost intensity with white channels (COULEURS.md canaux 25-28)
   const whiteBoost = Math.round(mainValue * 0.4);
   if (whiteBoost > 0) {
-    channels[24] = Math.round(whiteBoost * 0.5);  // Canal 25: Blanc un peu jaunis
-    channels[25] = whiteBoost;                      // Canal 26: Blanc
-    channels[26] = Math.round(whiteBoost * 0.7);   // Canal 27: Blanc un peu moins lumineux
-    channels[27] = Math.round(whiteBoost * 0.4);   // Canal 28: Blanc encore moins lumineux
+    channels[24] = Math.max(channels[24], Math.round(whiteBoost * 0.5));
+    channels[25] = Math.max(channels[25], whiteBoost);
+    channels[26] = Math.max(channels[26], Math.round(whiteBoost * 0.7));
+    channels[27] = Math.max(channels[27], Math.round(whiteBoost * 0.4));
   }
 
   return channels;
@@ -769,6 +772,7 @@ export default function JeuxPage() {
 
   // Nouveaux jeux natifs
   const [activeBuiltinGame, setActiveBuiltinGame] = useState<'color-speed' | 'maitre-blanc' | 'puissance4' | 'chasseur-gamut' | 'metamere' | null>(null);
+  const [activeView, setActiveView] = useState<null | 'spectre' | 'chromaticite'>(null);
   const [simonSequence, setSimonSequence] = useState<number[]>([]);
   const [simonPlayerInput, setSimonPlayerInput] = useState<number[]>([]);
   const [simonLevel, setSimonLevel] = useState<number>(1);
@@ -1125,7 +1129,6 @@ export default function JeuxPage() {
 
       const nextColors: string[] = Array(TOTAL_PLATES).fill('#000000');
       const nextActive: boolean[] = Array(TOTAL_PLATES).fill(false);
-      const platesData: { plateId: number; rgb: TargetColor; intensity: number }[] = [];
 
       for (let hr = 0; hr < HW_ROWS; hr++) {
         const gridRow = gridOffset + hr;
@@ -1137,16 +1140,15 @@ export default function JeuxPage() {
 
           const cellColor = merged[gridRow]?.[hc] ?? null;
           if (cellColor) {
-            platesData.push({ plateId, rgb: hexToRgb255(cellColor), intensity: 90 });
+            sendRgbToPlate(hexToRgb255(cellColor), 90, plateId);
             nextColors[tileIdx] = cellColor;
             nextActive[tileIdx] = true;
           } else {
-            platesData.push({ plateId, rgb: { r: 0, g: 0, b: 0 }, intensity: 0 });
+            sendRgbToPlate({ r: 0, g: 0, b: 0 }, 0, plateId);
           }
         }
       }
 
-      if (platesData.length > 0) sendColorsToPlates(platesData);
       setPlateColors(nextColors);
       setPlateActive(nextActive);
     }
@@ -1698,6 +1700,7 @@ export default function JeuxPage() {
   const hudGraphRunRef = useRef<{ timers: number[]; stop: boolean }>({ timers: [], stop: false });
   const hudGraphContinuationRef = useRef<(() => void) | null>(null);
   const hudGraphClickHandlersRef = useRef<Map<number, () => void>>(new Map());
+  const gameClickHandlerRef = useRef<((idx: number) => void) | null>(null);
 
   const stopHudGraph = () => {
     hudGraphRunRef.current.stop = true;
@@ -2646,22 +2649,18 @@ export default function JeuxPage() {
     }).catch(() => {});
   }
 
-  // Send colors to multiple plates at once (optimized for animations)
+  // Send colors to multiple plates — one request per plate to avoid overloading the server
   function sendColorsToPlates(platesData: { plateId: number; rgb: TargetColor; intensity: number }[]) {
-    const plates = platesData.map(({ plateId, rgb, intensity }) => {
+    for (const { plateId, rgb, intensity } of platesData) {
       const channels32 = rgbToChannels32(rgb, intensity);
-      const channels = channels32
-        .map((v, i) => ({ index: i, value: clamp255(v ?? 0) }));
-      return { plateId, channels };
-    });
-
-    // Fire-and-forget with fast mode for games
-    fetch('/api/supervision/batch', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ plates, fast: true }),
-      cache: 'no-store',
-    }).catch(() => {});
+      const channels = channels32.map((v, i) => ({ index: i, value: clamp255(v ?? 0) }));
+      fetch('/api/supervision/batch', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ plateId, channels, fast: true }),
+        cache: 'no-store',
+      }).catch(() => {});
+    }
   }
 
   // Exponential difficulty: base * (rate ^ level)
@@ -3190,9 +3189,29 @@ export default function JeuxPage() {
 
       return next;
     });
+    gameClickHandlerRef.current?.(index);
   }
 
   // currentGameDef supprimé : les jeux viennent de la DB
+
+  if (activeView !== null) {
+    return (
+      <div className="jeux" style={{ ['--tile-shadow-intensity' as any]: clamp100(masterIntensity) / 100 }}>
+        <NavigationMenu />
+        <div style={{ paddingTop: 72 }}>
+          <div style={{ padding: '12px 20px' }}>
+            <button
+              onClick={() => setActiveView(null)}
+              style={{ padding: '8px 18px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.08)', color: '#e8eaf0', cursor: 'pointer', fontWeight: 600, fontSize: 13 }}
+            >
+              ← Retour aux jeux
+            </button>
+          </div>
+          {activeView === 'spectre' ? <SpectrePage /> : <ChromaticitePage />}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="jeux" style={{ ['--tile-shadow-intensity' as any]: clamp100(masterIntensity) / 100 }}>
@@ -3505,33 +3524,6 @@ export default function JeuxPage() {
                   </button>
                 </div>
 
-                {/* Spectre Chromatique — jeu multijoueur */}
-                <div
-                  className="game-card"
-                  style={{ marginBottom: 8 }}
-                  onClick={() => { window.location.href = '/spectre'; }}
-                  role="button"
-                  tabIndex={0}
-                >
-                  <div className="game-icon" style={{ background: 'linear-gradient(135deg, #1a0a2e, #2d1060)' }}>
-                    <Sparkles size={20} color="#a78bfa" />
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
-                      <h4>Spectre Chromatique</h4>
-                      <span style={{ fontSize: 10, fontWeight: 700, color: '#a78bfa', background: 'rgba(167,139,250,0.18)', padding: '2px 7px', borderRadius: 5 }}>multijoueur</span>
-                    </div>
-                    <p>Mémorisez une couleur, reproduisez-la sur le chromographe spectral</p>
-                  </div>
-                  <button
-                    className="play-btn"
-                    style={{ background: 'rgba(167,139,250,0.2)', color: '#fff' }}
-                    onClick={(e) => { e.stopPropagation(); window.location.href = '/spectre'; }}
-                  >
-                    <Play size={15} />
-                  </button>
-                </div>
-
                 {/* Color Speed */}
                 {(['color-speed', 'maitre-blanc', 'puissance4', 'chasseur-gamut', 'metamere'] as const).map((gameId) => {
                   const META: Record<string, { title: string; desc: string; Icon: any; grad: string; accent: string }> = {
@@ -3585,11 +3577,11 @@ export default function JeuxPage() {
                   );
                 })}
 
-                {/* Spectre Chromatique — opens in new tab */}
+                {/* Spectre Chromatique */}
                 <div
                   className="game-card"
                   style={{ marginBottom: 8 }}
-                  onClick={() => window.open('/spectre', '_blank')}
+                  onClick={() => setActiveView('spectre')}
                   role="button" tabIndex={0}
                 >
                   <div className="game-icon" style={{ background: 'linear-gradient(135deg,#8b5cf6,#06d6a0)' }}>
@@ -3604,15 +3596,15 @@ export default function JeuxPage() {
                   </div>
                   <button className="play-btn"
                     style={{ background: '#8b5cf633', color: '#fff' }}
-                    onClick={(e) => { e.stopPropagation(); window.open('/spectre', '_blank'); }}
+                    onClick={(e) => { e.stopPropagation(); setActiveView('spectre'); }}
                   ><Play size={15} /></button>
                 </div>
 
-                {/* Diagramme Chromaticité CIE 1931 — outil solo */}
+                {/* Diagramme Chromaticité CIE 1931 */}
                 <div
                   className="game-card"
                   style={{ marginBottom: 8 }}
-                  onClick={() => window.open('/chromaticite', '_blank')}
+                  onClick={() => setActiveView('chromaticite')}
                   role="button" tabIndex={0}
                 >
                   <div className="game-icon" style={{ background: 'linear-gradient(135deg,#0f172a,#1e3a5f)' }}>
@@ -3627,7 +3619,7 @@ export default function JeuxPage() {
                   </div>
                   <button className="play-btn"
                     style={{ background: '#38bdf833', color: '#fff' }}
-                    onClick={(e) => { e.stopPropagation(); window.open('/chromaticite', '_blank'); }}
+                    onClick={(e) => { e.stopPropagation(); setActiveView('chromaticite'); }}
                   ><Play size={15} /></button>
                 </div>
 
@@ -3722,24 +3714,12 @@ export default function JeuxPage() {
 
               <div className="message-box">{message}</div>
 
-              <div className="light-plates-grid">
-                {Array.from({ length: 42 }).map((_, i) => (
-                  <div
-                    key={i}
-                    className={`light-plate ${plateActive[i] ? 'active' : ''}`}
-                    style={{
-                      backgroundColor: plateActive[i] ? plateColors[i] : '#1a1a1a',
-                      color: plateColors[i],
-                      ['--plate-color' as any]: plateColors[i],
-                    }}
-                    onClick={() => handlePlateClick(i)}
-                    role="button"
-                    tabIndex={0}
-                  >
-                    <span className="plate-label">{i + 1}</span>
-                  </div>
-                ))}
-              </div>
+              <Room3D
+                plateColors={plateColors}
+                plateActive={plateActive}
+                onPlateClick={handlePlateClick}
+                height={420}
+              />
 
               <div>
                 {gameActive && customRun ? (
@@ -3863,7 +3843,7 @@ export default function JeuxPage() {
                 {gameActive && tetrisStandalone && (
                   <div style={{ marginTop: 12, borderRadius: 18, overflow: 'hidden', border: '1px solid rgba(0,0,0,0.08)' }}>
                     <TetrisGame
-                      params={{ speed: 500, bgColor: '#0a0a0f', borderColor: '#222233' }}
+                      params={{ speed: 500 }}
                       isPlaying={gameActive}
                       onSnapshot={(snap) => { tetrisSnapRef.current = snap; }}
                     />
@@ -3945,39 +3925,50 @@ export default function JeuxPage() {
 
                 {/* Nouveaux jeux natifs */}
                 {gameActive && activeBuiltinGame && (() => {
+                  const flushVisualBatch = () => {
+                    const snapshot = new Map(tileColorBatchRef.current);
+                    tileColorBatchRef.current.clear();
+                    setPlateColors(prev => {
+                      const n = [...prev];
+                      snapshot.forEach(({ r, g, b, intensity }, i) => {
+                        if (intensity === 0) n[i] = '#000000';
+                        else n[i] = `rgb(${Math.round(r)},${Math.round(g)},${Math.round(b)})`;
+                      });
+                      return n;
+                    });
+                    setPlateActive(prev => {
+                      const n = [...prev];
+                      snapshot.forEach(({ intensity }, i) => { n[i] = intensity > 0; });
+                      return n;
+                    });
+                  };
                   const tileActions = {
                     onSendColor: (idx: number, r: number, g: number, b: number, intensity = 80) => {
                       const plateId = PLATE_ID_BY_INDEX[idx];
                       if (!plateId) return;
-                      // Buffer calls for 8 ms then flush as a single multi-plate batch
-                      tileColorBatchRef.current.set(plateId, { r, g, b, intensity });
+                      sendRgbToPlate({ r, g, b }, intensity, plateId);
+                      tileColorBatchRef.current.set(idx, { r, g, b, intensity });
                       window.clearTimeout(tileColorFlushRef.current);
-                      tileColorFlushRef.current = window.setTimeout(() => {
-                        const entries = Array.from(tileColorBatchRef.current.entries());
-                        tileColorBatchRef.current.clear();
-                        if (entries.length === 0) return;
-                        if (entries.length === 1) {
-                          const [pid, col] = entries[0];
-                          sendColorToPlateImmediate({ r: col.r, g: col.g, b: col.b }, col.intensity, pid);
-                        } else {
-                          sendColorsToPlates(entries.map(([pid, col]) => ({
-                            plateId: pid, rgb: { r: col.r, g: col.g, b: col.b }, intensity: col.intensity,
-                          })));
-                        }
-                      }, 8);
+                      tileColorFlushRef.current = window.setTimeout(flushVisualBatch, 50);
                     },
                     onTurnOff: (idx: number) => {
                       const plateId = PLATE_ID_BY_INDEX[idx];
-                      if (plateId) turnOffPlateImmediate(plateId);
+                      if (!plateId) return;
+                      sendRgbToPlate({ r: 0, g: 0, b: 0 }, 0, plateId);
+                      tileColorBatchRef.current.set(idx, { r: 0, g: 0, b: 0, intensity: 0 });
+                      window.clearTimeout(tileColorFlushRef.current);
+                      tileColorFlushRef.current = window.setTimeout(flushVisualBatch, 50);
                     },
                     onTurnOffAll: () => {
-                      // Cancel any pending batch and send global blackout (single PUT /)
                       tileColorBatchRef.current.clear();
                       window.clearTimeout(tileColorFlushRef.current);
                       fetch('/api/supervision/', { method: 'PUT', cache: 'no-store' }).catch(() => {});
+                      setPlateColors(Array(42).fill('#000000'));
+                      setPlateActive(Array(42).fill(false));
                     },
                     onQuit: () => { setActiveBuiltinGame(null); setGameActive(false); },
                     tileCount: 42,
+                    onRegisterClickHandler: (fn: ((idx: number) => void) | null) => { gameClickHandlerRef.current = fn; },
                   };
                   return (
                     <div style={{ marginTop: 12, borderRadius: 18, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(10,10,18,0.95)' }}>
@@ -3996,12 +3987,10 @@ export default function JeuxPage() {
                   const tetrisNode = nodes.find((n) => n.kind === 'game_tetris' && n.enabled !== false);
                   if (!tetrisNode) return null;
                   const speed = typeof tetrisNode.params?.speed === 'number' ? tetrisNode.params.speed : 500;
-                  const bgColor = typeof tetrisNode.params?.bgColor === 'string' ? tetrisNode.params.bgColor : '#0a0a0f';
-                  const borderColor = typeof tetrisNode.params?.borderColor === 'string' ? tetrisNode.params.borderColor : '#222233';
                   return (
                     <div style={{ marginTop: 12, borderRadius: 18, overflow: 'hidden', border: '1px solid rgba(0,0,0,0.08)' }}>
                       <TetrisGame
-                        params={{ speed: Math.max(50, speed), bgColor, borderColor }}
+                        params={{ speed: Math.max(50, speed) }}
                         isPlaying={gameActive}
                         onSnapshot={(snap) => { tetrisSnapRef.current = snap; }}
                       />

@@ -24,9 +24,9 @@ export const metadata: Metadata = {
   creator: 'Lycée Édouard Branly — BTS CIEL',
   publisher: 'Académie de Lyon',
   icons: {
-    icon: '/data.png',
-    shortcut: '/data.png',
-    apple: '/data.png',
+    icon: '/favicon.ico',
+    shortcut: '/favicon.ico',
+    apple: '/favicon.ico',
   },
   openGraph: {
     title: 'Color Room Games',

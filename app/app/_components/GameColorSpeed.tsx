@@ -8,6 +8,7 @@ export interface GameTileProps {
   onTurnOffAll: () => void;
   onQuit: () => void;
   tileCount?: number;
+  onRegisterClickHandler?: (fn: ((idx: number) => void) | null) => void;
 }
 
 function flashTiles(
@@ -44,7 +45,10 @@ const COLORS = [
   { r: 200, g: 0,   b: 255, css: '#c800ff', label: 'Violet' },
 ];
 
-export default function GameColorSpeed({ onSendColor, onTurnOff, onTurnOffAll, onQuit, tileCount = 42 }: GameTileProps) {
+type Toast = { id: number; text: string; positive: boolean };
+let toastIdCounter = 0;
+
+export default function GameColorSpeed({ onSendColor, onTurnOff, onTurnOffAll, onQuit, tileCount = 42, onRegisterClickHandler }: GameTileProps) {
   const [phase, setPhase] = useState<'ready' | 'playing' | 'finished'>('ready');
   const [timeLeft, setTimeLeft] = useState(GAME_DURATION);
   const [activeTile, setActiveTile] = useState<number | null>(null);
@@ -53,6 +57,7 @@ export default function GameColorSpeed({ onSendColor, onTurnOff, onTurnOffAll, o
   const [missed, setMissed] = useState(0);
   const [combo, setCombo] = useState(0);
   const [flash, setFlash] = useState<'good' | 'bad' | null>(null);
+  const [toasts, setToasts] = useState<Toast[]>([]);
   const [bestScore, setBestScore] = useState(() => {
     try { return Number(localStorage.getItem('cs_best_score') ?? 0); } catch { return 0; }
   });
@@ -89,6 +94,12 @@ export default function GameColorSpeed({ onSendColor, onTurnOff, onTurnOffAll, o
   function triggerFlash(kind: 'good' | 'bad') {
     setFlash(kind);
     window.setTimeout(() => setFlash(null), 250);
+  }
+
+  function spawnToast(text: string, positive: boolean) {
+    const id = ++toastIdCounter;
+    setToasts(prev => [...prev, { id, text, positive }]);
+    window.setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 1100);
   }
 
   function startGame() {
@@ -136,7 +147,9 @@ export default function GameColorSpeed({ onSendColor, onTurnOff, onTurnOffAll, o
       setCombo(comboRef.current);
       const bonusSpeed = Math.max(1, Math.floor(1500 / speedRef.current));
       const bonusCombo = Math.min(comboRef.current, 5);
-      setScore(s => s + 10 + bonusSpeed + bonusCombo);
+      const delta = 10 + bonusSpeed + bonusCombo;
+      setScore(s => s + delta);
+      spawnToast('+' + delta, true);
       triggerFlash('good');
       window.clearTimeout(tileTimerRef.current);
       flashTiles(numTiles, onSendColor, 20, 200, 60);
@@ -145,18 +158,21 @@ export default function GameColorSpeed({ onSendColor, onTurnOff, onTurnOffAll, o
       comboRef.current = 0;
       setCombo(0);
       setMissed(m => m + 1);
+      spawnToast('-1', false);
       triggerFlash('bad');
       flashTilesThenRestore(numTiles, onSendColor, onTurnOffAll, 200, 20, 20, activeTileRef.current, activeColorRef.current);
     }
   }
 
   useEffect(() => {
+    onRegisterClickHandler?.(handleTileClick);
     return () => {
+      onRegisterClickHandler?.(null);
       window.clearInterval(gameTimerRef.current);
       window.clearTimeout(tileTimerRef.current);
       onTurnOffAll();
     };
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const timerPct = (timeLeft / GAME_DURATION) * 100;
   const timerColor = timeLeft > 20 ? '#4ade80' : timeLeft > 10 ? '#fbbf24' : '#ef4444';
@@ -199,60 +215,79 @@ export default function GameColorSpeed({ onSendColor, onTurnOff, onTurnOffAll, o
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16, padding: '20px 24px', background: 'linear-gradient(160deg, #080c14 0%, #0c1020 100%)', fontFamily: 'system-ui, sans-serif', color: '#e8eaf0', borderRadius: 18 }}>
+      <style>{`
+        @keyframes floatUp {
+          0%   { transform: translateY(0);     opacity: 0; }
+          15%  { transform: translateY(-8px);  opacity: 1; }
+          80%  { transform: translateY(-48px); opacity: 1; }
+          100% { transform: translateY(-60px); opacity: 0; }
+        }
+      `}</style>
+
+      {/* Timer bar */}
+      <div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 4, color: 'rgba(255,255,255,0.5)' }}>
+          <span>Temps</span><span style={{ color: timerColor, fontWeight: 700 }}>{timeLeft}s</span>
+        </div>
+        <div style={{ height: 6, borderRadius: 4, background: 'rgba(255,255,255,0.1)', overflow: 'hidden' }}>
+          <div style={{ height: '100%', width: `${timerPct}%`, background: timerColor, transition: 'width 1s linear, background 0.3s' }} />
+        </div>
+      </div>
+
+      {/* Score + toasts + combo + stop */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-        <div style={{ flex: 1 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 4, color: 'rgba(255,255,255,0.5)' }}>
-            <span>Temps</span><span style={{ color: timerColor, fontWeight: 700 }}>{timeLeft}s</span>
-          </div>
-          <div style={{ height: 6, borderRadius: 4, background: 'rgba(255,255,255,0.1)', overflow: 'hidden' }}>
-            <div style={{ height: '100%', width: `${timerPct}%`, background: timerColor, transition: 'width 1s linear, background 0.3s' }} />
+        {/* Score with toast overlay */}
+        <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 72 }}>
+          <div style={{ fontSize: 42, fontWeight: 900, color: flash === 'good' ? '#4ade80' : flash === 'bad' ? '#ef4444' : '#fff', transition: 'color 0.1s', lineHeight: 1 }}>{score}</div>
+          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>pts</div>
+          {/* Floating toasts */}
+          <div style={{ position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%)', pointerEvents: 'none', width: 80 }}>
+            {toasts.map(t => (
+              <div key={t.id} style={{
+                position: 'absolute',
+                top: 0,
+                left: '50%',
+                transform: 'translateX(-50%)',
+                animation: 'floatUp 1.1s ease-out forwards',
+                background: 'rgba(255,255,255,0.12)',
+                backdropFilter: 'blur(12px)',
+                WebkitBackdropFilter: 'blur(12px)',
+                border: `1px solid ${t.positive ? 'rgba(74,222,128,0.4)' : 'rgba(239,68,68,0.4)'}`,
+                borderRadius: 10,
+                padding: '4px 10px',
+                fontSize: 15,
+                fontWeight: 800,
+                color: t.positive ? '#4ade80' : '#ef4444',
+                boxShadow: t.positive ? '0 0 12px rgba(74,222,128,0.45)' : '0 0 12px rgba(239,68,68,0.45)',
+                whiteSpace: 'nowrap',
+              }}>
+                {t.text}
+              </div>
+            ))}
           </div>
         </div>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: 22, fontWeight: 800, color: flash === 'good' ? '#4ade80' : flash === 'bad' ? '#ef4444' : '#fff', transition: 'color 0.1s' }}>{score}</div>
-          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>pts</div>
+
+        {/* Color indicator for active tile */}
+        {activeTile !== null && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1 }}>
+            <div style={{
+              width: 28, height: 28, borderRadius: '50%',
+              background: activeCss,
+              boxShadow: `0 0 18px ${activeCss}cc`,
+              animation: 'pulse 0.8s ease-in-out infinite alternate',
+            }} />
+            <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.55)' }}>Dalle <span style={{ fontWeight: 800, color: activeCss }}>{activeTile + 1}</span></span>
+          </div>
+        )}
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 'auto' }}>
+          {combo > 1 && (
+            <div style={{ background: '#fbbf24', color: '#000', fontWeight: 800, fontSize: 13, padding: '4px 10px', borderRadius: 8, boxShadow: '0 0 10px rgba(251,191,36,0.6)' }}>
+              x{combo} COMBO
+            </div>
+          )}
+          <button onClick={() => { window.clearInterval(gameTimerRef.current); window.clearTimeout(tileTimerRef.current); onTurnOffAll(); onQuit(); }} style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.7)', fontSize: 12, cursor: 'pointer' }}>⏹</button>
         </div>
-        {combo > 1 && <div style={{ background: '#fbbf24', color: '#000', fontWeight: 800, fontSize: 13, padding: '4px 10px', borderRadius: 8 }}>x{combo} COMBO</div>}
-        <button onClick={() => { window.clearInterval(gameTimerRef.current); window.clearTimeout(tileTimerRef.current); onTurnOffAll(); onQuit(); }} style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.7)', fontSize: 12, cursor: 'pointer' }}>⏹</button>
-      </div>
-
-      <div style={{ textAlign: 'center', fontSize: 13, color: 'rgba(255,255,255,0.6)' }}>
-        {activeTile !== null && <>Dalle <span style={{ fontWeight: 800, color: activeCss }}>{activeTile + 1}</span> — cliquez vite !</>}
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 6, maxWidth: 560, margin: '0 auto', width: '100%' }}>
-        {Array.from({ length: numTiles }, (_, i) => {
-          const isActive = i === activeTile;
-          return (
-            <button
-              key={i}
-              onClick={() => handleTileClick(i)}
-              style={{
-                aspectRatio: '1',
-                borderRadius: 8,
-                border: isActive ? `2px solid ${activeCss}` : '1px solid rgba(255,255,255,0.08)',
-                background: isActive ? activeCss + '33' : 'rgba(255,255,255,0.04)',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: 10,
-                color: isActive ? activeCss : 'rgba(255,255,255,0.35)',
-                fontWeight: isActive ? 800 : 400,
-                boxShadow: isActive ? `0 0 12px ${activeCss}88` : 'none',
-                transition: 'all 0.1s',
-                transform: isActive ? 'scale(1.08)' : 'scale(1)',
-              }}
-            >
-              {i + 1}
-            </button>
-          );
-        })}
-      </div>
-
-      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>
-        <span>Vitesse : {speedRef.current}ms</span>
-        <span>Manqués : {missed}</span>
       </div>
     </div>
   );
