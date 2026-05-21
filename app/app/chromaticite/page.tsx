@@ -162,24 +162,28 @@ function rgbToChannels32(r: number, g: number, b: number, intensity: number): nu
   channels[bestIdx] = mainValue;
   const whiteBoost = Math.round(mainValue * 0.4);
   if (whiteBoost > 0) {
-    channels[24] = Math.round(whiteBoost * 0.5);
-    channels[25] = whiteBoost;
-    channels[26] = Math.round(whiteBoost * 0.7);
-    channels[27] = Math.round(whiteBoost * 0.4);
+    channels[24] = Math.max(channels[24], Math.round(whiteBoost * 0.5));
+    channels[25] = Math.max(channels[25], whiteBoost);
+    channels[26] = Math.max(channels[26], Math.round(whiteBoost * 0.7));
+    channels[27] = Math.max(channels[27], Math.round(whiteBoost * 0.4));
   }
   return channels.map(v => clamp(Math.round(v), 0, 100));
 }
 
-// Envoi en une seule requête multi-plates (plus efficace que 42 requêtes)
 async function sendColorToAllPlates(r: number, g: number, b: number, intensity = 85) {
   const channelArray = rgbToChannels32(r, g, b, intensity).map((v, i) => ({ index: i, value: v }));
-  const plates = Array.from({ length: 42 }, (_, i) => ({ plateId: i + 1, channels: channelArray }));
-  await fetch('/api/supervision/batch', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ plates, fast: true }),
-    cache: 'no-store',
-  }).catch(() => {});
+  const sends: Promise<void>[] = [];
+  for (let plateId = 1; plateId <= 42; plateId++) {
+    sends.push(
+      fetch('/api/supervision/batch', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ plateId, channels: channelArray, fast: true }),
+        cache: 'no-store',
+      }).then(() => {}).catch(() => {})
+    );
+  }
+  await Promise.all(sends);
 }
 
 function clearAllPlates() {

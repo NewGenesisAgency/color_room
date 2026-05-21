@@ -2,118 +2,95 @@ import { NextResponse } from 'next/server';
 
 const DEFAULT_BASE_URL = 'http://172.17.50.136:18080';
 const DEFAULT_TIMEOUT_MS = 3000;
-const GAME_TIMEOUT_MS = 500; // Fast timeout for game lighting
+const GAME_TIMEOUT_MS = 500;
+
+// Limite globale de requêtes simultanées vers le serveur hardware embarqué.
+// Le serveur est monothread (HTTP/1.1) — au-delà de ~8 connexions simultanées
+// les requêtes se mettent en file et la latence explose.
+const HW_CONCURRENCY = 8;
 
 function getBaseUrl(): string {
   const v = process.env.SUPERVISION_API_URL?.trim();
   return v && v.length > 0 ? v.replace(/\/$/, '') : DEFAULT_BASE_URL;
 }
 
+// Exécute `fn` sur chaque item avec au plus `concurrency` appels simultanés.
+// Contrairement à Promise.all, cette version garantit que le hardware
+// ne reçoit jamais plus de `concurrency` requêtes en même temps.
+async function withConcurrency<T>(
+  items: T[],
+  concurrency: number,
+  fn: (item: T) => Promise<boolean>,
+): Promise<boolean[]> {
+  if (items.length === 0) return [];
+  const results: boolean[] = new Array(items.length).fill(false);
+  let next = 0;
+  async function worker() {
+    while (next < items.length) {
+      const i = next++;
+      results[i] = await fn(items[i]!);
+    }
+  }
+  await Promise.all(
+    Array.from({ length: Math.min(concurrency, items.length) }, worker),
+  );
+  return results;
+}
+
 export async function POST(req: Request) {
   try {
     const body = await req.json();
     const { plateId, channels, plates, fast } = body;
+    const timeoutMs = fast ? GAME_TIMEOUT_MS : DEFAULT_TIMEOUT_MS;
+    const baseUrl = getBaseUrl();
 
-    // Support for multi-plate batch updates (for animateAllPlates)
+    // ── Construire la liste plate de toutes les mises à jour ──────────────────
+    type ChanReq = { plateId: number; index: number; value: number };
+    const allRequests: ChanReq[] = [];
+
     if (plates && Array.isArray(plates)) {
-      const timeoutMs = fast ? GAME_TIMEOUT_MS : DEFAULT_TIMEOUT_MS;
-      const baseUrl = getBaseUrl();
-      
-      // Send all plate updates in parallel
-      const platePromises = plates.map(async (plate: { plateId: number; channels: { index: number; value: number }[] }) => {
-        const channelPromises = plate.channels.map(async (ch: { index: number; value: number }) => {
-          const url = `${baseUrl}/state/plaque/${plate.plateId}/canal/${ch.index}/${ch.value}`;
-          const controller = new AbortController();
-          const timeout = setTimeout(() => controller.abort(), timeoutMs);
-
-          try {
-            const res = await fetch(url, {
-              method: 'PUT',
-              cache: 'no-store',
-              signal: controller.signal,
-            });
-            return { channel: ch.index, ok: res.ok };
-          } catch {
-            return { channel: ch.index, ok: false };
-          } finally {
-            clearTimeout(timeout);
-          }
-        });
-
-        const settled = await Promise.allSettled(channelPromises);
-        const results = settled.map((r, i) => 
-          r.status === 'fulfilled' ? r.value : { channel: plate.channels[i]?.index ?? i, ok: false }
-        );
-        
-        return {
-          plateId: plate.plateId,
-          ok: results.every((r) => r.ok),
-          updatedChannels: results.filter((r) => r.ok).length,
-        };
-      });
-
-      const plateResults = await Promise.allSettled(platePromises);
-      const allOk = plateResults.every((r) => r.status === 'fulfilled' && r.value.ok);
-
-      return NextResponse.json({
-        ok: allOk,
-        plates: plateResults.map((r) => r.status === 'fulfilled' ? r.value : { ok: false }),
-      });
-    }
-
-    // Single plate batch update (original behavior)
-    if (!plateId || !Array.isArray(channels)) {
+      // Format multi-dalles : { plates: [{ plateId, channels: [...] }, ...] }
+      for (const plate of plates as { plateId: number; channels: { index: number; value: number }[] }[]) {
+        for (const ch of plate.channels) {
+          allRequests.push({ plateId: plate.plateId, index: ch.index, value: ch.value });
+        }
+      }
+    } else if (plateId && Array.isArray(channels)) {
+      // Format mono-dalle : { plateId, channels: [...] }
+      for (const ch of channels as { index: number; value: number }[]) {
+        allRequests.push({ plateId, index: ch.index, value: ch.value });
+      }
+    } else {
       return NextResponse.json(
-        { ok: false, error: 'MISSING_PARAMS', message: 'plateId and channels array required' },
-        { status: 400 }
+        { ok: false, error: 'MISSING_PARAMS', message: 'plateId+channels or plates required' },
+        { status: 400 },
       );
     }
 
-    const timeoutMs = fast ? GAME_TIMEOUT_MS : DEFAULT_TIMEOUT_MS;
-    const baseUrl = getBaseUrl();
-    const results: { channel: number; ok: boolean }[] = [];
+    if (allRequests.length === 0) {
+      return NextResponse.json({ ok: true, updatedChannels: 0 });
+    }
 
-    // Send all channel updates in parallel for maximum speed
-    const promises = channels.map(async (ch: { index: number; value: number }) => {
-      const url = `${baseUrl}/state/plaque/${plateId}/canal/${ch.index}/${ch.value}`;
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), timeoutMs);
-
+    // ── Envoyer avec concurrence limitée (HW_CONCURRENCY globale) ─────────────
+    const sendOne = async (r: ChanReq): Promise<boolean> => {
+      const url = `${baseUrl}/state/plaque/${r.plateId}/cursor/${r.index}/${r.value}`;
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), timeoutMs);
       try {
-        const res = await fetch(url, {
-          method: 'PUT',
-          cache: 'no-store',
-          signal: controller.signal,
-        });
-        return { channel: ch.index, ok: res.ok };
+        const res = await fetch(url, { method: 'PUT', cache: 'no-store', signal: ctrl.signal });
+        return res.ok;
       } catch {
-        return { channel: ch.index, ok: false };
+        return false;
       } finally {
-        clearTimeout(timeout);
+        clearTimeout(t);
       }
-    });
+    };
 
-    const settled = await Promise.allSettled(promises);
-    settled.forEach((r, i) => {
-      if (r.status === 'fulfilled') {
-        results.push(r.value);
-      } else {
-        results.push({ channel: channels[i]?.index ?? i, ok: false });
-      }
-    });
+    const results = await withConcurrency(allRequests, HW_CONCURRENCY, sendOne);
+    const ok = results.filter(Boolean).length;
 
-    const allOk = results.every((r) => r.ok);
-
-    return NextResponse.json({
-      ok: allOk,
-      plateId,
-      updatedChannels: results.filter((r) => r.ok).length,
-      totalChannels: channels.length,
-    });
+    return NextResponse.json({ ok: ok === results.length, updatedChannels: ok, totalChannels: results.length });
   } catch {
-    return NextResponse.json(
-      { ok: false, error: 'INTERNAL_ERROR' },
-      { status: 500 }
-    );
+    return NextResponse.json({ ok: false, error: 'INTERNAL_ERROR' }, { status: 500 });
   }
 }

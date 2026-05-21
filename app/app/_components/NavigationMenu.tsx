@@ -110,9 +110,9 @@ export default function NavigationMenu() {
         }}
       >
         {isOpen ? (
-          <X size={24} style={{ color: '#333' }} />
+          <X size={24} style={{ color: '#fff' }} />
         ) : (
-          <Menu size={24} style={{ color: '#333' }} />
+          <Menu size={24} style={{ color: '#fff' }} />
         )}
       </button>
 

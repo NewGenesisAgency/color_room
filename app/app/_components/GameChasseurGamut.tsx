@@ -80,6 +80,62 @@ const TARGETS = [
 const TOTAL_ROUNDS = 8;
 const AUTO_S = 4;
 
+/* ── Styles ──────────────────────────────────────────────────────────── */
+const G: Record<string, React.CSSProperties> = {
+  wrap: {
+    background: 'linear-gradient(160deg,rgba(8,12,24,.94) 0%,rgba(10,14,32,.90) 100%)',
+    backdropFilter: 'blur(28px)', WebkitBackdropFilter: 'blur(28px)',
+    border: '1px solid rgba(255,255,255,.07)',
+    borderRadius: 20, overflow: 'hidden',
+    fontFamily: 'system-ui,-apple-system,sans-serif', color: '#e8eaf0',
+  },
+  readyRow: {
+    display: 'flex', alignItems: 'flex-start', gap: 20, padding: '18px 22px',
+  },
+  tag: {
+    display: 'inline-block',
+    background: 'linear-gradient(135deg,rgba(6,214,160,.25),rgba(67,97,238,.2))',
+    border: '1px solid rgba(6,214,160,.4)', borderRadius: 8,
+    padding: '3px 10px', fontSize: 12, fontWeight: 800, color: '#06d6a0',
+    marginBottom: 8, letterSpacing: '.04em',
+  },
+  rules: {
+    fontSize: 13, color: 'rgba(255,255,255,.62)', lineHeight: 1.65, margin: '0 0 10px',
+  },
+  playBtn: {
+    padding: '11px 26px', borderRadius: 14, border: 'none',
+    background: 'linear-gradient(135deg,#06d6a0,#4361ee)',
+    boxShadow: '0 4px 20px rgba(6,214,160,.35), inset 0 1px 0 rgba(255,255,255,.15)',
+    color: '#fff', fontWeight: 800, fontSize: 15, cursor: 'pointer', letterSpacing: '.02em',
+  },
+  quitBtn: {
+    padding: '10px 20px', borderRadius: 14,
+    border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.06)',
+    color: 'rgba(255,255,255,.7)', fontWeight: 700, fontSize: 13, cursor: 'pointer',
+  },
+  finRow: {
+    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+    gap: 20, padding: '16px 22px', flexWrap: 'wrap' as const,
+  },
+  statGrid: { display: 'flex', gap: 10, flexWrap: 'wrap' as const },
+  statCard: {
+    background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.08)',
+    borderRadius: 12, padding: '8px 16px', textAlign: 'center' as const, minWidth: 72,
+  },
+  statLbl: {
+    fontSize: 10, color: 'rgba(255,255,255,.38)', fontWeight: 700,
+    textTransform: 'uppercase' as const, letterSpacing: '.08em', marginBottom: 3,
+  },
+  statVal: { fontSize: 22, fontWeight: 900 },
+  stopBtn: {
+    padding: '4px 12px', borderRadius: 8,
+    border: '1px solid rgba(255,255,255,.10)', background: 'rgba(255,255,255,.05)',
+    color: 'rgba(255,255,255,.5)', cursor: 'pointer', fontSize: 12,
+  },
+  glassCard: {
+    background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.08)', borderRadius: 12,
+  },
+};
 
 export default function GameChasseurGamut({ onSendColor, onTurnOffAll, onQuit, tileCount = 42 }: GameTileProps) {
   const [phase, setPhase] = useState<'ready' | 'playing' | 'result' | 'finished'>('ready');
@@ -163,7 +219,7 @@ export default function GameChasseurGamut({ onSendColor, onTurnOffAll, onQuit, t
     return () => window.clearInterval(id);
   }, [phase]); // intentional: capture roundScore/roundIdx/order at phase transition
 
-  useEffect(() => () => { onTurnOffAll(); window.clearTimeout(hwTimerRef.current); }, []);
+  useEffect(() => () => { onTurnOffAll(); window.clearTimeout(hwTimerRef.current); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   function shuffle(): number[] {
     const arr = TARGETS.map((_, i) => i);
@@ -227,139 +283,162 @@ export default function GameChasseurGamut({ onSendColor, onTurnOffAll, onQuit, t
   const srgbPts = [[0.64, 0.33], [0.30, 0.60], [0.15, 0.06]].map(([x, y]) => xyToSvg(x, y));
   const srgbPath = srgbPts.map(({ px, py }, i) => `${i === 0 ? 'M' : 'L'}${px.toFixed(1)},${py.toFixed(1)}`).join(' ') + ' Z';
 
+  /* ── READY ── */
   if (phase === 'ready') return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20, padding: 40, color: '#e8eaf0' }}>
-      <Crosshair size={52} color="#06d6a0" />
-      <h2 style={{ fontSize: 22, fontWeight: 800, margin: 0, color: '#e8eaf0' }}>Chasseur de Gamut</h2>
-      <p style={{ textAlign: 'center', color: 'rgba(255,255,255,0.7)', maxWidth: 420, lineHeight: 1.6 }}>
-        Une couleur s&apos;affiche sur les dalles Lumen.<br />
-        Déplacez le curseur sur le <strong>diagramme CIE 1931</strong> pour retrouver cette couleur.<br />
-        <span style={{ color: '#38bdf8' }}>Cliquez pour confirmer — avance automatique après.</span>
-      </p>
-      <div style={{ display: 'flex', gap: 12 }}>
-        <button onClick={startGame} style={{ padding: '14px 36px', borderRadius: 14, border: 'none', background: 'linear-gradient(135deg,#06d6a0,#4361ee)', color: '#fff', fontWeight: 700, fontSize: 16, cursor: 'pointer' }}>Jouer</button>
-        <button onClick={onQuit} style={{ padding: '14px 24px', borderRadius: 14, border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.08)', color: '#fff', fontWeight: 600, cursor: 'pointer' }}>Quitter</button>
-      </div>
-    </div>
-  );
-
-  if (phase === 'finished') return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20, padding: 40, color: '#e8eaf0' }}>
-      <Trophy size={56} color="#fbbf24" />
-      <h2 style={{ fontSize: 22, fontWeight: 800, color: '#e8eaf0' }}>Terminé !</h2>
-      <div style={{ fontSize: 48, fontWeight: 800, color: '#38bdf8' }}>{totalScore + roundScore}</div>
-      <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.6)' }}>/{TOTAL_ROUNDS * 1000} points</div>
-      <div style={{ display: 'flex', gap: 12 }}>
-        <button onClick={startGame} style={{ padding: '12px 28px', borderRadius: 12, border: 'none', background: 'linear-gradient(135deg,#06d6a0,#4361ee)', color: '#fff', fontWeight: 700, cursor: 'pointer' }}>Rejouer</button>
-        <button onClick={onQuit} style={{ padding: '12px 20px', borderRadius: 12, border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.08)', color: '#fff', fontWeight: 600, cursor: 'pointer' }}>Menu</button>
-      </div>
-    </div>
-  );
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '12px 16px', color: '#e8eaf0' }}>
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <span style={{ fontWeight: 700, color: '#e8eaf0' }}>Manche {roundIdx + 1}/{TOTAL_ROUNDS}</span>
-        <span style={{ fontWeight: 800, fontSize: 18, color: '#38bdf8' }}>{totalScore} pts</span>
-        <button onClick={() => { onTurnOffAll(); onQuit(); }} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.6)', cursor: 'pointer' }}>
-          <X size={12} />
-        </button>
-      </div>
-
-      {/* Info bar */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', background: 'rgba(255,255,255,0.05)', borderRadius: 10 }}>
-        <div>
-          <div style={{ fontWeight: 700, fontSize: 13 }}>{tgt.label}</div>
-          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>
-            {phase === 'playing'
-              ? (cursor ? `x=${cursor.x.toFixed(3)}, y=${cursor.y.toFixed(3)}` : 'Déplacez le curseur sur le diagramme')
-              : `x=${tgt.x.toFixed(4)}, y=${tgt.y.toFixed(4)}`}
-          </div>
+    <div style={G.wrap}>
+      <div style={G.readyRow}>
+        <div style={{ flex: 1 }}>
+          <span style={G.tag}>🎯 Chasseur de Gamut</span>
+          <p style={G.rules}>
+            Une couleur s&apos;affiche sur les dalles Lumen.
+            Déplacez le curseur sur le <em>diagramme CIE 1931</em> pour retrouver cette couleur.
+            <span style={{ color: '#38bdf8', marginLeft: 6 }}>Cliquez pour confirmer — avance automatique après.</span>
+          </p>
         </div>
-        {curColor && phase === 'playing' && (
-          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
-            <div style={{ width: 26, height: 26, borderRadius: 6, background: `rgb(${curColor.r},${curColor.g},${curColor.b})`, border: '1px solid rgba(255,255,255,0.2)', flexShrink: 0 }} />
-            <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>curseur</span>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flexShrink: 0 }}>
+          <button onClick={startGame} style={G.playBtn}>Jouer</button>
+          <button onClick={onQuit}    style={G.quitBtn}>Quitter</button>
+        </div>
+      </div>
+    </div>
+  );
+
+  /* ── FINISHED ── */
+  if (phase === 'finished') return (
+    <div style={G.wrap}>
+      <div style={G.finRow}>
+        <div style={G.statGrid}>
+          {([
+            ['Score',   totalScore + roundScore, '#06d6a0'],
+            ['Manches', TOTAL_ROUNDS,             '#fff'   ],
+            ['Max',     TOTAL_ROUNDS * 1000,      'rgba(255,255,255,.45)'],
+          ] as [string, number, string][]).map(([k, v, c]) => (
+            <div key={k} style={G.statCard}>
+              <div style={G.statLbl}>{k}</div>
+              <div style={{ ...G.statVal, color: c }}>{v}</div>
+            </div>
+          ))}
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flexShrink: 0 }}>
+          <button onClick={startGame} style={G.playBtn}>Rejouer</button>
+          <button onClick={onQuit}    style={G.quitBtn}>Menu</button>
+        </div>
+      </div>
+    </div>
+  );
+
+  /* ── PLAYING / RESULT ── */
+  return (
+    <div style={G.wrap}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '12px 16px' }}>
+        {/* Compact header bar */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 10px', background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.07)', borderRadius: 10 }}>
+          <span style={{ fontWeight: 700, color: '#e8eaf0', fontSize: 13 }}>Manche {roundIdx + 1}/{TOTAL_ROUNDS}</span>
+          <span style={{ fontWeight: 800, fontSize: 15, color: '#06d6a0' }}>{totalScore} pts</span>
+          <button onClick={() => { onTurnOffAll(); onQuit(); }} style={G.stopBtn}>
+            <X size={12} />
+          </button>
+        </div>
+
+        {/* Info bar */}
+        <div style={{ ...G.glassCard, display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px' }}>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: 13 }}>{tgt.label}</div>
+            <div style={{ fontSize: 11, color: 'rgba(255,255,255,.5)' }}>
+              {phase === 'playing'
+                ? (cursor ? `x=${cursor.x.toFixed(3)}, y=${cursor.y.toFixed(3)}` : 'Déplacez le curseur sur le diagramme')
+                : `x=${tgt.x.toFixed(4)}, y=${tgt.y.toFixed(4)}`}
+            </div>
+          </div>
+          {curColor && phase === 'playing' && (
+            <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <div style={{ width: 26, height: 26, borderRadius: 6, background: `rgb(${curColor.r},${curColor.g},${curColor.b})`, border: '1px solid rgba(255,255,255,.2)', flexShrink: 0 }} />
+              <span style={{ fontSize: 11, color: 'rgba(255,255,255,.4)' }}>curseur</span>
+            </div>
+          )}
+        </div>
+
+        {/* CIE Diagram — canvas background + SVG overlay */}
+        <div style={{ position: 'relative', borderRadius: 12, overflow: 'hidden', border: '1px solid rgba(255,255,255,.10)' }}>
+          <canvas ref={canvasRef} width={DW} height={DH} style={{ display: 'block', width: '100%', height: 'auto' }} />
+          <svg
+            ref={svgRef}
+            viewBox={`0 0 ${DW} ${DH}`}
+            width="100%"
+            style={{ position: 'absolute', top: 0, left: 0, cursor: phase === 'playing' ? 'none' : 'default' }}
+            onMouseMove={handleMouseMove}
+            onClick={handleClick}
+          >
+            {/* Horseshoe outline */}
+            <path d={horseSvgPath} fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="1.5" />
+            {/* sRGB triangle */}
+            <path d={srgbPath} fill="none" stroke="rgba(255,255,255,0.35)" strokeWidth="1" strokeDasharray="5,4" />
+            {/* sRGB labels */}
+            {(() => { const {px,py}=xyToSvg(0.64,0.33); return <text x={px+4} y={py-4} fill="rgba(255,255,255,0.4)" fontSize="8">R</text>; })()}
+            {(() => { const {px,py}=xyToSvg(0.30,0.60); return <text x={px-8} y={py-4} fill="rgba(255,255,255,0.4)" fontSize="8">G</text>; })()}
+            {(() => { const {px,py}=xyToSvg(0.15,0.06); return <text x={px-8} y={py+10} fill="rgba(255,255,255,0.4)" fontSize="8">B</text>; })()}
+            {/* Axis ticks */}
+            {[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8].map(v => { const { px } = xyToSvg(v, 0); return <text key={v} x={px} y={DH - 5} fill="rgba(255,255,255,0.3)" fontSize="8" textAnchor="middle">{v.toFixed(1)}</text>; })}
+            {[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9].map(v => { const { py } = xyToSvg(0, v); return <text key={v} x={PAD_L - 3} y={py + 3} fill="rgba(255,255,255,0.3)" fontSize="8" textAnchor="end">{v.toFixed(1)}</text>; })}
+            {/* Axis labels */}
+            <text x={DW / 2} y={DH - 3} fill="rgba(255,255,255,0.4)" fontSize="10" textAnchor="middle" fontStyle="italic">x</text>
+            <text x={8} y={DH / 2} fill="rgba(255,255,255,0.4)" fontSize="10" textAnchor="middle" fontStyle="italic" transform={`rotate(-90 8 ${DH / 2})`}>y</text>
+            {/* White point D65 */}
+            {(() => { const { px, py } = xyToSvg(0.3127, 0.3290); return <><circle cx={px} cy={py} r={4} fill="#fff" opacity={0.65} /><text x={px + 6} y={py + 4} fill="rgba(255,255,255,0.5)" fontSize="8">D65</text></>; })()}
+            {/* Moving cursor crosshair */}
+            {curSvg && phase === 'playing' && (
+              <g>
+                <line x1={curSvg.px - 14} y1={curSvg.py} x2={curSvg.px + 14} y2={curSvg.py} stroke="#fff" strokeWidth={1.5} />
+                <line x1={curSvg.px} y1={curSvg.py - 14} x2={curSvg.px} y2={curSvg.py + 14} stroke="#fff" strokeWidth={1.5} />
+                <circle cx={curSvg.px} cy={curSvg.py} r={7} fill="none" stroke="#fff" strokeWidth={1.5} />
+                {curColor && <circle cx={curSvg.px} cy={curSvg.py} r={3} fill={`rgb(${curColor.r},${curColor.g},${curColor.b})`} />}
+              </g>
+            )}
+            {/* Confirmed position */}
+            {confSvg && phase === 'result' && (
+              <g>
+                <circle cx={confSvg.px} cy={confSvg.py} r={9} fill="none" stroke="#fff" strokeWidth={2} />
+                <circle cx={confSvg.px} cy={confSvg.py} r={3} fill="#fff" />
+              </g>
+            )}
+            {/* Target revealed after click */}
+            {phase === 'result' && (
+              <g>
+                <circle cx={tgtSvg.px} cy={tgtSvg.py} r={11} fill="none" stroke="#4ade80" strokeWidth={2.5} />
+                <circle cx={tgtSvg.px} cy={tgtSvg.py} r={4} fill="#4ade80" />
+                {confSvg && (
+                  <line x1={confSvg.px} y1={confSvg.py} x2={tgtSvg.px} y2={tgtSvg.py} stroke="rgba(255,255,255,0.4)" strokeWidth={1.5} strokeDasharray="4,3" />
+                )}
+              </g>
+            )}
+          </svg>
+        </div>
+
+        {/* Result bar (auto-advances) */}
+        {phase === 'result' && (
+          <div style={{
+            ...G.glassCard,
+            background: roundScore >= 700 ? 'rgba(74,222,128,.10)' : 'rgba(251,191,36,.10)',
+            border: `1px solid ${roundScore >= 700 ? '#4ade8033' : '#fbbf2433'}`,
+            padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          }}>
+            <div>
+              <div style={{ fontWeight: 800, color: roundScore >= 700 ? '#4ade80' : '#fbbf24' }}>
+                {roundScore >= 800 ? 'Excellent !' : roundScore >= 500 ? 'Bien !' : 'Raté'}
+              </div>
+              <div style={{ fontSize: 12, color: 'rgba(255,255,255,.6)', marginTop: 2 }}>
+                Distance xy = {dist}
+              </div>
+            </div>
+            <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
+              <div style={{ fontSize: 20, fontWeight: 800, color: '#e8eaf0' }}>+{roundScore} pts</div>
+              <div style={{ fontSize: 12, color: '#06d6a0', fontWeight: 700 }}>
+                {roundIdx + 1 < TOTAL_ROUNDS ? `Suivant dans ${countdown}s` : `Résultats dans ${countdown}s`}
+              </div>
+            </div>
           </div>
         )}
       </div>
-
-      {/* CIE Diagram — canvas background + SVG overlay */}
-      <div style={{ position: 'relative', borderRadius: 12, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.08)' }}>
-        <canvas ref={canvasRef} width={DW} height={DH} style={{ display: 'block', width: '100%', height: 'auto' }} />
-        <svg
-          ref={svgRef}
-          viewBox={`0 0 ${DW} ${DH}`}
-          width="100%"
-          style={{ position: 'absolute', top: 0, left: 0, cursor: phase === 'playing' ? 'none' : 'default' }}
-          onMouseMove={handleMouseMove}
-          onClick={handleClick}
-        >
-          {/* Horseshoe outline */}
-          <path d={horseSvgPath} fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="1.5" />
-          {/* sRGB triangle */}
-          <path d={srgbPath} fill="none" stroke="rgba(255,255,255,0.35)" strokeWidth="1" strokeDasharray="5,4" />
-          {/* sRGB labels */}
-          {(() => { const {px,py}=xyToSvg(0.64,0.33); return <text x={px+4} y={py-4} fill="rgba(255,255,255,0.4)" fontSize="8">R</text>; })()}
-          {(() => { const {px,py}=xyToSvg(0.30,0.60); return <text x={px-8} y={py-4} fill="rgba(255,255,255,0.4)" fontSize="8">G</text>; })()}
-          {(() => { const {px,py}=xyToSvg(0.15,0.06); return <text x={px-8} y={py+10} fill="rgba(255,255,255,0.4)" fontSize="8">B</text>; })()}
-          {/* Axis ticks */}
-          {[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8].map(v => { const { px } = xyToSvg(v, 0); return <text key={v} x={px} y={DH - 5} fill="rgba(255,255,255,0.3)" fontSize="8" textAnchor="middle">{v.toFixed(1)}</text>; })}
-          {[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9].map(v => { const { py } = xyToSvg(0, v); return <text key={v} x={PAD_L - 3} y={py + 3} fill="rgba(255,255,255,0.3)" fontSize="8" textAnchor="end">{v.toFixed(1)}</text>; })}
-          {/* Axis labels */}
-          <text x={DW / 2} y={DH - 3} fill="rgba(255,255,255,0.4)" fontSize="10" textAnchor="middle" fontStyle="italic">x</text>
-          <text x={8} y={DH / 2} fill="rgba(255,255,255,0.4)" fontSize="10" textAnchor="middle" fontStyle="italic" transform={`rotate(-90 8 ${DH / 2})`}>y</text>
-          {/* White point D65 */}
-          {(() => { const { px, py } = xyToSvg(0.3127, 0.3290); return <><circle cx={px} cy={py} r={4} fill="#fff" opacity={0.65} /><text x={px + 6} y={py + 4} fill="rgba(255,255,255,0.5)" fontSize="8">D65</text></>; })()}
-          {/* Moving cursor crosshair */}
-          {curSvg && phase === 'playing' && (
-            <g>
-              <line x1={curSvg.px - 14} y1={curSvg.py} x2={curSvg.px + 14} y2={curSvg.py} stroke="#fff" strokeWidth={1.5} />
-              <line x1={curSvg.px} y1={curSvg.py - 14} x2={curSvg.px} y2={curSvg.py + 14} stroke="#fff" strokeWidth={1.5} />
-              <circle cx={curSvg.px} cy={curSvg.py} r={7} fill="none" stroke="#fff" strokeWidth={1.5} />
-              {curColor && <circle cx={curSvg.px} cy={curSvg.py} r={3} fill={`rgb(${curColor.r},${curColor.g},${curColor.b})`} />}
-            </g>
-          )}
-          {/* Confirmed position */}
-          {confSvg && phase === 'result' && (
-            <g>
-              <circle cx={confSvg.px} cy={confSvg.py} r={9} fill="none" stroke="#fff" strokeWidth={2} />
-              <circle cx={confSvg.px} cy={confSvg.py} r={3} fill="#fff" />
-            </g>
-          )}
-          {/* Target revealed after click */}
-          {phase === 'result' && (
-            <g>
-              <circle cx={tgtSvg.px} cy={tgtSvg.py} r={11} fill="none" stroke="#4ade80" strokeWidth={2.5} />
-              <circle cx={tgtSvg.px} cy={tgtSvg.py} r={4} fill="#4ade80" />
-              {confSvg && (
-                <line x1={confSvg.px} y1={confSvg.py} x2={tgtSvg.px} y2={tgtSvg.py} stroke="rgba(255,255,255,0.4)" strokeWidth={1.5} strokeDasharray="4,3" />
-              )}
-            </g>
-          )}
-        </svg>
-      </div>
-
-      {/* Result bar (auto-advances) */}
-      {phase === 'result' && (
-        <div style={{ background: roundScore >= 700 ? 'rgba(74,222,128,0.1)' : 'rgba(251,191,36,0.1)', border: `1px solid ${roundScore >= 700 ? '#4ade8033' : '#fbbf2433'}`, borderRadius: 12, padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            <div style={{ fontWeight: 800, color: roundScore >= 700 ? '#4ade80' : '#fbbf24' }}>
-              {roundScore >= 800 ? 'Excellent !' : roundScore >= 500 ? 'Bien !' : 'Raté'}
-            </div>
-            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', marginTop: 2 }}>
-              Distance xy = {dist}
-            </div>
-          </div>
-          <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
-            <div style={{ fontSize: 20, fontWeight: 800, color: '#e8eaf0' }}>+{roundScore} pts</div>
-            <div style={{ fontSize: 12, color: '#38bdf8', fontWeight: 700 }}>
-              {roundIdx + 1 < TOTAL_ROUNDS ? `Suivant dans ${countdown}s` : `Résultats dans ${countdown}s`}
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

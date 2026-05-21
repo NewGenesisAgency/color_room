@@ -2,7 +2,7 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
-import EditorTilesViewport from '@/app/_components/EditorTilesViewport';
+import Room3D from '@/app/_components/Room3D';
 import TetrisGame from '@/app/_components/TetrisGame';
 import CS150Panel from '@/app/_components/CS150Panel';
 import type { TetrisSnapshot } from '@/app/_components/TetrisGame';
@@ -54,6 +54,15 @@ type EditorNodeKind =
   | 'game_chasseur_gamut'
   | 'on_timer'
   | 'on_click'
+  | 'on_tick'
+  | 'on_tile_click'
+  | 'clear_tiles'
+  | 'variable_set'
+  | 'variable_get'
+  | 'add_score'
+  | 'get_score'
+  | 'random_int'
+  | 'game_tetris_block'
   // CS150 Colorimeter nodes
   | 'cs150_connect'
   | 'cs150_measure'
@@ -172,6 +181,8 @@ const NODE_CATALOG: NodeCatalogItem[] = [
   { kind: 'loop_count', category: 'Flux', title: 'Répéter N fois', defaults: { count: 3 } },
   { kind: 'on_timer', category: 'Évènements', title: 'Timer', defaults: { intervalMs: 1000 } },
   { kind: 'on_click', category: 'Évènements', title: 'On Click', defaults: { tileIndex: 0 } },
+  { kind: 'on_tick', category: 'Évènements', title: 'Tick (on_tick)', defaults: { intervalMs: 500 } },
+  { kind: 'on_tile_click', category: 'Évènements', title: 'Clic dalle', defaults: { tileIndex: -1, target: 'any' } },
   // Multijoueur
   { kind: 'mp_session', category: 'Multijoueur', title: 'Session MP', defaults: { maxPlayers: 4, timeoutSec: 300, gameMode: 'versus' } },
   { kind: 'mp_wait_players', category: 'Multijoueur', title: 'Attendre joueurs', defaults: { minPlayers: 2 } },
@@ -188,6 +199,13 @@ const NODE_CATALOG: NodeCatalogItem[] = [
   { kind: 'anim_rainbow', category: 'Animation', title: 'Arc-en-ciel', defaults: { speed: 1.0, durationMs: 5000 } },
   { kind: 'anim_wave', category: 'Animation', title: 'Vague', defaults: { color: '#00d7ff', direction: 'left', speed: 1.0, durationMs: 3000 } },
   // CS150 Colorimeter nodes
+  { kind: 'clear_tiles', category: 'Dalles', title: 'Effacer dalles', defaults: {} },
+  { kind: 'variable_set', category: 'Variables', title: 'Set Variable', defaults: { name: 'x', value: 0, op: 'set' } },
+  { kind: 'variable_get', category: 'Variables', title: 'Get Variable', defaults: { name: 'x' } },
+  { kind: 'add_score', category: 'Variables', title: 'Ajouter Score', defaults: { amount: 1 } },
+  { kind: 'get_score', category: 'Variables', title: 'Lire Score', defaults: {} },
+  { kind: 'random_int', category: 'Aléatoire', title: 'Entier aléatoire', defaults: { min: 0, max: 41, varName: 'rand' } },
+  { kind: 'game_tetris_block', category: 'Jeux', title: 'Tetris Blocs', defaults: { speed: 500, cols: 6, rows: 7 } },
   { kind: 'cs150_connect', category: 'Colorimètre', title: 'CS150 Connect', defaults: {} },
   { kind: 'cs150_measure', category: 'Colorimètre', title: 'CS150 Mesurer', defaults: {} },
   { kind: 'cs150_read_xyz', category: 'Colorimètre', title: 'CS150 Lire XYZ', defaults: {} },
@@ -229,6 +247,7 @@ const NODE_CATEGORY_ICONS: Record<string, LucideIcon> = {
   'Multijoueur': Users,
   'Couleur': Layers,
   'Animation': Film,
+  'Variables': Hash,
 };
 
 const NODE_CATEGORY_COLORS: Record<string, string> = {
@@ -246,6 +265,7 @@ const NODE_CATEGORY_COLORS: Record<string, string> = {
   'Multijoueur': '#38bdf8',
   'Couleur': '#e879f9',
   'Animation': '#fb923c',
+  'Variables': '#818cf8',
 };
 
 function clamp255(v: number): number {
@@ -557,97 +577,103 @@ const CHANNEL_PROFILES: { rgb: [number, number, number]; strength: number }[] = 
   { rgb: [0.92, 0.92, 0.92], strength: 0.70 }, // 32
 ];
 
+/**
+ * Convertit une couleur RGB (0-255) en tableau de 32 valeurs de canaux LED (0-100).
+ *
+ * Algorithme : décomposition achromatic + chromatique
+ *   W  = min(R,G,B)          → composante blanche pure (plancher gris)
+ *   Rc = R - W               → rouge chromatique
+ *   Gc = G - W               → vert chromatique
+ *   Bc = B - W               → bleu chromatique
+ *   Y  = min(Rc, Gc)         → jaune (overlap rouge+vert)
+ *   Ro = Rc - Y              → rouge résiduel
+ *   Go = Gc - Y              → vert résiduel
+ *
+ * Chaque composante est envoyée vers les groupes de canaux physiques correspondants.
+ * Aucun boost blanc automatique : le blanc n'apparaît que si la couleur source en contient.
+ */
 function rgbToChannels32(rgb: { r: number; g: number; b: number }, masterIntensity100: number): number[] {
-  const r = clamp255(rgb.r) / 255;
-  const g = clamp255(rgb.g) / 255;
-  const b = clamp255(rgb.b) / 255;
+  const R = Math.max(0, Math.min(255, Math.round(rgb.r)));
+  const G = Math.max(0, Math.min(255, Math.round(rgb.g)));
+  const B = Math.max(0, Math.min(255, Math.round(rgb.b)));
   const scale = Math.max(0, Math.min(100, masterIntensity100)) / 100;
 
-  const energy = Math.max(r, g, b);
   const channels = Array(32).fill(0);
-  if (energy <= 1e-6 || scale <= 1e-6) return channels;
+  if (scale <= 1e-6 || Math.max(R, G, B) === 0) return channels;
 
-  // Find the best matching channel using cosine similarity with CHANNEL_PROFILES
-  const norm = Math.max(1e-6, Math.sqrt(r * r + g * g + b * b));
-  const tr = r / norm;
-  const tg = g / norm;
-  const tb = b / norm;
+  // Décomposition
+  const W  = Math.min(R, G, B);           // blanc (achromatic)
+  const Rc = R - W;                         // rouge chromatique
+  const Gc = G - W;                         // vert chromatique
+  const Bc = B - W;                         // bleu chromatique
+  const Y  = Math.min(Rc, Gc);             // jaune (overlap R+G)
+  const Ro = Rc - Y;                        // rouge pur résiduel
+  const Go = Gc - Y;                        // vert pur résiduel
 
-  let bestIdx = 11; // Canal 12 (rouge pétant) as safe default
-  let bestScore = -1;
-  for (let i = 0; i < 32; i++) {
-    const p = CHANNEL_PROFILES[i];
-    if (!p || p.strength <= 0.05) continue;
-    const pn = Math.max(1e-6, Math.sqrt(p.rgb[0] * p.rgb[0] + p.rgb[1] * p.rgb[1] + p.rgb[2] * p.rgb[2]));
-    const pr = p.rgb[0] / pn;
-    const pg = p.rgb[1] / pn;
-    const pb = p.rgb[2] / pn;
-    const score = pr * tr + pg * tg + pb * tb;
-    if (score > bestScore) {
-      bestScore = score;
-      bestIdx = i;
-    }
+  // Facteur : valeur 0-255 → canal 0-100 avec masterIntensity
+  const K = scale / 255;
+  const v = (x: number) => Math.min(100, Math.round(x * K * 100));
+
+  // ── Canaux blancs / gris (24-31) ──────────────────────────────────────────
+  if (W > 0) {
+    const wv = v(W);
+    channels[25] = wv;                          // blanc pur dominant
+    channels[24] = Math.round(wv * 0.70);       // blanc jaunâtre
+    channels[26] = Math.round(wv * 0.55);       // blanc neutre
+    channels[27] = Math.round(wv * 0.35);       // blanc froid
+    channels[31] = Math.round(wv * 0.45);       // gris clair
   }
 
-  const mainValue = Math.max(0, Math.min(100, Math.round(energy * 100 * scale)));
-  channels[bestIdx] = mainValue;
+  // ── Canaux rouges (10-14) ─────────────────────────────────────────────────
+  if (Ro > 0) {
+    const rv = v(Ro);
+    channels[11] = Math.max(channels[11], rv);
+    channels[12] = Math.max(channels[12], Math.round(rv * 0.90));
+    channels[13] = Math.max(channels[13], Math.round(rv * 0.85));
+    channels[10] = Math.max(channels[10], Math.round(rv * 0.70));
+    channels[14] = Math.max(channels[14], Math.round(rv * 0.55));
+  }
 
-  // Boost intensity with white channels (COULEURS.md canaux 25-28)
-  // to increase overall luminosity — proportional to energy and scale
-  const whiteBoost = Math.round(mainValue * 0.4);
-  if (whiteBoost > 0) {
-    channels[24] = Math.round(whiteBoost * 0.5);  // Canal 25: Blanc un peu jaunis
-    channels[25] = whiteBoost;                      // Canal 26: Blanc (dominant)
-    channels[26] = Math.round(whiteBoost * 0.7);   // Canal 27: Blanc un peu moins lumineux
-    channels[27] = Math.round(whiteBoost * 0.4);   // Canal 28: Blanc encore moins lumineux
+  // ── Canaux verts (5-6) ────────────────────────────────────────────────────
+  if (Go > 0) {
+    const gv = v(Go);
+    channels[5]  = Math.max(channels[5], gv);
+    channels[6]  = Math.max(channels[6], Math.round(gv * 0.75));
+  }
+
+  // ── Canaux bleus / violets (0-4) ──────────────────────────────────────────
+  if (Bc > 0) {
+    const bv = v(Bc);
+    channels[4]  = Math.max(channels[4], bv);
+    channels[2]  = Math.max(channels[2], Math.round(bv * 0.80));
+    channels[3]  = Math.max(channels[3], Math.round(bv * 0.65));
+    channels[1]  = Math.max(channels[1], Math.round(bv * 0.60));
+    channels[0]  = Math.max(channels[0], Math.round(bv * 0.40));
+  }
+
+  // ── Canaux jaune / orange (7-9, 18-19) ───────────────────────────────────
+  if (Y > 0) {
+    const yv = v(Y);
+    channels[7]  = Math.max(channels[7],  yv);
+    channels[8]  = Math.max(channels[8],  Math.round(yv * 0.85));
+    channels[18] = Math.max(channels[18], Math.round(yv * 0.90));
+    channels[19] = Math.max(channels[19], Math.round(yv * 0.75));
+    channels[9]  = Math.max(channels[9],  Math.round(yv * 0.70));
   }
 
   return channels;
 }
 
-// Hardware batch: per-plate accumulator with 20ms coalescing window
-const hwLastSent: Map<string, number> = new Map();
-const hwBatchPending: Map<number, Record<number, number>> = new Map();
-const hwBatchTimers: Map<number, ReturnType<typeof setTimeout>> = new Map();
-
-function scheduleSetCanal(plaqueId: number, canalIndex: number, intensity: number) {
-  const key = `${plaqueId}:${canalIndex}`;
-  const clamped = Math.max(0, Math.min(255, Math.round(intensity)));
-  // Skip if value unchanged
-  const prev = hwLastSent.get(key);
-  if (prev === clamped) return;
-  hwLastSent.set(key, clamped);
-
-  // Accumulate into per-plate pending batch
-  if (!hwBatchPending.has(plaqueId)) hwBatchPending.set(plaqueId, {});
-  hwBatchPending.get(plaqueId)![canalIndex] = clamped;
-
-  // (Re-)arm a single 20ms timer per plate — all 32 channels coalesce into one batch
-  const existing = hwBatchTimers.get(plaqueId);
-  if (existing) clearTimeout(existing);
-  hwBatchTimers.set(plaqueId, setTimeout(() => {
-    hwBatchTimers.delete(plaqueId);
-    const channels = hwBatchPending.get(plaqueId);
-    hwBatchPending.delete(plaqueId);
-    if (!channels) return;
-    const channelArray = Object.entries(channels)
-      .map(([i, v]) => ({ index: Number(i), value: v }))
-      .filter(ch => ch.value >= 0);
-    if (channelArray.length === 0) return;
-    fetch('/api/supervision/batch', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ plateId: plaqueId, channels: channelArray }),
-      cache: 'no-store',
-    }).catch(() => {});
-  }, 20));
-}
+// Hardware batch: module-level ref holder — actual refs are inside the component
+// sendRgbToHardware is defined inside EditeurPage and exposed via a module-level ref
+type HwPlateUpdate = { plateId: number; channels: { index: number; value: number }[] };
+let _scheduleSetCanal: (plaqueId: number, canalIndex: number, intensity: number) => void = () => {};
 
 function sendChannelsToHardware(channels32: number[], plateIds: number[]) {
   for (const plaqueId of plateIds) {
     for (let i = 0; i < 32; i++) {
       const v = clamp255(channels32[i] ?? 0);
-      if (v > 0) scheduleSetCanal(plaqueId, i, v); // only schedule non-zero
+      _scheduleSetCanal(plaqueId, i, v);
     }
   }
 }
@@ -676,7 +702,7 @@ export default function EditeurPage() {
   const [showGrid, setShowGrid] = useState<boolean>(true);
   const [zoomLevel, setZoomLevel] = useState<number>(100);
   const [newProjectName, setNewProjectName] = useState<string>('');
-  const [newProjectTemplate, setNewProjectTemplate] = useState<'blank' | 'tutorial' | 'animation' | 'interactive' | 'fluorescence' | 'color-demo' | 'pulse-advanced' | 'rainbow' | 'tetris' | 'memory'>('blank');
+  const [newProjectTemplate, setNewProjectTemplate] = useState<'blank' | 'tutorial' | 'animation' | 'interactive' | 'fluorescence' | 'color-demo' | 'pulse-advanced' | 'rainbow' | 'tetris' | 'memory' | 'tetris-blueprint'>('blank');
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -688,9 +714,9 @@ export default function EditeurPage() {
   const [selectedTileIndex, setSelectedTileIndex] = useState<number | null>(null);
   const tetrisSnapRef = useRef<TetrisSnapshot | null>(null);
 
-  const [viewportHeight, setViewportHeight] = useState<number>(300);
+  const [viewportHeight, setViewportHeight] = useState<number>(500);
   const [resizing, setResizing] = useState<{ active: boolean; y: number; start: number }>(
-    { active: false, y: 0, start: 300 },
+    { active: false, y: 0, start: 500 },
   );
 
   const [linkDrag, setLinkDrag] = useState<{ active: boolean; x: number; y: number; gx: number; gy: number } | null>(null);
@@ -885,6 +911,333 @@ export default function EditeurPage() {
     }, 100); // 10 fps — suffisant pour l'aperçu des tuiles, évite le flood de re-renders
     return () => window.clearInterval(id);
   }, []);
+
+  // ── Hardware state machine (React refs) ──────────────────────────────────────
+  const hwLastSentRef = useRef<Record<string, number>>({});
+  const hwBatchPendingRef = useRef<Map<number, Record<number, number>>>(new Map());
+  const hwFlushScheduledRef = useRef(false);
+  const hwInFlightRef = useRef(false);
+  const hwPendingPlatesRef = useRef<HwPlateUpdate[] | null>(null);
+  const hwCurrentCtrlRef = useRef<AbortController | null>(null);
+  const hwFetchGenRef = useRef(0);
+
+  function buildHwPlates(pending: Map<number, Record<number, number>>): HwPlateUpdate[] {
+    const plates: HwPlateUpdate[] = [];
+    pending.forEach((channels, plateId) => {
+      const arr = Object.entries(channels).map(([i, v]) => ({ index: Number(i), value: v }));
+      if (arr.length > 0) plates.push({ plateId, channels: arr });
+    });
+    return plates;
+  }
+
+  function doSendBatch(plates: HwPlateUpdate[]) {
+    if (plates.length === 0) return;
+    const gen = ++hwFetchGenRef.current;
+    const ctrl = new AbortController();
+    hwCurrentCtrlRef.current = ctrl;
+    hwInFlightRef.current = true;
+    fetch('/api/supervision/batch', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ plates }),
+      cache: 'no-store',
+      signal: ctrl.signal,
+    }).catch(() => {}).finally(() => {
+      if (hwFetchGenRef.current !== gen) return;
+      const next = hwPendingPlatesRef.current;
+      hwPendingPlatesRef.current = null;
+      if (next && next.length > 0) doSendBatch(next);
+      else hwInFlightRef.current = false;
+    });
+  }
+
+  function flushHardwareBatch() {
+    const pending = hwBatchPendingRef.current;
+    if (pending.size === 0) return;
+    hwBatchPendingRef.current = new Map();
+    const plates = buildHwPlates(pending);
+    if (plates.length === 0) return;
+    if (!hwInFlightRef.current) doSendBatch(plates);
+    else hwPendingPlatesRef.current = plates;
+  }
+
+  function scheduleSetCanalLocal(plaqueId: number, canalIndex: number, intensity: number) {
+    const key = `${plaqueId}:${canalIndex}`;
+    const clamped = Math.max(0, Math.min(255, Math.round(intensity)));
+    const prev = hwLastSentRef.current[key];
+    if (prev === clamped) return;
+    hwLastSentRef.current[key] = clamped;
+    if (!hwBatchPendingRef.current.has(plaqueId)) hwBatchPendingRef.current.set(plaqueId, {});
+    hwBatchPendingRef.current.get(plaqueId)![canalIndex] = clamped;
+    if (!hwFlushScheduledRef.current) {
+      hwFlushScheduledRef.current = true;
+      queueMicrotask(() => {
+        hwFlushScheduledRef.current = false;
+        flushHardwareBatch();
+      });
+    }
+  }
+
+  // Wire up the module-level ref to this component's local function
+  useEffect(() => {
+    _scheduleSetCanal = scheduleSetCanalLocal;
+    return () => { _scheduleSetCanal = () => {}; };
+  });
+
+  // ── Runtime engine ────────────────────────────────────────────────────────────
+  type TetrisState = {
+    grid: (string | null)[][];
+    piece: { shape: number[][]; x: number; y: number; color: string } | null;
+    gameOver: boolean;
+  };
+
+  const runtimeTilesRef = useRef<TileState[]>(Array.from({ length: 42 }, () => ({ color: '#000000', intensity: 0 })));
+  const runtimeVariablesRef = useRef<Record<string, number>>({});
+  const runtimeScoreRef = useRef<number>(0);
+  const runtimeTickTimersRef = useRef<ReturnType<typeof setInterval>[]>([]);
+  const tetrisStateRef = useRef<TetrisState | null>(null);
+  const fireRuntimeClickRef = useRef<((idx: number) => void) | null>(null);
+  const [runtimeTiles, setRuntimeTiles] = useState<TileState[]>(Array.from({ length: 42 }, () => ({ color: '#000000', intensity: 0 })));
+  const [runtimeScore, setRuntimeScore] = useState(0);
+
+  const hasRuntimeEvents = useMemo(() => {
+    if (!activeGame) return false;
+    return activeGame.nodes.some(n => ['on_tick', 'on_tile_click'].includes(n.kind));
+  }, [activeGame]);
+
+  // Send runtime tiles to hardware
+  useEffect(() => {
+    if (!hasRuntimeEvents || !isPlaying) return;
+    runtimeTiles.forEach((tile, index) => {
+      const plateId = PLATE_ID_BY_INDEX[index];
+      if (!plateId) return;
+      const rgb = hexToRgb255(tile.color);
+      const intensity100 = Math.round(tile.intensity * 100);
+      sendRgbToHardware(rgb, intensity100, [plateId]);
+    });
+  }, [runtimeTiles, hasRuntimeEvents, isPlaying]);
+
+  // Start/stop runtime when game or isPlaying changes
+  useEffect(() => {
+    runtimeTickTimersRef.current.forEach(t => clearInterval(t));
+    runtimeTickTimersRef.current = [];
+
+    if (!activeGame || !isPlaying) return;
+    if (!hasRuntimeEvents) return;
+
+    // Reset state
+    runtimeTilesRef.current = Array.from({ length: 42 }, () => ({ color: '#000000', intensity: 0 }));
+    runtimeVariablesRef.current = {};
+    runtimeScoreRef.current = 0;
+    tetrisStateRef.current = null;
+    setRuntimeTiles(Array.from({ length: 42 }, () => ({ color: '#000000', intensity: 0 })));
+    setRuntimeScore(0);
+
+    const game = activeGame;
+
+    function executeNode(nodeId: string, depth = 0): void {
+      if (depth > 50) return;
+      const node = game.nodes.find(n => n.id === nodeId);
+      if (!node || !node.enabled) return;
+
+      const tiles = runtimeTilesRef.current;
+      const vars = runtimeVariablesRef.current;
+
+      switch (node.kind) {
+        case 'fill': {
+          const color = getColor(node.params, 'color', '#6d28ff');
+          const intensity = clamp01(getNum(node.params, 'intensity', 0.8));
+          for (let i = 0; i < tiles.length; i++) tiles[i] = { color, intensity };
+          break;
+        }
+        case 'clear_tiles': {
+          for (let i = 0; i < tiles.length; i++) tiles[i] = { color: '#000000', intensity: 0 };
+          break;
+        }
+        case 'tile':
+        case 'tile_set': {
+          const tileIndex = Math.max(0, Math.min(41, Math.round(getNum(node.params, 'tileIndex', 0))));
+          const color = getColor(node.params, 'color', '#ff2aa6');
+          const intensity = clamp01(getNum(node.params, 'intensity', 0.85));
+          tiles[tileIndex] = { color, intensity };
+          break;
+        }
+        case 'variable_set': {
+          const name = String(node.params.name ?? 'x');
+          let val = getNum(node.params, 'value', 0);
+          const op = String(node.params.op ?? 'set');
+          if (op === 'add') val = (vars[name] ?? 0) + val;
+          else if (op === 'sub') val = (vars[name] ?? 0) - val;
+          vars[name] = val;
+          break;
+        }
+        case 'add_score': {
+          runtimeScoreRef.current += getNum(node.params, 'amount', 1);
+          setRuntimeScore(runtimeScoreRef.current);
+          break;
+        }
+        case 'random_int': {
+          const min = Math.round(getNum(node.params, 'min', 0));
+          const max = Math.round(getNum(node.params, 'max', 10));
+          const name = String(node.params.varName ?? 'rand');
+          vars[name] = min + Math.floor(Math.random() * (max - min + 1));
+          break;
+        }
+        case 'if': {
+          const condVar = String(node.params.varName ?? '');
+          const condOp = String(node.params.op ?? 'gt');
+          const condVal = getNum(node.params, 'value', 0);
+          const varVal = vars[condVar] ?? 0;
+          let condResult = false;
+          if (condOp === 'gt') condResult = varVal > condVal;
+          else if (condOp === 'lt') condResult = varVal < condVal;
+          else if (condOp === 'eq') condResult = varVal === condVal;
+          else if (condOp === 'gte') condResult = varVal >= condVal;
+          else if (condOp === 'lte') condResult = varVal <= condVal;
+          else if (condOp === 'neq') condResult = varVal !== condVal;
+          const trueTarget = String(node.params.trueTarget ?? '');
+          const falseTarget = String(node.params.falseTarget ?? '');
+          if (condResult && trueTarget) executeNode(trueTarget, depth + 1);
+          else if (!condResult && falseTarget) executeNode(falseTarget, depth + 1);
+          setRuntimeTiles([...runtimeTilesRef.current]);
+          return;
+        }
+        case 'game_tetris_block': {
+          const COLS = Math.round(getNum(node.params, 'cols', 6));
+          const ROWS = Math.round(getNum(node.params, 'rows', 7));
+          const PIECES = [
+            { shape: [[1,1,1,1]], color: '#00e5ff' },
+            { shape: [[1,0],[1,0],[1,1]], color: '#ff6d00' },
+            { shape: [[0,1],[0,1],[1,1]], color: '#2979ff' },
+            { shape: [[1,1],[1,1]], color: '#ffd600' },
+            { shape: [[1,1,1],[0,1,0]], color: '#aa00ff' },
+            { shape: [[0,1,1],[1,1,0]], color: '#00c853' },
+            { shape: [[1,1,0],[0,1,1]], color: '#ff1744' },
+          ];
+          if (!tetrisStateRef.current) {
+            tetrisStateRef.current = {
+              grid: Array.from({ length: ROWS }, () => Array(COLS).fill(null)),
+              piece: null,
+              gameOver: false,
+            };
+          }
+          const ts = tetrisStateRef.current;
+          if (ts.gameOver) break;
+
+          const spawnPiece = () => {
+            const p = PIECES[Math.floor(Math.random() * PIECES.length)];
+            ts.piece = { shape: p.shape, x: Math.floor((COLS - p.shape[0].length) / 2), y: 0, color: p.color };
+          };
+
+          const hasCollision = (piece: NonNullable<typeof ts.piece>, dx: number, dy: number) => {
+            for (let r = 0; r < piece.shape.length; r++) {
+              for (let c = 0; c < piece.shape[r].length; c++) {
+                if (!piece.shape[r][c]) continue;
+                const nr = piece.y + r + dy;
+                const nc = piece.x + c + dx;
+                if (nr >= ROWS || nc < 0 || nc >= COLS) return true;
+                if (nr >= 0 && ts.grid[nr][nc]) return true;
+              }
+            }
+            return false;
+          };
+
+          if (!ts.piece) spawnPiece();
+          if (!ts.piece) break;
+
+          if (hasCollision(ts.piece, 0, 1)) {
+            for (let r = 0; r < ts.piece.shape.length; r++) {
+              for (let c = 0; c < ts.piece.shape[r].length; c++) {
+                if (!ts.piece.shape[r][c]) continue;
+                const gr = ts.piece.y + r;
+                const gc = ts.piece.x + c;
+                if (gr < 0) { ts.gameOver = true; break; }
+                if (gr < ROWS && gc < COLS) ts.grid[gr][gc] = ts.piece.color;
+              }
+            }
+            ts.piece = null;
+            let linesCleared = 0;
+            ts.grid = ts.grid.filter(row => {
+              const full = row.every(cell => cell !== null);
+              if (full) linesCleared++;
+              return !full;
+            });
+            while (ts.grid.length < ROWS) ts.grid.unshift(Array(COLS).fill(null));
+            if (linesCleared > 0) {
+              runtimeScoreRef.current += linesCleared * 100;
+              setRuntimeScore(runtimeScoreRef.current);
+            }
+            if (!ts.gameOver) spawnPiece();
+          } else {
+            ts.piece.y++;
+          }
+
+          const merged = ts.grid.map(row => [...row]);
+          if (ts.piece) {
+            for (let r = 0; r < ts.piece.shape.length; r++) {
+              for (let c = 0; c < ts.piece.shape[r].length; c++) {
+                if (!ts.piece.shape[r][c]) continue;
+                const gr = ts.piece.y + r;
+                const gc = ts.piece.x + c;
+                if (gr >= 0 && gr < ROWS && gc < COLS) merged[gr][gc] = ts.piece.color;
+              }
+            }
+          }
+          for (let r = 0; r < ROWS; r++) {
+            for (let c = 0; c < COLS; c++) {
+              const tileIdx = r * COLS + c;
+              if (tileIdx >= tiles.length) continue;
+              const cell = merged[r][c];
+              tiles[tileIdx] = cell ? { color: cell, intensity: 0.9 } : { color: '#050510', intensity: 0.05 };
+            }
+          }
+          if (ts.gameOver) {
+            for (let i = 0; i < tiles.length; i++) tiles[i] = { color: '#ff0000', intensity: 0.8 };
+          }
+          break;
+        }
+        default:
+          break;
+      }
+
+      // Follow all outgoing exec edges
+      const outgoing = game.edges.filter(e => e.from === nodeId);
+      for (const edge of outgoing) executeNode(edge.to, depth + 1);
+
+      setRuntimeTiles([...runtimeTilesRef.current]);
+    }
+
+    // Wire click handler
+    fireRuntimeClickRef.current = (tileIndex: number) => {
+      game.nodes
+        .filter(n => n.kind === 'on_tile_click' && n.enabled)
+        .forEach(node => {
+          runtimeVariablesRef.current['clickedTile'] = tileIndex;
+          game.edges.filter(e => e.from === node.id).forEach(e => executeNode(e.to));
+        });
+    };
+
+    // Fire event_begin
+    game.nodes.filter(n => n.kind === 'event_begin' && n.enabled).forEach(n => {
+      game.edges.filter(e => e.from === n.id).forEach(e => executeNode(e.to));
+    });
+
+    // Set up on_tick timers
+    game.nodes.filter(n => n.kind === 'on_tick' && n.enabled).forEach(node => {
+      const intervalMs = Math.max(50, getNum(node.params, 'intervalMs', 1000));
+      const timer = setInterval(() => {
+        game.edges.filter(e => e.from === node.id).forEach(e => executeNode(e.to));
+      }, intervalMs);
+      runtimeTickTimersRef.current.push(timer);
+    });
+
+    return () => {
+      runtimeTickTimersRef.current.forEach(t => clearInterval(t));
+      runtimeTickTimersRef.current = [];
+      fireRuntimeClickRef.current = null;
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeGame?.id, activeGame?.nodes.length, activeGame?.edges.length, isPlaying, hasRuntimeEvents]);
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -1091,6 +1444,29 @@ export default function EditeurPage() {
     }
   }, [selectedTileIndex, tileCount]);
 
+  // ── Conversion tiles → format Room3D (plateColors / plateActive) ──────────
+  const activeTilesData = hasRuntimeEvents && isPlaying ? runtimeTiles : tiles;
+  const roomPlateColors = useMemo(() => {
+    return Array.from({ length: 42 }, (_, i) => {
+      const tile = activeTilesData[i];
+      if (!tile || tile.intensity <= 0.01) return '#000000';
+      const rgb = hexToRgb255(tile.color);
+      const r = Math.round(rgb.r * tile.intensity);
+      const g = Math.round(rgb.g * tile.intensity);
+      const b = Math.round(rgb.b * tile.intensity);
+      return `rgb(${r},${g},${b})`;
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTilesData]);
+
+  const roomPlateActive = useMemo(() => {
+    return Array.from({ length: 42 }, (_, i) => {
+      const tile = activeTilesData[i];
+      return !!tile && tile.intensity > 0.05;
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTilesData]);
+
   const serializeGameConfig = (g: GameDoc): unknown => {
     return {
       version: 1,
@@ -1170,7 +1546,7 @@ export default function EditeurPage() {
     }
   };
 
-  const createGame = async (forcedName?: string, template: 'blank' | 'tutorial' | 'animation' | 'interactive' | 'fluorescence' | 'color-demo' | 'pulse-advanced' | 'rainbow' | 'tetris' | 'memory' = 'blank') => {
+  const createGame = async (forcedName?: string, template: 'blank' | 'tutorial' | 'animation' | 'interactive' | 'fluorescence' | 'color-demo' | 'pulse-advanced' | 'rainbow' | 'tetris' | 'memory' | 'tetris-blueprint' = 'blank') => {
     const makeId: IdFactory = () => `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
     const provisionalId = makeId();
     const nextIndex = (editorRef.current.games.length || 0) + 1;
@@ -1418,6 +1794,19 @@ export default function EditeurPage() {
       ];
     }
     
+    if (template === 'tetris-blueprint') {
+      const tickId = makeId();
+      const tetrisId = makeId();
+      initialNodes = [
+        { id: eventId, kind: 'event_begin', name: 'Démarrer', enabled: true, params: {}, pos: { x: 80, y: 200 } },
+        { id: tickId, kind: 'on_tick', name: 'Tick Jeu (500ms)', enabled: true, params: { intervalMs: 500 }, pos: { x: 320, y: 200 } },
+        { id: tetrisId, kind: 'game_tetris_block', name: 'Tetris Blocs', enabled: true, params: { speed: 500, cols: 6, rows: 7 }, pos: { x: 560, y: 200 } },
+      ];
+      initialEdges = [
+        { id: makeId(), from: tickId, to: tetrisId },
+      ];
+    }
+
     const provisionalGame: GameDoc = {
       id: provisionalId,
       name: gameName,
@@ -1539,12 +1928,11 @@ export default function EditeurPage() {
   const deleteActiveGame = async () => {
     if (!activeGame) return;
     const deletedId = activeGame.id;
-    const ok = await deleteDbGame(deletedId);
-    if (!ok) {
-      setStatus('Suppression impossible');
-      return;
-    }
-    // Use setEditor directly (not commit) to avoid setting dirty=true on a deleted game
+
+    // ── Optimistic delete: met à jour l'UI IMMÉDIATEMENT ─────────────────────
+    // Annule l'auto-save en cours avant qu'il parte (évite le délai 3s+requête)
+    setDirty(false);
+    setHistory({ past: [], future: [] });
     setEditor((cur) => {
       const nextGames = cur.games.filter((g) => g.id !== deletedId);
       const nextActive = nextGames[0] ?? null;
@@ -1556,9 +1944,12 @@ export default function EditeurPage() {
         visibleNodeIds: undefined,
       };
     });
-    setHistory({ past: [], future: [] });
-    setDirty(false);
     setStatus('Jeu supprimé ✓');
+
+    // DB en arrière-plan (non bloquant pour l'UI)
+    void deleteDbGame(deletedId).then((ok) => {
+      if (!ok) setStatus('Avertissement : suppression DB incomplète');
+    });
   };
 
   const addNode = (kind: EditorNodeKind, pos?: { x: number; y: number }): string | null => {
@@ -2110,43 +2501,51 @@ export default function EditeurPage() {
                     <span>2D</span>
                   </button>
                   <span style={{ fontSize: 12, fontWeight: 600, color: '#999' }}>{tileCount} dalles</span>
+                  {hasRuntimeEvents && runtimeScore > 0 && (
+                    <div style={{ background: '#ffd600', color: '#1a1a1a', borderRadius: 8, padding: '3px 10px', fontSize: 13, fontWeight: 700, letterSpacing: '0.02em' }}>
+                      Score: {runtimeScore}
+                    </div>
+                  )}
                 </div>
               </div>
               <div className="viewport">
                 {activeGame ? (
-                  <div className="viewport__split">
-                    <div className="viewport__pane viewport__pane--tiles">
-                      <EditorTilesViewport
-                        tiles={tiles}
-                        selectedTileIndex={selectedTileIndex}
-                        onTileClick={assignSelectedTileToNode}
-                      />
-                    </div>
-                    <div className="viewport__pane viewport__pane--ui" style={activeTetrisNode ? { flex: 2, minWidth: 0, overflow: 'auto' } : undefined}>
-                      {activeTetrisNode ? (
-                        <TetrisGame
-                          params={{
-                            speed: Math.max(50, getNum(activeTetrisNode.params, 'speed', 500)),
-                            bgColor: getColor(activeTetrisNode.params, 'bgColor', '#0a0a0f'),
-                            borderColor: getColor(activeTetrisNode.params, 'borderColor', '#222233'),
+                  activeTetrisNode ? (
+                    /* ── Split view quand un nœud Tetris est actif ─── */
+                    <div className="viewport__split">
+                      <div className="viewport__pane viewport__pane--tiles" style={{ background: '#0a0a0f' }}>
+                        <Room3D
+                          plateColors={roomPlateColors}
+                          plateActive={roomPlateActive}
+                          onPlateClick={(idx) => {
+                            if (hasRuntimeEvents && isPlaying) fireRuntimeClickRef.current?.(idx);
+                            else assignSelectedTileToNode(idx);
                           }}
+                          height={viewportHeight - 56}
+                        />
+                      </div>
+                      <div className="viewport__pane viewport__pane--ui" style={{ flex: 2, minWidth: 0, overflow: 'auto' }}>
+                        <TetrisGame
+                          params={{ speed: Math.max(50, getNum(activeTetrisNode.params, 'speed', 500)) }}
                           isPlaying={isPlaying}
                           onSnapshot={(snap) => { tetrisSnapRef.current = snap; }}
                         />
-                      ) : (
-                        <div className="viewport-ui">
-                          <div className="viewport-ui__card glass">
-                            <div className="viewport-ui__title">Visuel du jeu</div>
-                            <div className="viewport-ui__hint">
-                              Ajoutez un noeud <b>Tetris Lumière</b> (catégorie Jeux) pour lancer un jeu interactif.
-                              <br />
-                              Clic droit dans le graphe → Jeux → Tetris Lumière
-                            </div>
-                          </div>
-                        </div>
-                      )}
+                      </div>
                     </div>
-                  </div>
+                  ) : (
+                    /* ── Aperçu 3D plein écran (même vue que /jeux) ── */
+                    <div style={{ position: 'relative', height: '100%', background: '#050508', borderRadius: 18, overflow: 'hidden' }}>
+                      <Room3D
+                        plateColors={roomPlateColors}
+                        plateActive={roomPlateActive}
+                        onPlateClick={(idx) => {
+                          if (hasRuntimeEvents && isPlaying) fireRuntimeClickRef.current?.(idx);
+                          else assignSelectedTileToNode(idx);
+                        }}
+                        height={viewportHeight - 56}
+                      />
+                    </div>
+                  )
                 ) : (
                   <div className="bp-empty" style={{ height: '100%', display: 'grid', placeItems: 'center' }}>
                     <div style={{ display: 'grid', gap: 16, textAlign: 'center', maxWidth: 320 }}>
@@ -2463,7 +2862,7 @@ export default function EditeurPage() {
                       })
                       .map((n) => {
                       const selected = n.id === selectedNodeId;
-                      const hasInput = n.kind !== 'event_begin' && n.kind !== 'on_timer' && n.kind !== 'on_click';
+                      const hasInput = n.kind !== 'event_begin' && n.kind !== 'on_timer' && n.kind !== 'on_click' && n.kind !== 'on_tick' && n.kind !== 'on_tile_click';
                       const inLabel = 'Entrée';
                       const outLabel =
                         n.kind === 'event_begin' ? 'Commencer' :
@@ -2474,13 +2873,15 @@ export default function EditeurPage() {
                         n.kind === 'sequence' ? 'Exécuter' :
                         'Sortie';
                       const nodeAccent =
-                        ['event_begin', 'on_timer', 'on_click'].includes(n.kind) ? '#f59e0b' :
-                        ['game_tetris', 'game_simon', 'game_memory'].includes(n.kind) ? '#a855f7' :
-                        ['fill', 'pulse', 'tile', 'tile_set', 'tile_get'].includes(n.kind) ? '#22d3ee' :
-                        ['if', 'while', 'sequence', 'wait'].includes(n.kind) ? '#f97316' :
-                        ['math_add', 'math_sub', 'math_mul', 'math_div', 'math_clamp01', 'math_lerp'].includes(n.kind) ? '#4ade80' :
-                        ['compare_eq', 'compare_gt', 'compare_lt', 'logic_and', 'logic_or', 'logic_not'].includes(n.kind) ? '#60a5fa' :
-                        '#4361ee';
+                        NODE_CATEGORY_COLORS[categoryOfKind(n.kind)] ??
+                        ((['event_begin', 'on_timer', 'on_click', 'on_tick', 'on_tile_click'].includes(n.kind)) ? '#f59e0b' :
+                        (['game_tetris', 'game_simon', 'game_memory', 'game_tetris_block'].includes(n.kind)) ? '#a855f7' :
+                        (['fill', 'pulse', 'tile', 'tile_set', 'tile_get', 'clear_tiles'].includes(n.kind)) ? '#22d3ee' :
+                        (['if', 'while', 'sequence', 'wait'].includes(n.kind)) ? '#f97316' :
+                        (['math_add', 'math_sub', 'math_mul', 'math_div', 'math_clamp01', 'math_lerp'].includes(n.kind)) ? '#4ade80' :
+                        (['compare_eq', 'compare_gt', 'compare_lt', 'logic_and', 'logic_or', 'logic_not'].includes(n.kind)) ? '#60a5fa' :
+                        (['variable_set', 'variable_get', 'add_score', 'get_score', 'random_int'].includes(n.kind)) ? '#818cf8' :
+                        '#4361ee');
                       const linkingFromThis = pendingLink?.fromNodeId === n.id;
                       const seconds = Math.max(0, getNum(n.params, 'seconds', 1));
                       const fillIntensity = clamp01(getNum(n.params, 'intensity', 0.8));
@@ -2689,12 +3090,12 @@ export default function EditeurPage() {
                           }}
                         >
                           <div className="bp-node__header" style={{
-                            background: `linear-gradient(135deg, ${nodeAccent}20, ${nodeAccent}0a)`,
-                            borderBottom: `2px solid ${nodeAccent}35`,
+                            background: nodeAccent,
+                            borderBottom: `2px solid ${nodeAccent}`,
                           }}>
                             <div className="bp-node__header-left">
-                              {(() => { const CatIcon = NODE_CATEGORY_ICONS[categoryOfKind(n.kind)] ?? Boxes; return <CatIcon size={13} style={{ color: nodeAccent, flexShrink: 0 }} />; })()}
-                              <span className="bp-node__name">{n.name}</span>
+                              {(() => { const CatIcon = NODE_CATEGORY_ICONS[categoryOfKind(n.kind)] ?? Boxes; return <CatIcon size={13} style={{ color: '#fff', flexShrink: 0 }} />; })()}
+                              <span className="bp-node__name" style={{ color: '#fff' }}>{n.name}</span>
                             </div>
                             <div className="bp-node__header-right">
                               <button
@@ -3301,6 +3702,140 @@ export default function EditeurPage() {
                                 <input className="bp-node__colorinput" type="color"
                                   value={getColor(n.params, 'color', '#ffffff')}
                                   onChange={(e) => updateNodeParamsById(n.id, { color: e.target.value })} />
+                              </div>
+                            </div>
+                          ) : n.kind === 'on_tick' ? (
+                            <div className="bp-node__vars" onPointerDown={(e) => e.stopPropagation()}>
+                              <div className="bp-node__var">
+                                <span className="bp-node__varlabel">Intervalle (ms)</span>
+                                <div className="bp-node__varctrl">
+                                  <input className="bp-node__varinput" type="number" min={50} max={60000} step={50}
+                                    value={getNum(n.params, 'intervalMs', 1000)}
+                                    onChange={(e) => updateNodeParamsById(n.id, { intervalMs: Number(e.target.value) })} />
+                                </div>
+                              </div>
+                            </div>
+                          ) : n.kind === 'on_tile_click' ? (
+                            <div className="bp-node__vars" onPointerDown={(e) => e.stopPropagation()}>
+                              <div className="bp-node__var">
+                                <span className="bp-node__varlabel">Mode</span>
+                                <div className="bp-node__varctrl">
+                                  <select className="bp-node__varselect"
+                                    value={String(n.params.target ?? 'any')}
+                                    onChange={(e) => updateNodeParamsById(n.id, { target: e.target.value })}>
+                                    <option value="any">Toute dalle</option>
+                                    <option value="specific">Dalle spécifique</option>
+                                  </select>
+                                </div>
+                              </div>
+                              {n.params.target === 'specific' && (
+                                <div className="bp-node__var">
+                                  <span className="bp-node__varlabel">Dalle</span>
+                                  <div className="bp-node__varctrl">
+                                    <select className="bp-node__varselect"
+                                      value={String(Math.max(0, Math.round(getNum(n.params, 'tileIndex', 0))))}
+                                      onChange={(e) => updateNodeParamsById(n.id, { tileIndex: Number(e.target.value) })}>
+                                      {Array.from({ length: 42 }, (_, i) => <option key={i} value={i}>D{i+1}</option>)}
+                                    </select>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          ) : n.kind === 'variable_set' ? (
+                            <div className="bp-node__vars" onPointerDown={(e) => e.stopPropagation()}>
+                              <div className="bp-node__var">
+                                <span className="bp-node__varlabel">Nom</span>
+                                <div className="bp-node__varctrl">
+                                  <input className="bp-node__varinput" type="text"
+                                    value={String(n.params.name ?? 'x')}
+                                    onChange={(e) => updateNodeParamsById(n.id, { name: e.target.value })} />
+                                </div>
+                              </div>
+                              <div className="bp-node__varrow">
+                                <div className="bp-node__var">
+                                  <span className="bp-node__varlabel">Op.</span>
+                                  <div className="bp-node__varctrl">
+                                    <select className="bp-node__varselect"
+                                      value={String(n.params.op ?? 'set')}
+                                      onChange={(e) => updateNodeParamsById(n.id, { op: e.target.value })}>
+                                      <option value="set">= (set)</option>
+                                      <option value="add">+= (add)</option>
+                                      <option value="sub">-= (sub)</option>
+                                    </select>
+                                  </div>
+                                </div>
+                                <div className="bp-node__var">
+                                  <span className="bp-node__varlabel">Val.</span>
+                                  <div className="bp-node__varctrl">
+                                    <input className="bp-node__varinput" type="number" step={1}
+                                      value={getNum(n.params, 'value', 0)}
+                                      onChange={(e) => updateNodeParamsById(n.id, { value: Number(e.target.value) })} />
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          ) : n.kind === 'add_score' ? (
+                            <div className="bp-node__vars" onPointerDown={(e) => e.stopPropagation()}>
+                              <div className="bp-node__var">
+                                <span className="bp-node__varlabel">Points</span>
+                                <div className="bp-node__varctrl">
+                                  <input className="bp-node__varinput" type="number" step={1}
+                                    value={getNum(n.params, 'amount', 1)}
+                                    onChange={(e) => updateNodeParamsById(n.id, { amount: Number(e.target.value) })} />
+                                </div>
+                              </div>
+                            </div>
+                          ) : n.kind === 'random_int' ? (
+                            <div className="bp-node__vars" onPointerDown={(e) => e.stopPropagation()}>
+                              <div className="bp-node__var">
+                                <span className="bp-node__varlabel">Stocker dans</span>
+                                <div className="bp-node__varctrl">
+                                  <input className="bp-node__varinput" type="text"
+                                    value={String(n.params.varName ?? 'rand')}
+                                    onChange={(e) => updateNodeParamsById(n.id, { varName: e.target.value })} />
+                                </div>
+                              </div>
+                              <div className="bp-node__varrow">
+                                <div className="bp-node__var">
+                                  <span className="bp-node__varlabel">Min</span>
+                                  <div className="bp-node__varctrl">
+                                    <input className="bp-node__varinput" type="number" step={1}
+                                      value={getNum(n.params, 'min', 0)}
+                                      onChange={(e) => updateNodeParamsById(n.id, { min: Number(e.target.value) })} />
+                                  </div>
+                                </div>
+                                <div className="bp-node__var">
+                                  <span className="bp-node__varlabel">Max</span>
+                                  <div className="bp-node__varctrl">
+                                    <input className="bp-node__varinput" type="number" step={1}
+                                      value={getNum(n.params, 'max', 41)}
+                                      onChange={(e) => updateNodeParamsById(n.id, { max: Number(e.target.value) })} />
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          ) : n.kind === 'game_tetris_block' ? (
+                            <div className="bp-node__vars" onPointerDown={(e) => e.stopPropagation()}>
+                              <div className="bp-node__varrow">
+                                <div className="bp-node__var">
+                                  <span className="bp-node__varlabel">Colonnes</span>
+                                  <div className="bp-node__varctrl">
+                                    <input className="bp-node__varinput" type="number" min={3} max={10} step={1}
+                                      value={getNum(n.params, 'cols', 6)}
+                                      onChange={(e) => updateNodeParamsById(n.id, { cols: Number(e.target.value) })} />
+                                  </div>
+                                </div>
+                                <div className="bp-node__var">
+                                  <span className="bp-node__varlabel">Lignes</span>
+                                  <div className="bp-node__varctrl">
+                                    <input className="bp-node__varinput" type="number" min={3} max={10} step={1}
+                                      value={getNum(n.params, 'rows', 7)}
+                                      onChange={(e) => updateNodeParamsById(n.id, { rows: Number(e.target.value) })} />
+                                  </div>
+                                </div>
+                              </div>
+                              <div style={{ fontSize: 11, color: '#888', padding: '0 2px', lineHeight: 1.5 }}>
+                                Connecte un <strong>on_tick</strong> pour piloter la vitesse de chute.
                               </div>
                             </div>
                           ) : null}
@@ -4108,6 +4643,7 @@ export default function EditeurPage() {
                     { id: 'rainbow', icon: Palette, label: 'Arc-en-ciel', desc: 'Séquence colorée complète' },
                     { id: 'tetris', icon: Gamepad2, label: 'Tetris Lumière', desc: 'Jeu Tetris interactif sur les dalles' },
                     { id: 'memory', icon: Brain, label: 'Jeu de Mémoire', desc: 'Mémorisation de séquences lumineuses type Simon' },
+                    { id: 'tetris-blueprint', icon: Gamepad2, label: 'Tetris Blueprint (UE5)', desc: 'Tetris jouable via nœuds on_tick + game_tetris_block' },
                   ].map((t) => (
                     <button
                       key={t.id}

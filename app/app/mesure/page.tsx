@@ -57,6 +57,8 @@ const NM_LABELS = [460, 470, 480, 490, 500, 510, 520, 530, 540, 550, 560, 570, 5
 
 // ── Colour maths ───────────────────────────────────────────────────────────
 
+// Conversion XYZ → sRGB normalisée par chromaticité (Y=1 → utilisée uniquement
+// pour le diagramme CIE 1931, jamais pour afficher une mesure absolue).
 function xyzToSrgb(X: number, Y: number, Z: number) {
   let r =  3.2406 * X - 1.5372 * Y - 0.4986 * Z;
   let g = -0.9689 * X + 1.8758 * Y + 0.0415 * Z;
@@ -65,6 +67,52 @@ function xyzToSrgb(X: number, Y: number, Z: number) {
   if (min < 0) { r -= min; g -= min; b -= min; }
   const max = Math.max(r, g, b, 1e-9);
   r /= max; g /= max; b /= max;
+  const gc = (c: number) => c <= 0.0031308 ? 12.92 * c : 1.055 * c ** (1 / 2.4) - 0.055;
+  return { r: gc(r) * 255, g: gc(g) * 255, b: gc(b) * 255 };
+}
+
+/**
+ * Conversion XYZ → sRGB tenant compte de la LUMINANCE — utilisée pour la
+ * pastille de couleur mesurée.
+ *
+ * Problème de la version simple : diviser par max(r,g,b) efface toute
+ * information de luminosité. Une dalle éteinte (Y ≈ 0.001 cd/m²) avec un
+ * bruit léger donne la même saturation qu'une dalle à pleine puissance —
+ * d'où l'affichage de #00fff0 quand la dalle devrait être #000000.
+ *
+ * Solution :
+ *  • Si Y < noiseFloor → noir (#000000), signal = bruit de fond / fuite LED.
+ *  • Si refY fourni (mesure d'un blanc de référence) → normaliser par refY
+ *    pour obtenir la luminance relative [0–1].
+ *  • Sinon → normalisation chromatique classique (couleur sans info de luminance).
+ *
+ * @param refY  Y (en cd/m²) mesuré sur un blanc de référence. null = non calibré.
+ * @param noiseFloor  Seuil sous lequel Y est considéré comme bruit (défaut 0.1 cd/m²).
+ */
+function xyzToSrgbForSwatch(
+  X: number, Y: number, Z: number,
+  refY: number | null,
+  noiseFloor = 0.1,
+): { r: number; g: number; b: number } {
+  // Bruit / dalle éteinte → noir pur
+  const floor = refY != null ? refY * 0.005 : noiseFloor;
+  if (Y < floor) return { r: 0, g: 0, b: 0 };
+
+  let r =  3.2406 * X - 1.5372 * Y - 0.4986 * Z;
+  let g = -0.9689 * X + 1.8758 * Y + 0.0415 * Z;
+  let b =  0.0557 * X - 0.2040 * Y + 1.0570 * Z;
+
+  // Supprimer les valeurs hors-gamut sans décaler la chromaticité
+  r = Math.max(0, r); g = Math.max(0, g); b = Math.max(0, b);
+
+  // Normaliser :
+  //  • par refY si disponible → luminance relative (1.0 = blanc de réf.)
+  //  • sinon par max → chromaticité seule (saturé, sans info de brillance)
+  const norm = refY != null ? refY : Math.max(r, g, b, 1e-9);
+  r = Math.min(1, r / norm);
+  g = Math.min(1, g / norm);
+  b = Math.min(1, b / norm);
+
   const gc = (c: number) => c <= 0.0031308 ? 12.92 * c : 1.055 * c ** (1 / 2.4) - 0.055;
   return { r: gc(r) * 255, g: gc(g) * 255, b: gc(b) * 255 };
 }
@@ -417,6 +465,12 @@ export default function MesurePage() {
   const [history,     setHistory]     = useState<MeasureResult[]>([]);
   const [samples,     setSamples]     = useState<any | null>(null);
 
+  // ── Référence blanche pour la pastille de couleur ────────────────────────
+  // refY : Y (cd/m²) mesuré sur un blanc de référence — null = non calibré.
+  // noiseFloor : seuil sous lequel Y est traité comme bruit (dalle éteinte).
+  const [refY,       setRefY]       = useState<number | null>(null);
+  const [noiseFloor, setNoiseFloor] = useState<number>(0.1);
+
   const checkStatus = useCallback(async () => {
     try {
       const res  = await fetch('/api/cs150?action=status', { cache: 'no-store' });
@@ -595,7 +649,50 @@ export default function MesurePage() {
                     </ResultCard>
                   )}
                   <ResultCard title="Couleur sRGB">
-                    <ColorSwatch xyz={measurement.xyz} />
+                    <ColorSwatch
+                      xyz={measurement.xyz}
+                      refY={refY}
+                      noiseFloor={noiseFloor}
+                    />
+                    {/* Contrôles de référence luminance */}
+                    <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <button
+                          onClick={() => setRefY(measurement.xyz.Y)}
+                          title="Utiliser cette mesure comme blanc 100% (Y de référence)"
+                          style={{ flex: 1, padding: '5px 8px', borderRadius: 5, border: '1px solid #93c5fd', background: '#eff6ff', color: '#1d4ed8', fontSize: 10, fontWeight: 600, cursor: 'pointer' }}
+                        >
+                          Fixer blanc de réf. {refY != null ? `(Y=${refY.toFixed(3)})` : ''}
+                        </button>
+                        {refY != null && (
+                          <button
+                            onClick={() => setRefY(null)}
+                            title="Retirer la référence blanche (revenir en mode chromatique)"
+                            style={{ padding: '5px 8px', borderRadius: 5, border: '1px solid #fca5a5', background: '#fef2f2', color: '#dc2626', fontSize: 10, fontWeight: 600, cursor: 'pointer' }}
+                          >
+                            ✕
+                          </button>
+                        )}
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ fontSize: 10, color: '#64748b', whiteSpace: 'nowrap' }}>Seuil bruit Y&lt;</span>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={noiseFloor}
+                          onChange={e => setNoiseFloor(Math.max(0, Number(e.target.value)))}
+                          style={{ width: 64, padding: '3px 6px', borderRadius: 4, border: '1px solid #e2e8f0', fontSize: 10, fontFamily: 'monospace' }}
+                        />
+                        <span style={{ fontSize: 10, color: '#64748b' }}>cd/m²</span>
+                      </div>
+                      {refY == null && (
+                        <div style={{ fontSize: 9, color: '#94a3b8', lineHeight: 1.3 }}>
+                          Sans réf. blanche : chromaticité seule (luminance ignorée).
+                          Pointez sur blanc à fond, cliquez « Fixer blanc ».
+                        </div>
+                      )}
+                    </div>
                   </ResultCard>
                 </div>
               </div>
@@ -690,13 +787,37 @@ function Row({ label, val }: { label: string; val: string }) {
   );
 }
 
-function ColorSwatch({ xyz }: { xyz: { X: number; Y: number; Z: number } }) {
-  const { r, g, b } = xyzToSrgb(xyz.X, xyz.Y, xyz.Z);
+function ColorSwatch({
+  xyz,
+  refY = null,
+  noiseFloor = 0.1,
+}: {
+  xyz: { X: number; Y: number; Z: number };
+  refY?: number | null;
+  noiseFloor?: number;
+}) {
+  const { r, g, b } = xyzToSrgbForSwatch(xyz.X, xyz.Y, xyz.Z, refY, noiseFloor);
   const hex = `#${[r, g, b].map(v => Math.round(Math.max(0, Math.min(255, v))).toString(16).padStart(2, '0')).join('')}`;
+  const isBlack = r < 1 && g < 1 && b < 1;
   return (
     <div>
-      <div style={{ width: '100%', height: 52, borderRadius: 7, background: hex, border: '1px solid rgba(0,0,0,.08)', marginBottom: 4 }} />
-      <div style={{ fontSize: 11, color: '#64748b', fontFamily: 'monospace', textAlign: 'center' }}>{hex.toUpperCase()}</div>
+      <div style={{
+        width: '100%', height: 52, borderRadius: 7,
+        background: hex,
+        border: `1px solid ${isBlack ? '#334155' : 'rgba(0,0,0,.08)'}`,
+        marginBottom: 4,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}>
+        {isBlack && (
+          <span style={{ fontSize: 10, color: '#475569' }}>Noir / éteint</span>
+        )}
+      </div>
+      <div style={{ fontSize: 12, color: '#1e40af', fontFamily: 'monospace', textAlign: 'center', fontWeight: 700 }}>
+        {hex.toUpperCase()}
+      </div>
+      <div style={{ fontSize: 10, color: '#94a3b8', textAlign: 'center', marginTop: 2 }}>
+        Y = {xyz.Y.toFixed(4)} cd/m²
+      </div>
     </div>
   );
 }

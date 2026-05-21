@@ -8,6 +8,7 @@ import GameMaitreDuBlanc from '@/app/_components/GameMaitreDuBlanc';
 import GamePuissance4 from '@/app/_components/GamePuissance4';
 import GameChasseurGamut from '@/app/_components/GameChasseurGamut';
 import GameMetamerisme from '@/app/_components/GameMetamerisme';
+import GameChromaticite from '@/app/_games/chromaticity-diagram/ChromaticityDiagram';
 import NavigationMenu from '@/app/_components/NavigationMenu';
 import Room3D from '@/app/_components/Room3D';
 import LoginScreen from '@/app/_components/LoginScreen';
@@ -545,49 +546,88 @@ const CHANNEL_PROFILES: ChannelProfile[] = [
   { rgb: [0.92, 0.92, 0.92], strength: 0.70 },
 ];
 
+/**
+ * Convertit une couleur RGB (0-255) en tableau de 32 valeurs de canaux LED (0-100).
+ *
+ * Algorithme : décomposition achromatic + chromatique
+ *   W  = min(R,G,B)          → composante blanche pure (plancher gris)
+ *   Rc = R - W               → rouge chromatique
+ *   Gc = G - W               → vert chromatique
+ *   Bc = B - W               → bleu chromatique
+ *   Y  = min(Rc, Gc)         → jaune (overlap rouge+vert)
+ *   Ro = Rc - Y              → rouge résiduel
+ *   Go = Gc - Y              → vert résiduel
+ *
+ * Chaque composante est envoyée vers les groupes de canaux physiques correspondants.
+ * Aucun boost blanc automatique : le blanc n'apparaît que si la couleur source en contient.
+ */
 function rgbToChannels32(rgb: TargetColor, masterIntensity: number): number[] {
-  const r = clamp255(rgb.r) / 255;
-  const g = clamp255(rgb.g) / 255;
-  const b = clamp255(rgb.b) / 255;
+  const R = Math.max(0, Math.min(255, Math.round(rgb.r)));
+  const G = Math.max(0, Math.min(255, Math.round(rgb.g)));
+  const B = Math.max(0, Math.min(255, Math.round(rgb.b)));
   const scale = clamp100(masterIntensity) / 100;
 
-  const energy = Math.max(r, g, b);
   const channels = Array(32).fill(0);
-  if (energy <= 1e-6 || scale <= 1e-6) return channels;
+  if (scale <= 1e-6 || Math.max(R, G, B) === 0) return channels;
 
-  // Choose ONE dominant canal matching the requested RGB.
-  // This matches the requirement: ex. Rouge=255 -> Canal 12 à fond (profile rouge pétant).
-  const norm = Math.max(1e-6, Math.sqrt(r * r + g * g + b * b));
-  const tr = r / norm;
-  const tg = g / norm;
-  const tb = b / norm;
+  // Décomposition
+  const W  = Math.min(R, G, B);           // blanc (achromatic)
+  const Rc = R - W;                         // rouge chromatique
+  const Gc = G - W;                         // vert chromatique
+  const Bc = B - W;                         // bleu chromatique
+  const Y  = Math.min(Rc, Gc);             // jaune (overlap R+G)
+  const Ro = Rc - Y;                        // rouge pur résiduel
+  const Go = Gc - Y;                        // vert pur résiduel
 
-  let bestIdx = 11; // Canal 12 (index 11) as safe default
-  let bestScore = -1;
-  for (let i = 0; i < 32; i++) {
-    const p = CHANNEL_PROFILES[i];
-    if (!p || p.strength <= 0.05) continue;
-    const pn = Math.max(1e-6, Math.sqrt(p.rgb[0] * p.rgb[0] + p.rgb[1] * p.rgb[1] + p.rgb[2] * p.rgb[2]));
-    const pr = p.rgb[0] / pn;
-    const pg = p.rgb[1] / pn;
-    const pb = p.rgb[2] / pn;
-    const score = pr * tr + pg * tg + pb * tb;
-    if (score > bestScore) {
-      bestScore = score;
-      bestIdx = i;
-    }
+  // Facteur : valeur 0-255 → canal 0-100 avec masterIntensity
+  const K = scale / 255;
+  const v = (x: number) => Math.min(100, Math.round(x * K * 100));
+
+  // ── Canaux blancs / gris (24-31) ──────────────────────────────────────────
+  if (W > 0) {
+    const wv = v(W);
+    channels[25] = wv;                          // blanc pur dominant
+    channels[24] = Math.round(wv * 0.70);       // blanc jaunâtre
+    channels[26] = Math.round(wv * 0.55);       // blanc neutre
+    channels[27] = Math.round(wv * 0.35);       // blanc froid
+    channels[31] = Math.round(wv * 0.45);       // gris clair
   }
 
-  const mainValue = clamp100(energy * 100 * scale);
-  channels[bestIdx] = mainValue;
+  // ── Canaux rouges (10-14) ─────────────────────────────────────────────────
+  if (Ro > 0) {
+    const rv = v(Ro);
+    channels[11] = Math.max(channels[11], rv);
+    channels[12] = Math.max(channels[12], Math.round(rv * 0.90));
+    channels[13] = Math.max(channels[13], Math.round(rv * 0.85));
+    channels[10] = Math.max(channels[10], Math.round(rv * 0.70));
+    channels[14] = Math.max(channels[14], Math.round(rv * 0.55));
+  }
 
-  // Boost intensity with white channels (COULEURS.md canaux 25-28)
-  const whiteBoost = Math.round(mainValue * 0.4);
-  if (whiteBoost > 0) {
-    channels[24] = Math.max(channels[24], Math.round(whiteBoost * 0.5));
-    channels[25] = Math.max(channels[25], whiteBoost);
-    channels[26] = Math.max(channels[26], Math.round(whiteBoost * 0.7));
-    channels[27] = Math.max(channels[27], Math.round(whiteBoost * 0.4));
+  // ── Canaux verts (5-6) ────────────────────────────────────────────────────
+  if (Go > 0) {
+    const gv = v(Go);
+    channels[5]  = Math.max(channels[5], gv);
+    channels[6]  = Math.max(channels[6], Math.round(gv * 0.75));
+  }
+
+  // ── Canaux bleus / violets (0-4) ──────────────────────────────────────────
+  if (Bc > 0) {
+    const bv = v(Bc);
+    channels[4]  = Math.max(channels[4], bv);
+    channels[2]  = Math.max(channels[2], Math.round(bv * 0.80));
+    channels[3]  = Math.max(channels[3], Math.round(bv * 0.65));
+    channels[1]  = Math.max(channels[1], Math.round(bv * 0.60));
+    channels[0]  = Math.max(channels[0], Math.round(bv * 0.40));
+  }
+
+  // ── Canaux jaune / orange (7-9, 18-19) ───────────────────────────────────
+  if (Y > 0) {
+    const yv = v(Y);
+    channels[7]  = Math.max(channels[7],  yv);
+    channels[8]  = Math.max(channels[8],  Math.round(yv * 0.85));
+    channels[18] = Math.max(channels[18], Math.round(yv * 0.90));
+    channels[19] = Math.max(channels[19], Math.round(yv * 0.75));
+    channels[9]  = Math.max(channels[9],  Math.round(yv * 0.70));
   }
 
   return channels;
@@ -771,7 +811,7 @@ export default function JeuxPage() {
   const [simonActive, setSimonActive] = useState<boolean>(false);
 
   // Nouveaux jeux natifs
-  const [activeBuiltinGame, setActiveBuiltinGame] = useState<'color-speed' | 'maitre-blanc' | 'puissance4' | 'chasseur-gamut' | 'metamere' | null>(null);
+  const [activeBuiltinGame, setActiveBuiltinGame] = useState<'color-speed' | 'maitre-blanc' | 'puissance4' | 'chasseur-gamut' | 'metamere' | 'chromaticite-jeu' | null>(null);
   const [activeView, setActiveView] = useState<null | 'spectre' | 'chromaticite'>(null);
   const [simonSequence, setSimonSequence] = useState<number[]>([]);
   const [simonPlayerInput, setSimonPlayerInput] = useState<number[]>([]);
@@ -827,12 +867,21 @@ export default function JeuxPage() {
 
   const hwLastSentRef = useRef<Record<string, number>>({});
   const hwBatchPendingRef = useRef<Map<number, Record<number, number>>>(new Map());
-  const hwBatchTimersRef = useRef<Map<number, number>>(new Map());
+  // ── Moteur hardware : state machine 1-in-flight + 1-pending ──────────────
+  // Garantit qu'il n'y a JAMAIS plus d'une requête en vol simultanément.
+  // 30 clics en spam = au plus 2 requêtes envoyées (première + dernière état).
+  type HwPlateUpdate = { plateId: number; channels: { index: number; value: number }[] };
+  const hwFlushScheduledRef = useRef(false);   // microtask flush déjà planifié ?
+  const hwInFlightRef      = useRef(false);    // un POST est-il en cours ?
+  const hwPendingPlatesRef = useRef<HwPlateUpdate[] | null>(null); // état en attente (remplacé à chaque flush)
+  const hwCurrentCtrlRef   = useRef<AbortController | null>(null); // pour annuler le POST en cours
+  const hwFetchGenRef      = useRef(0);        // génération : invalide les callbacks orphelins
   const tetrisSnapRef = useRef<TetrisSnapshot | null>(null);
-  // Tile batching refs for game components (8ms window → single multi-plate request)
-  const tileColorBatchRef = useRef<Map<number, { r: number; g: number; b: number; intensity: number }>>(new Map());
-  const tileColorFlushRef = useRef<number>(0);
-
+  // State canonique des dalles pendant les jeux — équivalent tetrisSnapRef
+  const gameColorStateRef = useRef<Array<{r:number;g:number;b:number;intensity:number}|null>>(new Array(42).fill(null));
+  // Batch visuel (rAF) pour mettre à jour la 3D sans bloquer le fil principal
+  const visualBatchRef = useRef<Map<number,{r:number;g:number;b:number;intensity:number}>>(new Map());
+  const rafRef = useRef<number>(0);
   const [sceneApplyScope, setSceneApplyScope] = useState<'selected' | 'all'>('selected');
 
   function getTargetPlateIndexes(): number[] {
@@ -879,37 +928,79 @@ export default function JeuxPage() {
     return [PLATE_ID_BY_INDEX[0] ?? 1];
   }
 
+  /** Construit la liste de mises à jour depuis hwBatchPendingRef */
+  function buildHwPlates(pending: Map<number, Record<number, number>>): HwPlateUpdate[] {
+    return Array.from(pending.entries())
+      .map(([plateId, channels]) => ({
+        plateId,
+        channels: Object.entries(channels)
+          .map(([i, v]) => ({ index: Number(i), value: v }))
+          .filter(ch => ch.value >= 0),
+      }))
+      .filter(p => p.channels.length > 0);
+  }
+
+  /** Lance réellement le POST et gère la transition d'état */
+  function doSendBatch(plates: HwPlateUpdate[]) {
+    const gen = ++hwFetchGenRef.current;
+    const ctrl = new AbortController();
+    hwCurrentCtrlRef.current = ctrl;
+    hwInFlightRef.current = true;
+
+    fetch('/api/supervision/batch', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ plates, fast: true }),
+      cache: 'no-store',
+      signal: ctrl.signal,
+    })
+      .catch(() => {/* AbortError ou réseau — ignoré */})
+      .finally(() => {
+        if (hwFetchGenRef.current !== gen) return; // callback orphelin — ignorer
+        const next = hwPendingPlatesRef.current;
+        hwPendingPlatesRef.current = null;
+        if (next && next.length > 0) {
+          doSendBatch(next); // envoyer l'état en attente
+        } else {
+          hwInFlightRef.current = false;
+        }
+      });
+  }
+
+  /** Vide hwBatchPendingRef et planifie un envoi (state machine) */
+  function flushHardwareBatch() {
+    const pending = hwBatchPendingRef.current;
+    if (pending.size === 0) return;
+    hwBatchPendingRef.current = new Map(); // nouveau map atomiquement
+    const plates = buildHwPlates(pending);
+    if (plates.length === 0) return;
+
+    if (!hwInFlightRef.current) {
+      doSendBatch(plates);          // idle → envoyer immédiatement
+    } else {
+      hwPendingPlatesRef.current = plates; // sending → remplacer le pending
+    }
+  }
+
   function scheduleSetCanal(plaqueId: number, canalIndex: number, intensity: number) {
     const key = `${plaqueId}:${canalIndex}`;
     const clamped = Math.max(0, Math.min(255, Math.round(intensity)));
-    // Skip if value unchanged
     if (hwLastSentRef.current[key] === clamped) return;
     hwLastSentRef.current[key] = clamped;
 
-    // Accumulate into per-plate pending batch
     const pending = hwBatchPendingRef.current;
     if (!pending.has(plaqueId)) pending.set(plaqueId, {});
     pending.get(plaqueId)![canalIndex] = clamped;
 
-    // (Re-)arm a single 20ms timer per plate — all 32 channels coalesce into one batch
-    const existing = hwBatchTimersRef.current.get(plaqueId);
-    if (existing) window.clearTimeout(existing);
-    hwBatchTimersRef.current.set(plaqueId, window.setTimeout(() => {
-      hwBatchTimersRef.current.delete(plaqueId);
-      const channels = pending.get(plaqueId);
-      pending.delete(plaqueId);
-      if (!channels) return;
-      const channelArray = Object.entries(channels)
-        .map(([i, v]) => ({ index: Number(i), value: v }))
-        .filter(ch => ch.value >= 0);
-      if (channelArray.length === 0) return;
-      fetch('/api/supervision/batch', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ plateId: plaqueId, channels: channelArray, fast: true }),
-        cache: 'no-store',
-      }).catch(() => {});
-    }, 20));
+    // queueMicrotask : flush immédiatement après le code synchrone courant
+    // (0 ms de délai artificiel). Le flag évite les doublons dans la même tick.
+    if (!hwFlushScheduledRef.current) {
+      hwFlushScheduledRef.current = true;
+      queueMicrotask(() => {
+        hwFlushScheduledRef.current = false;
+        flushHardwareBatch();
+      });
+    }
   }
 
   function sendRgbToPlate(rgb: TargetColor, intensity100: number, plateId: number) {
@@ -1058,25 +1149,31 @@ export default function JeuxPage() {
   // Cancel all pending scheduleSetCanal debounce timers so they can't re-light
   // plates after a blackout/stop.
   function cancelPendingHardware() {
-    hwBatchTimersRef.current.forEach(id => window.clearTimeout(id));
-    hwBatchTimersRef.current.clear();
+    // 1. Empêcher tout flush microtask en attente
+    hwFlushScheduledRef.current = false;
+    // 2. Vider les accumulateurs
     hwBatchPendingRef.current.clear();
-    hwLastSentRef.current = {}; // reset cache so future commands always go through
+    hwPendingPlatesRef.current = null;
+    // 3. Invalider le callback du POST en cours (génération) et l'annuler
+    hwFetchGenRef.current++;
+    hwCurrentCtrlRef.current?.abort();
+    hwCurrentCtrlRef.current = null;
+    hwInFlightRef.current = false;
+    // 4. Reset du cache dedup (commandes futures repartent depuis un état connu)
+    hwLastSentRef.current = {};
   }
 
   async function blackoutHardware() {
     cancelPendingHardware();
-    const OFF = Array.from({ length: 32 }, (_, i) => ({ index: i, value: 0 }));
-    await Promise.all(
-      PLATE_ID_BY_INDEX.map(plateId =>
-        fetch('/api/supervision/batch', {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ plateId, channels: OFF }),
-          cache: 'no-store',
-        }).catch(() => {})
-      )
-    );
+    // PUT global = 1 seule requête rapide vers le hardware (reset total)
+    await fetch('/api/supervision/', { method: 'PUT', cache: 'no-store' }).catch(() => {});
+    // Pré-remplir le cache dedup avec 0 pour que les prochains onSendColor
+    // n'envoient que les canaux qui changent depuis 0 (pas de burst de 1344 canaux)
+    for (let pid = 1; pid <= 42; pid++) {
+      for (let ch = 0; ch < 32; ch++) {
+        hwLastSentRef.current[`${pid}:${ch}`] = 0;
+      }
+    }
   }
 
   function hexToRgb255(hex: string): TargetColor {
@@ -1161,6 +1258,15 @@ export default function JeuxPage() {
       void blackoutHardware();
     };
   }, [gameActive, tetrisStandalone, hasEditorTetris]);
+
+  // Nettoyage de l'état jeu quand on quitte le mode jeu
+  useEffect(() => {
+    if (!gameActive) {
+      cancelAnimationFrame(rafRef.current);
+      visualBatchRef.current.clear();
+      gameColorStateRef.current = new Array(42).fill(null);
+    }
+  }, [gameActive]);
 
   function inferColorTempK(r: number, g: number, b: number): number {
     const denom = Math.max(1, r + g);
@@ -1382,6 +1488,8 @@ export default function JeuxPage() {
         const json = (await res.json().catch(() => null)) as any;
         if (!json || json.ok !== true || !Array.isArray(json.games)) return;
         if (alive) setDbGames(json.games);
+      } catch {
+        // ignore — réseau indisponible ou API pas encore prête
       } finally {
         if (alive) {
           // Polling DB réduit : 60s au lieu de 30s
@@ -3150,6 +3258,12 @@ export default function JeuxPage() {
       handleSimonPlateClick(index);
       return;
     }
+    // When a builtin game handler is active (Color Speed, Maître du Blanc, etc.)
+    // skip the free-play toggle — the game manages its own plate state
+    if (gameClickHandlerRef.current) {
+      gameClickHandlerRef.current(index);
+      return;
+    }
 
     setPlateActive((prev) => {
       const next = [...prev];
@@ -3189,7 +3303,7 @@ export default function JeuxPage() {
 
       return next;
     });
-    gameClickHandlerRef.current?.(index);
+    // gameClickHandlerRef already handled above (early return) when active
   }
 
   // currentGameDef supprimé : les jeux viennent de la DB
@@ -3525,13 +3639,14 @@ export default function JeuxPage() {
                 </div>
 
                 {/* Color Speed */}
-                {(['color-speed', 'maitre-blanc', 'puissance4', 'chasseur-gamut', 'metamere'] as const).map((gameId) => {
+                {(['color-speed', 'maitre-blanc', 'puissance4', 'chasseur-gamut', 'metamere', 'chromaticite-jeu'] as const).map((gameId) => {
                   const META: Record<string, { title: string; desc: string; Icon: any; grad: string; accent: string }> = {
-                    'color-speed':    { title: 'Color Speed',        desc: "Cliquez la dalle qui s'allume — réflexes !",      Icon: Zap,        grad: 'linear-gradient(135deg,#4361ee,#7c3aed)', accent: '#7c3aed' },
-                    'maitre-blanc':   { title: 'Le Maître du Blanc', desc: 'Recréez la teinte cible en dosant R, G, B',        Icon: Sun,        grad: 'linear-gradient(135deg,#f59e0b,#ef4444)', accent: '#f59e0b' },
-                    'puissance4':     { title: 'Puissance 4',        desc: 'Alignez 4 couleurs sur la matrice 6×7',             Icon: Grid,    grad: 'linear-gradient(135deg,#ff2828,#2850ff)', accent: '#ff2828' },
-                    'chasseur-gamut': { title: 'Chasseur de Gamut',  desc: 'Localisez la couleur sur le diagramme CIE 1931',  Icon: Crosshair,  grad: 'linear-gradient(135deg,#06d6a0,#4361ee)', accent: '#06d6a0' },
-                    'metamere':       { title: 'Métamérie',           desc: 'Trouvez l\'éclairage qui cache ou révèle le texte', Icon: Sparkles,   grad: 'linear-gradient(135deg,#7c3aed,#06d6a0)', accent: '#06d6a0' },
+                    'color-speed':      { title: 'Color Speed',        desc: "Cliquez la dalle qui s'allume — réflexes !",            Icon: Zap,       grad: 'linear-gradient(135deg,#4361ee,#7c3aed)', accent: '#7c3aed' },
+                    'maitre-blanc':     { title: 'Le Maître du Blanc', desc: 'Recréez la teinte cible en dosant R, G, B',              Icon: Sun,       grad: 'linear-gradient(135deg,#f59e0b,#ef4444)', accent: '#f59e0b' },
+                    'puissance4':       { title: 'Puissance 4',        desc: 'Alignez 4 couleurs sur la matrice 6×7',                  Icon: Grid,      grad: 'linear-gradient(135deg,#ff2828,#2850ff)', accent: '#ff2828' },
+                    'chasseur-gamut':   { title: 'Chasseur de Gamut',  desc: 'Localisez la couleur sur le diagramme CIE 1931',         Icon: Crosshair, grad: 'linear-gradient(135deg,#06d6a0,#4361ee)', accent: '#06d6a0' },
+                    'metamere':         { title: 'Métamérie',           desc: "Trouvez l'éclairage qui cache ou révèle le texte",       Icon: Sparkles,  grad: 'linear-gradient(135deg,#7c3aed,#06d6a0)', accent: '#06d6a0' },
+                    'chromaticite-jeu': { title: 'Chromaticité CIE',   desc: 'Mémorisez la couleur 5s puis retrouvez x, y, z sur le diagramme', Icon: Crosshair, grad: 'linear-gradient(135deg,#81e6d9,#4361ee)', accent: '#81e6d9' },
                   };
                   const m = META[gameId];
                   const isSelected = activeBuiltinGame === gameId;
@@ -3600,28 +3715,6 @@ export default function JeuxPage() {
                   ><Play size={15} /></button>
                 </div>
 
-                {/* Diagramme Chromaticité CIE 1931 */}
-                <div
-                  className="game-card"
-                  style={{ marginBottom: 8 }}
-                  onClick={() => setActiveView('chromaticite')}
-                  role="button" tabIndex={0}
-                >
-                  <div className="game-icon" style={{ background: 'linear-gradient(135deg,#0f172a,#1e3a5f)' }}>
-                    <Crosshair size={20} color="#38bdf8" />
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
-                      <h4>Chromaticité CIE 1931</h4>
-                      <span style={{ fontSize: 10, fontWeight: 700, color: '#38bdf8', background: '#38bdf822', padding: '2px 7px', borderRadius: 5 }}>outil</span>
-                    </div>
-                    <p>Diagramme xy interactif — cliquez pour projeter une couleur sur les dalles</p>
-                  </div>
-                  <button className="play-btn"
-                    style={{ background: '#38bdf833', color: '#fff' }}
-                    onClick={(e) => { e.stopPropagation(); setActiveView('chromaticite'); }}
-                  ><Play size={15} /></button>
-                </div>
 
                 {dbGamesLoading ? (
                   <div style={{ padding: 20, textAlign: 'center', opacity: 0.75 }}>Chargement des jeux...</div>
@@ -3925,20 +4018,20 @@ export default function JeuxPage() {
 
                 {/* Nouveaux jeux natifs */}
                 {gameActive && activeBuiltinGame && (() => {
-                  const flushVisualBatch = () => {
-                    const snapshot = new Map(tileColorBatchRef.current);
-                    tileColorBatchRef.current.clear();
+                  // Flush visuel via rAF — ne déclenche qu'un seul setPlateColors par frame
+                  const flushVisual = () => {
+                    const snap = new Map(visualBatchRef.current);
+                    visualBatchRef.current.clear();
                     setPlateColors(prev => {
                       const n = [...prev];
-                      snapshot.forEach(({ r, g, b, intensity }, i) => {
-                        if (intensity === 0) n[i] = '#000000';
-                        else n[i] = `rgb(${Math.round(r)},${Math.round(g)},${Math.round(b)})`;
+                      snap.forEach(({ r, g, b, intensity }, i) => {
+                        n[i] = intensity > 0 ? `rgb(${Math.round(r)},${Math.round(g)},${Math.round(b)})` : '#000000';
                       });
                       return n;
                     });
                     setPlateActive(prev => {
                       const n = [...prev];
-                      snapshot.forEach(({ intensity }, i) => { n[i] = intensity > 0; });
+                      snap.forEach(({ intensity }, i) => { n[i] = intensity > 0; });
                       return n;
                     });
                   };
@@ -3946,23 +4039,46 @@ export default function JeuxPage() {
                     onSendColor: (idx: number, r: number, g: number, b: number, intensity = 80) => {
                       const plateId = PLATE_ID_BY_INDEX[idx];
                       if (!plateId) return;
+                      // 1. Mémoriser l'état canonique
+                      gameColorStateRef.current[idx] = { r, g, b, intensity };
+                      // 2. Envoyer au hardware immédiatement (event-driven, pas de polling)
                       sendRgbToPlate({ r, g, b }, intensity, plateId);
-                      tileColorBatchRef.current.set(idx, { r, g, b, intensity });
-                      window.clearTimeout(tileColorFlushRef.current);
-                      tileColorFlushRef.current = window.setTimeout(flushVisualBatch, 50);
+                      // 3. Mettre à jour le visuel 3D via rAF (max 1 setPlateColors/frame)
+                      visualBatchRef.current.set(idx, { r, g, b, intensity });
+                      cancelAnimationFrame(rafRef.current);
+                      rafRef.current = requestAnimationFrame(flushVisual);
                     },
                     onTurnOff: (idx: number) => {
                       const plateId = PLATE_ID_BY_INDEX[idx];
                       if (!plateId) return;
+                      gameColorStateRef.current[idx] = null;
                       sendRgbToPlate({ r: 0, g: 0, b: 0 }, 0, plateId);
-                      tileColorBatchRef.current.set(idx, { r: 0, g: 0, b: 0, intensity: 0 });
-                      window.clearTimeout(tileColorFlushRef.current);
-                      tileColorFlushRef.current = window.setTimeout(flushVisualBatch, 50);
+                      visualBatchRef.current.set(idx, { r: 0, g: 0, b: 0, intensity: 0 });
+                      cancelAnimationFrame(rafRef.current);
+                      rafRef.current = requestAnimationFrame(flushVisual);
                     },
                     onTurnOffAll: () => {
-                      tileColorBatchRef.current.clear();
-                      window.clearTimeout(tileColorFlushRef.current);
+                      gameColorStateRef.current = new Array(42).fill(null);
+                      cancelAnimationFrame(rafRef.current);
+                      visualBatchRef.current.clear();
+                      // Annuler tout envoi en attente sans vider le cache dedup
+                      hwFlushScheduledRef.current = false;
+                      hwBatchPendingRef.current.clear();
+                      hwPendingPlatesRef.current = null;
+                      hwFetchGenRef.current++;
+                      hwCurrentCtrlRef.current?.abort();
+                      hwCurrentCtrlRef.current = null;
+                      hwInFlightRef.current = false;
+                      // Reset hardware via le PUT global (1 seule requête rapide)
                       fetch('/api/supervision/', { method: 'PUT', cache: 'no-store' }).catch(() => {});
+                      // IMPORTANT : pré-remplir le cache dedup avec 0 pour toutes les dalles
+                      // au lieu de le vider → le prochain onSendColor n'envoie QUE les canaux
+                      // qui changent depuis 0 (6-10 canaux max), pas les 32×42=1344
+                      for (let pid = 1; pid <= 42; pid++) {
+                        for (let ch = 0; ch < 32; ch++) {
+                          hwLastSentRef.current[`${pid}:${ch}`] = 0;
+                        }
+                      }
                       setPlateColors(Array(42).fill('#000000'));
                       setPlateActive(Array(42).fill(false));
                     },
@@ -3972,11 +4088,12 @@ export default function JeuxPage() {
                   };
                   return (
                     <div style={{ marginTop: 12, borderRadius: 18, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(10,10,18,0.95)' }}>
-                      {activeBuiltinGame === 'color-speed'    && <GameColorSpeed    {...tileActions} />}
-                      {activeBuiltinGame === 'maitre-blanc'   && <GameMaitreDuBlanc {...tileActions} />}
-                      {activeBuiltinGame === 'puissance4'     && <GamePuissance4    {...tileActions} />}
-                      {activeBuiltinGame === 'chasseur-gamut' && <GameChasseurGamut {...tileActions} />}
-                      {activeBuiltinGame === 'metamere'       && <GameMetamerisme   {...tileActions} />}
+                      {activeBuiltinGame === 'color-speed'      && <GameColorSpeed      {...tileActions} />}
+                      {activeBuiltinGame === 'maitre-blanc'    && <GameMaitreDuBlanc   {...tileActions} />}
+                      {activeBuiltinGame === 'puissance4'      && <GamePuissance4      {...tileActions} />}
+                      {activeBuiltinGame === 'chasseur-gamut'  && <GameChasseurGamut   {...tileActions} />}
+                      {activeBuiltinGame === 'metamere'        && <GameMetamerisme     {...tileActions} />}
+                      {activeBuiltinGame === 'chromaticite-jeu'&& <GameChromaticite   {...tileActions} />}
                     </div>
                   );
                 })()}

@@ -417,7 +417,7 @@
  }
 
 .panelbody {
-  padding: 18px;
+  padding: 16px 18px 20px;
 }
 
 .divider {
@@ -473,33 +473,34 @@
 
 .ue__viewport {
   overflow: hidden;
-  min-height: 420px;
+  min-height: 500px;
 }
 
 .viewport {
   height: 100%;
   position: relative;
+  /* Room3D a son propre background sombre — pas de padding ici */
 }
 
  .viewport__split {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 12px;
+  gap: 10px;
   height: 100%;
+  padding: 10px;
  }
 
  .viewport__pane {
   position: relative;
-  border-radius: 18px;
+  border-radius: 16px;
   border: 1px solid color-mix(in srgb, var(--c-dark) 10%, transparent);
-  background: color-mix(in srgb, var(--c-light) 60%, transparent);
+  background: #080810;
   overflow: hidden;
   min-height: 380px;
  }
 
  .viewport__pane--tiles {
-  background: radial-gradient(circle at 20% 0%, rgba(255, 255, 255, 0.62), rgba(255, 255, 255, 0.08) 58%, transparent 78%),
-    color-mix(in srgb, var(--c-glass) 10%, transparent);
+  background: #080810;
  }
 
  .viewport__pane--ui {
@@ -837,8 +838,20 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 8px 10px 7px;
+  padding: 9px 11px 8px;
   border-radius: 13px 13px 0 0;
+  /* couleur pleine gérée en inline style, texte toujours blanc */
+  color: #fff;
+}
+
+.bp-node__name {
+  color: #fff;
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .bp-node__header-left {
@@ -861,23 +874,24 @@
   height: 22px;
   border-radius: 6px;
   border: none;
-  background: rgba(0,0,0,0.06);
+  background: rgba(255,255,255,0.18);
   cursor: pointer;
   display: grid;
   place-items: center;
-  opacity: 0.7;
+  opacity: 0.8;
   transition: all 0.12s;
   padding: 0;
+  color: #fff;
 }
 
 .bp-node__hbtn:hover {
   opacity: 1;
-  background: rgba(0,0,0,0.12);
+  background: rgba(255,255,255,0.28);
 }
 
 .bp-node__hbtn--del:hover {
-  background: rgba(239,68,68,0.15);
-  color: #ef4444;
+  background: rgba(239,68,68,0.5);
+  color: #fff;
 }
 
 .bp-node__kind-bar {
@@ -885,10 +899,11 @@
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  padding: 3px 12px 5px;
-  background: rgba(0,0,0,0.025);
-  border-bottom: 1px solid rgba(0,0,0,0.05);
-  opacity: 0.85;
+  padding: 4px 12px 5px;
+  background: rgba(0,0,0,0.035);
+  border-bottom: 1px solid rgba(0,0,0,0.06);
+  color: var(--c-content);
+  opacity: 0.72;
 }
 
 .bp-node__meta {
@@ -904,9 +919,9 @@
 }
 
 .bp-node__vars {
-  padding: 10px 14px 12px;
+  padding: 12px 14px 14px;
   display: grid;
-  gap: 10px;
+  gap: 11px;
 }
 
 .bp-node__varrow {
@@ -917,12 +932,15 @@
 
 .bp-node__var {
   display: grid;
-  gap: 6px;
+  gap: 5px;
 }
 
 .bp-node__varlabel {
-  font-size: 11px;
-  opacity: 0.78;
+  font-size: 10.5px;
+  font-weight: 600;
+  opacity: 0.72;
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
 }
 
 .bp-node__varctrl {
@@ -978,50 +996,53 @@
 
 .bp-node__varinput {
   width: 92px;
-  height: 32px;
-  padding: 0 10px;
+  height: 34px;
+  padding: 0 11px;
   border-radius: 10px;
-  border: 1px solid rgba(0,0,0,0.10);
-  background: rgba(255,255,255,0.82);
+  border: 1.5px solid rgba(0,0,0,0.09);
+  background: rgba(255,255,255,0.92);
   color: var(--c-content);
   font-family: inherit;
   font-size: 13px;
+  font-weight: 500;
   outline: none;
-  transition: all 140ms;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.9);
+  transition: border-color 140ms, box-shadow 140ms;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,1), 0 1px 3px rgba(0,0,0,0.06);
 }
 
 .bp-node__varinput:focus {
   border-color: var(--c-action);
-  box-shadow: 0 0 0 2px rgba(67,97,238,0.14), inset 0 1px 0 rgba(255,255,255,1);
+  box-shadow: 0 0 0 3px rgba(67,97,238,0.15), inset 0 1px 0 rgba(255,255,255,1);
 }
 
 .bp-node__varunit {
   font-size: 11px;
-  opacity: 0.7;
+  font-weight: 600;
+  opacity: 0.6;
 }
 
 .bp-node__varselect {
   width: 100%;
-  height: 32px;
-  padding: 0 10px;
+  height: 34px;
+  padding: 0 28px 0 11px;
   border-radius: 10px;
-  border: 1px solid rgba(0,0,0,0.10);
-  background: rgba(255,255,255,0.82);
+  border: 1.5px solid rgba(0,0,0,0.09);
+  background: rgba(255,255,255,0.92) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23666'/%3E%3C/svg%3E") no-repeat right 10px center;
   color: var(--c-content);
   font-family: inherit;
   font-size: 13px;
+  font-weight: 500;
   outline: none;
   cursor: pointer;
-  transition: all 140ms;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.9);
+  transition: border-color 140ms, box-shadow 140ms;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,1), 0 1px 3px rgba(0,0,0,0.06);
   -webkit-appearance: none;
   appearance: none;
 }
 
 .bp-node__varselect:focus {
   border-color: var(--c-action);
-  box-shadow: 0 0 0 2px rgba(67,97,238,0.14), inset 0 1px 0 rgba(255,255,255,1);
+  box-shadow: 0 0 0 3px rgba(67,97,238,0.15), inset 0 1px 0 rgba(255,255,255,1);
 }
 
 .bp-node__varrange {
