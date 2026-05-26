@@ -88,31 +88,34 @@ export default function NavigationMenu() {
           zIndex: 1001,
           width: '48px',
           height: '48px',
-          borderRadius: '50%',
-          border: '1px solid rgba(255,255,255,0.3)',
-          background: 'rgba(255,255,255,0.15)',
+          borderRadius: '14px',
+          border: '1px solid rgba(255,255,255,0.14)',
+          background: 'rgba(14,18,32,0.88)',
           backdropFilter: 'blur(20px)',
           WebkitBackdropFilter: 'blur(20px)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           cursor: 'pointer',
-          transition: 'all 0.3s ease',
-          boxShadow: '0 4px 30px rgba(0,0,0,0.1)',
+          transition: 'all 0.2s ease',
+          boxShadow: '0 4px 24px rgba(0,0,0,0.35), 0 1px 4px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.08)',
         }}
         onMouseEnter={(e) => {
-          e.currentTarget.style.background = 'rgba(255,255,255,0.25)';
-          e.currentTarget.style.transform = 'scale(1.05)';
+          e.currentTarget.style.background = 'rgba(22,28,52,0.95)';
+          e.currentTarget.style.transform = 'scale(1.06)';
+          e.currentTarget.style.boxShadow = '0 6px 28px rgba(0,0,0,0.45), 0 1px 4px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.10)';
         }}
         onMouseLeave={(e) => {
-          e.currentTarget.style.background = 'rgba(255,255,255,0.15)';
+          e.currentTarget.style.background = 'rgba(14,18,32,0.88)';
           e.currentTarget.style.transform = 'scale(1)';
+          e.currentTarget.style.boxShadow = '0 4px 24px rgba(0,0,0,0.35), 0 1px 4px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.08)';
         }}
+        aria-label={isOpen ? 'Fermer le menu' : 'Ouvrir le menu'}
       >
         {isOpen ? (
-          <X size={24} style={{ color: '#fff' }} />
+          <X size={20} style={{ color: 'rgba(255,255,255,0.92)' }} />
         ) : (
-          <Menu size={24} style={{ color: '#fff' }} />
+          <Menu size={20} style={{ color: 'rgba(255,255,255,0.92)' }} />
         )}
       </button>
 
