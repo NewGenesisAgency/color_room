@@ -998,6 +998,42 @@ export default function EditeurPage() {
     };
   }, [graphZoom, graphPan.x, graphPan.y, activeGameId, games.length, nodesLayoutKey, activeGame?.edges.length]);
 
+  // Auto-layout quand on charge un jeu dont les nœuds se superposent
+  const prevActiveGameIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!activeGameId || activeGameId === prevActiveGameIdRef.current) return;
+    prevActiveGameIdRef.current = activeGameId;
+
+    const nodes = editorRef.current.games.find((g) => g.id === activeGameId)?.nodes ?? [];
+    if (nodes.length < 2) return;
+
+    // Calcule l'étendue des positions existantes
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    nodes.forEach((n) => {
+      if (n.pos.x < minX) minX = n.pos.x;
+      if (n.pos.x > maxX) maxX = n.pos.x;
+      if (n.pos.y < minY) minY = n.pos.y;
+      if (n.pos.y > maxY) maxY = n.pos.y;
+    });
+    const spread = Math.max(maxX - minX, maxY - minY);
+
+    // Si les nœuds sont trop serrés (< 200px d'écart), on les réorganise
+    if (spread < 200) {
+      // Petit délai pour laisser l'état se stabiliser
+      const t = setTimeout(() => {
+        autoLayoutNodesRef.current?.();
+      }, 80);
+      return () => clearTimeout(t);
+    } else {
+      // Sinon, juste centrer la vue avec fit
+      const t = setTimeout(() => {
+        fitNodesToViewRef.current?.();
+      }, 80);
+      return () => clearTimeout(t);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeGameId]);
+
   const selectedNode = useMemo(() => {
     if (!activeGame) return null;
     return activeGame.nodes.find((n) => n.id === selectedNodeId) || null;
@@ -6105,44 +6141,77 @@ export default function EditeurPage() {
                   flex: 1,
                   display: 'grid',
                   placeItems: 'center',
-                  padding: 32,
+                  padding: '20px 28px',
                   background: '#fafafa',
+                  overflowY: 'auto',
                 }}
               >
-                <div style={{ display: 'grid', gap: 20, width: '100%', maxWidth: 550 }}>
-                  {/* Grille de dalles 3x3 */}
-                  <div
-                    style={{
-                      display: 'grid',
-                      gridTemplateColumns: 'repeat(3, 1fr)',
-                      gap: 12,
-                      padding: 20,
-                      background: '#fff',
-                      borderRadius: 16,
-                      border: '1px solid rgba(0,0,0,0.06)',
-                    }}
-                  >
-                    {tiles.map((tile, i) => (
-                      <div
-                        key={i}
-                        style={{
-                          aspectRatio: '1',
-                          borderRadius: 12,
-                          background: `linear-gradient(135deg, ${tile.color}${Math.round(tile.intensity * 255).toString(16).padStart(2, '0')}, ${tile.color}${Math.round(tile.intensity * 200).toString(16).padStart(2, '0')})`,
-                          boxShadow: `0 0 ${tile.intensity * 20}px ${tile.color}${Math.round(tile.intensity * 100).toString(16).padStart(2, '0')}`,
-                          border: '1px solid rgba(0,0,0,0.08)',
-                          transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                          display: 'grid',
-                          placeItems: 'center',
-                          color: '#fff',
-                          fontSize: 13,
-                          fontWeight: 700,
-                          textShadow: '0 1px 3px rgba(0,0,0,0.3)',
-                        }}
-                      >
-                        {i + 1}
-                      </div>
-                    ))}
+                <div style={{ display: 'grid', gap: 14, width: '100%', maxWidth: 560 }}>
+                  {/* Grille de dalles — layout physique ColorRoom : 6 cols × 7 rows */}
+                  <div style={{ background: '#0a0c14', borderRadius: 16, padding: 14, border: '1px solid #1e2030' }}>
+                    {/* Légendes salles */}
+                    <div style={{ display: 'flex', gap: 8, marginBottom: 6 }}>
+                      <div style={{ flex: 3, textAlign: 'center', fontSize: 9, color: '#555', letterSpacing: '0.08em', textTransform: 'uppercase' }}>◂ Salle gauche</div>
+                      <div style={{ width: 8 }} />
+                      <div style={{ flex: 3, textAlign: 'center', fontSize: 9, color: '#555', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Salle droite ▸</div>
+                    </div>
+                    {/* 7 rangées, chacune = 3 dalles gauche + séparateur + 3 dalles droite */}
+                    <div style={{ display: 'grid', gap: 4 }}>
+                      {Array.from({ length: 7 }, (_, row) => (
+                        <div key={row} style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr) 8px repeat(3, 1fr)', gap: 4 }}>
+                          {/* 3 dalles salle gauche */}
+                          {[0,1,2].map(c => {
+                            const idx = row * 6 + c;
+                            const tile = tiles[idx] ?? { color: '#111', intensity: 0 };
+                            const hex = (v: number) => Math.min(255, Math.round(v)).toString(16).padStart(2, '0');
+                            return (
+                              <div key={c} title={`Dalle ${idx + 1}`} style={{
+                                aspectRatio: '1', borderRadius: 5,
+                                background: tile.intensity > 0.02 ? `radial-gradient(circle at 38% 32%, ${tile.color}ff, ${tile.color}${hex(tile.intensity * 140)})` : '#131526',
+                                boxShadow: tile.intensity > 0.05 ? `0 0 ${tile.intensity * 12}px ${tile.color}${hex(tile.intensity * 160)}` : 'none',
+                                border: `1px solid ${tile.intensity > 0.05 ? tile.color + '44' : '#1e2030'}`,
+                                transition: 'background 0.25s, box-shadow 0.25s',
+                                display: 'grid', placeItems: 'center',
+                                color: tile.intensity > 0.4 ? '#fff' : '#3a3d55',
+                                fontSize: 8, fontWeight: 700,
+                              }}>
+                                {idx + 1}
+                              </div>
+                            );
+                          })}
+                          {/* Séparateur */}
+                          <div style={{ background: '#1e2030', borderRadius: 2 }} />
+                          {/* 3 dalles salle droite */}
+                          {[3,4,5].map(c => {
+                            const idx = row * 6 + c;
+                            const tile = tiles[idx] ?? { color: '#111', intensity: 0 };
+                            const hex = (v: number) => Math.min(255, Math.round(v)).toString(16).padStart(2, '0');
+                            return (
+                              <div key={c} title={`Dalle ${idx + 1}`} style={{
+                                aspectRatio: '1', borderRadius: 5,
+                                background: tile.intensity > 0.02 ? `radial-gradient(circle at 38% 32%, ${tile.color}ff, ${tile.color}${hex(tile.intensity * 140)})` : '#131526',
+                                boxShadow: tile.intensity > 0.05 ? `0 0 ${tile.intensity * 12}px ${tile.color}${hex(tile.intensity * 160)}` : 'none',
+                                border: `1px solid ${tile.intensity > 0.05 ? tile.color + '44' : '#1e2030'}`,
+                                transition: 'background 0.25s, box-shadow 0.25s',
+                                display: 'grid', placeItems: 'center',
+                                color: tile.intensity > 0.4 ? '#fff' : '#3a3d55',
+                                fontSize: 8, fontWeight: 700,
+                              }}>
+                                {idx + 1}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ))}
+                    </div>
+                    {/* Légende rangées */}
+                    <div style={{ display: 'flex', marginTop: 6, gap: 4 }}>
+                      {[0,1,2,3,4,5].map(c => (
+                        <div key={c} style={{ flex: 1, textAlign: 'center', fontSize: 7, color: '#3a3d55' }}>
+                          {c < 3 ? `G${c+1}` : `D${c-2}`}
+                        </div>
+                      ))}
+                    </div>
                   </div>
 
                   {/* Info du jeu */}
