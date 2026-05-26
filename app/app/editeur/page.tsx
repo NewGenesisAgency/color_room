@@ -88,7 +88,37 @@ type EditorNodeKind =
   | 'anim_rainbow'
   | 'anim_wave'
   // Flux étendu
-  | 'loop_count';
+  | 'loop_count'
+  // Blocs spécifiques Tetris
+  | 'tetris_on_line_clear'
+  | 'tetris_on_level_up'
+  | 'tetris_on_game_over'
+  | 'tetris_set_speed'
+  // Blocs spécifiques Simon
+  | 'simon_on_success'
+  | 'simon_on_fail'
+  | 'simon_on_complete'
+  | 'simon_set_speed'
+  // Blocs spécifiques Memory
+  | 'memory_on_match'
+  | 'memory_on_fail'
+  | 'memory_on_complete'
+  // Blocs spécifiques Spectre
+  | 'spectrum_on_submit'
+  | 'spectrum_on_round_end'
+  | 'spectrum_on_game_over'
+  // Blocs spécifiques Color Speed
+  | 'cspeed_on_hit'
+  | 'cspeed_on_miss'
+  | 'cspeed_on_time_up'
+  // Blocs spécifiques Puissance 4
+  | 'p4_on_win'
+  | 'p4_on_draw'
+  | 'p4_set_color'
+  // Blocs spécifiques Chasseur Gamut
+  | 'gamut_on_hit'
+  | 'gamut_on_miss'
+  | 'gamut_on_complete';
 
 type EditorNode = {
   id: string;
@@ -206,6 +236,36 @@ const NODE_CATALOG: NodeCatalogItem[] = [
   { kind: 'get_score', category: 'Variables', title: 'Lire Score', defaults: {} },
   { kind: 'random_int', category: 'Aléatoire', title: 'Entier aléatoire', defaults: { min: 0, max: 41, varName: 'rand' } },
   { kind: 'game_tetris_block', category: 'Jeux', title: 'Tetris Blocs', defaults: { speed: 500, cols: 6, rows: 7 } },
+  // ─── Blocs Tetris ───────────────────────────────────────────────────────────
+  { kind: 'tetris_on_line_clear', category: 'Tetris', title: '⬛ Ligne effacée', defaults: { lines: 1 } },
+  { kind: 'tetris_on_level_up', category: 'Tetris', title: '⬆ Niveau supérieur', defaults: { level: 2 } },
+  { kind: 'tetris_on_game_over', category: 'Tetris', title: '💀 Game Over', defaults: {} },
+  { kind: 'tetris_set_speed', category: 'Tetris', title: '⚡ Changer vitesse', defaults: { speedMs: 300 } },
+  // ─── Blocs Simon ────────────────────────────────────────────────────────────
+  { kind: 'simon_on_success', category: 'Simon', title: '✅ Séquence réussie', defaults: { step: 1 } },
+  { kind: 'simon_on_fail', category: 'Simon', title: '❌ Erreur séquence', defaults: {} },
+  { kind: 'simon_on_complete', category: 'Simon', title: '🏆 Simon terminé', defaults: {} },
+  { kind: 'simon_set_speed', category: 'Simon', title: '⚡ Changer vitesse', defaults: { speedMs: 600 } },
+  // ─── Blocs Memory ───────────────────────────────────────────────────────────
+  { kind: 'memory_on_match', category: 'Mémoire', title: '✅ Paire trouvée', defaults: { pairIndex: 0 } },
+  { kind: 'memory_on_fail', category: 'Mémoire', title: '❌ Mauvaise paire', defaults: {} },
+  { kind: 'memory_on_complete', category: 'Mémoire', title: '🏆 Memory terminé', defaults: {} },
+  // ─── Blocs Spectre ──────────────────────────────────────────────────────────
+  { kind: 'spectrum_on_submit', category: 'Spectre', title: '📍 Réponse soumise', defaults: { seat: 0 } },
+  { kind: 'spectrum_on_round_end', category: 'Spectre', title: '🔁 Fin de manche', defaults: { round: 1 } },
+  { kind: 'spectrum_on_game_over', category: 'Spectre', title: '🏆 Partie terminée', defaults: {} },
+  // ─── Blocs Color Speed ──────────────────────────────────────────────────────
+  { kind: 'cspeed_on_hit', category: 'Color Speed', title: '🎯 Dalle correcte', defaults: { tileIndex: 0 } },
+  { kind: 'cspeed_on_miss', category: 'Color Speed', title: '💥 Mauvaise dalle', defaults: {} },
+  { kind: 'cspeed_on_time_up', category: 'Color Speed', title: '⏱ Temps écoulé', defaults: {} },
+  // ─── Blocs Puissance 4 ──────────────────────────────────────────────────────
+  { kind: 'p4_on_win', category: 'Puissance 4', title: '🏆 Victoire', defaults: { player: 1 } },
+  { kind: 'p4_on_draw', category: 'Puissance 4', title: '🤝 Match nul', defaults: {} },
+  { kind: 'p4_set_color', category: 'Puissance 4', title: '🎨 Couleur joueur', defaults: { player: 1, color: '#f59e0b' } },
+  // ─── Blocs Chasseur Gamut ───────────────────────────────────────────────────
+  { kind: 'gamut_on_hit', category: 'Chasseur Gamut', title: '✅ Identifié', defaults: { round: 1 } },
+  { kind: 'gamut_on_miss', category: 'Chasseur Gamut', title: '❌ Manqué', defaults: {} },
+  { kind: 'gamut_on_complete', category: 'Chasseur Gamut', title: '🏆 Jeu terminé', defaults: {} },
   { kind: 'cs150_connect', category: 'Colorimètre', title: 'CS150 Connect', defaults: {} },
   { kind: 'cs150_measure', category: 'Colorimètre', title: 'CS150 Mesurer', defaults: {} },
   { kind: 'cs150_read_xyz', category: 'Colorimètre', title: 'CS150 Lire XYZ', defaults: {} },
