@@ -308,6 +308,13 @@ const NODE_CATEGORY_ICONS: Record<string, LucideIcon> = {
   'Couleur': Layers,
   'Animation': Film,
   'Variables': Hash,
+  'Tetris': Boxes,
+  'Simon': Zap,
+  'Mémoire': Brain,
+  'Spectre': Palette,
+  'Color Speed': Shuffle,
+  'Puissance 4': LayoutGrid,
+  'Chasseur Gamut': Film,
 };
 
 const NODE_CATEGORY_COLORS: Record<string, string> = {
@@ -326,6 +333,13 @@ const NODE_CATEGORY_COLORS: Record<string, string> = {
   'Couleur': '#e879f9',
   'Animation': '#fb923c',
   'Variables': '#818cf8',
+  'Tetris': '#6366f1',
+  'Simon': '#f43f5e',
+  'Mémoire': '#8b5cf6',
+  'Spectre': '#06b6d4',
+  'Color Speed': '#f97316',
+  'Puissance 4': '#eab308',
+  'Chasseur Gamut': '#10b981',
 };
 
 function clamp255(v: number): number {
