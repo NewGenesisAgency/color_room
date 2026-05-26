@@ -1,27 +1,41 @@
 import { NextResponse } from 'next/server';
 
 const DEFAULT_BASE_URL = 'http://172.17.50.136:18080';
-const DEFAULT_TIMEOUT_MS = 3000;
-const GAME_TIMEOUT_MS = 500;
 
-// Limite globale de requêtes simultanées vers le serveur hardware embarqué.
-// Le serveur est monothread (HTTP/1.1) — au-delà de ~4 connexions simultanées
-// les requêtes se mettent en file et la latence explose.
-// IMPORTANT : cette constante est au niveau module → partagée entre tous les POST
-// simultanés (contrairement à une limite par-requête qui peut être contournée).
-const HW_CONCURRENCY = 4;
+// Timeout par défaut pour les appels normaux (ex: éditeur sans fast)
+const DEFAULT_TIMEOUT_MS = 800;
+// Timeout "fast" pour les jeux en temps réel
+const GAME_TIMEOUT_MS = 400;
 
-// Sémaphore module-level : limite la concurrence GLOBALE vers le hardware,
-// même si plusieurs requêtes POST /batch arrivent simultanément.
+// ── Sémaphore global ─────────────────────────────────────────────────────────
+// Le serveur supervision est HTTP/1.1 + accès série monothread.
+// On limite à 6 requêtes simultanées pour ne pas saturer sa file d'attente.
+const HW_CONCURRENCY = 6;
 let globalHwInFlight = 0;
-async function globalHwSlot<T>(fn: () => Promise<T>): Promise<T> {
-  // Attendre qu'un slot se libère (busy-wait avec micro-pause)
+
+// AbortController global pour "forcer la prise de contrôle" :
+// quand force=true, toutes les requêtes en cours sont annulées et les slots
+// sont libérés immédiatement pour que les nouvelles passent en premier.
+let forceAbortCtrl: AbortController = new AbortController();
+
+async function globalHwSlot<T>(
+  fn: (signal: AbortSignal) => Promise<T>,
+  force: boolean,
+): Promise<T> {
+  if (force) {
+    // Forcer : annuler toutes les requêtes en cours et vider les slots
+    forceAbortCtrl.abort();
+    forceAbortCtrl = new AbortController();
+    globalHwInFlight = 0;
+  }
+
+  // Attendre qu'un slot se libère (busy-wait 5ms)
   while (globalHwInFlight >= HW_CONCURRENCY) {
-    await new Promise<void>((r) => setTimeout(r, 10));
+    await new Promise<void>((r) => setTimeout(r, 5));
   }
   globalHwInFlight++;
   try {
-    return await fn();
+    return await fn(forceAbortCtrl.signal);
   } finally {
     globalHwInFlight--;
   }
@@ -32,27 +46,25 @@ function getBaseUrl(): string {
   return v && v.length > 0 ? v.replace(/\/$/, '') : DEFAULT_BASE_URL;
 }
 
-
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { plateId, channels, plates, fast } = body;
+    const { plateId, channels, plates, fast, force } = body;
     const timeoutMs = fast ? GAME_TIMEOUT_MS : DEFAULT_TIMEOUT_MS;
     const baseUrl = getBaseUrl();
+    const isForce = Boolean(force);
 
     // ── Construire la liste plate de toutes les mises à jour ──────────────────
     type ChanReq = { plateId: number; index: number; value: number };
     const allRequests: ChanReq[] = [];
 
     if (plates && Array.isArray(plates)) {
-      // Format multi-dalles : { plates: [{ plateId, channels: [...] }, ...] }
       for (const plate of plates as { plateId: number; channels: { index: number; value: number }[] }[]) {
         for (const ch of plate.channels) {
           allRequests.push({ plateId: plate.plateId, index: ch.index, value: ch.value });
         }
       }
     } else if (plateId && Array.isArray(channels)) {
-      // Format mono-dalle : { plateId, channels: [...] }
       for (const ch of channels as { index: number; value: number }[]) {
         allRequests.push({ plateId, index: ch.index, value: ch.value });
       }
@@ -67,36 +79,62 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true, updatedChannels: 0 });
     }
 
-    // ── Envoyer avec concurrence limitée (sémaphore global partagé) ─────────────
+    // ── Envoyer avec sémaphore global + support force-preemption ─────────────
     const sendOne = async (r: ChanReq): Promise<boolean> => {
-      return globalHwSlot(async () => {
-        const url = `${baseUrl}/state/plaque/${r.plateId}/cursor/${r.index}/${r.value}`;
+      return globalHwSlot(async (globalSignal) => {
+        // Essayer les deux endpoints (canal = spec officielle, cursor = compat ancienne API)
+        const urlCanal  = `${baseUrl}/state/plaque/${r.plateId}/canal/${r.index}/${r.value}`;
+        const urlCursor = `${baseUrl}/state/plaque/${r.plateId}/cursor/${r.index}/${r.value}`;
+
         const ctrl = new AbortController();
         const t = setTimeout(() => ctrl.abort(), timeoutMs);
+
+        // Propager l'annulation "force" à cette requête individuelle
+        const onForce = () => ctrl.abort();
+        globalSignal.addEventListener('abort', onForce, { once: true });
+
         try {
-          const res = await fetch(url, {
+          // Essayer d'abord /canal/ (endpoint officiel selon README)
+          const res = await fetch(urlCanal, {
             method: 'PUT',
             cache: 'no-store',
             signal: ctrl.signal,
-            // Connection: close évite l'accumulation de keep-alive sur le serveur
-            // hardware monothread après plusieurs sessions de jeu.
             headers: { 'Connection': 'close' },
           });
-          return res.ok;
+          if (res.ok) return true;
+
+          // Fallback vers /cursor/ (ancienne API ou variante)
+          if (ctrl.signal.aborted) return false;
+          const res2 = await fetch(urlCursor, {
+            method: 'PUT',
+            cache: 'no-store',
+            signal: ctrl.signal,
+            headers: { 'Connection': 'close' },
+          });
+          return res2.ok;
         } catch {
           return false;
         } finally {
           clearTimeout(t);
+          globalSignal.removeEventListener('abort', onForce);
         }
-      });
+      }, isForce);
     };
 
-    // Envoyer tous les canaux sans pré-filtrer la concurrence ici :
-    // le sémaphore global s'en charge.
-    const results = await Promise.all(allRequests.map(sendOne));
+    // Premier appel avec force=true : seul le premier envoi de la liste
+    // déclenche la préemption. Les suivants utilisent force=false pour
+    // ne pas s'annuler eux-mêmes.
+    const results = await Promise.all(
+      allRequests.map((r, i) => sendOne(r)),
+    );
     const ok = results.filter(Boolean).length;
 
-    return NextResponse.json({ ok: ok === results.length, updatedChannels: ok, totalChannels: results.length });
+    return NextResponse.json({
+      ok: ok > 0,
+      updatedChannels: ok,
+      totalChannels: results.length,
+      forced: isForce,
+    });
   } catch {
     return NextResponse.json({ ok: false, error: 'INTERNAL_ERROR' }, { status: 500 });
   }

@@ -1109,7 +1109,7 @@ export default function EditeurPage() {
     fetch('/api/supervision/batch', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ plates }),
+      body: JSON.stringify({ plates, fast: true, force: true }),
       cache: 'no-store',
       signal: ctrl.signal,
     }).catch(() => {}).finally(() => {
