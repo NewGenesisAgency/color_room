@@ -76,6 +76,25 @@
   box-sizing: border-box;
 }
 
+/* Inputs / form elements — restore padding stripped by the universal reset */
+.editeur input:not([type='range']):not([type='color']):not([type='checkbox']):not([type='radio']),
+.editeur select,
+.editeur textarea {
+  padding: 0 12px;
+}
+.editeur .g-input,
+.editeur input.g-input,
+.editeur select.g-input,
+.editeur textarea.g-input {
+  padding: 0 14px;
+}
+.editeur input[type='range'],
+.editeur input[type='color'],
+.editeur input[type='checkbox'],
+.editeur input[type='radio'] {
+  padding: 0;
+}
+
 /* Réinitialiser le padding pour les SVG et icônes */
 .editeur svg,
 .editeur .btn svg,

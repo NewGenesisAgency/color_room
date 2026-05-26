@@ -853,7 +853,7 @@ export default function EditeurPage() {
   const [pendingAutoConnect, setPendingAutoConnect] = useState<{ fromNodeId: string } | null>(null);
 
   const [graphPan, setGraphPan] = useState<{ x: number; y: number }>({ x: 120, y: 80 });
-  const [graphZoom, setGraphZoom] = useState<number>(0.7);
+  const [graphZoom, setGraphZoom] = useState<number>(0.5);
   const bpContentRef = useRef<HTMLDivElement | null>(null);
   const [pinPositions, setPinPositions] = useState<
     Record<string, { in?: { x: number; y: number }; out?: { x: number; y: number } }>
@@ -2397,82 +2397,73 @@ export default function EditeurPage() {
   return (
     <main className="editeur stage">
       <div className="ue">
-        <aside className="ue__left" style={{ borderRadius: 16, overflow: 'hidden', background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(20px)', border: '1px solid rgba(0,0,0,0.06)' }}>
-            <div className="panelhead" style={{ background: '#fff', borderBottom: '1px solid rgba(0,0,0,0.06)', padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'center' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <Gamepad2 size={16} color="#1a1a1a" />
-                <strong style={{ fontSize: 14, fontWeight: 800, letterSpacing: '-0.02em', color: '#1a1a1a' }}>Explorateur</strong>
+        <aside className="ue__left" style={{ borderRadius: 16, overflow: 'hidden', background: '#fff', border: '1px solid rgba(0,0,0,0.07)', display: 'flex', flexDirection: 'column' }}>
+            <div className="panelhead" style={{ background: '#fff', borderBottom: '1px solid rgba(0,0,0,0.07)', padding: '10px 14px', flexShrink: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Gamepad2 size={14} color="#4361ee" />
+                <strong style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'rgba(10,12,18,0.55)' }}>Explorateur</strong>
               </div>
-              <Lightbulb size={14} style={{ color: '#4361ee' }} />
-              <span style={{ fontSize: 12, fontWeight: 600, color: '#666' }}>Jeux</span>
             </div>
 
-            <div className="panelbody">
-              <div className="panelsection">
-                <div className="panelsection__head">
-                  <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                    <button 
-                      className="g-btn g-btn--sm" 
-                      disabled={!activeGame || dbLoading} 
-                      onClick={() => void saveActiveGame()}
-                      title="Sauvegarder"
-                    >
-                      <Save size={14} />
-                      <span>{dirty ? <X size={10} /> : <Check size={10} />}</span>
-                    </button>
-                    <button 
-                      className="g-btn g-btn--sm g-btn--danger" 
-                      disabled={!activeGame || dbLoading} 
-                      onClick={() => activeGame && setModal({ type: 'confirm-delete', gameId: activeGame.id, gameName: activeGame.name })}
-                      title="Supprimer"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                    <button
-                      className="g-btn g-btn--sm g-btn--accent"
-                      disabled={dbLoading}
-                      onClick={() => setModal({ type: 'create-project' })}
-                    >
-                      <FolderPlus size={14} />
-                      <span>{dbLoading ? '...' : 'Nouveau'}</span>
-                    </button>
-                    <button
-                      className="g-btn g-btn--sm g-btn--danger"
-                      disabled={dbLoading || games.length === 0}
-                      title="Vider la bibliothèque (supprime tous les jeux)"
-                      onClick={async () => {
-                        if (!confirm('Supprimer TOUS les jeux de la bibliothèque ?')) return;
-                        await fetch('/api/games', { method: 'DELETE' });
-                        setEditor({ games: [], activeGameId: null, selectedNodeId: null });
-                        editorRef.current = { games: [], activeGameId: null, selectedNodeId: null };
-                        setStatus('Bibliothèque vidée');
-                      }}
-                    >
-                      <Trash2 size={14} />
-                      <span>Vider</span>
-                    </button>
-                  </div>
-                </div>
+            {/* Actions toolbar */}
+            <div style={{ padding: '8px 10px', borderBottom: '1px solid rgba(0,0,0,0.06)', display: 'flex', gap: 4, flexWrap: 'wrap', flexShrink: 0 }}>
+              <button
+                className="g-btn g-btn--sm g-btn--accent"
+                disabled={dbLoading}
+                onClick={() => setModal({ type: 'create-project' })}
+                style={{ flex: 1 }}
+              >
+                <FolderPlus size={13} />
+                <span>{dbLoading ? '…' : 'Nouveau jeu'}</span>
+              </button>
+              <button
+                className="g-btn g-btn--sm"
+                disabled={!activeGame || dbLoading}
+                onClick={() => void saveActiveGame()}
+                title="Sauvegarder le jeu actif"
+                style={{ width: 32, padding: 0 }}
+              >
+                {dirty ? <Save size={13} color="#f97316" /> : <Check size={13} color="#059669" />}
+              </button>
+              <button
+                className="g-btn g-btn--sm g-btn--danger"
+                disabled={!activeGame || dbLoading}
+                onClick={() => activeGame && setModal({ type: 'confirm-delete', gameId: activeGame.id, gameName: activeGame.name })}
+                title="Supprimer le jeu actif"
+                style={{ width: 32, padding: 0 }}
+              >
+                <Trash2 size={13} />
+              </button>
+            </div>
 
-                <div className="list panelsection__list">
-                  {games.map((g) => {
-                    const GIcon = GAME_ICON_MAP[g.icon ?? 'Lightbulb'] ?? Lightbulb;
-                    return (
-                      <button
-                        key={g.id}
-                        className={g.id === activeGameId ? 'list__item list__item--active' : 'list__item'}
-                        onClick={() => {
-                          commit((cur) => ({ ...cur, activeGameId: g.id, selectedNodeId: g.nodes[0]?.id ?? null }));
-                          setStatus('Jeu sélectionné');
-                        }}
-                        style={{ display: 'flex', alignItems: 'center', gap: 8 }}
-                      >
+            {/* Liste des jeux — scrollable */}
+            <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: '6px 8px' }}>
+              <div style={{ display: 'grid', gap: 4 }}>
+                {games.length === 0 && (
+                  <div style={{ padding: '24px 12px', textAlign: 'center', color: '#bbb', fontSize: 12 }}>
+                    <Gamepad2 size={24} style={{ opacity: 0.2, margin: '0 auto 8px' }} />
+                    <div>Aucun jeu</div>
+                    <div style={{ fontSize: 10, marginTop: 4 }}>Créez votre premier projet</div>
+                  </div>
+                )}
+                {games.map((g) => {
+                  const GIcon = GAME_ICON_MAP[g.icon ?? 'Lightbulb'] ?? Lightbulb;
+                  return (
+                    <button
+                      key={g.id}
+                      className={g.id === activeGameId ? 'list__item list__item--active' : 'list__item'}
+                      onClick={() => {
+                        commit((cur) => ({ ...cur, activeGameId: g.id, selectedNodeId: g.nodes[0]?.id ?? null }));
+                        setStatus('Jeu sélectionné');
+                      }}
+                      style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 10 }}
+                    >
                         <GIcon size={14} style={{ opacity: 0.6, flexShrink: 0 }} />
                         <span className="list__title" style={{ flex: 1 }}>{g.name}</span>
-                        <span className="list__meta">{g.nodes.length} noeuds · {g.tileCount ?? 42}d</span>
-                      </button>
-                    );
-                  })}
+                        <span className="list__meta" style={{ fontSize: 10 }}>{g.nodes.length}n · {g.tileCount ?? 42}d</span>
+                    </button>
+                  );
+                })}
                 </div>
 
                 {activeGame ? (
@@ -2716,7 +2707,6 @@ export default function EditeurPage() {
                   )}
                 </div>
               </div>
-            </div>
 
             <div className="divider" />
           </aside>
