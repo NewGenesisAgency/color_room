@@ -4437,6 +4437,350 @@ export default function EditeurPage() {
                         Utilisez le panneau CS150 dans la barre latérale pour le contrôle direct.
                       </p>
                     </>
+                  ) : selectedNode.kind === 'game_simon' ? (
+                    <div style={{ display: 'grid', gap: 14 }}>
+                      <div style={{ padding: 16, borderRadius: 12, background: '#fff', border: '1px solid rgba(0,0,0,0.06)', display: 'grid', gap: 14 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+                          <div style={{ width: 36, height: 36, borderRadius: 10, background: 'linear-gradient(135deg,#ef476f,#f72585)', display: 'grid', placeItems: 'center' }}><Brain size={18} color="#fff" /></div>
+                          <div><div style={{ fontWeight: 700, fontSize: 14 }}>Simon</div><div style={{ fontSize: 12, opacity: 0.6 }}>Jeu de mémoire visuel</div></div>
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 60px', gap: 10, alignItems: 'center' }}>
+                          <div><span className="g-label" style={{ marginBottom: 6, display: 'block' }}>Vitesse (ms)</span>
+                            <input type="range" className="g-slider g-slider--accent" min={200} max={2000} step={50}
+                              value={getNum(selectedNode.params, 'speed', 800)}
+                              onChange={(e) => updateSelectedParams({ speed: Number(e.target.value) })}
+                              style={{ ['--pct' as any]: `${((getNum(selectedNode.params, 'speed', 800) - 200) / 1800) * 100}%` }} />
+                          </div>
+                          <span style={{ fontSize: 13, fontWeight: 700, color: '#1a1a1a', textAlign: 'right' }}>{getNum(selectedNode.params, 'speed', 800)}ms</span>
+                        </div>
+                        <label style={{ display: 'grid', gap: 4 }}>
+                          <span className="g-label">Nombre de couleurs (2–4)</span>
+                          <select className="g-select" style={{ height: 36, fontSize: 13 }}
+                            value={String(getNum(selectedNode.params, 'colors', 4))}
+                            onChange={(e) => updateSelectedParams({ colors: Number(e.target.value) })}>
+                            <option value="2">2 couleurs (facile)</option>
+                            <option value="3">3 couleurs (normal)</option>
+                            <option value="4">4 couleurs (difficile)</option>
+                          </select>
+                        </label>
+                        <label style={{ display: 'grid', gap: 4 }}>
+                          <span className="g-label">Longueur max séquence</span>
+                          <input className="g-input" type="number" min={3} max={30} style={{ height: 36, fontSize: 13 }}
+                            value={getNum(selectedNode.params, 'maxLength', 10)}
+                            onChange={(e) => updateSelectedParams({ maxLength: Number(e.target.value) })} />
+                        </label>
+                      </div>
+                      <p style={{ fontSize: 11, opacity: 0.5, lineHeight: 1.4 }}>Reproduis la séquence de couleurs sur les dalles. Chaque erreur réinitialise.</p>
+                    </div>
+                  ) : selectedNode.kind === 'game_memory' ? (
+                    <div style={{ display: 'grid', gap: 14 }}>
+                      <div style={{ padding: 16, borderRadius: 12, background: '#fff', border: '1px solid rgba(0,0,0,0.06)', display: 'grid', gap: 14 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+                          <div style={{ width: 36, height: 36, borderRadius: 10, background: 'linear-gradient(135deg,#06d6a0,#0099cc)', display: 'grid', placeItems: 'center' }}><Puzzle size={18} color="#fff" /></div>
+                          <div><div style={{ fontWeight: 700, fontSize: 14 }}>Mémoire</div><div style={{ fontSize: 12, opacity: 0.6 }}>Memory de couleurs</div></div>
+                        </div>
+                        <label style={{ display: 'grid', gap: 4 }}>
+                          <span className="g-label">Nombre de paires (2–21)</span>
+                          <input className="g-input" type="number" min={2} max={21} style={{ height: 36, fontSize: 13 }}
+                            value={getNum(selectedNode.params, 'pairs', 8)}
+                            onChange={(e) => updateSelectedParams({ pairs: Math.max(2, Math.min(21, Number(e.target.value))) })} />
+                        </label>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 60px', gap: 10, alignItems: 'center' }}>
+                          <div><span className="g-label" style={{ marginBottom: 6, display: 'block' }}>Temps révélation (ms)</span>
+                            <input type="range" className="g-slider g-slider--accent" min={500} max={5000} step={100}
+                              value={getNum(selectedNode.params, 'revealMs', 1500)}
+                              onChange={(e) => updateSelectedParams({ revealMs: Number(e.target.value) })}
+                              style={{ ['--pct' as any]: `${((getNum(selectedNode.params, 'revealMs', 1500) - 500) / 4500) * 100}%` }} />
+                          </div>
+                          <span style={{ fontSize: 13, fontWeight: 700, color: '#1a1a1a', textAlign: 'right' }}>{getNum(selectedNode.params, 'revealMs', 1500)}ms</span>
+                        </div>
+                      </div>
+                      <p style={{ fontSize: 11, opacity: 0.5, lineHeight: 1.4 }}>Retrouve les paires de dalles de même couleur. Les dalles se retournent après révélation.</p>
+                    </div>
+                  ) : selectedNode.kind === 'game_spectrum' ? (
+                    <div style={{ display: 'grid', gap: 14 }}>
+                      <div style={{ padding: 16, borderRadius: 12, background: '#fff', border: '1px solid rgba(0,0,0,0.06)', display: 'grid', gap: 14 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+                          <div style={{ width: 36, height: 36, borderRadius: 10, background: 'linear-gradient(135deg,#a855f7,#6366f1)', display: 'grid', placeItems: 'center' }}><Sparkles size={18} color="#fff" /></div>
+                          <div><div style={{ fontWeight: 700, fontSize: 14 }}>Spectre Chromatique</div><div style={{ fontSize: 12, opacity: 0.6 }}>CIE 1931 multijoueur</div></div>
+                        </div>
+                        <label style={{ display: 'grid', gap: 4 }}>
+                          <span className="g-label">Nombre de manches</span>
+                          <input className="g-input" type="number" min={1} max={20} style={{ height: 36, fontSize: 13 }}
+                            value={getNum(selectedNode.params, 'maxRounds', 5)}
+                            onChange={(e) => updateSelectedParams({ maxRounds: Number(e.target.value) })} />
+                        </label>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 60px', gap: 10, alignItems: 'center' }}>
+                          <div><span className="g-label" style={{ marginBottom: 6, display: 'block' }}>Révélation (ms)</span>
+                            <input type="range" className="g-slider g-slider--accent" min={1000} max={15000} step={500}
+                              value={getNum(selectedNode.params, 'revealMs', 5000)}
+                              onChange={(e) => updateSelectedParams({ revealMs: Number(e.target.value) })}
+                              style={{ ['--pct' as any]: `${((getNum(selectedNode.params, 'revealMs', 5000) - 1000) / 14000) * 100}%` }} />
+                          </div>
+                          <span style={{ fontSize: 12, fontWeight: 700, color: '#1a1a1a', textAlign: 'right' }}>{(getNum(selectedNode.params, 'revealMs', 5000) / 1000).toFixed(0)}s</span>
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 60px', gap: 10, alignItems: 'center' }}>
+                          <div><span className="g-label" style={{ marginBottom: 6, display: 'block' }}>Temps réponse (ms)</span>
+                            <input type="range" className="g-slider g-slider--accent" min={5000} max={120000} step={1000}
+                              value={getNum(selectedNode.params, 'guessMs', 30000)}
+                              onChange={(e) => updateSelectedParams({ guessMs: Number(e.target.value) })}
+                              style={{ ['--pct' as any]: `${((getNum(selectedNode.params, 'guessMs', 30000) - 5000) / 115000) * 100}%` }} />
+                          </div>
+                          <span style={{ fontSize: 12, fontWeight: 700, color: '#1a1a1a', textAlign: 'right' }}>{(getNum(selectedNode.params, 'guessMs', 30000) / 1000).toFixed(0)}s</span>
+                        </div>
+                      </div>
+                      <p style={{ fontSize: 11, opacity: 0.5, lineHeight: 1.4 }}>Reproduis la couleur cible sur le diagramme CIE 1931. Score selon la précision chromatique.</p>
+                    </div>
+                  ) : selectedNode.kind === 'game_color_speed' ? (
+                    <div style={{ display: 'grid', gap: 14 }}>
+                      <div style={{ padding: 16, borderRadius: 12, background: '#fff', border: '1px solid rgba(0,0,0,0.06)', display: 'grid', gap: 14 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+                          <div style={{ width: 36, height: 36, borderRadius: 10, background: 'linear-gradient(135deg,#f59e0b,#ef4444)', display: 'grid', placeItems: 'center' }}><Zap size={18} color="#fff" /></div>
+                          <div><div style={{ fontWeight: 700, fontSize: 14 }}>Color Speed</div><div style={{ fontSize: 12, opacity: 0.6 }}>Réaction aux couleurs</div></div>
+                        </div>
+                        <label style={{ display: 'grid', gap: 4 }}>
+                          <span className="g-label">Dalles actives</span>
+                          <input className="g-input" type="number" min={1} max={42} style={{ height: 36, fontSize: 13 }}
+                            value={getNum(selectedNode.params, 'tileCount', 42)}
+                            onChange={(e) => updateSelectedParams({ tileCount: Math.max(1, Math.min(42, Number(e.target.value))) })} />
+                        </label>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 60px', gap: 10, alignItems: 'center' }}>
+                          <div><span className="g-label" style={{ marginBottom: 6, display: 'block' }}>Durée partie (s)</span>
+                            <input type="range" className="g-slider g-slider--accent" min={10} max={300} step={5}
+                              value={getNum(selectedNode.params, 'gameDuration', 60)}
+                              onChange={(e) => updateSelectedParams({ gameDuration: Number(e.target.value) })}
+                              style={{ ['--pct' as any]: `${((getNum(selectedNode.params, 'gameDuration', 60) - 10) / 290) * 100}%` }} />
+                          </div>
+                          <span style={{ fontSize: 13, fontWeight: 700, color: '#1a1a1a', textAlign: 'right' }}>{getNum(selectedNode.params, 'gameDuration', 60)}s</span>
+                        </div>
+                      </div>
+                      <p style={{ fontSize: 11, opacity: 0.5, lineHeight: 1.4 }}>Appuie sur les dalles de la bonne couleur le plus vite possible.</p>
+                    </div>
+                  ) : selectedNode.kind === 'game_maitre_blanc' ? (
+                    <div style={{ display: 'grid', gap: 14 }}>
+                      <div style={{ padding: 16, borderRadius: 12, background: '#fff', border: '1px solid rgba(0,0,0,0.06)', display: 'grid', gap: 14 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+                          <div style={{ width: 36, height: 36, borderRadius: 10, background: 'linear-gradient(135deg,#e2e8f0,#94a3b8)', display: 'grid', placeItems: 'center' }}><Sun size={18} color="#1a1a1a" /></div>
+                          <div><div style={{ fontWeight: 700, fontSize: 14 }}>Maître du Blanc</div><div style={{ fontSize: 12, opacity: 0.6 }}>Perception du blanc pur</div></div>
+                        </div>
+                        <label style={{ display: 'grid', gap: 4 }}>
+                          <span className="g-label">Nombre de manches</span>
+                          <input className="g-input" type="number" min={1} max={30} style={{ height: 36, fontSize: 13 }}
+                            value={getNum(selectedNode.params, 'rounds', 10)}
+                            onChange={(e) => updateSelectedParams({ rounds: Number(e.target.value) })} />
+                        </label>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 60px', gap: 10, alignItems: 'center' }}>
+                          <div><span className="g-label" style={{ marginBottom: 6, display: 'block' }}>Seuil tolérance ΔE</span>
+                            <input type="range" className="g-slider g-slider--accent" min={0.005} max={0.1} step={0.005}
+                              value={getNum(selectedNode.params, 'threshold', 0.025)}
+                              onChange={(e) => updateSelectedParams({ threshold: Number(e.target.value) })}
+                              style={{ ['--pct' as any]: `${((getNum(selectedNode.params, 'threshold', 0.025) - 0.005) / 0.095) * 100}%` }} />
+                          </div>
+                          <span style={{ fontSize: 11, fontWeight: 700, color: '#1a1a1a', textAlign: 'right' }}>±{getNum(selectedNode.params, 'threshold', 0.025).toFixed(3)}</span>
+                        </div>
+                      </div>
+                      <p style={{ fontSize: 11, opacity: 0.5, lineHeight: 1.4 }}>Trouve la combinaison RGB qui donne le blanc le plus pur. Mesuré par colorimètre CS150.</p>
+                    </div>
+                  ) : selectedNode.kind === 'game_puissance4' ? (
+                    <div style={{ display: 'grid', gap: 14 }}>
+                      <div style={{ padding: 16, borderRadius: 12, background: '#fff', border: '1px solid rgba(0,0,0,0.06)', display: 'grid', gap: 14 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+                          <div style={{ width: 36, height: 36, borderRadius: 10, background: 'linear-gradient(135deg,#fbbf24,#f59e0b)', display: 'grid', placeItems: 'center' }}><Layers size={18} color="#fff" /></div>
+                          <div><div style={{ fontWeight: 700, fontSize: 14 }}>Puissance 4 Chromatique</div><div style={{ fontSize: 12, opacity: 0.6 }}>4 en ligne avec teintes LED</div></div>
+                        </div>
+                        <label style={{ display: 'grid', gap: 4 }}>
+                          <span className="g-label">Mode de jeu</span>
+                          <select className="g-select" style={{ height: 36, fontSize: 13 }}
+                            value={String(selectedNode.params.mode ?? 'pvp')}
+                            onChange={(e) => updateSelectedParams({ mode: e.target.value })}>
+                            <option value="pvp">Joueur vs Joueur</option>
+                            <option value="pvc">Joueur vs IA</option>
+                            <option value="coop">Coopératif (même poste)</option>
+                          </select>
+                        </label>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                          <label style={{ display: 'grid', gap: 4 }}>
+                            <span className="g-label">Couleur J1</span>
+                            <input type="color" value={getColor(selectedNode.params, 'colorP1', '#f59e0b')}
+                              onChange={(e) => updateSelectedParams({ colorP1: e.target.value })}
+                              style={{ width: '100%', height: 36, borderRadius: 8, border: '1px solid rgba(0,0,0,0.1)', cursor: 'pointer', padding: 0 }} />
+                          </label>
+                          <label style={{ display: 'grid', gap: 4 }}>
+                            <span className="g-label">Couleur J2</span>
+                            <input type="color" value={getColor(selectedNode.params, 'colorP2', '#ef4444')}
+                              onChange={(e) => updateSelectedParams({ colorP2: e.target.value })}
+                              style={{ width: '100%', height: 36, borderRadius: 8, border: '1px solid rgba(0,0,0,0.1)', cursor: 'pointer', padding: 0 }} />
+                          </label>
+                        </div>
+                      </div>
+                      <p style={{ fontSize: 11, opacity: 0.5, lineHeight: 1.4 }}>Aligne 4 jetons de ta couleur en ligne, colonne ou diagonale sur les dalles LED.</p>
+                    </div>
+                  ) : selectedNode.kind === 'game_chasseur_gamut' ? (
+                    <div style={{ display: 'grid', gap: 14 }}>
+                      <div style={{ padding: 16, borderRadius: 12, background: '#fff', border: '1px solid rgba(0,0,0,0.06)', display: 'grid', gap: 14 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+                          <div style={{ width: 36, height: 36, borderRadius: 10, background: 'linear-gradient(135deg,#4ade80,#06d6a0)', display: 'grid', placeItems: 'center' }}><Target size={18} color="#fff" /></div>
+                          <div><div style={{ fontWeight: 700, fontSize: 14 }}>Chasseur de Gamut</div><div style={{ fontSize: 12, opacity: 0.6 }}>Couleurs hors-gamut sRGB</div></div>
+                        </div>
+                        <label style={{ display: 'grid', gap: 4 }}>
+                          <span className="g-label">Nombre de manches</span>
+                          <input className="g-input" type="number" min={1} max={20} style={{ height: 36, fontSize: 13 }}
+                            value={getNum(selectedNode.params, 'rounds', 8)}
+                            onChange={(e) => updateSelectedParams({ rounds: Number(e.target.value) })} />
+                        </label>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 60px', gap: 10, alignItems: 'center' }}>
+                          <div><span className="g-label" style={{ marginBottom: 6, display: 'block' }}>Temps par manche (s)</span>
+                            <input type="range" className="g-slider g-slider--accent" min={5} max={60} step={1}
+                              value={getNum(selectedNode.params, 'roundTimeS', 20)}
+                              onChange={(e) => updateSelectedParams({ roundTimeS: Number(e.target.value) })}
+                              style={{ ['--pct' as any]: `${((getNum(selectedNode.params, 'roundTimeS', 20) - 5) / 55) * 100}%` }} />
+                          </div>
+                          <span style={{ fontSize: 13, fontWeight: 700, color: '#1a1a1a', textAlign: 'right' }}>{getNum(selectedNode.params, 'roundTimeS', 20)}s</span>
+                        </div>
+                        <label style={{ display: 'grid', gap: 4 }}>
+                          <span className="g-label">Difficulté</span>
+                          <select className="g-select" style={{ height: 36, fontSize: 13 }}
+                            value={String(selectedNode.params.difficulty ?? 'normal')}
+                            onChange={(e) => updateSelectedParams({ difficulty: e.target.value })}>
+                            <option value="easy">Facile</option>
+                            <option value="normal">Normal</option>
+                            <option value="hard">Difficile</option>
+                          </select>
+                        </label>
+                      </div>
+                      <p style={{ fontSize: 11, opacity: 0.5, lineHeight: 1.4 }}>Identifie les couleurs hors-gamut sRGB. Entraîne la perception colorimétrique.</p>
+                    </div>
+                  ) : selectedNode.kind === 'event_begin' ? (
+                    <div style={{ padding: 16, borderRadius: 12, background: '#fffbeb', border: '1px solid rgba(245,158,11,0.2)', display: 'grid', gap: 12 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <Zap size={18} color="#f59e0b" />
+                        <div style={{ fontWeight: 700, fontSize: 14 }}>Point d&apos;entrée</div>
+                      </div>
+                      <p style={{ fontSize: 12, opacity: 0.7, lineHeight: 1.5 }}>Démarre la séquence quand le jeu est lancé. Un seul nœud &ldquo;Évènement&rdquo; par jeu.</p>
+                      <label style={{ display: 'grid', gap: 4 }}>
+                        <span className="g-label">Label (optionnel)</span>
+                        <input className="g-input" style={{ height: 36, fontSize: 13 }}
+                          value={String(selectedNode.params.label ?? '')}
+                          placeholder="ex: Début du jeu"
+                          onChange={(e) => updateSelectedParams({ label: e.target.value })} />
+                      </label>
+                    </div>
+                  ) : selectedNode.kind === 'sequence' ? (
+                    <div style={{ padding: 16, borderRadius: 12, background: '#fff7ed', border: '1px solid rgba(249,115,22,0.2)', display: 'grid', gap: 12 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <GitBranch size={18} color="#f97316" />
+                        <div style={{ fontWeight: 700, fontSize: 14 }}>Séquence</div>
+                      </div>
+                      <p style={{ fontSize: 12, opacity: 0.7, lineHeight: 1.5 }}>Exécute les nœuds connectés en série, l&apos;un après l&apos;autre.</p>
+                    </div>
+                  ) : selectedNode.kind === 'loop_count' ? (
+                    <div style={{ display: 'grid', gap: 12 }}>
+                      <label style={{ display: 'grid', gap: 4 }}>
+                        <span className="g-label">Nombre de répétitions</span>
+                        <input className="g-input" type="number" min={1} max={1000} style={{ height: 36, fontSize: 13 }}
+                          value={getNum(selectedNode.params, 'count', 3)}
+                          onChange={(e) => updateSelectedParams({ count: Number(e.target.value) })} />
+                      </label>
+                      <p style={{ fontSize: 11, opacity: 0.5, lineHeight: 1.4 }}>Répète le corps de la boucle N fois avant de passer à la suite.</p>
+                    </div>
+                  ) : selectedNode.kind === 'const_number' ? (
+                    <label style={{ display: 'grid', gap: 4 }}>
+                      <span className="g-label">Valeur numérique</span>
+                      <input className="g-input" type="number" style={{ height: 36, fontSize: 13 }}
+                        value={getNum(selectedNode.params, 'value', 0)}
+                        onChange={(e) => updateSelectedParams({ value: Number(e.target.value) })} />
+                    </label>
+                  ) : selectedNode.kind === 'const_bool' ? (
+                    <label style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                      <input type="checkbox" className="g-check"
+                        checked={Boolean(selectedNode.params.value ?? false)}
+                        onChange={(e) => updateSelectedParams({ value: e.target.checked })} />
+                      <span className="g-label" style={{ margin: 0 }}>Valeur booléenne</span>
+                    </label>
+                  ) : selectedNode.kind === 'const_color' ? (
+                    <div style={{ display: 'grid', gap: 8 }}>
+                      <span className="g-label">Couleur</span>
+                      <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                        <div style={{ width: 36, height: 36, borderRadius: 10, background: getColor(selectedNode.params, 'value', '#ffffff'), border: '1px solid rgba(0,0,0,0.1)', flexShrink: 0 }} />
+                        <input type="color" value={getColor(selectedNode.params, 'value', '#ffffff')}
+                          onChange={(e) => updateSelectedParams({ value: e.target.value })}
+                          style={{ flex: 1, height: 36, borderRadius: 8, border: '1px solid rgba(0,0,0,0.1)', cursor: 'pointer', padding: 0 }} />
+                      </div>
+                    </div>
+                  ) : selectedNode.kind === 'random_int' ? (
+                    <div style={{ display: 'grid', gap: 12 }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                        <label style={{ display: 'grid', gap: 4 }}>
+                          <span className="g-label">Min</span>
+                          <input className="g-input" type="number" style={{ height: 36, fontSize: 13 }}
+                            value={getNum(selectedNode.params, 'min', 0)}
+                            onChange={(e) => updateSelectedParams({ min: Number(e.target.value) })} />
+                        </label>
+                        <label style={{ display: 'grid', gap: 4 }}>
+                          <span className="g-label">Max</span>
+                          <input className="g-input" type="number" style={{ height: 36, fontSize: 13 }}
+                            value={getNum(selectedNode.params, 'max', 41)}
+                            onChange={(e) => updateSelectedParams({ max: Number(e.target.value) })} />
+                        </label>
+                      </div>
+                      <label style={{ display: 'grid', gap: 4 }}>
+                        <span className="g-label">Variable résultat</span>
+                        <input className="g-input" style={{ height: 36, fontSize: 13 }}
+                          value={String(selectedNode.params.varName ?? 'rand')}
+                          onChange={(e) => updateSelectedParams({ varName: e.target.value })} />
+                      </label>
+                    </div>
+                  ) : selectedNode.kind === 'variable_set' ? (
+                    <div style={{ display: 'grid', gap: 12 }}>
+                      <label style={{ display: 'grid', gap: 4 }}>
+                        <span className="g-label">Nom de variable</span>
+                        <input className="g-input" style={{ height: 36, fontSize: 13 }}
+                          value={String(selectedNode.params.name ?? 'x')}
+                          onChange={(e) => updateSelectedParams({ name: e.target.value })} />
+                      </label>
+                      <label style={{ display: 'grid', gap: 4 }}>
+                        <span className="g-label">Valeur</span>
+                        <input className="g-input" type="number" style={{ height: 36, fontSize: 13 }}
+                          value={getNum(selectedNode.params, 'value', 0)}
+                          onChange={(e) => updateSelectedParams({ value: Number(e.target.value) })} />
+                      </label>
+                      <label style={{ display: 'grid', gap: 4 }}>
+                        <span className="g-label">Opération</span>
+                        <select className="g-select" style={{ height: 36, fontSize: 13 }}
+                          value={String(selectedNode.params.op ?? 'set')}
+                          onChange={(e) => updateSelectedParams({ op: e.target.value })}>
+                          <option value="set">= Assigner</option>
+                          <option value="add">+= Ajouter</option>
+                          <option value="sub">-= Soustraire</option>
+                          <option value="mul">*= Multiplier</option>
+                        </select>
+                      </label>
+                    </div>
+                  ) : selectedNode.kind === 'variable_get' ? (
+                    <label style={{ display: 'grid', gap: 4 }}>
+                      <span className="g-label">Nom de variable</span>
+                      <input className="g-input" style={{ height: 36, fontSize: 13 }}
+                        value={String(selectedNode.params.name ?? 'x')}
+                        onChange={(e) => updateSelectedParams({ name: e.target.value })} />
+                    </label>
+                  ) : selectedNode.kind === 'add_score' ? (
+                    <label style={{ display: 'grid', gap: 4 }}>
+                      <span className="g-label">Points à ajouter</span>
+                      <input className="g-input" type="number" style={{ height: 36, fontSize: 13 }}
+                        value={getNum(selectedNode.params, 'amount', 1)}
+                        onChange={(e) => updateSelectedParams({ amount: Number(e.target.value) })} />
+                    </label>
+                  ) : ['math_add','math_sub','math_mul','math_div','math_clamp01','math_lerp','compare_eq','compare_gt','compare_lt','logic_and','logic_or','logic_not','time_seconds','random_01','get_score'].includes(selectedNode.kind) ? (
+                    <div style={{ padding: 16, borderRadius: 12, background: '#f8f9ff', border: '1px solid rgba(99,102,241,0.15)' }}>
+                      <p style={{ fontSize: 12, opacity: 0.7, lineHeight: 1.5 }}>
+                        {selectedNode.kind === 'math_lerp' ? 'Interpolation linéaire A→B selon t (0..1).' :
+                         selectedNode.kind === 'math_clamp01' ? 'Borne la valeur entre 0 et 1.' :
+                         selectedNode.kind === 'time_seconds' ? 'Retourne le temps écoulé en secondes.' :
+                         selectedNode.kind === 'random_01' ? 'Génère un nombre aléatoire entre 0 et 1.' :
+                         selectedNode.kind === 'get_score' ? 'Retourne le score actuel du joueur.' :
+                         'Nœud de calcul. Connectez les entrées A et B.'}
+                      </p>
+                    </div>
                   ) : (
                     <>
                       <label style={{ display: 'grid', gap: 4 }}>
@@ -4444,7 +4788,7 @@ export default function EditeurPage() {
                         <select
                           className="g-select"
                           style={{ height: 36, fontSize: 13 }}
-                          value={String(Math.max(0, Math.min(tileCount - 1, Math.round(getNum(selectedNode.params, 'tileIndex', 0))))) }
+                          value={String(Math.max(0, Math.min(tileCount - 1, Math.round(getNum(selectedNode.params, 'tileIndex', 0)))))}
                           onChange={(e) => {
                             const idx = Math.max(0, Math.min(tileCount - 1, Number(e.target.value)));
                             setSelectedTileIndex(idx);
