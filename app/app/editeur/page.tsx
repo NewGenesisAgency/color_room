@@ -4844,6 +4844,195 @@ export default function EditeurPage() {
                         value={getNum(selectedNode.params, 'amount', 1)}
                         onChange={(e) => updateSelectedParams({ amount: Number(e.target.value) })} />
                     </label>
+                  ) : selectedNode.kind === 'tetris_on_line_clear' ? (
+                    <div style={{ display: 'grid', gap: 12 }}>
+                      <div style={{ padding: 12, borderRadius: 10, background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.18)' }}>
+                        <p style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.5 }}>🎯 Déclenché quand le joueur efface une ou plusieurs lignes.</p>
+                      </div>
+                      <label style={{ display: 'grid', gap: 4 }}>
+                        <span className="g-label">Lignes minimum</span>
+                        <input className="g-input" type="number" min={1} max={4} style={{ height: 36, fontSize: 13 }}
+                          value={getNum(selectedNode.params, 'lines', 1)}
+                          onChange={(e) => updateSelectedParams({ lines: Number(e.target.value) })} />
+                      </label>
+                    </div>
+                  ) : selectedNode.kind === 'tetris_on_level_up' ? (
+                    <div style={{ display: 'grid', gap: 12 }}>
+                      <div style={{ padding: 12, borderRadius: 10, background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.18)' }}>
+                        <p style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.5 }}>⬆ Déclenché quand le joueur atteint un nouveau niveau.</p>
+                      </div>
+                      <label style={{ display: 'grid', gap: 4 }}>
+                        <span className="g-label">Niveau déclencheur</span>
+                        <input className="g-input" type="number" min={1} max={99} style={{ height: 36, fontSize: 13 }}
+                          value={getNum(selectedNode.params, 'level', 2)}
+                          onChange={(e) => updateSelectedParams({ level: Number(e.target.value) })} />
+                      </label>
+                    </div>
+                  ) : selectedNode.kind === 'tetris_on_game_over' ? (
+                    <div style={{ padding: 12, borderRadius: 10, background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.18)' }}>
+                      <p style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.5 }}>💀 Déclenché quand le joueur perd (plateau plein). Pas de paramètre.</p>
+                    </div>
+                  ) : selectedNode.kind === 'tetris_set_speed' ? (
+                    <div style={{ display: 'grid', gap: 12 }}>
+                      <label style={{ display: 'grid', gap: 4 }}>
+                        <span className="g-label">Vitesse de chute (ms)</span>
+                        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                          <input type="range" min={100} max={1500} step={50} style={{ flex: 1 }}
+                            value={getNum(selectedNode.params, 'speedMs', 500)}
+                            onChange={(e) => updateSelectedParams({ speedMs: Number(e.target.value) })} />
+                          <span style={{ fontSize: 12, fontWeight: 700, minWidth: 45, textAlign: 'right' }}>{getNum(selectedNode.params, 'speedMs', 500)}ms</span>
+                        </div>
+                      </label>
+                    </div>
+                  ) : selectedNode.kind === 'simon_on_success' ? (
+                    <div style={{ display: 'grid', gap: 12 }}>
+                      <div style={{ padding: 12, borderRadius: 10, background: 'rgba(244,63,94,0.08)', border: '1px solid rgba(244,63,94,0.18)' }}>
+                        <p style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.5 }}>✅ Déclenché quand le joueur répète correctement la séquence.</p>
+                      </div>
+                      <label style={{ display: 'grid', gap: 4 }}>
+                        <span className="g-label">Étape (0 = toutes)</span>
+                        <input className="g-input" type="number" min={0} max={50} style={{ height: 36, fontSize: 13 }}
+                          value={getNum(selectedNode.params, 'step', 1)}
+                          onChange={(e) => updateSelectedParams({ step: Number(e.target.value) })} />
+                      </label>
+                    </div>
+                  ) : selectedNode.kind === 'simon_on_fail' ? (
+                    <div style={{ padding: 12, borderRadius: 10, background: 'rgba(244,63,94,0.08)', border: '1px solid rgba(244,63,94,0.18)' }}>
+                      <p style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.5 }}>❌ Déclenché quand le joueur tape la mauvaise couleur.</p>
+                    </div>
+                  ) : selectedNode.kind === 'simon_on_complete' ? (
+                    <div style={{ padding: 12, borderRadius: 10, background: 'rgba(244,63,94,0.08)', border: '1px solid rgba(244,63,94,0.18)' }}>
+                      <p style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.5 }}>🏆 Déclenché quand toutes les séquences sont complétées.</p>
+                    </div>
+                  ) : selectedNode.kind === 'simon_set_speed' ? (
+                    <div style={{ display: 'grid', gap: 12 }}>
+                      <label style={{ display: 'grid', gap: 4 }}>
+                        <span className="g-label">Intervalle flash (ms)</span>
+                        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                          <input type="range" min={200} max={2000} step={50} style={{ flex: 1 }}
+                            value={getNum(selectedNode.params, 'speedMs', 600)}
+                            onChange={(e) => updateSelectedParams({ speedMs: Number(e.target.value) })} />
+                          <span style={{ fontSize: 12, fontWeight: 700, minWidth: 45, textAlign: 'right' }}>{getNum(selectedNode.params, 'speedMs', 600)}ms</span>
+                        </div>
+                      </label>
+                    </div>
+                  ) : selectedNode.kind === 'memory_on_match' ? (
+                    <div style={{ display: 'grid', gap: 12 }}>
+                      <div style={{ padding: 12, borderRadius: 10, background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.18)' }}>
+                        <p style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.5 }}>✅ Déclenché quand une paire de dalles identiques est trouvée.</p>
+                      </div>
+                      <label style={{ display: 'grid', gap: 4 }}>
+                        <span className="g-label">Index de paire (0 = toutes)</span>
+                        <input className="g-input" type="number" min={0} max={20} style={{ height: 36, fontSize: 13 }}
+                          value={getNum(selectedNode.params, 'pairIndex', 0)}
+                          onChange={(e) => updateSelectedParams({ pairIndex: Number(e.target.value) })} />
+                      </label>
+                    </div>
+                  ) : selectedNode.kind === 'memory_on_fail' ? (
+                    <div style={{ padding: 12, borderRadius: 10, background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.18)' }}>
+                      <p style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.5 }}>❌ Déclenché quand le joueur retourne deux dalles différentes.</p>
+                    </div>
+                  ) : selectedNode.kind === 'memory_on_complete' ? (
+                    <div style={{ padding: 12, borderRadius: 10, background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.18)' }}>
+                      <p style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.5 }}>🏆 Déclenché quand toutes les paires sont trouvées.</p>
+                    </div>
+                  ) : selectedNode.kind === 'spectrum_on_submit' ? (
+                    <div style={{ display: 'grid', gap: 12 }}>
+                      <div style={{ padding: 12, borderRadius: 10, background: 'rgba(6,182,212,0.08)', border: '1px solid rgba(6,182,212,0.18)' }}>
+                        <p style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.5 }}>📍 Déclenché quand un joueur soumet sa réponse.</p>
+                      </div>
+                      <label style={{ display: 'grid', gap: 4 }}>
+                        <span className="g-label">Siège (0 = tous)</span>
+                        <input className="g-input" type="number" min={0} max={30} style={{ height: 36, fontSize: 13 }}
+                          value={getNum(selectedNode.params, 'seat', 0)}
+                          onChange={(e) => updateSelectedParams({ seat: Number(e.target.value) })} />
+                      </label>
+                    </div>
+                  ) : selectedNode.kind === 'spectrum_on_round_end' ? (
+                    <div style={{ padding: 12, borderRadius: 10, background: 'rgba(6,182,212,0.08)', border: '1px solid rgba(6,182,212,0.18)' }}>
+                      <p style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.5 }}>🔔 Déclenché à la fin de chaque round de Spectre Chromatique.</p>
+                    </div>
+                  ) : selectedNode.kind === 'spectrum_on_game_over' ? (
+                    <div style={{ padding: 12, borderRadius: 10, background: 'rgba(6,182,212,0.08)', border: '1px solid rgba(6,182,212,0.18)' }}>
+                      <p style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.5 }}>🏁 Déclenché à la fin de la partie Spectre.</p>
+                    </div>
+                  ) : selectedNode.kind === 'cspeed_on_hit' ? (
+                    <div style={{ display: 'grid', gap: 12 }}>
+                      <div style={{ padding: 12, borderRadius: 10, background: 'rgba(249,115,22,0.08)', border: '1px solid rgba(249,115,22,0.18)' }}>
+                        <p style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.5 }}>🎯 Déclenché quand le joueur tape la bonne dalle colorée.</p>
+                      </div>
+                      <label style={{ display: 'grid', gap: 4 }}>
+                        <span className="g-label">Index dalle (0 = toutes)</span>
+                        <input className="g-input" type="number" min={0} max={41} style={{ height: 36, fontSize: 13 }}
+                          value={getNum(selectedNode.params, 'tileIndex', 0)}
+                          onChange={(e) => updateSelectedParams({ tileIndex: Number(e.target.value) })} />
+                      </label>
+                    </div>
+                  ) : selectedNode.kind === 'cspeed_on_miss' ? (
+                    <div style={{ padding: 12, borderRadius: 10, background: 'rgba(249,115,22,0.08)', border: '1px solid rgba(249,115,22,0.18)' }}>
+                      <p style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.5 }}>💥 Déclenché quand le joueur tape la mauvaise dalle.</p>
+                    </div>
+                  ) : selectedNode.kind === 'cspeed_on_time_up' ? (
+                    <div style={{ padding: 12, borderRadius: 10, background: 'rgba(249,115,22,0.08)', border: '1px solid rgba(249,115,22,0.18)' }}>
+                      <p style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.5 }}>⏱ Déclenché quand le temps de la partie Color Speed est écoulé.</p>
+                    </div>
+                  ) : selectedNode.kind === 'p4_on_win' ? (
+                    <div style={{ display: 'grid', gap: 12 }}>
+                      <div style={{ padding: 12, borderRadius: 10, background: 'rgba(234,179,8,0.08)', border: '1px solid rgba(234,179,8,0.18)' }}>
+                        <p style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.5 }}>🏆 Déclenché quand un joueur gagne à Puissance 4.</p>
+                      </div>
+                      <label style={{ display: 'grid', gap: 4 }}>
+                        <span className="g-label">Joueur (1 ou 2, 0 = tous)</span>
+                        <input className="g-input" type="number" min={0} max={2} style={{ height: 36, fontSize: 13 }}
+                          value={getNum(selectedNode.params, 'player', 1)}
+                          onChange={(e) => updateSelectedParams({ player: Number(e.target.value) })} />
+                      </label>
+                    </div>
+                  ) : selectedNode.kind === 'p4_on_draw' ? (
+                    <div style={{ padding: 12, borderRadius: 10, background: 'rgba(234,179,8,0.08)', border: '1px solid rgba(234,179,8,0.18)' }}>
+                      <p style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.5 }}>🤝 Déclenché quand la partie se termine par un match nul.</p>
+                    </div>
+                  ) : selectedNode.kind === 'p4_set_color' ? (
+                    <div style={{ display: 'grid', gap: 12 }}>
+                      <label style={{ display: 'grid', gap: 4 }}>
+                        <span className="g-label">Joueur</span>
+                        <select className="g-select" style={{ height: 36, fontSize: 13 }}
+                          value={String(getNum(selectedNode.params, 'player', 1))}
+                          onChange={(e) => updateSelectedParams({ player: Number(e.target.value) })}>
+                          <option value="1">Joueur 1</option>
+                          <option value="2">Joueur 2</option>
+                        </select>
+                      </label>
+                      <label style={{ display: 'grid', gap: 4 }}>
+                        <span className="g-label">Couleur</span>
+                        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                          <div style={{ width: 36, height: 36, borderRadius: 10, background: getColor(selectedNode.params, 'color', '#f59e0b'), border: '1px solid rgba(0,0,0,0.1)', flexShrink: 0 }} />
+                          <input type="color" value={getColor(selectedNode.params, 'color', '#f59e0b')}
+                            onChange={(e) => updateSelectedParams({ color: e.target.value })}
+                            style={{ flex: 1, height: 36, borderRadius: 8, border: '1px solid rgba(0,0,0,0.1)', cursor: 'pointer', padding: 0 }} />
+                        </div>
+                      </label>
+                    </div>
+                  ) : selectedNode.kind === 'gamut_on_hit' ? (
+                    <div style={{ display: 'grid', gap: 12 }}>
+                      <div style={{ padding: 12, borderRadius: 10, background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.18)' }}>
+                        <p style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.5 }}>✅ Déclenché quand le joueur identifie correctement une couleur hors-gamut.</p>
+                      </div>
+                      <label style={{ display: 'grid', gap: 4 }}>
+                        <span className="g-label">Round (0 = tous)</span>
+                        <input className="g-input" type="number" min={0} max={20} style={{ height: 36, fontSize: 13 }}
+                          value={getNum(selectedNode.params, 'round', 1)}
+                          onChange={(e) => updateSelectedParams({ round: Number(e.target.value) })} />
+                      </label>
+                    </div>
+                  ) : selectedNode.kind === 'gamut_on_miss' ? (
+                    <div style={{ padding: 12, borderRadius: 10, background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.18)' }}>
+                      <p style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.5 }}>❌ Déclenché quand le joueur rate l&apos;identification hors-gamut.</p>
+                    </div>
+                  ) : selectedNode.kind === 'gamut_on_complete' ? (
+                    <div style={{ padding: 12, borderRadius: 10, background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.18)' }}>
+                      <p style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.5 }}>🏆 Déclenché quand toutes les rounds du Chasseur de Gamut sont terminées.</p>
+                    </div>
                   ) : ['math_add','math_sub','math_mul','math_div','math_clamp01','math_lerp','compare_eq','compare_gt','compare_lt','logic_and','logic_or','logic_not','time_seconds','random_01','get_score'].includes(selectedNode.kind) ? (
                     <div style={{ padding: 16, borderRadius: 12, background: '#f8f9ff', border: '1px solid rgba(99,102,241,0.15)' }}>
                       <p style={{ fontSize: 12, opacity: 0.7, lineHeight: 1.5 }}>
