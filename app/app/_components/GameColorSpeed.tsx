@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from 'react';
 
 export interface GameTileProps {
   onSendColor: (tileIdx: number, r: number, g: number, b: number, intensity?: number) => void;
+  /** Envoie directement 32 valeurs de canaux (0-100) à une dalle, sans conversion RGB. */
+  onSendRawChannels?: (tileIdx: number, channels: number[]) => void;
   onTurnOff:   (tileIdx: number) => void;
   onTurnOffAll: () => void;
   onQuit:      () => void;

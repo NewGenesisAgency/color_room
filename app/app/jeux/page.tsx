@@ -9,6 +9,7 @@ import GamePuissance4 from '@/app/_components/GamePuissance4';
 import GameChasseurGamut from '@/app/_components/GameChasseurGamut';
 import GameMetamerisme from '@/app/_components/GameMetamerisme';
 import GameChromaticite from '@/app/_games/chromaticity-diagram/ChromaticityDiagram';
+import GameCanalMix from '@/app/_components/GameCanalMix';
 import NavigationMenu from '@/app/_components/NavigationMenu';
 import Room3D from '@/app/_components/Room3D';
 import LoginScreen from '@/app/_components/LoginScreen';
@@ -811,7 +812,7 @@ export default function JeuxPage() {
   const [simonActive, setSimonActive] = useState<boolean>(false);
 
   // Nouveaux jeux natifs
-  const [activeBuiltinGame, setActiveBuiltinGame] = useState<'color-speed' | 'maitre-blanc' | 'puissance4' | 'chasseur-gamut' | 'metamere' | 'chromaticite-jeu' | null>(null);
+  const [activeBuiltinGame, setActiveBuiltinGame] = useState<'color-speed' | 'maitre-blanc' | 'puissance4' | 'chasseur-gamut' | 'metamere' | 'chromaticite-jeu' | 'canal-mix' | null>(null);
   const [activeView, setActiveView] = useState<null | 'spectre' | 'chromaticite'>(null);
   const [simonSequence, setSimonSequence] = useState<number[]>([]);
   const [simonPlayerInput, setSimonPlayerInput] = useState<number[]>([]);
@@ -3683,7 +3684,7 @@ export default function JeuxPage() {
                 </div>
 
                 {/* Color Speed */}
-                {(['color-speed', 'maitre-blanc', 'puissance4', 'chasseur-gamut', 'metamere', 'chromaticite-jeu'] as const).map((gameId) => {
+                {(['color-speed', 'maitre-blanc', 'puissance4', 'chasseur-gamut', 'metamere', 'chromaticite-jeu', 'canal-mix'] as const).map((gameId) => {
                   const META: Record<string, { title: string; desc: string; Icon: any; grad: string; accent: string }> = {
                     'color-speed':      { title: 'Color Speed',        desc: "Cliquez la dalle qui s'allume — réflexes !",            Icon: Zap,       grad: 'linear-gradient(135deg,#4361ee,#7c3aed)', accent: '#7c3aed' },
                     'maitre-blanc':     { title: 'Le Maître du Blanc', desc: 'Recréez la teinte cible en dosant R, G, B',              Icon: Sun,       grad: 'linear-gradient(135deg,#f59e0b,#ef4444)', accent: '#f59e0b' },
@@ -3691,6 +3692,7 @@ export default function JeuxPage() {
                     'chasseur-gamut':   { title: 'Chasseur de Gamut',  desc: 'Localisez la couleur sur le diagramme CIE 1931',         Icon: Crosshair, grad: 'linear-gradient(135deg,#06d6a0,#4361ee)', accent: '#06d6a0' },
                     'metamere':         { title: 'Métamérie',           desc: "Trouvez l'éclairage qui cache ou révèle le texte",       Icon: Sparkles,  grad: 'linear-gradient(135deg,#7c3aed,#06d6a0)', accent: '#06d6a0' },
                     'chromaticite-jeu': { title: 'Chromaticité CIE',   desc: 'Mémorisez la couleur 5s puis retrouvez x, y, z sur le diagramme', Icon: Crosshair, grad: 'linear-gradient(135deg,#81e6d9,#4361ee)', accent: '#81e6d9' },
+                    'canal-mix':        { title: 'Mix de Canaux',       desc: '3 canaux LED aléatoires → retrouvez la couleur sur le diagramme CIE', Icon: Palette,  grad: 'linear-gradient(135deg,#f97316,#7c3aed)', accent: '#f97316' },
                   };
                   const m = META[gameId];
                   const isSelected = activeBuiltinGame === gameId;
@@ -4126,6 +4128,22 @@ export default function JeuxPage() {
                       setPlateColors(Array(42).fill('#000000'));
                       setPlateActive(Array(42).fill(false));
                     },
+                    onSendRawChannels: (idx: number, channels: number[]) => {
+                      const plateId = PLATE_ID_BY_INDEX[idx];
+                      if (!plateId) return;
+                      // Envoyer chaque canal directement (0-100 déjà) sans conversion RGB
+                      for (let ch = 0; ch < Math.min(channels.length, 32); ch++) {
+                        scheduleSetCanal(plateId, ch, Math.max(0, Math.min(100, Math.round(channels[ch] ?? 0))));
+                      }
+                      // Mise à jour visuelle : reconstituer une couleur approximative depuis les 3 premiers canaux
+                      const r = clamp255(Math.round((channels[0] ?? 0) * 2.55));
+                      const g = clamp255(Math.round((channels[1] ?? 0) * 2.55));
+                      const b = clamp255(Math.round((channels[2] ?? 0) * 2.55));
+                      const intensity = channels.some(v => v > 0) ? 80 : 0;
+                      visualBatchRef.current.set(idx, { r, g, b, intensity });
+                      cancelAnimationFrame(rafRef.current);
+                      rafRef.current = requestAnimationFrame(flushVisual);
+                    },
                     onQuit: () => { setActiveBuiltinGame(null); setGameActive(false); },
                     tileCount: 42,
                     onRegisterClickHandler: (fn: ((idx: number) => void) | null) => { gameClickHandlerRef.current = fn; },
@@ -4138,6 +4156,7 @@ export default function JeuxPage() {
                       {activeBuiltinGame === 'chasseur-gamut'  && <GameChasseurGamut   {...tileActions} />}
                       {activeBuiltinGame === 'metamere'        && <GameMetamerisme     {...tileActions} />}
                       {activeBuiltinGame === 'chromaticite-jeu'&& <GameChromaticite   {...tileActions} />}
+                      {activeBuiltinGame === 'canal-mix'        && <GameCanalMix       {...tileActions} onSendRawChannels={tileActions.onSendRawChannels!} />}
                     </div>
                   );
                 })()}
