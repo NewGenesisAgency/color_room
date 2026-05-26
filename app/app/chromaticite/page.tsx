@@ -227,14 +227,14 @@ export default function ChromaticitePage() {
         const { x, y } = svgToXy(diagX, diagY);
         const idx4 = (py * iw + px) * 4;
         if (!inHorseshoe(x, y) || x < X_MIN || y < Y_MIN || x > X_MAX || y > Y_MAX) {
-          img.data[idx4] = 6; img.data[idx4+1] = 8; img.data[idx4+2] = 18; img.data[idx4+3] = 255;
+          img.data[idx4] = 240; img.data[idx4+1] = 242; img.data[idx4+2] = 255; img.data[idx4+3] = 255;
           continue;
         }
         const c = xyToRgb255(x, y);
         if (c) {
           img.data[idx4] = c.r; img.data[idx4+1] = c.g; img.data[idx4+2] = c.b; img.data[idx4+3] = 255;
         } else {
-          img.data[idx4] = 6; img.data[idx4+1] = 8; img.data[idx4+2] = 18; img.data[idx4+3] = 255;
+          img.data[idx4] = 240; img.data[idx4+1] = 242; img.data[idx4+2] = 255; img.data[idx4+3] = 255;
         }
       }
     }
@@ -328,18 +328,18 @@ export default function ChromaticitePage() {
   return (
     <div style={{
       minHeight: '100vh',
-      background: 'linear-gradient(160deg,#06080f 0%,#0a0d1a 100%)',
-      color: '#e8eaf0',
+      background: '#f8f9ff',
+      color: '#1a1a2e',
       fontFamily: 'system-ui, sans-serif',
       padding: '28px 20px',
     }}>
       {/* Header */}
       <div style={{ maxWidth: 960, margin: '0 auto' }}>
         <div style={{ marginBottom: 24 }}>
-          <h1 style={{ fontSize: 22, fontWeight: 800, margin: 0, color: '#e8eaf0' }}>
+          <h1 style={{ fontSize: 22, fontWeight: 800, margin: 0, color: '#1a1a2e' }}>
             Diagramme de Chromaticité CIE 1931
           </h1>
-          <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', marginTop: 4 }}>
+          <p style={{ fontSize: 13, color: 'rgba(0,0,0,0.5)', marginTop: 4 }}>
             Cliquez sur le diagramme pour sélectionner une couleur et l'envoyer aux dalles Lumen
           </p>
         </div>
@@ -348,7 +348,7 @@ export default function ChromaticitePage() {
 
           {/* ── Diagram ── */}
           <div style={{ flex: '1 1 460px', minWidth: 320 }}>
-            <div style={{ position: 'relative', borderRadius: 14, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }}>
+            <div style={{ position: 'relative', borderRadius: 14, overflow: 'hidden', border: '1px solid rgba(0,0,0,0.1)', boxShadow: '0 8px 32px rgba(0,0,0,0.12)' }}>
               <canvas
                 ref={canvasRef}
                 width={DW}
@@ -366,41 +366,41 @@ export default function ChromaticitePage() {
                 onClick={handleClick}
               >
                 {/* Horseshoe outline */}
-                <path d={horsePath} fill="none" stroke="rgba(255,255,255,0.6)" strokeWidth="1.5" />
+                <path d={horsePath} fill="none" stroke="rgba(0,0,0,0.6)" strokeWidth="1.5" />
 
                 {/* sRGB gamut triangle */}
-                <path d={srgbPath} fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth="1" strokeDasharray="5,4" />
+                <path d={srgbPath} fill="none" stroke="rgba(0,0,0,0.35)" strokeWidth="1" strokeDasharray="5,4" />
                 {/* sRGB labels */}
-                {(() => { const {px,py}=xyToSvg(0.64,0.33); return <text x={px+5} y={py-4} fill="rgba(255,255,255,0.45)" fontSize="9" fontWeight="700">R</text>; })()}
-                {(() => { const {px,py}=xyToSvg(0.30,0.60); return <text x={px-10} y={py-5} fill="rgba(255,255,255,0.45)" fontSize="9" fontWeight="700">G</text>; })()}
-                {(() => { const {px,py}=xyToSvg(0.15,0.06); return <text x={px-10} y={py+12} fill="rgba(255,255,255,0.45)" fontSize="9" fontWeight="700">B</text>; })()}
+                {(() => { const {px,py}=xyToSvg(0.64,0.33); return <text x={px+5} y={py-4} fill="rgba(0,0,0,0.5)" fontSize="9" fontWeight="700">R</text>; })()}
+                {(() => { const {px,py}=xyToSvg(0.30,0.60); return <text x={px-10} y={py-5} fill="rgba(0,0,0,0.5)" fontSize="9" fontWeight="700">G</text>; })()}
+                {(() => { const {px,py}=xyToSvg(0.15,0.06); return <text x={px-10} y={py+12} fill="rgba(0,0,0,0.5)" fontSize="9" fontWeight="700">B</text>; })()}
 
                 {/* Planckian locus */}
-                <path d={planckPath} fill="none" stroke="rgba(255,220,100,0.65)" strokeWidth="1.5" strokeDasharray="3,3" />
+                <path d={planckPath} fill="none" stroke="rgba(180,120,0,0.7)" strokeWidth="1.5" strokeDasharray="3,3" />
                 {/* Planckian label */}
-                {(() => { const {px,py}=xyToSvg(0.45,0.41); return <text x={px} y={py-7} fill="rgba(255,220,100,0.7)" fontSize="8" fontStyle="italic">Locus de Planck</text>; })()}
+                {(() => { const {px,py}=xyToSvg(0.45,0.41); return <text x={px} y={py-7} fill="rgba(180,120,0,0.8)" fontSize="8" fontStyle="italic">Locus de Planck</text>; })()}
                 {/* Some K labels */}
                 {[2700, 4000, 6500].map(K => {
                   const pt = PLANCKIAN.find(p => p.K === K);
                   if (!pt) return null;
                   const {px,py} = xyToSvg(pt.x, pt.y);
                   return <g key={K}>
-                    <circle cx={px} cy={py} r={3} fill="rgba(255,220,100,0.7)" />
-                    <text x={px+5} y={py+3} fill="rgba(255,220,100,0.8)" fontSize="8">{K}K</text>
+                    <circle cx={px} cy={py} r={3} fill="rgba(180,120,0,0.7)" />
+                    <text x={px+5} y={py+3} fill="rgba(150,100,0,0.9)" fontSize="8">{K}K</text>
                   </g>;
                 })}
 
                 {/* Axis ticks */}
                 {[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8].map(v => {
                   const { px } = xyToSvg(v, 0);
-                  return <text key={v} x={px} y={DH - 6} fill="rgba(255,255,255,0.3)" fontSize="8" textAnchor="middle">{v.toFixed(1)}</text>;
+                  return <text key={v} x={px} y={DH - 6} fill="rgba(0,0,0,0.4)" fontSize="8" textAnchor="middle">{v.toFixed(1)}</text>;
                 })}
                 {[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9].map(v => {
                   const { py } = xyToSvg(0, v);
-                  return <text key={v} x={PAD_L - 4} y={py + 3} fill="rgba(255,255,255,0.3)" fontSize="8" textAnchor="end">{v.toFixed(1)}</text>;
+                  return <text key={v} x={PAD_L - 4} y={py + 3} fill="rgba(0,0,0,0.4)" fontSize="8" textAnchor="end">{v.toFixed(1)}</text>;
                 })}
-                <text x={DW / 2} y={DH - 2} fill="rgba(255,255,255,0.4)" fontSize="10" textAnchor="middle" fontStyle="italic">x</text>
-                <text x={8} y={DH / 2} fill="rgba(255,255,255,0.4)" fontSize="10" textAnchor="middle" fontStyle="italic" transform={`rotate(-90 8 ${DH / 2})`}>y</text>
+                <text x={DW / 2} y={DH - 2} fill="rgba(0,0,0,0.5)" fontSize="10" textAnchor="middle" fontStyle="italic">x</text>
+                <text x={8} y={DH / 2} fill="rgba(0,0,0,0.5)" fontSize="10" textAnchor="middle" fontStyle="italic" transform={`rotate(-90 8 ${DH / 2})`}>y</text>
 
                 {/* Wavelength labels on spectral locus */}
                 {WL_LABELS.map(({ idx, nm, offset }) => {
@@ -409,8 +409,8 @@ export default function ChromaticitePage() {
                   return (
                     <g key={nm}>
                       <line x1={px} y1={py} x2={px + offset[0] * 0.6} y2={py + offset[1] * 0.6}
-                        stroke="rgba(255,255,255,0.35)" strokeWidth={0.8} />
-                      <text x={px + offset[0]} y={py + offset[1]} fill="rgba(255,255,255,0.55)"
+                        stroke="rgba(0,0,0,0.4)" strokeWidth={0.8} />
+                      <text x={px + offset[0]} y={py + offset[1]} fill="rgba(0,0,0,0.6)"
                         fontSize="8" textAnchor="middle">{nm}</text>
                     </g>
                   );
@@ -420,8 +420,8 @@ export default function ChromaticitePage() {
                 {(() => {
                   const { px, py } = xyToSvg(0.3127, 0.3290);
                   return <>
-                    <circle cx={px} cy={py} r={4.5} fill="#fff" opacity={0.7} />
-                    <text x={px + 7} y={py + 4} fill="rgba(255,255,255,0.6)" fontSize="8" fontWeight="700">D65</text>
+                    <circle cx={px} cy={py} r={4.5} fill="rgba(0,0,0,0.7)" opacity={0.7} />
+                    <text x={px + 7} y={py + 4} fill="rgba(0,0,0,0.5)" fontSize="8" fontWeight="700">D65</text>
                   </>;
                 })()}
 
@@ -448,21 +448,21 @@ export default function ChromaticitePage() {
             </div>
 
             {/* Legend */}
-            <div style={{ display: 'flex', gap: 16, marginTop: 10, flexWrap: 'wrap', fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>
+            <div style={{ display: 'flex', gap: 16, marginTop: 10, flexWrap: 'wrap', fontSize: 11, color: 'rgba(0,0,0,0.5)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                <div style={{ width: 18, height: 2, background: 'rgba(255,255,255,0.5)' }} />
+                <div style={{ width: 18, height: 2, background: 'rgba(0,0,0,0.5)' }} />
                 <span>Locus spectral</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                <div style={{ width: 18, height: 2, background: 'rgba(255,255,255,0.3)', borderTop: '1px dashed rgba(255,255,255,0.4)' }} />
+                <div style={{ width: 18, height: 2, background: 'rgba(0,0,0,0.3)', borderTop: '1px dashed rgba(0,0,0,0.4)' }} />
                 <span>Gamut sRGB</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                <div style={{ width: 18, height: 2, background: 'rgba(255,220,100,0.65)', borderTop: '1px dashed rgba(255,220,100,0.7)' }} />
+                <div style={{ width: 18, height: 2, background: 'rgba(180,120,0,0.65)', borderTop: '1px dashed rgba(180,120,0,0.7)' }} />
                 <span>Locus de Planck</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#fff', opacity: 0.7 }} />
+                <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'rgba(0,0,0,0.7)', opacity: 0.7 }} />
                 <span>D65 (lumière du jour)</span>
               </div>
             </div>
@@ -472,35 +472,35 @@ export default function ChromaticitePage() {
           <div style={{ flex: '0 0 220px', display: 'flex', flexDirection: 'column', gap: 14 }}>
 
             {/* Hover preview */}
-            <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: 12, padding: '14px 16px', border: '1px solid rgba(255,255,255,0.08)' }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.4)', marginBottom: 10, letterSpacing: '0.06em' }}>CURSEUR</div>
+            <div style={{ background: '#fff', borderRadius: 12, padding: '14px 16px', border: '1px solid rgba(0,0,0,0.08)' }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(0,0,0,0.4)', marginBottom: 10, letterSpacing: '0.06em' }}>CURSEUR</div>
               {cursor && cursorRgb ? (
                 <>
-                  <div style={{ width: '100%', height: 40, borderRadius: 8, background: `rgb(${cursorRgb.r},${cursorRgb.g},${cursorRgb.b})`, border: '1px solid rgba(255,255,255,0.15)', marginBottom: 10 }} />
-                  <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', lineHeight: 1.7 }}>
-                    <div>x = <strong style={{ color: '#e8eaf0' }}>{cursor.x.toFixed(4)}</strong></div>
-                    <div>y = <strong style={{ color: '#e8eaf0' }}>{cursor.y.toFixed(4)}</strong></div>
-                    <div>RGB = <strong style={{ color: '#e8eaf0' }}>{cursorRgb.r}, {cursorRgb.g}, {cursorRgb.b}</strong></div>
-                    {!inHorseshoe(cursor.x, cursor.y) && <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11 }}>Hors du locus</div>}
+                  <div style={{ width: '100%', height: 40, borderRadius: 8, background: `rgb(${cursorRgb.r},${cursorRgb.g},${cursorRgb.b})`, border: '1px solid rgba(0,0,0,0.1)', marginBottom: 10 }} />
+                  <div style={{ fontSize: 12, color: 'rgba(0,0,0,0.6)', lineHeight: 1.7 }}>
+                    <div>x = <strong style={{ color: '#1a1a2e' }}>{cursor.x.toFixed(4)}</strong></div>
+                    <div>y = <strong style={{ color: '#1a1a2e' }}>{cursor.y.toFixed(4)}</strong></div>
+                    <div>RGB = <strong style={{ color: '#1a1a2e' }}>{cursorRgb.r}, {cursorRgb.g}, {cursorRgb.b}</strong></div>
+                    {!inHorseshoe(cursor.x, cursor.y) && <div style={{ color: 'rgba(0,0,0,0.35)', fontSize: 11 }}>Hors du locus</div>}
                   </div>
                 </>
               ) : (
-                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)' }}>Déplacez le curseur sur le diagramme</div>
+                <div style={{ fontSize: 12, color: 'rgba(0,0,0,0.35)' }}>Déplacez le curseur sur le diagramme</div>
               )}
             </div>
 
             {/* Selected color */}
-            <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: 12, padding: '14px 16px', border: `1px solid ${selected ? 'rgba(255,255,255,0.18)' : 'rgba(255,255,255,0.08)'}`, transition: 'border-color 0.2s' }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.4)', marginBottom: 10, letterSpacing: '0.06em' }}>SÉLECTION</div>
+            <div style={{ background: '#fff', borderRadius: 12, padding: '14px 16px', border: `1px solid ${selected ? 'rgba(0,0,0,0.15)' : 'rgba(0,0,0,0.08)'}`, transition: 'border-color 0.2s' }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(0,0,0,0.4)', marginBottom: 10, letterSpacing: '0.06em' }}>SÉLECTION</div>
               {selected && selectedRgb ? (
                 <>
-                  <div style={{ width: '100%', height: 56, borderRadius: 10, background: `rgb(${selectedRgb.r},${selectedRgb.g},${selectedRgb.b})`, border: '1px solid rgba(255,255,255,0.2)', marginBottom: 12, boxShadow: `0 0 20px rgb(${selectedRgb.r},${selectedRgb.g},${selectedRgb.b})44` }} />
-                  <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)', lineHeight: 1.8, marginBottom: 12 }}>
-                    <div>x = <strong style={{ color: '#e8eaf0' }}>{selected.x.toFixed(4)}</strong></div>
-                    <div>y = <strong style={{ color: '#e8eaf0' }}>{selected.y.toFixed(4)}</strong></div>
-                    <div>RGB = <strong style={{ color: '#e8eaf0' }}>{selectedRgb.r}, {selectedRgb.g}, {selectedRgb.b}</strong></div>
+                  <div style={{ width: '100%', height: 56, borderRadius: 10, background: `rgb(${selectedRgb.r},${selectedRgb.g},${selectedRgb.b})`, border: '1px solid rgba(0,0,0,0.1)', marginBottom: 12, boxShadow: `0 0 20px rgb(${selectedRgb.r},${selectedRgb.g},${selectedRgb.b})44` }} />
+                  <div style={{ fontSize: 12, color: 'rgba(0,0,0,0.7)', lineHeight: 1.8, marginBottom: 12 }}>
+                    <div>x = <strong style={{ color: '#1a1a2e' }}>{selected.x.toFixed(4)}</strong></div>
+                    <div>y = <strong style={{ color: '#1a1a2e' }}>{selected.y.toFixed(4)}</strong></div>
+                    <div>RGB = <strong style={{ color: '#1a1a2e' }}>{selectedRgb.r}, {selectedRgb.g}, {selectedRgb.b}</strong></div>
                     {selWl && <div>λ ≈ <strong style={{ color: '#fbbf24' }}>{selWl} nm</strong></div>}
-                    {!inHorseshoe(selected.x, selected.y) && <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11 }}>Hors gamut visible</div>}
+                    {!inHorseshoe(selected.x, selected.y) && <div style={{ color: 'rgba(0,0,0,0.4)', fontSize: 11 }}>Hors gamut visible</div>}
                   </div>
                   <button
                     onClick={handleSendToPlates}
@@ -518,13 +518,13 @@ export default function ChromaticitePage() {
                   </button>
                 </>
               ) : (
-                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)' }}>Cliquez sur le diagramme pour sélectionner une couleur</div>
+                <div style={{ fontSize: 12, color: 'rgba(0,0,0,0.35)' }}>Cliquez sur le diagramme pour sélectionner une couleur</div>
               )}
             </div>
 
             {/* Intensity slider */}
-            <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: 12, padding: '14px 16px', border: '1px solid rgba(255,255,255,0.08)' }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.4)', marginBottom: 10, letterSpacing: '0.06em' }}>INTENSITÉ</div>
+            <div style={{ background: '#fff', borderRadius: 12, padding: '14px 16px', border: '1px solid rgba(0,0,0,0.08)' }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(0,0,0,0.4)', marginBottom: 10, letterSpacing: '0.06em' }}>INTENSITÉ</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <input type="range" min={10} max={100} value={intensity} onChange={e => setIntensity(Number(e.target.value))}
                   style={{ flex: 1, accentColor: '#a78bfa' }} />
@@ -533,11 +533,11 @@ export default function ChromaticitePage() {
             </div>
 
             {/* Live mode toggle */}
-            <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: 12, padding: '14px 16px', border: '1px solid rgba(255,255,255,0.08)' }}>
+            <div style={{ background: '#fff', borderRadius: 12, padding: '14px 16px', border: '1px solid rgba(0,0,0,0.08)' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
                 <div>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: '#e8eaf0' }}>Mode live</div>
-                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>Les dalles suivent le curseur</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: '#1a1a2e' }}>Mode live</div>
+                  <div style={{ fontSize: 11, color: 'rgba(0,0,0,0.4)', marginTop: 2 }}>Les dalles suivent le curseur</div>
                 </div>
                 <button
                   onClick={() => setLiveOnPlates(v => !v)}
@@ -558,7 +558,7 @@ export default function ChromaticitePage() {
             {/* Éteindre */}
             <button
               onClick={() => clearAllPlates()}
-              style={{ padding: '10px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.6)', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}
+              style={{ padding: '10px', borderRadius: 10, border: '1px solid rgba(0,0,0,0.1)', background: '#fff', color: 'rgba(0,0,0,0.6)', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}
             >
               Éteindre les dalles
             </button>

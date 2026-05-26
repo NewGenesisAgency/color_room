@@ -283,14 +283,14 @@ export default function SpectrePage() {
         const { x, y } = cSvgToXy(px * (CDW / iw), py * (CDH / ih));
         const idx = (py * iw + px) * 4;
         if (!cInHS(x, y) || x < CXN || y < CYN || x > CXX || y > CYX) {
-          img.data[idx] = 8; img.data[idx + 1] = 8; img.data[idx + 2] = 18; img.data[idx + 3] = 255;
+          img.data[idx] = 240; img.data[idx + 1] = 242; img.data[idx + 2] = 255; img.data[idx + 3] = 255;
           continue;
         }
         const c = cXyToRgb(x, y);
         if (c) {
           img.data[idx] = c.r; img.data[idx + 1] = c.g; img.data[idx + 2] = c.b; img.data[idx + 3] = 255;
         } else {
-          img.data[idx] = 8; img.data[idx + 1] = 8; img.data[idx + 2] = 18; img.data[idx + 3] = 255;
+          img.data[idx] = 240; img.data[idx + 1] = 242; img.data[idx + 2] = 255; img.data[idx + 3] = 255;
         }
       }
     }
@@ -402,17 +402,17 @@ export default function SpectrePage() {
   // ────────────────────────────────────────────────────────────────────────────
   if (view === 'login') {
     return (
-      <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg,#0a0a1a 0%,#111133 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'system-ui,sans-serif' }}>
-        <div style={{ width: 420, padding: 40, borderRadius: 24, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', backdropFilter: 'blur(20px)' }}>
+      <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg,#f0f2ff 0%,#f8f0ff 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'system-ui,sans-serif' }}>
+        <div style={{ width: 420, padding: 40, borderRadius: 24, background: 'rgba(255,255,255,0.9)', border: '1px solid rgba(0,0,0,0.08)', backdropFilter: 'blur(20px)' }}>
           <div style={{ textAlign: 'center', marginBottom: 32 }}>
             <div style={{ marginBottom: 8 }}><Palette size={48} color="#a78bfa" /></div>
-            <h1 style={{ color: '#fff', fontSize: 28, fontWeight: 800, margin: 0 }}>Spectre Chromatique</h1>
-            <p style={{ color: 'rgba(255,255,255,0.5)', marginTop: 8, fontSize: 14 }}>Reproduisez la couleur cible sur le spectre lumineux</p>
+            <h1 style={{ color: '#1a1a2e', fontSize: 28, fontWeight: 800, margin: 0 }}>Spectre Chromatique</h1>
+            <p style={{ color: 'rgba(0,0,0,0.5)', marginTop: 8, fontSize: 14 }}>Reproduisez la couleur cible sur le spectre lumineux</p>
           </div>
 
           <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
             {(['create', 'join'] as const).map((m) => (
-              <button key={m} onClick={() => setLoginMode(m)} style={{ flex: 1, padding: '10px 0', borderRadius: 12, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 14, background: loginMode === m ? 'linear-gradient(135deg,#667eea,#764ba2)' : 'rgba(255,255,255,0.08)', color: loginMode === m ? '#fff' : 'rgba(255,255,255,0.5)', transition: 'all 0.2s' }}>
+              <button key={m} onClick={() => setLoginMode(m)} style={{ flex: 1, padding: '10px 0', borderRadius: 12, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 14, background: loginMode === m ? 'linear-gradient(135deg,#667eea,#764ba2)' : 'rgba(0,0,0,0.06)', color: loginMode === m ? '#fff' : 'rgba(0,0,0,0.5)', transition: 'all 0.2s' }}>
                 {m === 'create' ? 'Créer une salle' : 'Rejoindre'}
               </button>
             ))}
@@ -422,20 +422,20 @@ export default function SpectrePage() {
             <input
               value={nameInput} onChange={(e) => setNameInput(e.target.value)}
               placeholder="Votre prénom"
-              style={{ padding: '14px 16px', borderRadius: 12, border: '1px solid rgba(255,255,255,0.2)', background: '#1a1a30', color: '#fff', fontSize: 15, outline: 'none' }}
+              style={{ padding: '14px 16px', borderRadius: 12, border: '1px solid rgba(0,0,0,0.15)', background: '#fff', color: '#1a1a2e', fontSize: 15, outline: 'none' }}
             />
             {loginMode === 'join' && (
               <input
                 value={joinCodeInput} onChange={(e) => setJoinCodeInput(e.target.value)}
                 placeholder="Coller le code de la salle ici…"
-                style={{ padding: '14px 16px', borderRadius: 12, border: '1px solid rgba(167,139,250,0.4)', background: '#1a1a30', color: '#a78bfa', fontSize: 13, outline: 'none', fontFamily: 'monospace' }}
+                style={{ padding: '14px 16px', borderRadius: 12, border: '1px solid rgba(167,139,250,0.4)', background: '#fff', color: '#a78bfa', fontSize: 13, outline: 'none', fontFamily: 'monospace' }}
               />
             )}
             {loginMode === 'create' && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13, whiteSpace: 'nowrap' }}>Nombre de manches :</span>
+                <span style={{ color: 'rgba(0,0,0,0.5)', fontSize: 13, whiteSpace: 'nowrap' }}>Nombre de manches :</span>
                 <input type="number" min={1} max={10} value={maxRoundsInput} onChange={(e) => setMaxRoundsInput(Number(e.target.value))}
-                  style={{ flex: 1, padding: '10px 14px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.15)', background: '#1a1a30', color: '#fff', fontSize: 15, outline: 'none' }} />
+                  style={{ flex: 1, padding: '10px 14px', borderRadius: 10, border: '1px solid rgba(0,0,0,0.15)', background: '#fff', color: '#1a1a2e', fontSize: 15, outline: 'none' }} />
               </div>
             )}
             {error && <p style={{ color: '#ff6b6b', fontSize: 13, margin: 0 }}>⚠ {error}</p>}
@@ -451,8 +451,8 @@ export default function SpectrePage() {
 
   if (!gameState) {
     return (
-      <div style={{ minHeight: '100vh', background: '#0a0a1a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: 18 }}>Connexion…</div>
+      <div style={{ minHeight: '100vh', background: '#f8f9ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ color: 'rgba(0,0,0,0.5)', fontSize: 18 }}>Connexion…</div>
       </div>
     );
   }
@@ -467,34 +467,34 @@ export default function SpectrePage() {
   // ────────────────────────────────────────────────────────────────────────────
   if (gameState.phase === 'lobby') {
     return (
-      <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg,#0a0a1a,#111133)', fontFamily: 'system-ui,sans-serif', padding: 40, boxSizing: 'border-box' }}>
+      <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg,#f0f2ff,#f8f0ff)', fontFamily: 'system-ui,sans-serif', padding: 40, boxSizing: 'border-box' }}>
         <div style={{ maxWidth: 560, margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: 40 }}>
             <div style={{ marginBottom: 8 }}><Palette size={48} color="#a78bfa" /></div>
-            <h1 style={{ color: '#fff', fontSize: 26, fontWeight: 800, margin: 0 }}>Spectre Chromatique</h1>
-            <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 14, marginTop: 8 }}>Salle d&apos;attente · Manche {gameState.maxRounds} ×</p>
+            <h1 style={{ color: '#1a1a2e', fontSize: 26, fontWeight: 800, margin: 0 }}>Spectre Chromatique</h1>
+            <p style={{ color: 'rgba(0,0,0,0.5)', fontSize: 14, marginTop: 8 }}>Salle d&apos;attente · Manche {gameState.maxRounds} ×</p>
           </div>
 
-          <div style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 20, padding: 24, marginBottom: 20 }}>
-            <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', margin: '0 0 8px' }}>Code de la salle</p>
+          <div style={{ background: 'rgba(255,255,255,0.9)', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 20, padding: 24, marginBottom: 20 }}>
+            <p style={{ color: 'rgba(0,0,0,0.5)', fontSize: 12, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', margin: '0 0 8px' }}>Code de la salle</p>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <code style={{ flex: 1, color: '#a78bfa', fontSize: 12, background: 'rgba(167,139,250,0.1)', padding: '10px 14px', borderRadius: 10, wordBreak: 'break-all' }}>{sessionId}</code>
-              <button onClick={() => navigator.clipboard.writeText(sessionId)} style={{ padding: '10px 14px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.7)', cursor: 'pointer', fontSize: 13 }}>Copier</button>
+              <button onClick={() => navigator.clipboard.writeText(sessionId)} style={{ padding: '10px 14px', borderRadius: 10, border: '1px solid rgba(0,0,0,0.12)', background: 'rgba(0,0,0,0.04)', color: 'rgba(0,0,0,0.6)', cursor: 'pointer', fontSize: 13 }}>Copier</button>
             </div>
           </div>
 
-          <div style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 20, padding: 24, marginBottom: 24 }}>
-            <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', margin: '0 0 16px' }}>Joueurs connectés ({players.length})</p>
+          <div style={{ background: 'rgba(255,255,255,0.9)', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 20, padding: 24, marginBottom: 24 }}>
+            <p style={{ color: 'rgba(0,0,0,0.5)', fontSize: 12, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', margin: '0 0 16px' }}>Joueurs connectés ({players.length})</p>
             {players.length === 0 ? (
-              <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: 14 }}>En attente de joueurs…</p>
+              <p style={{ color: 'rgba(0,0,0,0.35)', fontSize: 14 }}>En attente de joueurs…</p>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 {players.map((p) => (
-                  <div key={p.seat} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', borderRadius: 12, background: p.seat === seat ? 'rgba(102,126,234,0.15)' : 'rgba(255,255,255,0.04)', border: p.seat === seat ? '1px solid rgba(102,126,234,0.4)' : '1px solid transparent' }}>
+                  <div key={p.seat} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', borderRadius: 12, background: p.seat === seat ? 'rgba(102,126,234,0.1)' : 'rgba(0,0,0,0.02)', border: p.seat === seat ? '1px solid rgba(102,126,234,0.4)' : '1px solid rgba(0,0,0,0.06)' }}>
                     <div style={{ width: 10, height: 10, borderRadius: '50%', background: SEAT_COLORS[(p.seat - 1) % 8] }} />
-                    <span style={{ color: '#fff', fontWeight: 600, fontSize: 15 }}>{p.name}</span>
+                    <span style={{ color: '#1a1a2e', fontWeight: 600, fontSize: 15 }}>{p.name}</span>
                     {p.seat === 1 && <span style={{ marginLeft: 'auto', fontSize: 12, color: '#ffd700', display: 'flex', alignItems: 'center', gap: 4 }}><Crown size={13} color="#ffd700" /> Hôte</span>}
-                    {p.seat === seat && p.seat !== 1 && <span style={{ marginLeft: 'auto', fontSize: 12, color: 'rgba(255,255,255,0.4)' }}>← Vous</span>}
+                    {p.seat === seat && p.seat !== 1 && <span style={{ marginLeft: 'auto', fontSize: 12, color: 'rgba(0,0,0,0.4)' }}>← Vous</span>}
                   </div>
                 ))}
               </div>
@@ -503,11 +503,11 @@ export default function SpectrePage() {
 
           {isHost ? (
             <button onClick={handleAdvance} disabled={players.length < 1}
-              style={{ width: '100%', padding: '18px', borderRadius: 16, border: 'none', cursor: players.length < 1 ? 'not-allowed' : 'pointer', fontWeight: 800, fontSize: 17, background: players.length < 1 ? 'rgba(255,255,255,0.1)' : 'linear-gradient(135deg,#667eea,#764ba2)', color: '#fff', opacity: players.length < 1 ? 0.5 : 1, transition: 'all 0.2s' }}>
+              style={{ width: '100%', padding: '18px', borderRadius: 16, border: 'none', cursor: players.length < 1 ? 'not-allowed' : 'pointer', fontWeight: 800, fontSize: 17, background: players.length < 1 ? 'rgba(0,0,0,0.1)' : 'linear-gradient(135deg,#667eea,#764ba2)', color: '#fff', opacity: players.length < 1 ? 0.5 : 1, transition: 'all 0.2s' }}>
               Lancer la partie
             </button>
           ) : (
-            <div style={{ textAlign: 'center', color: 'rgba(255,255,255,0.4)', fontSize: 14 }}>En attente que l&apos;hôte lance la partie…</div>
+            <div style={{ textAlign: 'center', color: 'rgba(0,0,0,0.5)', fontSize: 14 }}>En attente que l&apos;hôte lance la partie…</div>
           )}
         </div>
       </div>
@@ -561,31 +561,31 @@ export default function SpectrePage() {
     }
 
     return (
-      <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg,#07070f,#0d0d1e)', fontFamily: 'system-ui,sans-serif', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '16px', boxSizing: 'border-box' }}>
+      <div style={{ minHeight: '100vh', background: '#f8f9ff', fontFamily: 'system-ui,sans-serif', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '16px', boxSizing: 'border-box' }}>
         {/* Header */}
         <div style={{ width: '100%', maxWidth: 540, marginBottom: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase' }}>Manche {gameState.round}/{gameState.maxRounds} · Reproduction</span>
-          <div style={{ background: timeLeft <= 10 ? 'rgba(255,70,70,0.2)' : 'rgba(255,255,255,0.08)', border: `1px solid ${timeLeft <= 10 ? 'rgba(255,70,70,0.5)' : 'rgba(255,255,255,0.15)'}`, borderRadius: 20, padding: '6px 14px', color: timeLeft <= 10 ? '#ff6b6b' : '#fff', fontWeight: 800, fontSize: 18, fontVariantNumeric: 'tabular-nums' }}>
+          <span style={{ color: 'rgba(0,0,0,0.5)', fontSize: 12, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase' }}>Manche {gameState.round}/{gameState.maxRounds} · Reproduction</span>
+          <div style={{ background: timeLeft <= 10 ? 'rgba(255,70,70,0.1)' : 'rgba(0,0,0,0.06)', border: `1px solid ${timeLeft <= 10 ? 'rgba(255,70,70,0.4)' : 'rgba(0,0,0,0.12)'}`, borderRadius: 20, padding: '6px 14px', color: timeLeft <= 10 ? '#ef4444' : '#1a1a2e', fontWeight: 800, fontSize: 18, fontVariantNumeric: 'tabular-nums' }}>
             {String(Math.floor(timeLeft / 60)).padStart(2, '0')}:{String(timeLeft % 60).padStart(2, '0')}
           </div>
         </div>
 
         {/* Color preview */}
-        <div style={{ width: '100%', maxWidth: 540, marginBottom: 10, display: 'flex', gap: 10, alignItems: 'center', padding: '10px 14px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 14, boxSizing: 'border-box' }}>
-          <div style={{ width: 40, height: 40, borderRadius: 10, background: myCss, border: '2px solid rgba(255,255,255,0.15)', boxShadow: `0 0 20px ${myCss}55`, flexShrink: 0, transition: 'background 0.1s, box-shadow 0.1s' }} />
+        <div style={{ width: '100%', maxWidth: 540, marginBottom: 10, display: 'flex', gap: 10, alignItems: 'center', padding: '10px 14px', background: 'rgba(255,255,255,0.9)', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 14, boxSizing: 'border-box' }}>
+          <div style={{ width: 40, height: 40, borderRadius: 10, background: myCss, border: '2px solid rgba(0,0,0,0.1)', boxShadow: `0 0 20px ${myCss}55`, flexShrink: 0, transition: 'background 0.1s, box-shadow 0.1s' }} />
           <div>
-            <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Votre couleur</div>
-            <code style={{ color: '#fff', fontSize: 12 }}>x={myX.toFixed(3)}, y={myY.toFixed(3)}</code>
+            <div style={{ color: 'rgba(0,0,0,0.4)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Votre couleur</div>
+            <code style={{ color: '#1a1a2e', fontSize: 12 }}>x={myX.toFixed(3)}, y={myY.toFixed(3)}</code>
           </div>
           {submitted && (
-            <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6, color: '#44ffaa', fontWeight: 700, fontSize: 13 }}>
+            <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6, color: '#22c55e', fontWeight: 700, fontSize: 13 }}>
               <CheckCircle2 size={16} /> Soumis
             </div>
           )}
         </div>
 
         {/* CIE 1931 diagram */}
-        <div style={{ width: '100%', maxWidth: 540, position: 'relative', borderRadius: 12, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)', marginBottom: 10 }}>
+        <div style={{ width: '100%', maxWidth: 540, position: 'relative', borderRadius: 12, overflow: 'hidden', border: '1px solid rgba(0,0,0,0.1)', marginBottom: 10 }}>
           <canvas ref={cieCanvasRef} width={CDW} height={CDH} style={{ display: 'block', width: '100%', height: 'auto' }} />
           <svg
             viewBox={`0 0 ${CDW} ${CDH}`}
@@ -594,25 +594,25 @@ export default function SpectrePage() {
             onMouseMove={handleDiagMove}
             onClick={() => { if (!submitted) void handleSubmitGuess(); }}
           >
-            <path d={horsePath} fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="1.5" />
-            <path d={srgbPath} fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth="1" strokeDasharray="5,4" />
-            {[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7].map(v => { const { px } = cXyToSvg(v, 0); return <text key={v} x={px} y={CDH - 4} fill="rgba(255,255,255,0.3)" fontSize="8" textAnchor="middle">{v.toFixed(1)}</text>; })}
-            {[0.2, 0.4, 0.6, 0.8].map(v => { const { py } = cXyToSvg(0, v); return <text key={v} x={CPL - 3} y={py + 3} fill="rgba(255,255,255,0.3)" fontSize="8" textAnchor="end">{v.toFixed(1)}</text>; })}
-            <text x={CDW / 2} y={CDH - 2} fill="rgba(255,255,255,0.35)" fontSize="9" textAnchor="middle" fontStyle="italic">x</text>
-            <text x={7} y={CDH / 2} fill="rgba(255,255,255,0.35)" fontSize="9" textAnchor="middle" fontStyle="italic" transform={`rotate(-90 7 ${CDH / 2})`}>y</text>
-            {(() => { const { px, py } = cXyToSvg(0.3127, 0.3290); return <><circle cx={px} cy={py} r={4} fill="#fff" opacity={0.6} /><text x={px + 5} y={py + 3} fill="rgba(255,255,255,0.45)" fontSize="7">D65</text></>; })()}
+            <path d={horsePath} fill="none" stroke="rgba(0,0,0,0.4)" strokeWidth="1.5" />
+            <path d={srgbPath} fill="none" stroke="rgba(0,0,0,0.4)" strokeWidth="1" strokeDasharray="5,4" />
+            {[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7].map(v => { const { px } = cXyToSvg(v, 0); return <text key={v} x={px} y={CDH - 4} fill="rgba(0,0,0,0.4)" fontSize="8" textAnchor="middle">{v.toFixed(1)}</text>; })}
+            {[0.2, 0.4, 0.6, 0.8].map(v => { const { py } = cXyToSvg(0, v); return <text key={v} x={CPL - 3} y={py + 3} fill="rgba(0,0,0,0.4)" fontSize="8" textAnchor="end">{v.toFixed(1)}</text>; })}
+            <text x={CDW / 2} y={CDH - 2} fill="rgba(0,0,0,0.4)" fontSize="9" textAnchor="middle" fontStyle="italic">x</text>
+            <text x={7} y={CDH / 2} fill="rgba(0,0,0,0.4)" fontSize="9" textAnchor="middle" fontStyle="italic" transform={`rotate(-90 7 ${CDH / 2})`}>y</text>
+            {(() => { const { px, py } = cXyToSvg(0.3127, 0.3290); return <><circle cx={px} cy={py} r={4} fill="rgba(0,0,0,0.7)" opacity={0.6} /><text x={px + 5} y={py + 3} fill="rgba(0,0,0,0.5)" fontSize="7">D65</text></>; })()}
             {!submitted && (
               <g>
-                <line x1={curSvg.px - 14} y1={curSvg.py} x2={curSvg.px + 14} y2={curSvg.py} stroke="#fff" strokeWidth={1.5} />
-                <line x1={curSvg.px} y1={curSvg.py - 14} x2={curSvg.px} y2={curSvg.py + 14} stroke="#fff" strokeWidth={1.5} />
-                <circle cx={curSvg.px} cy={curSvg.py} r={7} fill="none" stroke="#fff" strokeWidth={1.5} />
+                <line x1={curSvg.px - 14} y1={curSvg.py} x2={curSvg.px + 14} y2={curSvg.py} stroke="#1a1a2e" strokeWidth={1.5} />
+                <line x1={curSvg.px} y1={curSvg.py - 14} x2={curSvg.px} y2={curSvg.py + 14} stroke="#1a1a2e" strokeWidth={1.5} />
+                <circle cx={curSvg.px} cy={curSvg.py} r={7} fill="none" stroke="#1a1a2e" strokeWidth={1.5} />
                 {isInGamut && <circle cx={curSvg.px} cy={curSvg.py} r={3} fill={myCss} />}
               </g>
             )}
             {submitted && (
               <g>
-                <circle cx={curSvg.px} cy={curSvg.py} r={9} fill="none" stroke="#44ffaa" strokeWidth={2} />
-                <circle cx={curSvg.px} cy={curSvg.py} r={3} fill="#44ffaa" />
+                <circle cx={curSvg.px} cy={curSvg.py} r={9} fill="none" stroke="#22c55e" strokeWidth={2} />
+                <circle cx={curSvg.px} cy={curSvg.py} r={3} fill="#22c55e" />
               </g>
             )}
           </svg>
@@ -620,11 +620,11 @@ export default function SpectrePage() {
 
         {/* Submit / waiting */}
         {submitted ? (
-          <div style={{ width: '100%', maxWidth: 540, textAlign: 'center', padding: '14px', borderRadius: 14, background: 'rgba(68,255,170,0.1)', border: '1px solid rgba(68,255,170,0.3)', color: '#44ffaa', fontWeight: 700, fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, boxSizing: 'border-box' }}>
+          <div style={{ width: '100%', maxWidth: 540, textAlign: 'center', padding: '14px', borderRadius: 14, background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.3)', color: '#22c55e', fontWeight: 700, fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, boxSizing: 'border-box' }}>
             <CheckCircle2 size={18} /> Réponse soumise — en attente des autres joueurs…
           </div>
         ) : (
-          <div style={{ width: '100%', maxWidth: 540, textAlign: 'center', color: 'rgba(255,255,255,0.4)', fontSize: 13, boxSizing: 'border-box' }}>
+          <div style={{ width: '100%', maxWidth: 540, textAlign: 'center', color: 'rgba(0,0,0,0.5)', fontSize: 13, boxSizing: 'border-box' }}>
             Déplacez le curseur sur le diagramme · <strong style={{ color: '#a78bfa' }}>Cliquez pour confirmer</strong>
           </div>
         )}
@@ -632,9 +632,9 @@ export default function SpectrePage() {
         {/* Player status */}
         <div style={{ marginTop: 12, display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
           {Object.values(gameState.players).filter(Boolean).map((p) => (
-            <div key={p!.seat} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 10px', borderRadius: 20, background: 'rgba(255,255,255,0.06)', border: `1px solid ${p!.submitted ? 'rgba(68,255,170,0.4)' : 'rgba(255,255,255,0.1)'}` }}>
-              <div style={{ width: 7, height: 7, borderRadius: '50%', background: p!.submitted ? '#44ffaa' : 'rgba(255,255,255,0.3)' }} />
-              <span style={{ color: p!.submitted ? '#44ffaa' : 'rgba(255,255,255,0.5)', fontSize: 13, fontWeight: 600 }}>{p!.name}</span>
+            <div key={p!.seat} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 10px', borderRadius: 20, background: 'rgba(255,255,255,0.9)', border: `1px solid ${p!.submitted ? 'rgba(34,197,94,0.4)' : 'rgba(0,0,0,0.1)'}` }}>
+              <div style={{ width: 7, height: 7, borderRadius: '50%', background: p!.submitted ? '#22c55e' : 'rgba(0,0,0,0.3)' }} />
+              <span style={{ color: p!.submitted ? '#22c55e' : 'rgba(0,0,0,0.5)', fontSize: 13, fontWeight: 600 }}>{p!.name}</span>
             </div>
           ))}
         </div>
@@ -647,15 +647,15 @@ export default function SpectrePage() {
   // ────────────────────────────────────────────────────────────────────────────
   if (gameState.phase === 'result') {
     return (
-      <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg,#07070f,#0d0d1e)', fontFamily: 'system-ui,sans-serif', padding: '32px 16px', boxSizing: 'border-box' }}>
+      <div style={{ minHeight: '100vh', background: '#f8f9ff', fontFamily: 'system-ui,sans-serif', padding: '32px 16px', boxSizing: 'border-box' }}>
         <div style={{ maxWidth: 560, margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: 28 }}>
-            <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', margin: '0 0 8px' }}>Manche {gameState.round} / {gameState.maxRounds} · Résultats</p>
-            <h2 style={{ color: '#fff', fontSize: 26, fontWeight: 900, margin: 0 }}>Couleur cible</h2>
+            <p style={{ color: 'rgba(0,0,0,0.5)', fontSize: 12, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', margin: '0 0 8px' }}>Manche {gameState.round} / {gameState.maxRounds} · Résultats</p>
+            <h2 style={{ color: '#1a1a2e', fontSize: 26, fontWeight: 900, margin: 0 }}>Couleur cible</h2>
           </div>
 
           {/* Target color */}
-          <div style={{ height: 80, borderRadius: 20, background: targetCss, marginBottom: 24, border: '2px solid rgba(255,255,255,0.15)', boxShadow: `0 0 60px ${targetCss}66` }} />
+          <div style={{ height: 80, borderRadius: 20, background: targetCss, marginBottom: 24, border: '2px solid rgba(0,0,0,0.1)', boxShadow: `0 0 60px ${targetCss}66` }} />
 
           {/* Player results */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 24 }}>
@@ -663,19 +663,19 @@ export default function SpectrePage() {
               const pCss = rgb(p.guessR, p.guessG, p.guessB);
               const accuracy = Math.round((p.roundScore / 1000) * 100);
               return (
-                <div key={p.seat} style={{ background: 'rgba(255,255,255,0.05)', border: `1px solid ${i === 0 ? 'rgba(255,215,0,0.4)' : 'rgba(255,255,255,0.08)'}`, borderRadius: 18, padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 16 }}>
-                  <div style={{ fontSize: 14, fontWeight: 800, minWidth: 22, textAlign: 'center', color: i === 0 ? '#fbbf24' : i === 1 ? '#94a3b8' : i === 2 ? '#cd7c3a' : 'rgba(255,255,255,0.4)' }}>{i + 1}</div>
+                <div key={p.seat} style={{ background: '#fff', border: `1px solid ${i === 0 ? 'rgba(255,215,0,0.4)' : 'rgba(0,0,0,0.08)'}`, borderRadius: 18, padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 16 }}>
+                  <div style={{ fontSize: 14, fontWeight: 800, minWidth: 22, textAlign: 'center', color: i === 0 ? '#fbbf24' : i === 1 ? '#94a3b8' : i === 2 ? '#cd7c3a' : 'rgba(0,0,0,0.4)' }}>{i + 1}</div>
                   <div style={{ flex: 1 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                      <span style={{ color: '#fff', fontWeight: 700, fontSize: 15 }}>{p.name}</span>
-                      <span style={{ color: '#fff', fontWeight: 900, fontSize: 18 }}>{p.roundScore} pts</span>
+                      <span style={{ color: '#1a1a2e', fontWeight: 700, fontSize: 15 }}>{p.name}</span>
+                      <span style={{ color: '#1a1a2e', fontWeight: 900, fontSize: 18 }}>{p.roundScore} pts</span>
                     </div>
                     <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                      <div style={{ width: 32, height: 32, borderRadius: 8, background: pCss, border: '2px solid rgba(255,255,255,0.2)', flexShrink: 0 }} />
-                      <div style={{ flex: 1, height: 8, borderRadius: 4, background: 'rgba(255,255,255,0.1)', overflow: 'hidden' }}>
-                        <div style={{ height: '100%', width: `${accuracy}%`, borderRadius: 4, background: accuracy >= 80 ? '#44ffaa' : accuracy >= 50 ? '#ffaa44' : '#ff6b6b', transition: 'width 0.5s' }} />
+                      <div style={{ width: 32, height: 32, borderRadius: 8, background: pCss, border: '2px solid rgba(0,0,0,0.1)', flexShrink: 0 }} />
+                      <div style={{ flex: 1, height: 8, borderRadius: 4, background: 'rgba(0,0,0,0.08)', overflow: 'hidden' }}>
+                        <div style={{ height: '100%', width: `${accuracy}%`, borderRadius: 4, background: accuracy >= 80 ? '#22c55e' : accuracy >= 50 ? '#f97316' : '#ef4444', transition: 'width 0.5s' }} />
                       </div>
-                      <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, fontWeight: 700, minWidth: 40, textAlign: 'right' }}>{accuracy}%</span>
+                      <span style={{ color: 'rgba(0,0,0,0.5)', fontSize: 12, fontWeight: 700, minWidth: 40, textAlign: 'right' }}>{accuracy}%</span>
                     </div>
                   </div>
                 </div>
@@ -684,12 +684,12 @@ export default function SpectrePage() {
           </div>
 
           {/* Scores cumulés */}
-          <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 16, padding: '14px 20px', marginBottom: 20 }}>
-            <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', margin: '0 0 10px' }}>Score total</p>
+          <div style={{ background: '#fff', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 16, padding: '14px 20px', marginBottom: 20 }}>
+            <p style={{ color: 'rgba(0,0,0,0.5)', fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', margin: '0 0 10px' }}>Score total</p>
             {sortedPlayers.map((p) => (
               <div key={p.seat} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: 14 }}>{p.name}</span>
-                <span style={{ color: '#fff', fontWeight: 800, fontSize: 16 }}>{p.totalScore} pts</span>
+                <span style={{ color: 'rgba(0,0,0,0.7)', fontSize: 14 }}>{p.name}</span>
+                <span style={{ color: '#1a1a2e', fontWeight: 800, fontSize: 16 }}>{p.totalScore} pts</span>
               </div>
             ))}
           </div>
@@ -700,7 +700,7 @@ export default function SpectrePage() {
             </button>
           )}
           {!isHost && (
-            <div style={{ textAlign: 'center', color: 'rgba(255,255,255,0.3)', fontSize: 14 }}>En attente de l&apos;hôte…{timeLeft > 0 ? ` (${timeLeft}s)` : ''}</div>
+            <div style={{ textAlign: 'center', color: 'rgba(0,0,0,0.35)', fontSize: 14 }}>En attente de l&apos;hôte…{timeLeft > 0 ? ` (${timeLeft}s)` : ''}</div>
           )}
         </div>
       </div>
@@ -713,25 +713,25 @@ export default function SpectrePage() {
   if (gameState.phase === 'finished' || sessionStatus === 'finished') {
     const winner = sortedPlayers[0];
     return (
-      <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg,#07070f,#0d0d1e)', fontFamily: 'system-ui,sans-serif', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 16px', boxSizing: 'border-box' }}>
+      <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg,#f0f2ff,#f8f0ff)', fontFamily: 'system-ui,sans-serif', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 16px', boxSizing: 'border-box' }}>
         <div style={{ width: '100%', maxWidth: 520 }}>
           <div style={{ textAlign: 'center', marginBottom: 32 }}>
             <div style={{ marginBottom: 12 }}><Trophy size={64} color="#ffd700" /></div>
-            <h1 style={{ color: '#fff', fontSize: 30, fontWeight: 900, margin: '0 0 8px' }}>Partie terminée !</h1>
+            <h1 style={{ color: '#1a1a2e', fontSize: 30, fontWeight: 900, margin: '0 0 8px' }}>Partie terminée !</h1>
             {winner && <p style={{ color: '#ffd700', fontSize: 18, fontWeight: 700, margin: 0 }}>Vainqueur : {winner.name}</p>}
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 32 }}>
             {sortedPlayers.map((p, i) => (
-              <div key={p.seat} style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '18px 24px', borderRadius: 18, background: i === 0 ? 'linear-gradient(135deg,rgba(255,215,0,0.15),rgba(255,165,0,0.1))' : 'rgba(255,255,255,0.05)', border: `1px solid ${i === 0 ? 'rgba(255,215,0,0.4)' : 'rgba(255,255,255,0.08)'}` }}>
-                <div style={{ fontSize: 16, fontWeight: 900, minWidth: 40, textAlign: 'center', color: i === 0 ? '#ffd700' : i === 1 ? '#94a3b8' : i === 2 ? '#cd7c3a' : 'rgba(255,255,255,0.4)' }}>{i + 1}</div>
+              <div key={p.seat} style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '18px 24px', borderRadius: 18, background: i === 0 ? 'linear-gradient(135deg,rgba(255,215,0,0.12),rgba(255,165,0,0.07))' : '#fff', border: `1px solid ${i === 0 ? 'rgba(255,215,0,0.4)' : 'rgba(0,0,0,0.08)'}` }}>
+                <div style={{ fontSize: 16, fontWeight: 900, minWidth: 40, textAlign: 'center', color: i === 0 ? '#ffd700' : i === 1 ? '#94a3b8' : i === 2 ? '#cd7c3a' : 'rgba(0,0,0,0.4)' }}>{i + 1}</div>
                 <div style={{ flex: 1 }}>
-                  <div style={{ color: '#fff', fontWeight: 700, fontSize: 17 }}>{p.name}</div>
-                  <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13 }}>Siège {p.seat}</div>
+                  <div style={{ color: '#1a1a2e', fontWeight: 700, fontSize: 17 }}>{p.name}</div>
+                  <div style={{ color: 'rgba(0,0,0,0.4)', fontSize: 13 }}>Siège {p.seat}</div>
                 </div>
                 <div style={{ textAlign: 'right' }}>
-                  <div style={{ color: i === 0 ? '#ffd700' : '#fff', fontWeight: 900, fontSize: 24 }}>{p.totalScore}</div>
-                  <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12 }}>points</div>
+                  <div style={{ color: i === 0 ? '#ffd700' : '#1a1a2e', fontWeight: 900, fontSize: 24 }}>{p.totalScore}</div>
+                  <div style={{ color: 'rgba(0,0,0,0.4)', fontSize: 12 }}>points</div>
                 </div>
               </div>
             ))}
@@ -743,11 +743,11 @@ export default function SpectrePage() {
             </button>
           )}
           {!isHost && (
-            <div style={{ textAlign: 'center', color: 'rgba(255,255,255,0.3)', fontSize: 14 }}>En attente de l&apos;hôte pour rejouer…</div>
+            <div style={{ textAlign: 'center', color: 'rgba(0,0,0,0.35)', fontSize: 14 }}>En attente de l&apos;hôte pour rejouer…</div>
           )}
 
           <button onClick={() => { window.localStorage.removeItem('sp_session'); setView('login'); setToken(''); setGameState(null); setSeat(null); setSessionId(''); }}
-            style={{ marginTop: 12, width: '100%', padding: '14px', borderRadius: 14, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontWeight: 600, fontSize: 15 }}>
+            style={{ marginTop: 12, width: '100%', padding: '14px', borderRadius: 14, border: '1px solid rgba(0,0,0,0.1)', background: 'rgba(255,255,255,0.7)', color: 'rgba(0,0,0,0.5)', cursor: 'pointer', fontWeight: 600, fontSize: 15 }}>
             Quitter
           </button>
         </div>
