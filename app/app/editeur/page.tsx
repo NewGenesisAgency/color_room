@@ -1724,10 +1724,10 @@ export default function EditeurPage() {
       const wait1 = makeId();
       const fill2 = makeId();
       initialNodes = [
-        { id: eventId, kind: 'event_begin', name: 'Démarrer', enabled: true, params: {}, pos: { x: 80, y: 80 } },
-        { id: fill1, kind: 'fill', name: 'UV Activation', enabled: true, params: { color: '#8b00ff', intensity: 0.3, mask: 'all', seconds: 1 }, pos: { x: 400, y: 80 } },
-        { id: wait1, kind: 'wait', name: 'Pause', enabled: true, params: { seconds: 2 }, pos: { x: 400, y: 200 } },
-        { id: fill2, kind: 'fill', name: 'Fluorescence', enabled: true, params: { color: '#00ff88', intensity: 0.8, mask: 'all', seconds: 3 }, pos: { x: 400, y: 320 } },
+        { id: eventId, kind: 'event_begin', name: 'Démarrer', enabled: true, params: {}, pos: { x: 80, y: 160 } },
+        { id: fill1, kind: 'fill', name: 'UV Activation', enabled: true, params: { color: '#8b00ff', intensity: 0.3, mask: 'all', seconds: 1 }, pos: { x: 440, y: 80 } },
+        { id: wait1, kind: 'wait', name: 'Pause', enabled: true, params: { seconds: 2 }, pos: { x: 440, y: 320 } },
+        { id: fill2, kind: 'fill', name: 'Fluorescence', enabled: true, params: { color: '#00ff88', intensity: 0.8, mask: 'all', seconds: 3 }, pos: { x: 440, y: 560 } },
       ];
       initialEdges = [
         { id: makeId(), from: eventId, to: fill1 },
@@ -1739,10 +1739,10 @@ export default function EditeurPage() {
       const tile2 = makeId();
       const tile3 = makeId();
       initialNodes = [
-        { id: eventId, kind: 'event_begin', name: 'Démarrer', enabled: true, params: {}, pos: { x: 80, y: 80 } },
-        { id: tile1, kind: 'tile', name: 'Rouge', enabled: true, params: { tileIndex: 0, color: '#ff0000', intensity: 0.8 }, pos: { x: 400, y: 50 } },
-        { id: tile2, kind: 'tile', name: 'Vert', enabled: true, params: { tileIndex: 1, color: '#00ff00', intensity: 0.8 }, pos: { x: 400, y: 170 } },
-        { id: tile3, kind: 'tile', name: 'Bleu', enabled: true, params: { tileIndex: 2, color: '#0000ff', intensity: 0.8 }, pos: { x: 400, y: 290 } },
+        { id: eventId, kind: 'event_begin', name: 'Démarrer', enabled: true, params: {}, pos: { x: 80, y: 300 } },
+        { id: tile1, kind: 'tile', name: 'Rouge', enabled: true, params: { tileIndex: 0, color: '#ff0000', intensity: 0.8 }, pos: { x: 440, y: 80 } },
+        { id: tile2, kind: 'tile', name: 'Vert', enabled: true, params: { tileIndex: 1, color: '#00ff00', intensity: 0.8 }, pos: { x: 440, y: 320 } },
+        { id: tile3, kind: 'tile', name: 'Bleu', enabled: true, params: { tileIndex: 2, color: '#0000ff', intensity: 0.8 }, pos: { x: 440, y: 560 } },
       ];
       initialEdges = [
         { id: makeId(), from: eventId, to: tile1 },
@@ -1754,10 +1754,10 @@ export default function EditeurPage() {
       const wait1 = makeId();
       const pulse2 = makeId();
       initialNodes = [
-        { id: eventId, kind: 'event_begin', name: 'Démarrer', enabled: true, params: {}, pos: { x: 80, y: 80 } },
-        { id: pulse1, kind: 'pulse', name: 'Pulsation chaude', enabled: true, params: { baseColor: '#ff6b00', targetColor: '#ffeb00', fromIntensity: 0.2, toIntensity: 0.9, speed: 0.8, phase: 0 }, pos: { x: 400, y: 80 } },
-        { id: wait1, kind: 'wait', name: 'Transition', enabled: true, params: { seconds: 3 }, pos: { x: 400, y: 200 } },
-        { id: pulse2, kind: 'pulse', name: 'Pulsation froide', enabled: true, params: { baseColor: '#00d4ff', targetColor: '#b829dd', fromIntensity: 0.2, toIntensity: 0.9, speed: 1.2, phase: 0 }, pos: { x: 400, y: 320 } },
+        { id: eventId, kind: 'event_begin', name: 'Démarrer', enabled: true, params: {}, pos: { x: 80, y: 160 } },
+        { id: pulse1, kind: 'pulse', name: 'Pulsation chaude', enabled: true, params: { baseColor: '#ff6b00', targetColor: '#ffeb00', fromIntensity: 0.2, toIntensity: 0.9, speed: 0.8, phase: 0 }, pos: { x: 440, y: 80 } },
+        { id: wait1, kind: 'wait', name: 'Transition', enabled: true, params: { seconds: 3 }, pos: { x: 440, y: 320 } },
+        { id: pulse2, kind: 'pulse', name: 'Pulsation froide', enabled: true, params: { baseColor: '#00d4ff', targetColor: '#b829dd', fromIntensity: 0.2, toIntensity: 0.9, speed: 1.2, phase: 0 }, pos: { x: 440, y: 560 } },
       ];
       initialEdges = [
         { id: makeId(), from: eventId, to: pulse1 },
@@ -1771,12 +1771,12 @@ export default function EditeurPage() {
       const fill4 = makeId();
       const fill5 = makeId();
       initialNodes = [
-        { id: eventId, kind: 'event_begin', name: 'Démarrer', enabled: true, params: {}, pos: { x: 80, y: 80 } },
-        { id: fill1, kind: 'fill', name: 'Rouge', enabled: true, params: { color: '#ff0000', intensity: 0.7, mask: 'all', seconds: 0.8 }, pos: { x: 400, y: 40 } },
-        { id: fill2, kind: 'fill', name: 'Jaune', enabled: true, params: { color: '#ffff00', intensity: 0.7, mask: 'all', seconds: 0.8 }, pos: { x: 400, y: 140 } },
-        { id: fill3, kind: 'fill', name: 'Vert', enabled: true, params: { color: '#00ff00', intensity: 0.7, mask: 'all', seconds: 0.8 }, pos: { x: 400, y: 240 } },
-        { id: fill4, kind: 'fill', name: 'Cyan', enabled: true, params: { color: '#00ffff', intensity: 0.7, mask: 'all', seconds: 0.8 }, pos: { x: 400, y: 340 } },
-        { id: fill5, kind: 'fill', name: 'Bleu', enabled: true, params: { color: '#0000ff', intensity: 0.7, mask: 'all', seconds: 0.8 }, pos: { x: 400, y: 440 } },
+        { id: eventId, kind: 'event_begin', name: 'Démarrer', enabled: true, params: {}, pos: { x: 80, y: 560 } },
+        { id: fill1, kind: 'fill', name: 'Rouge', enabled: true, params: { color: '#ff0000', intensity: 0.7, mask: 'all', seconds: 0.8 }, pos: { x: 440, y: 80 } },
+        { id: fill2, kind: 'fill', name: 'Jaune', enabled: true, params: { color: '#ffff00', intensity: 0.7, mask: 'all', seconds: 0.8 }, pos: { x: 440, y: 320 } },
+        { id: fill3, kind: 'fill', name: 'Vert', enabled: true, params: { color: '#00ff00', intensity: 0.7, mask: 'all', seconds: 0.8 }, pos: { x: 440, y: 560 } },
+        { id: fill4, kind: 'fill', name: 'Cyan', enabled: true, params: { color: '#00ffff', intensity: 0.7, mask: 'all', seconds: 0.8 }, pos: { x: 440, y: 800 } },
+        { id: fill5, kind: 'fill', name: 'Bleu', enabled: true, params: { color: '#0000ff', intensity: 0.7, mask: 'all', seconds: 0.8 }, pos: { x: 440, y: 1040 } },
       ];
       initialEdges = [
         { id: makeId(), from: eventId, to: fill1 },
@@ -1887,24 +1887,24 @@ export default function EditeurPage() {
       const pulse4 = makeId();
       
       initialNodes = [
-        { id: eventId, kind: 'event_begin', name: 'Démarrer', enabled: true, params: {}, pos: { x: 80, y: 200 } },
+        { id: eventId, kind: 'event_begin', name: 'Démarrer', enabled: true, params: {}, pos: { x: 80, y: 440 } },
         // Séquence de démarrage
-        { id: seqStart, kind: 'sequence', name: 'Séquence', enabled: true, params: {}, pos: { x: 300, y: 200 } },
+        { id: seqStart, kind: 'sequence', name: 'Séquence', enabled: true, params: {}, pos: { x: 420, y: 440 } },
         // Attentes entre les flashs
-        { id: wait1, kind: 'wait', name: 'Pause 0.5s', enabled: true, params: { seconds: 0.5 }, pos: { x: 520, y: 50 } },
-        { id: wait2, kind: 'wait', name: 'Pause 0.5s', enabled: true, params: { seconds: 0.5 }, pos: { x: 520, y: 150 } },
-        { id: wait3, kind: 'wait', name: 'Pause 0.5s', enabled: true, params: { seconds: 0.5 }, pos: { x: 520, y: 250 } },
-        { id: wait4, kind: 'wait', name: 'Pause 0.5s', enabled: true, params: { seconds: 0.5 }, pos: { x: 520, y: 350 } },
+        { id: wait1, kind: 'wait', name: 'Pause 0.5s', enabled: true, params: { seconds: 0.5 }, pos: { x: 760, y: 80 } },
+        { id: wait2, kind: 'wait', name: 'Pause 0.5s', enabled: true, params: { seconds: 0.5 }, pos: { x: 760, y: 320 } },
+        { id: wait3, kind: 'wait', name: 'Pause 0.5s', enabled: true, params: { seconds: 0.5 }, pos: { x: 760, y: 560 } },
+        { id: wait4, kind: 'wait', name: 'Pause 0.5s', enabled: true, params: { seconds: 0.5 }, pos: { x: 760, y: 800 } },
         // Dalles à mémoriser (coins)
-        { id: tile1, kind: 'tile', name: 'Coin HG', enabled: true, params: { tileIndex: 0, color: '#ff0000', intensity: 0.9 }, pos: { x: 740, y: 50 } },
-        { id: tile2, kind: 'tile', name: 'Coin HD', enabled: true, params: { tileIndex: 5, color: '#00ff00', intensity: 0.9 }, pos: { x: 740, y: 150 } },
-        { id: tile3, kind: 'tile', name: 'Coin BG', enabled: true, params: { tileIndex: 36, color: '#0000ff', intensity: 0.9 }, pos: { x: 740, y: 250 } },
-        { id: tile4, kind: 'tile', name: 'Coin BD', enabled: true, params: { tileIndex: 41, color: '#ffff00', intensity: 0.9 }, pos: { x: 740, y: 350 } },
+        { id: tile1, kind: 'tile', name: 'Coin HG', enabled: true, params: { tileIndex: 0, color: '#ff0000', intensity: 0.9 }, pos: { x: 1100, y: 80 } },
+        { id: tile2, kind: 'tile', name: 'Coin HD', enabled: true, params: { tileIndex: 5, color: '#00ff00', intensity: 0.9 }, pos: { x: 1100, y: 320 } },
+        { id: tile3, kind: 'tile', name: 'Coin BG', enabled: true, params: { tileIndex: 36, color: '#0000ff', intensity: 0.9 }, pos: { x: 1100, y: 560 } },
+        { id: tile4, kind: 'tile', name: 'Coin BD', enabled: true, params: { tileIndex: 41, color: '#ffff00', intensity: 0.9 }, pos: { x: 1100, y: 800 } },
         // Pulsations pour l'effet visuel
-        { id: pulse1, kind: 'pulse', name: 'Pulse R', enabled: true, params: { baseColor: '#ff0000', targetColor: '#ff6666', fromIntensity: 0.3, toIntensity: 1, speed: 2, phase: 0 }, pos: { x: 960, y: 50 } },
-        { id: pulse2, kind: 'pulse', name: 'Pulse V', enabled: true, params: { baseColor: '#00ff00', targetColor: '#66ff66', fromIntensity: 0.3, toIntensity: 1, speed: 2, phase: 0 }, pos: { x: 960, y: 150 } },
-        { id: pulse3, kind: 'pulse', name: 'Pulse B', enabled: true, params: { baseColor: '#0000ff', targetColor: '#6666ff', fromIntensity: 0.3, toIntensity: 1, speed: 2, phase: 0 }, pos: { x: 960, y: 250 } },
-        { id: pulse4, kind: 'pulse', name: 'Pulse J', enabled: true, params: { baseColor: '#ffff00', targetColor: '#ffff66', fromIntensity: 0.3, toIntensity: 1, speed: 2, phase: 0 }, pos: { x: 960, y: 350 } },
+        { id: pulse1, kind: 'pulse', name: 'Pulse R', enabled: true, params: { baseColor: '#ff0000', targetColor: '#ff6666', fromIntensity: 0.3, toIntensity: 1, speed: 2, phase: 0 }, pos: { x: 1440, y: 80 } },
+        { id: pulse2, kind: 'pulse', name: 'Pulse V', enabled: true, params: { baseColor: '#00ff00', targetColor: '#66ff66', fromIntensity: 0.3, toIntensity: 1, speed: 2, phase: 0 }, pos: { x: 1440, y: 320 } },
+        { id: pulse3, kind: 'pulse', name: 'Pulse B', enabled: true, params: { baseColor: '#0000ff', targetColor: '#6666ff', fromIntensity: 0.3, toIntensity: 1, speed: 2, phase: 0 }, pos: { x: 1440, y: 560 } },
+        { id: pulse4, kind: 'pulse', name: 'Pulse J', enabled: true, params: { baseColor: '#ffff00', targetColor: '#ffff66', fromIntensity: 0.3, toIntensity: 1, speed: 2, phase: 0 }, pos: { x: 1440, y: 800 } },
       ];
       initialEdges = [
         { id: makeId(), from: eventId, to: seqStart },
@@ -2221,6 +2221,87 @@ export default function EditeurPage() {
 
   function getUiComponents(): GameUIComponent[] {
     return activeGame?.uiComponents ?? [];
+  }
+
+  /** Re-layout : espace les nœuds du jeu actif en colonnes selon la profondeur BFS */
+  function autoLayoutNodes() {
+    if (!activeGameId || !activeGame) return;
+    const nodes = activeGame.nodes;
+    const edges = activeGame.edges;
+    if (nodes.length === 0) return;
+
+    const NODE_W = 340;  // largeur nœud + gap horizontal
+    const NODE_H = 240;  // hauteur nœud + gap vertical
+
+    // BFS depuis tous les nœuds événements pour calculer la profondeur (colonne)
+    const depth: Record<string, number> = {};
+    const queue: string[] = [];
+    nodes.forEach((n) => {
+      if (['event_begin', 'on_timer', 'on_click', 'on_tick', 'on_tile_click', 'on_ui_click'].includes(n.kind)) {
+        depth[n.id] = 0;
+        queue.push(n.id);
+      }
+    });
+    // Si aucun nœud racine, partir du premier nœud
+    if (queue.length === 0 && nodes.length > 0) {
+      depth[nodes[0].id] = 0;
+      queue.push(nodes[0].id);
+    }
+
+    let head = 0;
+    while (head < queue.length) {
+      const cur = queue[head++];
+      const curDepth = depth[cur] ?? 0;
+      edges.forEach((e) => {
+        if (e.from === cur && depth[e.to] === undefined) {
+          depth[e.to] = curDepth + 1;
+          queue.push(e.to);
+        }
+      });
+    }
+    // Nœuds sans profondeur → les mettre à la fin
+    nodes.forEach((n) => {
+      if (depth[n.id] === undefined) depth[n.id] = 99;
+    });
+
+    // Grouper par colonne
+    const cols: Record<number, string[]> = {};
+    nodes.forEach((n) => {
+      const col = depth[n.id]!;
+      if (!cols[col]) cols[col] = [];
+      cols[col].push(n.id);
+    });
+
+    // Calculer les nouvelles positions
+    const colNums = Object.keys(cols).map(Number).sort((a, b) => a - b);
+    const newPositions: Record<string, { x: number; y: number }> = {};
+    colNums.forEach((col, ci) => {
+      const nodeIds = cols[col];
+      const totalH = nodeIds.length * NODE_H;
+      const startY = 80;
+      nodeIds.forEach((id, ni) => {
+        newPositions[id] = { x: 80 + ci * NODE_W, y: startY + ni * NODE_H };
+      });
+    });
+
+    commit((cur) => {
+      const nextGames = cur.games.map((g) => {
+        if (g.id !== cur.activeGameId) return g;
+        return {
+          ...g,
+          nodes: g.nodes.map((n) => ({
+            ...n,
+            pos: newPositions[n.id] ?? n.pos,
+          })),
+        };
+      });
+      return { ...cur, games: nextGames };
+    });
+    // Recentrer la vue
+    setGraphPan({ x: 120, y: 80 });
+    setGraphZoom(0.7);
+    setStatus('Nœuds réorganisés');
+    setTimeout(() => void saveActiveGame(), 200);
   }
 
   function addUiComponent(kind: UICompKind) {
@@ -2757,30 +2838,57 @@ export default function EditeurPage() {
             />
 
             <div className="ue__graph glass">
-              <div className="panelhead" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div className="panelhead" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <strong>Graphe</strong>
-                <span className="panelhead__meta">MVP</span>
+                <span className="panelhead__meta">Blueprint</span>
                 {activeGame && (
-                  <span style={{ marginLeft: 'auto', fontSize: 12, opacity: 0.8 }}>
+                  <span style={{ fontSize: 12, opacity: 0.6, marginLeft: 4 }}>
                     {activeGame.name}
                   </span>
                 )}
-                {editor.expandedGameNodeId && (
+                <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  {/* Indicateur de zoom */}
+                  <span style={{ fontSize: 11, color: '#888', fontVariantNumeric: 'tabular-nums', minWidth: 36, textAlign: 'right' }}>
+                    {Math.round(graphZoom * 100)}%
+                  </span>
+                  {/* Bouton reset zoom */}
                   <button
-                    className="btn btn--small"
-                    onClick={() => {
-                      commit((cur) => ({
-                        ...cur,
-                        expandedGameNodeId: undefined,
-                        visibleNodeIds: undefined,
-                      }));
-                      setStatus('Vue complète');
-                    }}
-                    style={{ marginLeft: 8 }}
+                    className="btn btn--mini"
+                    title="Réinitialiser le zoom (100%)"
+                    onClick={() => { setGraphZoom(0.7); setGraphPan({ x: 120, y: 80 }); }}
+                    style={{ padding: '0 8px', height: 28, fontSize: 11 }}
                   >
-                    Afficher tout
+                    <Minimize2 size={12} />
                   </button>
-                )}
+                  {/* Re-layout */}
+                  {activeGame && (
+                    <button
+                      className="btn btn--mini"
+                      title="Auto-espacer les nœuds"
+                      onClick={autoLayoutNodes}
+                      style={{ padding: '0 8px', height: 28, fontSize: 11, gap: 4 }}
+                    >
+                      <LayoutGrid size={12} />
+                      <span>Re-layout</span>
+                    </button>
+                  )}
+                  {editor.expandedGameNodeId && (
+                    <button
+                      className="btn btn--mini"
+                      onClick={() => {
+                        commit((cur) => ({
+                          ...cur,
+                          expandedGameNodeId: undefined,
+                          visibleNodeIds: undefined,
+                        }));
+                        setStatus('Vue complète');
+                      }}
+                      style={{ padding: '0 8px', height: 28, fontSize: 11 }}
+                    >
+                      Afficher tout
+                    </button>
+                  )}
+                </div>
               </div>
               <div className="panelbody">
                 <div
@@ -2876,7 +2984,16 @@ export default function EditeurPage() {
                   }}
                   onWheel={(e) => {
                     if ((e.target as HTMLElement).closest('.bp-menu')) return;
-                    const next = Math.max(0.6, Math.min(1.6, graphZoom + (e.deltaY > 0 ? -0.06 : 0.06)));
+                    // Zoom centré sur la position de la souris
+                    const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
+                    const mx = e.clientX - rect.left;
+                    const my = e.clientY - rect.top;
+                    const factor = e.deltaY > 0 ? 0.88 : 1.12;
+                    const next = Math.max(0.1, Math.min(3.0, graphZoom * factor));
+                    // Ajuster le pan pour zoomer sur la souris
+                    const gx = (mx - graphPan.x) / graphZoom;
+                    const gy = (my - graphPan.y) / graphZoom;
+                    setGraphPan({ x: mx - gx * next, y: my - gy * next });
                     setGraphZoom(next);
                   }}
                 >
