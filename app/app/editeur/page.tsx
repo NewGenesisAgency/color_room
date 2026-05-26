@@ -127,7 +127,13 @@ type EditorNodeKind =
   | 'ui_progress'
   | 'ui_show'
   | 'ui_hide'
-  | 'on_ui_click';
+  | 'on_ui_click'
+  // Mesure colorimétrique dans les jeux
+  | 'measure_start'
+  | 'measure_on_result'
+  | 'measure_compare'
+  | 'measure_show_cie'
+  | 'measure_target_xy';
 
 type EditorNode = {
   id: string;
@@ -148,6 +154,21 @@ const GAME_ICON_MAP: Record<GameIconName, LucideIcon> = {
 
 const GAME_ICON_NAMES: GameIconName[] = Object.keys(GAME_ICON_MAP) as GameIconName[];
 
+type UICompKind = 'button' | 'slider' | 'label' | 'counter' | 'timer';
+
+type GameUIComponent = {
+  id: string;
+  kind: UICompKind;
+  label: string;
+  color?: string;
+  nodeRef?: string;   // ID du nœud on_ui_click ou variable_set lié
+  varName?: string;   // pour slider/counter
+  min?: number;       // pour slider
+  max?: number;       // pour slider
+  step?: number;      // pour slider
+  value?: number;     // valeur initiale
+};
+
 type GameDoc = {
   id: string;
   name: string;
@@ -161,6 +182,7 @@ type GameDoc = {
   gameMode?: 'solo' | 'coop' | 'versus';
   nodes: EditorNode[];
   edges: GraphEdge[];
+  uiComponents?: GameUIComponent[];
 };
 
 type GraphEdge = {
@@ -300,6 +322,12 @@ const NODE_CATALOG: NodeCatalogItem[] = [
     trueLv: 11.0, trueX: 0.4, trueY: 0.4,
     calibId: 'single_calib_001', targetChannel: 1
   }},
+  // ─── Mesure colorimétrique dans les jeux ────────────────────────────────────
+  { kind: 'measure_start', category: 'Mesure Jeu', title: '📡 Lancer mesure', defaults: { deviceId: 'cs150', timeoutSec: 5 } },
+  { kind: 'measure_on_result', category: 'Mesure Jeu', title: '✅ Résultat reçu', defaults: { varX: 'meas_x', varY: 'meas_y', varLv: 'meas_lv' } },
+  { kind: 'measure_compare', category: 'Mesure Jeu', title: '🎯 Comparer couleur', defaults: { targetX: 0.3127, targetY: 0.3290, toleranceDeltaE: 5 } },
+  { kind: 'measure_show_cie', category: 'Mesure Jeu', title: '🌈 Afficher CIE 1931', defaults: { showTarget: true, showResult: true } },
+  { kind: 'measure_target_xy', category: 'Mesure Jeu', title: '🎯 Cible chromatique', defaults: { x: 0.3127, y: 0.3290, label: 'D65', toleranceDeltaE: 3 } },
 ];
 
 /** Kinds that are native built-in games — shown in catalog but NOT addable to canvas */
@@ -340,6 +368,7 @@ const NODE_CATEGORY_ICONS: Record<string, LucideIcon> = {
   'Puissance 4': LayoutGrid,
   'Chasseur Gamut': Film,
   'Interface': MousePointer2,
+  'Mesure Jeu': Thermometer,
 };
 
 const NODE_CATEGORY_COLORS: Record<string, string> = {
@@ -366,6 +395,7 @@ const NODE_CATEGORY_COLORS: Record<string, string> = {
   'Puissance 4': '#eab308',
   'Chasseur Gamut': '#10b981',
   'Interface': '#ec4899',
+  'Mesure Jeu': '#0ea5e9',
 };
 
 function clamp255(v: number): number {
@@ -822,8 +852,8 @@ export default function EditeurPage() {
   const [linkDrag, setLinkDrag] = useState<{ active: boolean; x: number; y: number; gx: number; gy: number } | null>(null);
   const [pendingAutoConnect, setPendingAutoConnect] = useState<{ fromNodeId: string } | null>(null);
 
-  const [graphPan, setGraphPan] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
-  const [graphZoom, setGraphZoom] = useState<number>(1);
+  const [graphPan, setGraphPan] = useState<{ x: number; y: number }>({ x: 120, y: 80 });
+  const [graphZoom, setGraphZoom] = useState<number>(0.7);
   const bpContentRef = useRef<HTMLDivElement | null>(null);
   const [pinPositions, setPinPositions] = useState<
     Record<string, { in?: { x: number; y: number }; out?: { x: number; y: number } }>
@@ -2188,6 +2218,53 @@ export default function EditeurPage() {
       return { ...cur, games: nextGames };
     });
   };
+
+  function getUiComponents(): GameUIComponent[] {
+    return activeGame?.uiComponents ?? [];
+  }
+
+  function addUiComponent(kind: UICompKind) {
+    if (!activeGameId) return;
+    const newComp: GameUIComponent = {
+      id: `ui_${Date.now().toString(36)}`,
+      kind,
+      label: kind === 'button' ? 'Bouton' : kind === 'slider' ? 'Slider' : kind === 'label' ? 'Texte' : kind === 'counter' ? 'Score' : 'Timer',
+      color: '#4361ee',
+      min: 0,
+      max: 100,
+      step: 1,
+      value: 0,
+    };
+    commit((cur) => {
+      const nextGames = cur.games.map((g) => {
+        if (g.id !== cur.activeGameId) return g;
+        return { ...g, uiComponents: [...(g.uiComponents ?? []), newComp] };
+      });
+      return { ...cur, games: nextGames };
+    });
+    setTimeout(() => void saveActiveGame(), 100);
+  }
+
+  function removeUiComponent(id: string) {
+    commit((cur) => {
+      const nextGames = cur.games.map((g) => {
+        if (g.id !== cur.activeGameId) return g;
+        return { ...g, uiComponents: (g.uiComponents ?? []).filter((c) => c.id !== id) };
+      });
+      return { ...cur, games: nextGames };
+    });
+    setTimeout(() => void saveActiveGame(), 100);
+  }
+
+  function updateUiComponent(id: string, patch: Partial<GameUIComponent>) {
+    commit((cur) => {
+      const nextGames = cur.games.map((g) => {
+        if (g.id !== cur.activeGameId) return g;
+        return { ...g, uiComponents: (g.uiComponents ?? []).map((c) => c.id === id ? { ...c, ...patch } : c) };
+      });
+      return { ...cur, games: nextGames };
+    });
+  }
 
   if (isTeacher === null) {
     return (
@@ -5085,6 +5162,119 @@ export default function EditeurPage() {
                     <div style={{ padding: 12, borderRadius: 10, background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.18)' }}>
                       <p style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.5 }}>🏆 Déclenché quand toutes les rounds du Chasseur de Gamut sont terminées.</p>
                     </div>
+                  ) : selectedNode.kind === 'measure_start' ? (
+                    <div style={{ display: 'grid', gap: 12 }}>
+                      <div style={{ padding: 12, borderRadius: 10, background: 'rgba(14,165,233,0.08)', border: '1px solid rgba(14,165,233,0.2)' }}>
+                        <p style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.5 }}>📡 Lance une mesure colorimétrique via le CS-150. Connectez la sortie à <strong>measure_on_result</strong>.</p>
+                      </div>
+                      <label style={{ display: 'grid', gap: 4 }}>
+                        <span className="g-label">Timeout (sec)</span>
+                        <input className="g-input" type="number" min={1} max={30} style={{ height: 36, fontSize: 13 }}
+                          value={getNum(selectedNode.params, 'timeoutSec', 5)}
+                          onChange={(e) => updateSelectedParams({ timeoutSec: Number(e.target.value) })} />
+                      </label>
+                    </div>
+                  ) : selectedNode.kind === 'measure_on_result' ? (
+                    <div style={{ display: 'grid', gap: 12 }}>
+                      <div style={{ padding: 12, borderRadius: 10, background: 'rgba(14,165,233,0.08)', border: '1px solid rgba(14,165,233,0.2)' }}>
+                        <p style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.5 }}>✅ Déclenché quand la mesure CS-150 est reçue. Les coordonnées CIE xy et la luminance Lv sont stockées dans des variables.</p>
+                      </div>
+                      <label style={{ display: 'grid', gap: 4 }}>
+                        <span className="g-label">Variable x</span>
+                        <input className="g-input" style={{ height: 36, fontSize: 13 }}
+                          value={String(selectedNode.params.varX ?? 'meas_x')}
+                          onChange={(e) => updateSelectedParams({ varX: e.target.value })} />
+                      </label>
+                      <label style={{ display: 'grid', gap: 4 }}>
+                        <span className="g-label">Variable y</span>
+                        <input className="g-input" style={{ height: 36, fontSize: 13 }}
+                          value={String(selectedNode.params.varY ?? 'meas_y')}
+                          onChange={(e) => updateSelectedParams({ varY: e.target.value })} />
+                      </label>
+                      <label style={{ display: 'grid', gap: 4 }}>
+                        <span className="g-label">Variable Lv (luminance)</span>
+                        <input className="g-input" style={{ height: 36, fontSize: 13 }}
+                          value={String(selectedNode.params.varLv ?? 'meas_lv')}
+                          onChange={(e) => updateSelectedParams({ varLv: e.target.value })} />
+                      </label>
+                    </div>
+                  ) : selectedNode.kind === 'measure_compare' ? (
+                    <div style={{ display: 'grid', gap: 12 }}>
+                      <div style={{ padding: 12, borderRadius: 10, background: 'rgba(14,165,233,0.08)', border: '1px solid rgba(14,165,233,0.2)' }}>
+                        <p style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.5 }}>🎯 Compare la dernière mesure à une cible CIE xy. Retourne vrai si ΔE &lt; tolérance.</p>
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                        <label style={{ display: 'grid', gap: 4 }}>
+                          <span className="g-label">Cible x</span>
+                          <input className="g-input" type="number" step={0.001} min={0} max={1} style={{ height: 36, fontSize: 13 }}
+                            value={getNum(selectedNode.params, 'targetX', 0.3127)}
+                            onChange={(e) => updateSelectedParams({ targetX: Number(e.target.value) })} />
+                        </label>
+                        <label style={{ display: 'grid', gap: 4 }}>
+                          <span className="g-label">Cible y</span>
+                          <input className="g-input" type="number" step={0.001} min={0} max={1} style={{ height: 36, fontSize: 13 }}
+                            value={getNum(selectedNode.params, 'targetY', 0.329)}
+                            onChange={(e) => updateSelectedParams({ targetY: Number(e.target.value) })} />
+                        </label>
+                      </div>
+                      <label style={{ display: 'grid', gap: 4 }}>
+                        <span className="g-label">Tolérance ΔE</span>
+                        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                          <input type="range" min={1} max={20} step={0.5} style={{ flex: 1 }}
+                            value={getNum(selectedNode.params, 'toleranceDeltaE', 5)}
+                            onChange={(e) => updateSelectedParams({ toleranceDeltaE: Number(e.target.value) })} />
+                          <span style={{ fontSize: 12, fontWeight: 700, minWidth: 30 }}>ΔE {getNum(selectedNode.params, 'toleranceDeltaE', 5)}</span>
+                        </div>
+                      </label>
+                    </div>
+                  ) : selectedNode.kind === 'measure_show_cie' ? (
+                    <div style={{ display: 'grid', gap: 12 }}>
+                      <div style={{ padding: 12, borderRadius: 10, background: 'rgba(14,165,233,0.08)', border: '1px solid rgba(14,165,233,0.2)' }}>
+                        <p style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.5 }}>🌈 Affiche un diagramme CIE 1931 avec la mesure et la cible dans l&apos;interface du jeu.</p>
+                      </div>
+                      <label style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                        <input type="checkbox" className="g-check"
+                          checked={Boolean(selectedNode.params.showTarget ?? true)}
+                          onChange={(e) => updateSelectedParams({ showTarget: e.target.checked })} />
+                        <span className="g-label" style={{ margin: 0 }}>Afficher la cible</span>
+                      </label>
+                      <label style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                        <input type="checkbox" className="g-check"
+                          checked={Boolean(selectedNode.params.showResult ?? true)}
+                          onChange={(e) => updateSelectedParams({ showResult: e.target.checked })} />
+                        <span className="g-label" style={{ margin: 0 }}>Afficher le résultat</span>
+                      </label>
+                    </div>
+                  ) : selectedNode.kind === 'measure_target_xy' ? (
+                    <div style={{ display: 'grid', gap: 12 }}>
+                      <label style={{ display: 'grid', gap: 4 }}>
+                        <span className="g-label">Label de la cible</span>
+                        <input className="g-input" style={{ height: 36, fontSize: 13 }}
+                          value={String(selectedNode.params.label ?? 'D65')}
+                          onChange={(e) => updateSelectedParams({ label: e.target.value })} />
+                      </label>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                        <label style={{ display: 'grid', gap: 4 }}>
+                          <span className="g-label">x CIE</span>
+                          <input className="g-input" type="number" step={0.001} min={0} max={0.8} style={{ height: 36, fontSize: 13 }}
+                            value={getNum(selectedNode.params, 'x', 0.3127)}
+                            onChange={(e) => updateSelectedParams({ x: Number(e.target.value) })} />
+                        </label>
+                        <label style={{ display: 'grid', gap: 4 }}>
+                          <span className="g-label">y CIE</span>
+                          <input className="g-input" type="number" step={0.001} min={0} max={0.9} style={{ height: 36, fontSize: 13 }}
+                            value={getNum(selectedNode.params, 'y', 0.329)}
+                            onChange={(e) => updateSelectedParams({ y: Number(e.target.value) })} />
+                        </label>
+                      </div>
+                      <label style={{ display: 'grid', gap: 4 }}>
+                        <span className="g-label">Tolérance ΔE</span>
+                        <input className="g-input" type="number" step={0.5} min={0.5} max={30} style={{ height: 36, fontSize: 13 }}
+                          value={getNum(selectedNode.params, 'toleranceDeltaE', 3)}
+                          onChange={(e) => updateSelectedParams({ toleranceDeltaE: Number(e.target.value) })} />
+                      </label>
+                      <p style={{ fontSize: 11, opacity: 0.5, lineHeight: 1.4 }}>D65 = (0.3127, 0.3290) · D50 = (0.3457, 0.3585) · Illuminant A = (0.4476, 0.4074)</p>
+                    </div>
                   ) : selectedNode.kind === 'ui_button' ? (
                     <div style={{ display: 'grid', gap: 12 }}>
                       <div style={{ padding: 12, borderRadius: 10, background: 'rgba(236,72,153,0.08)', border: '1px solid rgba(236,72,153,0.18)' }}>
@@ -5811,74 +6001,153 @@ export default function EditeurPage() {
             </div>
 
             {/* Panneau latéral - Configuration UI */}
-            <div style={{ display: 'flex', flexDirection: 'column', borderLeft: '1px solid rgba(0,0,0,0.06)', background: '#fafafa' }}>
-              <div style={{ padding: '18px 20px', borderBottom: '1px solid rgba(0,0,0,0.06)', background: '#fff' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <Layers size={16} color="#1a1a1a" />
-                  <strong style={{ fontSize: 14, fontWeight: 800, color: '#1a1a1a' }}>Configuration UI</strong>
-                </div>
+            <div style={{ display: 'flex', flexDirection: 'column', width: 300, flexShrink: 0, borderLeft: '1px solid rgba(0,0,0,0.07)', background: '#f8f9fb', overflowY: 'auto' }}>
+              {/* Header */}
+              <div style={{ padding: '14px 16px', borderBottom: '1px solid rgba(0,0,0,0.07)', background: '#fff', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <MousePointer2 size={15} color="#4361ee" />
+                <strong style={{ fontSize: 13, fontWeight: 800, color: '#1a1d2e' }}>Configuration UI</strong>
               </div>
 
-              <div style={{ flex: 1, overflowY: 'auto', padding: 20 }}>
-                <div style={{ display: 'grid', gap: 16 }}>
-                  {/* Visibilité des dalles */}
-                  <div>
-                    <label className="g-label" style={{ marginBottom: 8, display: 'block' }}>Affichage des dalles</label>
-                    <select className="g-select" style={{ height: 36, fontSize: 13 }}>
-                      <option value="all">Toutes les dalles (9)</option>
-                      <option value="3x3">Grille 3×3</option>
-                      <option value="2x2">Grille 2×2</option>
-                      <option value="1x3">Ligne 1×3</option>
-                      <option value="custom">Personnalisé</option>
-                    </select>
-                  </div>
-
-                  {/* Nombre de dalles */}
-                  <div>
-                    <label className="g-label" style={{ marginBottom: 8, display: 'block' }}>Nombre de dalles visibles</label>
-                    <input
-                      type="number"
-                      className="g-input"
-                      min={1}
-                      max={9}
-                      defaultValue={9}
-                      style={{ height: 36, fontSize: 13 }}
-                    />
-                  </div>
-
-                  <div style={{ height: 1, background: 'rgba(0,0,0,0.06)', margin: '8px 0' }} />
-
-                  {/* Composants UI */}
-                  <div>
-                    <label className="g-label" style={{ marginBottom: 8, display: 'block' }}>Composants UI du jeu</label>
-                    <p style={{ fontSize: 11, color: '#999', marginBottom: 12, lineHeight: 1.4 }}>Ajoutez des boutons et sliders pour contrôler le jeu depuis /jeux</p>
-                    
-                    <div style={{ display: 'grid', gap: 8 }}>
-                      <button className="g-btn g-btn--sm" style={{ justifyContent: 'flex-start' }}>
-                        <Plus size={14} />
-                        <span>Ajouter un bouton</span>
-                      </button>
-                      <button className="g-btn g-btn--sm" style={{ justifyContent: 'flex-start' }}>
-                        <Plus size={14} />
-                        <span>Ajouter un slider</span>
-                      </button>
-                      <button className="g-btn g-btn--sm" style={{ justifyContent: 'flex-start' }}>
-                        <Plus size={14} />
-                        <span>Ajouter un texte</span>
-                      </button>
-                    </div>
-                  </div>
-
-                  <div style={{ height: 1, background: 'rgba(0,0,0,0.06)', margin: '8px 0' }} />
-
-                  {/* Liste des composants ajoutés */}
-                  <div>
-                    <label className="g-label" style={{ marginBottom: 8, display: 'block' }}>Composants ajoutés (0)</label>
-                    <div style={{ padding: 20, textAlign: 'center', color: '#999', fontSize: 12, background: '#fff', borderRadius: 12, border: '1px dashed rgba(0,0,0,0.1)' }}>
-                      Aucun composant UI pour le moment
-                    </div>
+              <div style={{ flex: 1, overflowY: 'auto', padding: '14px 16px', display: 'grid', gap: 16 }}>
+                {/* Affichage dalles */}
+                <div>
+                  <div className="g-label" style={{ marginBottom: 6 }}>Affichage des dalles</div>
+                  <select className="g-select" style={{ height: 34, fontSize: 12, width: '100%' }}
+                    value={String(activeGame?.tileCount ?? 42)}
+                    onChange={(e) => { updateActiveGameMeta({ tileCount: Number(e.target.value) }); void saveActiveGame(); }}>
+                    <option value="9">9 dalles (3×3)</option>
+                    <option value="12">12 dalles</option>
+                    <option value="21">21 dalles</option>
+                    <option value="42">42 dalles (toutes)</option>
+                  </select>
+                  <div style={{ marginTop: 6, fontSize: 11, color: '#888' }}>
+                    Nombre de dalles visibles : <strong>{activeGame?.tileCount ?? 42}</strong>
                   </div>
                 </div>
+
+                <div style={{ height: 1, background: 'rgba(0,0,0,0.06)' }} />
+
+                {/* Composants UI */}
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                    <span className="g-label" style={{ margin: 0 }}>Composants UI du jeu</span>
+                    <span style={{ fontSize: 10, color: '#888', fontWeight: 700 }}>{getUiComponents().length} ajouté{getUiComponents().length !== 1 ? 's' : ''}</span>
+                  </div>
+                  <p style={{ fontSize: 11, color: '#999', marginBottom: 10, lineHeight: 1.5 }}>
+                    Boutons et sliders pour contrôler le jeu depuis <strong>/jeux</strong>
+                  </p>
+
+                  {/* Boutons d'ajout */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 12 }}>
+                    {(['button', 'slider', 'label', 'counter', 'timer'] as UICompKind[]).map((kind) => (
+                      <button key={kind} className="g-btn g-btn--sm" style={{ justifyContent: 'flex-start', fontSize: 11, padding: '0 10px' }}
+                        disabled={!activeGameId}
+                        onClick={() => addUiComponent(kind)}>
+                        <Plus size={12} />
+                        <span>{kind === 'button' ? 'Bouton' : kind === 'slider' ? 'Slider' : kind === 'label' ? 'Texte' : kind === 'counter' ? 'Compteur' : 'Timer'}</span>
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Liste des composants */}
+                  {getUiComponents().length === 0 ? (
+                    <div style={{ padding: '20px 16px', textAlign: 'center', color: '#bbb', fontSize: 12, background: '#fff', borderRadius: 10, border: '1px dashed rgba(0,0,0,0.1)' }}>
+                      <MousePointer2 size={20} style={{ opacity: 0.3, margin: '0 auto 8px' }} />
+                      <div>Aucun composant UI</div>
+                      <div style={{ fontSize: 10, marginTop: 4, opacity: 0.7 }}>Ajoutez un bouton ou slider ci-dessus</div>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'grid', gap: 8 }}>
+                      {getUiComponents().map((comp) => (
+                        <div key={comp.id} style={{ background: '#fff', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, padding: '10px 12px', display: 'grid', gap: 8 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <div style={{ width: 10, height: 10, borderRadius: 3, background: comp.color ?? '#4361ee', flexShrink: 0 }} />
+                            <span style={{ fontSize: 12, fontWeight: 700, flex: 1, color: '#1a1d2e' }}>{comp.label}</span>
+                            <span style={{ fontSize: 10, color: '#888', background: 'rgba(0,0,0,0.05)', padding: '2px 6px', borderRadius: 4 }}>{comp.kind}</span>
+                            <button onClick={() => removeUiComponent(comp.id)} style={{ border: 'none', background: 'none', cursor: 'pointer', padding: 2, color: '#dc2626', opacity: 0.6 }}
+                              title="Supprimer">
+                              <X size={12} />
+                            </button>
+                          </div>
+                          <input className="g-input" style={{ height: 30, fontSize: 11 }}
+                            value={comp.label}
+                            placeholder="Label"
+                            onChange={(e) => updateUiComponent(comp.id, { label: e.target.value })}
+                            onBlur={() => void saveActiveGame()} />
+                          {/* Lien nœud */}
+                          <div>
+                            <div style={{ fontSize: 10, color: '#888', marginBottom: 4, fontWeight: 600 }}>Nœud lié (on_ui_click ID)</div>
+                            <select className="g-select" style={{ height: 30, fontSize: 11, width: '100%' }}
+                              value={comp.nodeRef ?? ''}
+                              onChange={(e) => { updateUiComponent(comp.id, { nodeRef: e.target.value }); void saveActiveGame(); }}>
+                              <option value="">-- Aucun --</option>
+                              {(activeGame?.nodes ?? []).filter((n) => n.kind === 'on_ui_click' || n.kind === 'variable_set').map((n) => (
+                                <option key={n.id} value={n.id}>{n.name} ({n.kind})</option>
+                              ))}
+                            </select>
+                          </div>
+                          {comp.kind === 'slider' && (
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                              <label style={{ display: 'grid', gap: 3 }}>
+                                <span style={{ fontSize: 10, color: '#888', fontWeight: 600 }}>Min</span>
+                                <input className="g-input" type="number" style={{ height: 28, fontSize: 11 }}
+                                  value={comp.min ?? 0}
+                                  onChange={(e) => { updateUiComponent(comp.id, { min: Number(e.target.value) }); void saveActiveGame(); }} />
+                              </label>
+                              <label style={{ display: 'grid', gap: 3 }}>
+                                <span style={{ fontSize: 10, color: '#888', fontWeight: 600 }}>Max</span>
+                                <input className="g-input" type="number" style={{ height: 28, fontSize: 11 }}
+                                  value={comp.max ?? 100}
+                                  onChange={(e) => { updateUiComponent(comp.id, { max: Number(e.target.value) }); void saveActiveGame(); }} />
+                              </label>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Prévisualisation des composants dans le jeu */}
+                {getUiComponents().length > 0 && (
+                  <>
+                    <div style={{ height: 1, background: 'rgba(0,0,0,0.06)' }} />
+                    <div>
+                      <div className="g-label" style={{ marginBottom: 10 }}>Prévisualisation</div>
+                      <div style={{ background: '#fff', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 12, padding: 14, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                        {getUiComponents().map((comp) => {
+                          if (comp.kind === 'button') return (
+                            <button key={comp.id} style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: comp.color ?? '#4361ee', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+                              {comp.label}
+                            </button>
+                          );
+                          if (comp.kind === 'slider') return (
+                            <div key={comp.id} style={{ width: '100%' }}>
+                              <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 4, color: '#1a1d2e' }}>{comp.label}</div>
+                              <input type="range" min={comp.min ?? 0} max={comp.max ?? 100} step={comp.step ?? 1} defaultValue={comp.value ?? 50} style={{ width: '100%' }} />
+                            </div>
+                          );
+                          if (comp.kind === 'label') return (
+                            <div key={comp.id} style={{ fontSize: 13, fontWeight: 600, color: '#1a1d2e' }}>{comp.label}</div>
+                          );
+                          if (comp.kind === 'counter') return (
+                            <div key={comp.id} style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#f0f2ff', borderRadius: 8, padding: '6px 12px' }}>
+                              <span style={{ fontSize: 11, color: '#666' }}>{comp.label}</span>
+                              <span style={{ fontSize: 18, fontWeight: 800, color: '#4361ee' }}>{comp.value ?? 0}</span>
+                            </div>
+                          );
+                          if (comp.kind === 'timer') return (
+                            <div key={comp.id} style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#fff7ed', borderRadius: 8, padding: '6px 12px' }}>
+                              <Clock size={14} color="#f97316" />
+                              <span style={{ fontSize: 16, fontWeight: 800, color: '#f97316', fontVariantNumeric: 'tabular-nums' }}>60s</span>
+                            </div>
+                          );
+                          return null;
+                        })}
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           </div>
