@@ -1399,26 +1399,43 @@ export default function JeuxPage() {
 
   useEffect(() => {
     if (view !== 'main') return;
-    
+
     // Ne poll que si un token MP existe OU si le status est actif OU si une session existe
     const shouldPoll = mpToken || mpStatus === 'active' || mpSessionId;
     if (!shouldPoll) return;
-    
+
     let alive = true;
     let timer = 0;
 
     const tick = async () => {
       if (!alive) return;
+      // Flag pour contrôler si finally doit reprogrammer (évite le double-schedule)
+      let nextDelay = mpStatus === 'active' ? 800 : 5000;
+      let doReschedule = true;
+
       try {
         const qs = mpToken ? `?token=${encodeURIComponent(mpToken)}` : '';
         const res = await fetch(`/api/multiplayer/state${qs}`, { cache: 'no-store' });
+
         if (!res.ok) {
-          timer = window.setTimeout(tick, 700);
+          if (res.status === 404) {
+            // Session introuvable → nettoyer le token et stopper le polling
+            // (le useEffect se réexécutera avec shouldPoll=false et sortira)
+            setMpToken('');
+            setMpSessionId('');
+            setMpStatus('');
+            if (typeof window !== 'undefined') window.localStorage.removeItem('crg_mp_token');
+            doReschedule = false;
+          } else {
+            // Autre erreur HTTP → retry espacé
+            nextDelay = 5000;
+          }
           return;
         }
+
         const data = (await res.json()) as any;
         if (!data?.ok) {
-          timer = window.setTimeout(tick, 700);
+          nextDelay = 5000;
           return;
         }
 
@@ -1454,9 +1471,7 @@ export default function JeuxPage() {
             }
           } else {
             // Only auto-follow if user has previously joined this session
-            // Don't auto-start just because a session exists
             if (mpAutoFollow && mpToken && youSeat) {
-              // Auto-follow multijoueur
               if (!gameActive) setGameActive(true);
             }
           }
@@ -1466,11 +1481,13 @@ export default function JeuxPage() {
           if (mpStatus === 'active' && gameActive && !mpEndPrompt && mpSeat === 1) setMpEndPrompt(true);
         }
       } catch {
-        // ignore
+        // Erreur réseau → retry espacé
+        nextDelay = 5000;
       } finally {
-        // Polling plus espacé : 500ms si actif, 2000ms sinon
-        const nextDelay = mpStatus === 'active' ? 500 : 2000;
-        timer = window.setTimeout(tick, nextDelay);
+        // Ne reprogrammer que si on n'a pas arrêté et que le composant est toujours monté
+        if (doReschedule && alive) {
+          timer = window.setTimeout(tick, nextDelay);
+        }
       }
     };
 
