@@ -3802,7 +3802,7 @@ export default function JeuxPage() {
                               <h4>{g.name}</h4>
                               <span style={{ fontSize: 10, fontWeight: 700, color: '#c4b5fd', background: 'rgba(124,58,237,0.18)', padding: '2px 7px', borderRadius: 5 }}>custom</span>
                             </div>
-                            <p style={{ color: 'var(--text-2)', fontSize: 12, margin: '2px 0 0', lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{description}</p>
+                            <p style={{ color: 'var(--text-2)', fontSize: 12, margin: '2px 0 0', lineHeight: 1.4, whiteSpace: 'pre-line' }}>{description}</p>
                           </div>
                           <button
                             className="play-btn"

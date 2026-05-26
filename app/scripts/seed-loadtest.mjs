@@ -219,8 +219,7 @@ const config = {
   tileCount: 42,
   icon: 'Palette',
   difficulty: 3,
-  description:
-    'Mesurez une couleur avec le CS-150, observez-la 5 secondes sur les 42 dalles, puis retrouvez-la sur le diagramme CIE 1931 !',
+  description: 'Mesure avec le CS-150\nRetrouve la couleur\nsur le diagramme CIE',
   bgColor: '#0d1117',
   accentColor: '#7c3aed',
   nodes,
