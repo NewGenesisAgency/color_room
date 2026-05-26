@@ -948,15 +948,17 @@ export default function JeuxPage() {
     hwCurrentCtrlRef.current = ctrl;
     hwInFlightRef.current = true;
 
-    // Timeout auto-cancel : si la requête dépasse 3s (hardware saturé ou lent),
-    // on abandonne proprement et on envoie l'état pending — évite de bloquer
-    // l'UI 10s quand le serveur hardware est sous charge.
-    const autoAbortTimer = window.setTimeout(() => ctrl.abort(), 3000);
+    // Timeout auto-cancel : 1500ms max.
+    // force:true est envoyé SYSTÉMATIQUEMENT — le serveur purge immédiatement
+    // sa file interne (waiters stale) avant de traiter ce batch.
+    // Sans ça, les anciennes requêtes s'accumulent dans la file du serveur et
+    // saturent la connexion TCP de supervision.exe → ralentissement exponentiel.
+    const autoAbortTimer = window.setTimeout(() => ctrl.abort(), 1500);
 
     fetch('/api/supervision/batch', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ plates, fast: true }),
+      body: JSON.stringify({ plates, fast: true, force: true }),
       cache: 'no-store',
       signal: ctrl.signal,
     })

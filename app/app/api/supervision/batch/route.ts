@@ -5,47 +5,69 @@ const DEFAULT_BASE_URL = 'http://172.17.50.136:18080';
 // Timeout par défaut pour les appels normaux (ex: éditeur sans fast)
 const DEFAULT_TIMEOUT_MS = 1200;
 // Timeout "fast" pour les jeux en temps réel
-const GAME_TIMEOUT_MS = 800;
+const GAME_TIMEOUT_MS = 700;
 
-// ── Sémaphore global ─────────────────────────────────────────────────────────
-// Le serveur supervision est HTTP/1.1 + accès série monothread.
-// On limite à 6 requêtes simultanées pour ne pas saturer sa file d'attente.
-const HW_CONCURRENCY = 6;
-let globalHwInFlight = 0;
+// ── Drainable promise-queue semaphore ─────────────────────────────────────────
+//
+// POURQUOI PAS UN BUSY-WAIT ?
+// L'ancienne implémentation utilisait :
+//   while (globalHwInFlight >= N) await new Promise(r => setTimeout(r, 5));
+// Problème : quand force() est appelé, les promises dormantes continuent de
+// s'exécuter dès qu'un slot se libère — même si leurs données sont obsolètes.
+// Résultat : accumulation indéfinie de requêtes stale dans la file de supervision.exe,
+// qui sature sa connexion TCP et ralentit exponentiellement.
+//
+// La file drainable résout ça : quand forceReset() est appelé, TOUS les waiters
+// sont résolus immédiatement avec false (ne pas procéder). Zéro accumulation.
 
-// AbortController global pour "forcer la prise de contrôle" :
-// quand force=true, toutes les requêtes en cours sont annulées et les slots
-// sont libérés immédiatement pour que les nouvelles passent en premier.
+const HW_CONCURRENCY = 2; // supervision.exe est essentiellement série
+
+type Waiter = { resolve: (proceed: boolean) => void };
+let hwInFlight = 0;
+const hwWaiters: Waiter[] = [];
 let forceAbortCtrl: AbortController = new AbortController();
 
-// ── Preemption (une seule fois par batch) ────────────────────────────────────
-// La préemption ne doit être déclenchée QU'UNE SEULE FOIS par batch.
-// Si on l'applique à tous les channels en Promise.all, chaque appel abort
-// tous les précédents → cascade d'annulations → seul le dernier survit.
-//
-// On N'ÉCRASE PAS globalHwInFlight : les requêtes abortées vont rapidement
-// passer dans leur bloc finally et décrémenter le compteur elles-mêmes.
-// Si on le réinitialisait à 0, leurs finally le passeraient en négatif.
-function applyForceOnce() {
-  forceAbortCtrl.abort();
-  forceAbortCtrl = new AbortController();
-  // globalHwInFlight se remettra à 0 naturellement via les blocs finally
-  // des requêtes abortées (en quelques millisecondes max)
+function drainWaiters() {
+  while (hwWaiters.length > 0 && hwInFlight < HW_CONCURRENCY) {
+    hwInFlight++;
+    hwWaiters.shift()!.resolve(true);
+  }
 }
 
-async function globalHwSlot<T>(
-  fn: (signal: AbortSignal) => Promise<T>,
-): Promise<T> {
-  // Attendre qu'un slot se libère (busy-wait 5ms)
-  while (globalHwInFlight >= HW_CONCURRENCY) {
-    await new Promise<void>((r) => setTimeout(r, 5));
+async function acquireHwSlot(): Promise<boolean> {
+  if (hwInFlight < HW_CONCURRENCY) {
+    hwInFlight++;
+    return true;
   }
-  globalHwInFlight++;
-  try {
-    return await fn(forceAbortCtrl.signal);
-  } finally {
-    globalHwInFlight--;
+  // MAX_QUEUE : évite les accumulations infinies en cas de boucle non-force
+  if (hwWaiters.length >= 256) {
+    // Éjecter le plus ancien (le plus stale)
+    const dropped = hwWaiters.shift()!;
+    dropped.resolve(false);
   }
+  return new Promise<boolean>((resolve) => {
+    hwWaiters.push({ resolve });
+  });
+}
+
+function releaseHwSlot() {
+  hwInFlight = Math.max(0, hwInFlight - 1);
+  drainWaiters();
+}
+
+/**
+ * Purge instantanée de toute la file + abort des requêtes en cours.
+ * Les waiters reçoivent false → ils ne lancent aucun fetch.
+ * Les fetches en cours reçoivent un signal d'abort.
+ */
+function forceReset() {
+  forceAbortCtrl.abort();
+  forceAbortCtrl = new AbortController();
+
+  // Vider la file : les waiters n'ont PAS encore incrémenté hwInFlight
+  const stale = hwWaiters.splice(0);
+  for (const w of stale) w.resolve(false);
+  // hwInFlight reste correct : il ne compte que les fetches réellement en cours
 }
 
 function getBaseUrl(): string {
@@ -86,54 +108,78 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true, updatedChannels: 0 });
     }
 
-    // ── Force-preemption : UNE SEULE FOIS avant d'envoyer le batch ────────────
-    // On abort toutes les requêtes précédentes AVANT de lancer le Promise.all.
-    // Ainsi aucune des nouvelles requêtes ne s'abort mutuellement.
+    // ── Force-preemption : purge la file AVANT de lancer les nouvelles requêtes ─
     if (isForce) {
-      applyForceOnce();
+      forceReset();
     }
 
-    // ── Envoyer avec sémaphore global ─────────────────────────────────────────
+    // ── Snapshot du signal de force pour CE batch ─────────────────────────────
+    // On capture le signal APRÈS forceReset() pour ne pas écouter le signal
+    // déjà aborté — on veut le nouveau signal de la nouvelle génération.
+    const batchForceSignal = forceAbortCtrl.signal;
+
+    // ── Propager l'annulation client (disconnect) ─────────────────────────────
+    // Si le client coupe la connexion (ex: timeout côté Next.js), on purge la file.
+    const clientSignal = req.signal;
+    if (clientSignal) {
+      clientSignal.addEventListener('abort', () => {
+        // Purger la file quand le client se déconnecte (évite d'envoyer des
+        // commandes obsolètes à supervision.exe pour rien)
+        const stale = hwWaiters.splice(0);
+        for (const w of stale) w.resolve(false);
+      }, { once: true });
+    }
+
+    // ── Envoyer avec la file drainable ────────────────────────────────────────
     const sendOne = async (r: ChanReq): Promise<boolean> => {
-      return globalHwSlot(async (globalSignal) => {
-        // Seul l'endpoint /canal/ est documenté dans le README officiel
-        const urlCanal  = `${baseUrl}/state/plaque/${r.plateId}/canal/${r.index}/${r.value}`;
-        // Fallback /cursor/ pour compat ancienne version de l'API
+      // Vérifier si déjà annulé avant de demander un slot
+      if (batchForceSignal.aborted || clientSignal?.aborted) return false;
+
+      const proceed = await acquireHwSlot();
+      if (!proceed) return false;
+
+      // Re-vérifier après avoir obtenu le slot (peut avoir changé pendant l'attente)
+      if (batchForceSignal.aborted || clientSignal?.aborted) {
+        releaseHwSlot();
+        return false;
+      }
+
+      const reqCtrl = new AbortController();
+      const t = setTimeout(() => reqCtrl.abort(), timeoutMs);
+
+      const onForce  = () => reqCtrl.abort();
+      const onClient = () => reqCtrl.abort();
+      batchForceSignal.addEventListener('abort', onForce, { once: true });
+      clientSignal?.addEventListener('abort', onClient, { once: true });
+
+      try {
+        const urlCanal = `${baseUrl}/state/plaque/${r.plateId}/canal/${r.index}/${r.value}`;
+        const res = await fetch(urlCanal, {
+          method: 'PUT',
+          cache: 'no-store',
+          signal: reqCtrl.signal,
+          headers: { Connection: 'close' },
+        });
+        if (res.ok) return true;
+
+        // Fallback /cursor/ (ancienne version de l'API)
+        if (reqCtrl.signal.aborted) return false;
         const urlCursor = `${baseUrl}/state/plaque/${r.plateId}/cursor/${r.index}/${r.value}`;
-
-        const ctrl = new AbortController();
-        const t = setTimeout(() => ctrl.abort(), timeoutMs);
-
-        // Propager l'annulation "force" à cette requête individuelle
-        const onForce = () => ctrl.abort();
-        globalSignal.addEventListener('abort', onForce, { once: true });
-
-        try {
-          // Essayer d'abord /canal/ (endpoint officiel selon README)
-          const res = await fetch(urlCanal, {
-            method: 'PUT',
-            cache: 'no-store',
-            signal: ctrl.signal,
-            headers: { 'Connection': 'close' },
-          });
-          if (res.ok) return true;
-
-          // Fallback vers /cursor/ (ancienne API ou variante)
-          if (ctrl.signal.aborted) return false;
-          const res2 = await fetch(urlCursor, {
-            method: 'PUT',
-            cache: 'no-store',
-            signal: ctrl.signal,
-            headers: { 'Connection': 'close' },
-          });
-          return res2.ok;
-        } catch {
-          return false;
-        } finally {
-          clearTimeout(t);
-          globalSignal.removeEventListener('abort', onForce);
-        }
-      });
+        const res2 = await fetch(urlCursor, {
+          method: 'PUT',
+          cache: 'no-store',
+          signal: reqCtrl.signal,
+          headers: { Connection: 'close' },
+        });
+        return res2.ok;
+      } catch {
+        return false;
+      } finally {
+        clearTimeout(t);
+        batchForceSignal.removeEventListener('abort', onForce);
+        clientSignal?.removeEventListener('abort', onClient);
+        releaseHwSlot();
+      }
     };
 
     const results = await Promise.all(allRequests.map((r) => sendOne(r)));
