@@ -7,7 +7,7 @@ import TetrisGame from '@/app/_components/TetrisGame';
 import CS150Panel from '@/app/_components/CS150Panel';
 import type { TetrisSnapshot } from '@/app/_components/TetrisGame';
 
-import { Boxes, Gamepad2, Plus, Play, Pause, RotateCcw, Save, Trash2, FolderPlus, X, Lightbulb, Layers, Zap, Palette, Clock, MousePointer2, LayoutGrid, Maximize2, Minimize2, Eye, Star, Heart, Sun, Moon, Flame, Snowflake, Music, Target, Puzzle, Sparkles, Trophy, Rocket, Ghost, Dice1, Brain, Check, GitBranch, Hash, Settings2, Shuffle, Search, Users, Film, Thermometer, ScanLine, type LucideIcon } from 'lucide-react';
+import { Boxes, Gamepad2, Plus, Play, Pause, RotateCcw, Save, Trash2, FolderPlus, X, Lightbulb, Layers, Zap, Palette, Clock, MousePointer2, LayoutGrid, Maximize2, Minimize2, Eye, Star, Heart, Sun, Moon, Flame, Snowflake, Music, Target, Puzzle, Sparkles, Trophy, Rocket, Ghost, Dice1, Brain, Check, GitBranch, Hash, Settings2, Shuffle, Search, Users, Film, Thermometer, ScanLine, Wifi, WifiOff, type LucideIcon } from 'lucide-react';
 
 type IdFactory = () => string;
 
@@ -842,6 +842,24 @@ export default function EditeurPage() {
 
   const [status, setStatus] = useState<string>('');
   const [selectedTileIndex, setSelectedTileIndex] = useState<number | null>(null);
+
+  // ── Statut connexion supervision API ──────────────────────────────────────
+  const [hwReachable, setHwReachable] = useState<'unknown' | 'ok' | 'error'>('unknown');
+  useEffect(() => {
+    let cancelled = false;
+    async function checkHw() {
+      try {
+        const r = await fetch('/api/supervision/status', { cache: 'no-store' });
+        const j = await r.json().catch(() => null);
+        if (!cancelled) setHwReachable(j?.reachable === true ? 'ok' : 'error');
+      } catch {
+        if (!cancelled) setHwReachable('error');
+      }
+    }
+    void checkHw();
+    const interval = setInterval(() => void checkHw(), 8000);
+    return () => { cancelled = true; clearInterval(interval); };
+  }, []);
   const tetrisSnapRef = useRef<TetrisSnapshot | null>(null);
   // Refs stables pour les callbacks utilisés dans le keydown handler global
   const saveActiveGameRef = useRef<(() => Promise<void>) | null>(null);
@@ -2835,6 +2853,19 @@ export default function EditeurPage() {
                   <strong style={{ fontSize: 14, fontWeight: 800, letterSpacing: '-0.02em', color: '#1a1a1a' }}>Aperçu</strong>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  {/* Indicateur statut API supervision */}
+                  <div
+                    title={hwReachable === 'ok' ? 'Supervision API joignable' : hwReachable === 'error' ? 'Supervision API inaccessible — vérifiez SUPERVISION_API_URL' : 'Vérification...'}
+                    style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 8px', borderRadius: 8, fontSize: 11, fontWeight: 600,
+                      background: hwReachable === 'ok' ? 'rgba(6,214,160,0.12)' : hwReachable === 'error' ? 'rgba(255,80,80,0.12)' : 'rgba(160,160,160,0.1)',
+                      color: hwReachable === 'ok' ? '#06d6a0' : hwReachable === 'error' ? '#ff5050' : '#888',
+                      border: `1px solid ${hwReachable === 'ok' ? 'rgba(6,214,160,0.25)' : hwReachable === 'error' ? 'rgba(255,80,80,0.25)' : 'rgba(160,160,160,0.2)'}`,
+                      cursor: 'default',
+                    }}
+                  >
+                    {hwReachable === 'ok' ? <Wifi size={12} /> : hwReachable === 'error' ? <WifiOff size={12} /> : <Wifi size={12} opacity={0.4} />}
+                    <span>{hwReachable === 'ok' ? 'API OK' : hwReachable === 'error' ? 'Hors ligne' : '…'}</span>
+                  </div>
                   <button
                     className="g-btn g-btn--sm"
                     onClick={() => setIsPlaying((p) => !p)}

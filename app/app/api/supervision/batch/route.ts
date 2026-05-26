@@ -3,9 +3,9 @@ import { NextResponse } from 'next/server';
 const DEFAULT_BASE_URL = 'http://172.17.50.136:18080';
 
 // Timeout par défaut pour les appels normaux (ex: éditeur sans fast)
-const DEFAULT_TIMEOUT_MS = 800;
+const DEFAULT_TIMEOUT_MS = 1200;
 // Timeout "fast" pour les jeux en temps réel
-const GAME_TIMEOUT_MS = 400;
+const GAME_TIMEOUT_MS = 800;
 
 // ── Sémaphore global ─────────────────────────────────────────────────────────
 // Le serveur supervision est HTTP/1.1 + accès série monothread.
@@ -18,17 +18,24 @@ let globalHwInFlight = 0;
 // sont libérés immédiatement pour que les nouvelles passent en premier.
 let forceAbortCtrl: AbortController = new AbortController();
 
+// ── Preemption (une seule fois par batch) ────────────────────────────────────
+// La préemption ne doit être déclenchée QU'UNE SEULE FOIS par batch.
+// Si on l'applique à tous les channels en Promise.all, chaque appel abort
+// tous les précédents → cascade d'annulations → seul le dernier survit.
+//
+// On N'ÉCRASE PAS globalHwInFlight : les requêtes abortées vont rapidement
+// passer dans leur bloc finally et décrémenter le compteur elles-mêmes.
+// Si on le réinitialisait à 0, leurs finally le passeraient en négatif.
+function applyForceOnce() {
+  forceAbortCtrl.abort();
+  forceAbortCtrl = new AbortController();
+  // globalHwInFlight se remettra à 0 naturellement via les blocs finally
+  // des requêtes abortées (en quelques millisecondes max)
+}
+
 async function globalHwSlot<T>(
   fn: (signal: AbortSignal) => Promise<T>,
-  force: boolean,
 ): Promise<T> {
-  if (force) {
-    // Forcer : annuler toutes les requêtes en cours et vider les slots
-    forceAbortCtrl.abort();
-    forceAbortCtrl = new AbortController();
-    globalHwInFlight = 0;
-  }
-
   // Attendre qu'un slot se libère (busy-wait 5ms)
   while (globalHwInFlight >= HW_CONCURRENCY) {
     await new Promise<void>((r) => setTimeout(r, 5));
@@ -79,11 +86,19 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true, updatedChannels: 0 });
     }
 
-    // ── Envoyer avec sémaphore global + support force-preemption ─────────────
+    // ── Force-preemption : UNE SEULE FOIS avant d'envoyer le batch ────────────
+    // On abort toutes les requêtes précédentes AVANT de lancer le Promise.all.
+    // Ainsi aucune des nouvelles requêtes ne s'abort mutuellement.
+    if (isForce) {
+      applyForceOnce();
+    }
+
+    // ── Envoyer avec sémaphore global ─────────────────────────────────────────
     const sendOne = async (r: ChanReq): Promise<boolean> => {
       return globalHwSlot(async (globalSignal) => {
-        // Essayer les deux endpoints (canal = spec officielle, cursor = compat ancienne API)
+        // Seul l'endpoint /canal/ est documenté dans le README officiel
         const urlCanal  = `${baseUrl}/state/plaque/${r.plateId}/canal/${r.index}/${r.value}`;
+        // Fallback /cursor/ pour compat ancienne version de l'API
         const urlCursor = `${baseUrl}/state/plaque/${r.plateId}/cursor/${r.index}/${r.value}`;
 
         const ctrl = new AbortController();
@@ -118,15 +133,10 @@ export async function POST(req: Request) {
           clearTimeout(t);
           globalSignal.removeEventListener('abort', onForce);
         }
-      }, isForce);
+      });
     };
 
-    // Premier appel avec force=true : seul le premier envoi de la liste
-    // déclenche la préemption. Les suivants utilisent force=false pour
-    // ne pas s'annuler eux-mêmes.
-    const results = await Promise.all(
-      allRequests.map((r, i) => sendOne(r)),
-    );
+    const results = await Promise.all(allRequests.map((r) => sendOne(r)));
     const ok = results.filter(Boolean).length;
 
     return NextResponse.json({
