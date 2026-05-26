@@ -275,10 +275,10 @@ a:hover {
 }
 
 .g-btn--success:hover:not(:disabled) {
-  background: #1a1a1a;
+  background: #059669;
   color: #fff;
-  border-color: #1a1a1a;
-  box-shadow: 0 4px 18px rgba(0,0,0,0.18);
+  border-color: #059669;
+  box-shadow: 0 4px 18px rgba(5,150,105,0.25);
 }
 
 /* --- Global Input --- */
@@ -382,7 +382,7 @@ a:hover {
   height: 18px;
   border-radius: 999px;
   border: 2px solid #fff;
-  background: var(--track-color, #1a1a1a);
+  background: var(--track-color, #4361ee);
   box-shadow: 0 1px 4px rgba(0,0,0,0.18);
   cursor: pointer;
   transition: transform 0.12s ease, box-shadow 0.12s ease;
@@ -407,7 +407,7 @@ a:hover {
 .g-slider::-moz-range-progress {
   height: 4px;
   border-radius: 999px;
-  background: var(--track-color, #1a1a1a);
+  background: var(--track-color, #4361ee);
 }
 
 .g-slider::-moz-range-thumb {
@@ -415,7 +415,7 @@ a:hover {
   height: 18px;
   border-radius: 999px;
   border: 2px solid #fff;
-  background: var(--track-color, #1a1a1a);
+  background: var(--track-color, #4361ee);
   box-shadow: 0 1px 4px rgba(0,0,0,0.18);
   cursor: pointer;
 }

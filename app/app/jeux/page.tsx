@@ -3403,34 +3403,34 @@ export default function JeuxPage() {
           <div
             style={{
               width: 'min(480px, calc(100vw - 32px))',
-              background: '#1a1b2e',
-              border: '1px solid rgba(255,255,255,0.12)',
+              background: 'rgba(255,255,255,0.97)',
+              border: '1px solid rgba(0,0,0,0.08)',
               borderRadius: 20,
               padding: 28,
-              boxShadow: '0 24px 60px rgba(0,0,0,0.6)',
+              boxShadow: '0 24px 60px rgba(0,0,0,0.18), 0 4px 16px rgba(0,0,0,0.08)',
               fontFamily: 'system-ui, sans-serif',
             }}
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
-              <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#4ade80', boxShadow: '0 0 8px #4ade80', flexShrink: 0 }} />
-              <span style={{ color: '#fff', fontWeight: 800, fontSize: 16 }}>Session multijoueur détectée</span>
+              <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#4ade80', boxShadow: '0 0 8px rgba(74,222,128,0.6)', flexShrink: 0 }} />
+              <span style={{ color: '#1a1d2e', fontWeight: 800, fontSize: 16 }}>Session multijoueur détectée</span>
             </div>
             {/* Session ID */}
-            <code style={{ display: 'block', color: 'rgba(255,255,255,0.35)', fontSize: 11, fontFamily: 'monospace', marginBottom: 16 }}>
+            <code style={{ display: 'block', color: 'rgba(26,29,46,0.4)', fontSize: 11, fontFamily: 'monospace', marginBottom: 16 }}>
               ID : {mpJoinPrompt.sessionId || '—'}
             </code>
             {/* Body */}
-            <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.75)', lineHeight: 1.6 }}>
-              Un autre poste a lancé le jeu <strong style={{ color: '#fff' }}>Multijoueur — Teintes</strong>.
+            <div style={{ fontSize: 14, color: 'rgba(26,29,46,0.75)', lineHeight: 1.6 }}>
+              Un autre poste a lancé le jeu <strong style={{ color: '#1a1d2e' }}>Multijoueur — Teintes</strong>.
               <br />
               Voulez-vous rejoindre ? La partie démarrera automatiquement dès qu'il y aura 2 joueurs.
             </div>
             {/* Buttons */}
             <div style={{ marginTop: 24, display: 'flex', gap: 10 }}>
               <button
-                style={{ flex: 1, padding: '12px 0', borderRadius: 12, border: '1px solid rgba(255,255,255,0.18)', background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.8)', fontWeight: 600, fontSize: 14, cursor: 'pointer' }}
+                style={{ flex: 1, padding: '12px 0', borderRadius: 12, border: '1px solid rgba(0,0,0,0.12)', background: '#f5f6fa', color: 'rgba(26,29,46,0.7)', fontWeight: 600, fontSize: 14, cursor: 'pointer' }}
                 onClick={() => {
                   const sid = mpJoinPrompt.sessionId || '';
                   setMpJoinPrompt({ open: false, sessionId: '' });
@@ -3613,8 +3613,8 @@ export default function JeuxPage() {
                   role="button"
                   tabIndex={0}
                 >
-                  <div className="game-icon" style={{ background: 'linear-gradient(135deg, #1a1d2e, #2a2d4e)' }}>
-                    <Gamepad2 size={20} color="#4361ee" />
+                  <div className="game-icon" style={{ background: 'linear-gradient(135deg, #4361ee, #6366f1)' }}>
+                    <Gamepad2 size={20} color="#fff" />
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
@@ -4973,12 +4973,12 @@ export default function JeuxPage() {
         >
           <div
             style={{
-              background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
+              background: 'rgba(255,255,255,0.98)',
               borderRadius: 24,
               padding: '40px 48px',
               textAlign: 'center',
-              border: '2px solid rgba(255,255,255,0.1)',
-              boxShadow: '0 25px 50px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.05)',
+              border: '1px solid rgba(0,0,0,0.08)',
+              boxShadow: '0 25px 50px rgba(0,0,0,0.15), 0 4px 16px rgba(0,0,0,0.08)',
               animation: 'slideUp 0.4s ease-out',
               maxWidth: 400,
               width: '90%'
@@ -4989,25 +4989,25 @@ export default function JeuxPage() {
               fontSize: 28,
               fontWeight: 800,
               marginBottom: 12,
-              background: 'linear-gradient(135deg, #667eea, #f093fb)',
+              background: 'linear-gradient(135deg, #4361ee, #7c3aed)',
               WebkitBackgroundClip: 'text',
               WebkitTextFillColor: 'transparent'
             }}>
-              Jeu Terminé!
+              Jeu Terminé !
             </h2>
-            <p style={{ fontSize: 16, color: '#a0a0a0', marginBottom: 8 }}>
+            <p style={{ fontSize: 16, color: 'rgba(26,29,46,0.6)', marginBottom: 8 }}>
               {gameOverPopup.game}
             </p>
             <div style={{
               fontSize: 42,
               fontWeight: 800,
-              color: '#fff',
+              color: '#1a1d2e',
               marginBottom: 8,
               fontFamily: 'SF Pro Display, -apple-system, sans-serif'
             }}>
               {gameOverPopup.score} pts
             </div>
-            <p style={{ fontSize: 14, color: '#888', marginBottom: 32 }}>
+            <p style={{ fontSize: 14, color: 'rgba(26,29,46,0.5)', marginBottom: 32 }}>
               {gameOverPopup.message}
             </p>
 

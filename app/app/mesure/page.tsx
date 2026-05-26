@@ -614,11 +614,11 @@ export default function MesurePage() {
       <div style={{ display: 'grid', gridTemplateColumns: '480px 1fr', gap: 20, marginBottom: 20, alignItems: 'start' }}>
 
         {/* Chromaticity diagram */}
-        <div style={{ background: '#0f172a', borderRadius: 14, padding: 12, border: '1px solid #1e293b' }}>
+        <div style={{ background: '#1e293b', borderRadius: 14, padding: 12, border: '1px solid #334155', boxShadow: '0 4px 16px rgba(0,0,0,0.12)' }}>
           <div style={{ fontSize: 12, fontWeight: 600, color: '#94a3b8', marginBottom: 10, letterSpacing: 0.5 }}>
             DIAGRAMME DE CHROMATICITÉ CIE 1931
-            {currentPoint && <span style={{ marginLeft: 8, color: '#fff' }}>● mesure courante</span>}
-            {historyPoints.length > 0 && <span style={{ marginLeft: 8, color: 'rgba(255,255,255,0.45)' }}>— trajectoire (couleur = z, épaisseur = Z)</span>}
+            {currentPoint && <span style={{ marginLeft: 8, color: '#e2e8f0' }}>● mesure courante</span>}
+            {historyPoints.length > 0 && <span style={{ marginLeft: 8, color: 'rgba(226,232,240,0.45)' }}>— trajectoire (couleur = z, épaisseur = Z)</span>}
           </div>
           <ChromaticityDiagram current={currentPoint} history={historyPoints} />
         </div>
