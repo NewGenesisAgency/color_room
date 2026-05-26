@@ -118,7 +118,16 @@ type EditorNodeKind =
   // Blocs spécifiques Chasseur Gamut
   | 'gamut_on_hit'
   | 'gamut_on_miss'
-  | 'gamut_on_complete';
+  | 'gamut_on_complete'
+  // Interface utilisateur
+  | 'ui_button'
+  | 'ui_label'
+  | 'ui_counter'
+  | 'ui_timer_display'
+  | 'ui_progress'
+  | 'ui_show'
+  | 'ui_hide'
+  | 'on_ui_click';
 
 type EditorNode = {
   id: string;
@@ -266,6 +275,15 @@ const NODE_CATALOG: NodeCatalogItem[] = [
   { kind: 'gamut_on_hit', category: 'Chasseur Gamut', title: '✅ Identifié', defaults: { round: 1 } },
   { kind: 'gamut_on_miss', category: 'Chasseur Gamut', title: '❌ Manqué', defaults: {} },
   { kind: 'gamut_on_complete', category: 'Chasseur Gamut', title: '🏆 Jeu terminé', defaults: {} },
+  // ─── Interface ──────────────────────────────────────────────────────────────
+  { kind: 'ui_button', category: 'Interface', title: '🔘 Bouton', defaults: { label: 'Cliquer', color: '#4361ee', id: 'btn1' } },
+  { kind: 'ui_label', category: 'Interface', title: '🏷 Étiquette', defaults: { text: 'Texte', size: 16, color: '#1a1d2e' } },
+  { kind: 'ui_counter', category: 'Interface', title: '🔢 Compteur', defaults: { label: 'Score', value: 0, id: 'counter1' } },
+  { kind: 'ui_timer_display', category: 'Interface', title: '⏱ Minuterie', defaults: { durationSec: 60, id: 'timer1' } },
+  { kind: 'ui_progress', category: 'Interface', title: '📊 Barre de progression', defaults: { label: 'Vie', id: 'progress1', value: 100, max: 100 } },
+  { kind: 'ui_show', category: 'Interface', title: '👁 Afficher élément', defaults: { targetId: 'btn1' } },
+  { kind: 'ui_hide', category: 'Interface', title: '🙈 Masquer élément', defaults: { targetId: 'btn1' } },
+  { kind: 'on_ui_click', category: 'Évènements', title: '🖱 Clic sur bouton UI', defaults: { buttonId: 'btn1' } },
   { kind: 'cs150_connect', category: 'Colorimètre', title: 'CS150 Connect', defaults: {} },
   { kind: 'cs150_measure', category: 'Colorimètre', title: 'CS150 Mesurer', defaults: {} },
   { kind: 'cs150_read_xyz', category: 'Colorimètre', title: 'CS150 Lire XYZ', defaults: {} },
@@ -278,11 +296,17 @@ const NODE_CATALOG: NodeCatalogItem[] = [
     trueBlueX: 500, trueBlueY: 600, trueBlueZ: 1000,
     calibId: 'rgb_calib_001', targetChannel: 1 
   }},
-  { kind: 'cs150_single_calib', category: 'Colorimètre', title: 'CS150 Calib 1 Point', defaults: { 
+  { kind: 'cs150_single_calib', category: 'Colorimètre', title: 'CS150 Calib 1 Point', defaults: {
     trueLv: 11.0, trueX: 0.4, trueY: 0.4,
-    calibId: 'single_calib_001', targetChannel: 1 
+    calibId: 'single_calib_001', targetChannel: 1
   }},
 ];
+
+/** Kinds that are native built-in games — shown in catalog but NOT addable to canvas */
+const NATIVE_GAME_KINDS: Set<EditorNodeKind> = new Set([
+  'game_tetris', 'game_simon', 'game_memory', 'game_spectrum',
+  'game_color_speed', 'game_maitre_blanc', 'game_puissance4', 'game_chasseur_gamut',
+]);
 
 function labelNodeKind(kind: EditorNodeKind): string {
   return NODE_CATALOG.find((x) => x.kind === kind)?.title ?? kind;
@@ -315,6 +339,7 @@ const NODE_CATEGORY_ICONS: Record<string, LucideIcon> = {
   'Color Speed': Shuffle,
   'Puissance 4': LayoutGrid,
   'Chasseur Gamut': Film,
+  'Interface': MousePointer2,
 };
 
 const NODE_CATEGORY_COLORS: Record<string, string> = {
@@ -340,6 +365,7 @@ const NODE_CATEGORY_COLORS: Record<string, string> = {
   'Color Speed': '#f97316',
   'Puissance 4': '#eab308',
   'Chasseur Gamut': '#10b981',
+  'Interface': '#ec4899',
 };
 
 function clamp255(v: number): number {
@@ -2608,7 +2634,7 @@ export default function EditeurPage() {
                     </div>
                   ) : (
                     /* ── Aperçu 3D plein écran (même vue que /jeux) ── */
-                    <div style={{ position: 'relative', height: '100%', background: '#050508', borderRadius: 18, overflow: 'hidden' }}>
+                    <div style={{ position: 'relative', height: '100%', background: '#0a0c18', borderRadius: 18, overflow: 'hidden' }}>
                       <Room3D
                         plateColors={roomPlateColors}
                         plateActive={roomPlateActive}
@@ -2818,42 +2844,68 @@ export default function EditeurPage() {
                         <div className="bp-menu__list">
                           {(() => {
                             const q = contextMenu.q.trim().toLowerCase();
-                            const filtered = NODE_CATALOG.filter((n) => {
+                            const allFiltered = NODE_CATALOG.filter((n) => {
                               if (!q) return true;
                               return `${n.category} ${n.title} ${n.kind}`.toLowerCase().includes(q);
                             });
-                            const categories = [...new Set(filtered.map((n) => n.category))];
-                            return categories.map((cat) => {
-                              const CatIcon = NODE_CATEGORY_ICONS[cat] ?? Boxes;
-                              const catColor = NODE_CATEGORY_COLORS[cat] ?? '#999';
-                              return (
-                                <div key={cat}>
-                                  <div className="bp-menu__cathead" style={{ borderLeft: `3px solid ${catColor}` }}>
-                                    <CatIcon size={11} style={{ color: catColor, flexShrink: 0 }} />
-                                    <span>{cat}</span>
+                            const addable = allFiltered.filter((n) => !NATIVE_GAME_KINDS.has(n.kind));
+                            const natives = allFiltered.filter((n) => NATIVE_GAME_KINDS.has(n.kind));
+                            const categories = [...new Set(addable.map((n) => n.category))];
+                            return (
+                              <>
+                                {categories.map((cat) => {
+                                  const CatIcon = NODE_CATEGORY_ICONS[cat] ?? Boxes;
+                                  const catColor = NODE_CATEGORY_COLORS[cat] ?? '#999';
+                                  return (
+                                    <div key={cat}>
+                                      <div className="bp-menu__cathead" style={{ borderLeft: `3px solid ${catColor}` }}>
+                                        <CatIcon size={11} style={{ color: catColor, flexShrink: 0 }} />
+                                        <span>{cat}</span>
+                                      </div>
+                                      {addable.filter((n) => n.category === cat).map((n) => (
+                                        <button
+                                          key={n.kind}
+                                          className="bp-menu__item"
+                                          onClick={() => {
+                                            const createdId = addNode(n.kind, { x: contextMenu.gx, y: contextMenu.gy });
+                                            if (createdId && pendingAutoConnect?.fromNodeId) {
+                                              addEdge(pendingAutoConnect.fromNodeId, createdId);
+                                              setPendingLink(null);
+                                              setPendingAutoConnect(null);
+                                            }
+                                            setContextMenu((p) => ({ ...p, open: false }));
+                                            setStatus('Noeud ajouté');
+                                          }}
+                                        >
+                                          <span className="bp-menu__title">{n.title}</span>
+                                          <span className="bp-menu__meta" style={{ color: catColor, opacity: 0.7, fontSize: 11 }}>{n.kind.startsWith('cs150') ? 'CS150' : ''}</span>
+                                        </button>
+                                      ))}
+                                    </div>
+                                  );
+                                })}
+                                {natives.length > 0 && (
+                                  <div>
+                                    <div className="bp-menu__cathead" style={{ borderLeft: '3px solid #a855f7', marginTop: 8 }}>
+                                      <Gamepad2 size={11} style={{ color: '#a855f7', flexShrink: 0 }} />
+                                      <span>Jeux Natifs</span>
+                                      <span style={{ marginLeft: 4, fontSize: 9, opacity: 0.6, fontWeight: 600 }}>(lecture seule)</span>
+                                    </div>
+                                    {natives.map((n) => (
+                                      <div
+                                        key={n.kind}
+                                        className="bp-menu__item"
+                                        style={{ opacity: 0.45, cursor: 'not-allowed', userSelect: 'none' }}
+                                        title="Jeu natif — non recréable via l'éditeur"
+                                      >
+                                        <span className="bp-menu__title">{n.title}</span>
+                                        <span className="bp-menu__meta" style={{ color: '#a855f7', opacity: 0.7, fontSize: 10 }}>natif</span>
+                                      </div>
+                                    ))}
                                   </div>
-                                  {filtered.filter((n) => n.category === cat).map((n) => (
-                                    <button
-                                      key={n.kind}
-                                      className="bp-menu__item"
-                                      onClick={() => {
-                                        const createdId = addNode(n.kind, { x: contextMenu.gx, y: contextMenu.gy });
-                                        if (createdId && pendingAutoConnect?.fromNodeId) {
-                                          addEdge(pendingAutoConnect.fromNodeId, createdId);
-                                          setPendingLink(null);
-                                          setPendingAutoConnect(null);
-                                        }
-                                        setContextMenu((p) => ({ ...p, open: false }));
-                                        setStatus('Noeud ajouté');
-                                      }}
-                                    >
-                                      <span className="bp-menu__title">{n.title}</span>
-                                      <span className="bp-menu__meta" style={{ color: catColor, opacity: 0.7, fontSize: 11 }}>{n.kind.startsWith('cs150') ? 'CS150' : ''}</span>
-                                    </button>
-                                  ))}
-                                </div>
-                              );
-                            });
+                                )}
+                              </>
+                            );
                           })()}
                         </div>
                       </div>
@@ -5032,6 +5084,162 @@ export default function EditeurPage() {
                   ) : selectedNode.kind === 'gamut_on_complete' ? (
                     <div style={{ padding: 12, borderRadius: 10, background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.18)' }}>
                       <p style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.5 }}>🏆 Déclenché quand toutes les rounds du Chasseur de Gamut sont terminées.</p>
+                    </div>
+                  ) : selectedNode.kind === 'ui_button' ? (
+                    <div style={{ display: 'grid', gap: 12 }}>
+                      <div style={{ padding: 12, borderRadius: 10, background: 'rgba(236,72,153,0.08)', border: '1px solid rgba(236,72,153,0.18)' }}>
+                        <p style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.5 }}>🔘 Bouton cliquable affiché dans l&apos;interface du jeu. Utilisez <strong>on_ui_click</strong> pour déclencher des actions.</p>
+                      </div>
+                      <label style={{ display: 'grid', gap: 4 }}>
+                        <span className="g-label">ID du bouton</span>
+                        <input className="g-input" style={{ height: 36, fontSize: 13 }}
+                          value={String(selectedNode.params.id ?? 'btn1')}
+                          placeholder="ex: btn_start"
+                          onChange={(e) => updateSelectedParams({ id: e.target.value })} />
+                      </label>
+                      <label style={{ display: 'grid', gap: 4 }}>
+                        <span className="g-label">Texte du bouton</span>
+                        <input className="g-input" style={{ height: 36, fontSize: 13 }}
+                          value={String(selectedNode.params.label ?? 'Cliquer')}
+                          placeholder="ex: Démarrer"
+                          onChange={(e) => updateSelectedParams({ label: e.target.value })} />
+                      </label>
+                      <label style={{ display: 'grid', gap: 4 }}>
+                        <span className="g-label">Couleur</span>
+                        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                          <div style={{ width: 36, height: 36, borderRadius: 10, background: getColor(selectedNode.params, 'color', '#4361ee'), border: '1px solid rgba(0,0,0,0.1)', flexShrink: 0 }} />
+                          <input type="color" value={getColor(selectedNode.params, 'color', '#4361ee')}
+                            onChange={(e) => updateSelectedParams({ color: e.target.value })}
+                            style={{ flex: 1, height: 36, borderRadius: 8, border: '1px solid rgba(0,0,0,0.1)', cursor: 'pointer', padding: 0 }} />
+                        </div>
+                      </label>
+                    </div>
+                  ) : selectedNode.kind === 'ui_label' ? (
+                    <div style={{ display: 'grid', gap: 12 }}>
+                      <label style={{ display: 'grid', gap: 4 }}>
+                        <span className="g-label">Texte affiché</span>
+                        <input className="g-input" style={{ height: 36, fontSize: 13 }}
+                          value={String(selectedNode.params.text ?? 'Texte')}
+                          onChange={(e) => updateSelectedParams({ text: e.target.value })} />
+                      </label>
+                      <label style={{ display: 'grid', gap: 4 }}>
+                        <span className="g-label">Taille (px)</span>
+                        <input className="g-input" type="number" min={10} max={96} style={{ height: 36, fontSize: 13 }}
+                          value={getNum(selectedNode.params, 'size', 16)}
+                          onChange={(e) => updateSelectedParams({ size: Number(e.target.value) })} />
+                      </label>
+                      <label style={{ display: 'grid', gap: 4 }}>
+                        <span className="g-label">Couleur texte</span>
+                        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                          <div style={{ width: 36, height: 36, borderRadius: 10, background: getColor(selectedNode.params, 'color', '#1a1d2e'), border: '1px solid rgba(0,0,0,0.1)', flexShrink: 0 }} />
+                          <input type="color" value={getColor(selectedNode.params, 'color', '#1a1d2e')}
+                            onChange={(e) => updateSelectedParams({ color: e.target.value })}
+                            style={{ flex: 1, height: 36, borderRadius: 8, border: '1px solid rgba(0,0,0,0.1)', cursor: 'pointer', padding: 0 }} />
+                        </div>
+                      </label>
+                    </div>
+                  ) : selectedNode.kind === 'ui_counter' ? (
+                    <div style={{ display: 'grid', gap: 12 }}>
+                      <div style={{ padding: 12, borderRadius: 10, background: 'rgba(236,72,153,0.08)', border: '1px solid rgba(236,72,153,0.18)' }}>
+                        <p style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.5 }}>🔢 Affiche un compteur numérique (score, vies, etc.) dans l&apos;interface du jeu.</p>
+                      </div>
+                      <label style={{ display: 'grid', gap: 4 }}>
+                        <span className="g-label">ID du compteur</span>
+                        <input className="g-input" style={{ height: 36, fontSize: 13 }}
+                          value={String(selectedNode.params.id ?? 'counter1')}
+                          placeholder="ex: score_display"
+                          onChange={(e) => updateSelectedParams({ id: e.target.value })} />
+                      </label>
+                      <label style={{ display: 'grid', gap: 4 }}>
+                        <span className="g-label">Label</span>
+                        <input className="g-input" style={{ height: 36, fontSize: 13 }}
+                          value={String(selectedNode.params.label ?? 'Score')}
+                          onChange={(e) => updateSelectedParams({ label: e.target.value })} />
+                      </label>
+                      <label style={{ display: 'grid', gap: 4 }}>
+                        <span className="g-label">Valeur initiale</span>
+                        <input className="g-input" type="number" style={{ height: 36, fontSize: 13 }}
+                          value={getNum(selectedNode.params, 'value', 0)}
+                          onChange={(e) => updateSelectedParams({ value: Number(e.target.value) })} />
+                      </label>
+                    </div>
+                  ) : selectedNode.kind === 'ui_timer_display' ? (
+                    <div style={{ display: 'grid', gap: 12 }}>
+                      <label style={{ display: 'grid', gap: 4 }}>
+                        <span className="g-label">ID de la minuterie</span>
+                        <input className="g-input" style={{ height: 36, fontSize: 13 }}
+                          value={String(selectedNode.params.id ?? 'timer1')}
+                          placeholder="ex: game_timer"
+                          onChange={(e) => updateSelectedParams({ id: e.target.value })} />
+                      </label>
+                      <label style={{ display: 'grid', gap: 4 }}>
+                        <span className="g-label">Durée (secondes)</span>
+                        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                          <input type="range" min={5} max={600} step={5} style={{ flex: 1 }}
+                            value={getNum(selectedNode.params, 'durationSec', 60)}
+                            onChange={(e) => updateSelectedParams({ durationSec: Number(e.target.value) })} />
+                          <span style={{ fontSize: 12, fontWeight: 700, minWidth: 40, textAlign: 'right' }}>{getNum(selectedNode.params, 'durationSec', 60)}s</span>
+                        </div>
+                      </label>
+                    </div>
+                  ) : selectedNode.kind === 'ui_progress' ? (
+                    <div style={{ display: 'grid', gap: 12 }}>
+                      <label style={{ display: 'grid', gap: 4 }}>
+                        <span className="g-label">ID de la barre</span>
+                        <input className="g-input" style={{ height: 36, fontSize: 13 }}
+                          value={String(selectedNode.params.id ?? 'progress1')}
+                          placeholder="ex: health_bar"
+                          onChange={(e) => updateSelectedParams({ id: e.target.value })} />
+                      </label>
+                      <label style={{ display: 'grid', gap: 4 }}>
+                        <span className="g-label">Label</span>
+                        <input className="g-input" style={{ height: 36, fontSize: 13 }}
+                          value={String(selectedNode.params.label ?? 'Vie')}
+                          onChange={(e) => updateSelectedParams({ label: e.target.value })} />
+                      </label>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                        <label style={{ display: 'grid', gap: 4 }}>
+                          <span className="g-label">Valeur</span>
+                          <input className="g-input" type="number" style={{ height: 36, fontSize: 13 }}
+                            value={getNum(selectedNode.params, 'value', 100)}
+                            onChange={(e) => updateSelectedParams({ value: Number(e.target.value) })} />
+                        </label>
+                        <label style={{ display: 'grid', gap: 4 }}>
+                          <span className="g-label">Maximum</span>
+                          <input className="g-input" type="number" style={{ height: 36, fontSize: 13 }}
+                            value={getNum(selectedNode.params, 'max', 100)}
+                            onChange={(e) => updateSelectedParams({ max: Number(e.target.value) })} />
+                        </label>
+                      </div>
+                    </div>
+                  ) : selectedNode.kind === 'ui_show' || selectedNode.kind === 'ui_hide' ? (
+                    <div style={{ display: 'grid', gap: 12 }}>
+                      <div style={{ padding: 12, borderRadius: 10, background: 'rgba(236,72,153,0.08)', border: '1px solid rgba(236,72,153,0.18)' }}>
+                        <p style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.5 }}>
+                          {selectedNode.kind === 'ui_show' ? '👁 Affiche un élément UI caché.' : '🙈 Masque un élément UI visible.'}
+                        </p>
+                      </div>
+                      <label style={{ display: 'grid', gap: 4 }}>
+                        <span className="g-label">ID de l&apos;élément cible</span>
+                        <input className="g-input" style={{ height: 36, fontSize: 13 }}
+                          value={String(selectedNode.params.targetId ?? 'btn1')}
+                          placeholder="ex: btn_start"
+                          onChange={(e) => updateSelectedParams({ targetId: e.target.value })} />
+                      </label>
+                    </div>
+                  ) : selectedNode.kind === 'on_ui_click' ? (
+                    <div style={{ display: 'grid', gap: 12 }}>
+                      <div style={{ padding: 12, borderRadius: 10, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.18)' }}>
+                        <p style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.5 }}>🖱 Évènement déclenché quand le joueur clique sur un bouton UI. Reliez à une séquence d&apos;actions.</p>
+                      </div>
+                      <label style={{ display: 'grid', gap: 4 }}>
+                        <span className="g-label">ID du bouton</span>
+                        <input className="g-input" style={{ height: 36, fontSize: 13 }}
+                          value={String(selectedNode.params.buttonId ?? 'btn1')}
+                          placeholder="ex: btn_start"
+                          onChange={(e) => updateSelectedParams({ buttonId: e.target.value })} />
+                      </label>
+                      <p style={{ fontSize: 11, opacity: 0.5, lineHeight: 1.4 }}>L&apos;ID doit correspondre à celui du nœud <strong>Bouton</strong> correspondant.</p>
                     </div>
                   ) : ['math_add','math_sub','math_mul','math_div','math_clamp01','math_lerp','compare_eq','compare_gt','compare_lt','logic_and','logic_or','logic_not','time_seconds','random_01','get_score'].includes(selectedNode.kind) ? (
                     <div style={{ padding: 16, borderRadius: 12, background: '#f8f9ff', border: '1px solid rgba(99,102,241,0.15)' }}>
