@@ -947,6 +947,11 @@ export default function JeuxPage() {
     hwCurrentCtrlRef.current = ctrl;
     hwInFlightRef.current = true;
 
+    // Timeout auto-cancel : si la requête dépasse 3s (hardware saturé ou lent),
+    // on abandonne proprement et on envoie l'état pending — évite de bloquer
+    // l'UI 10s quand le serveur hardware est sous charge.
+    const autoAbortTimer = window.setTimeout(() => ctrl.abort(), 3000);
+
     fetch('/api/supervision/batch', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -956,6 +961,7 @@ export default function JeuxPage() {
     })
       .catch(() => {/* AbortError ou réseau — ignoré */})
       .finally(() => {
+        window.clearTimeout(autoAbortTimer);
         if (hwFetchGenRef.current !== gen) return; // callback orphelin — ignorer
         const next = hwPendingPlatesRef.current;
         hwPendingPlatesRef.current = null;
@@ -1506,6 +1512,11 @@ export default function JeuxPage() {
   }, [view]);
 
   useEffect(() => {
+    // Ne pas poller pendant le jeu actif : le hardware doit être 100% disponible
+    // pour les commandes couleur. Sinon les GET télémétrie (jusqu'à 3s) bloquent
+    // les PUT de jeu sur le serveur monothread et créent un délai de 10s.
+    if (gameActive) return;
+
     let stopped = false;
     let timer = 0;
 
@@ -1515,19 +1526,35 @@ export default function JeuxPage() {
       const t0 = performance.now();
       let json: unknown = null;
 
+      // Timeout court côté client (2s) pour éviter de bloquer le hardware
+      // si la route proxy met du temps à répondre.
+      const ctrl1 = new AbortController();
+      const t1Abort = window.setTimeout(() => ctrl1.abort(), 2000);
       try {
-        const res = await fetch(`/api/supervision/state/plaque/${INSTRUMENT_PLATE_ID}/all`, { cache: 'no-store' });
+        const res = await fetch(`/api/supervision/state/plaque/${INSTRUMENT_PLATE_ID}/all`, {
+          cache: 'no-store',
+          signal: ctrl1.signal,
+        });
         if (res.ok) json = (await res.json().catch(() => null)) as unknown;
       } catch {
         json = null;
+      } finally {
+        window.clearTimeout(t1Abort);
       }
 
       if (!json) {
+        const ctrl2 = new AbortController();
+        const t2Abort = window.setTimeout(() => ctrl2.abort(), 2000);
         try {
-          const res = await fetch(`/api/supervision/state/plaque/${INSTRUMENT_PLATE_ID}`, { cache: 'no-store' });
+          const res = await fetch(`/api/supervision/state/plaque/${INSTRUMENT_PLATE_ID}`, {
+            cache: 'no-store',
+            signal: ctrl2.signal,
+          });
           if (res.ok) json = (await res.json().catch(() => null)) as unknown;
         } catch {
           json = null;
+        } finally {
+          window.clearTimeout(t2Abort);
         }
       }
 
@@ -1558,7 +1585,7 @@ export default function JeuxPage() {
         apiLatency,
       });
 
-      timer = window.setTimeout(poll, 3000);
+      if (!stopped) timer = window.setTimeout(poll, 3000);
     };
 
     void poll();
@@ -1566,7 +1593,7 @@ export default function JeuxPage() {
       stopped = true;
       if (timer) window.clearTimeout(timer);
     };
-  }, []);
+  }, [gameActive]); // Pause le poll quand un jeu est actif
 
   useEffect(() => {
     if (!gameActive) return;

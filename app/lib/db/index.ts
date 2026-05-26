@@ -2,7 +2,13 @@ import Database from 'better-sqlite3';
 import fs from 'node:fs';
 import path from 'node:path';
 
-let dbSingleton: Database.Database | null = null;
+// ── Singleton sur globalThis ───────────────────────────────────────────────────
+// En mode dev Next.js, les modules serveur sont reconstruits à chaque hot-reload
+// MAIS globalThis survit. Sans ça, chaque reload crée un nouveau handle
+// better-sqlite3 qui tente d'ouvrir le fichier encore verrouillé par l'ancien
+// handle → SQLITE_CANTOPEN / "unable to open database file" sur Windows.
+// En production le module n'est chargé qu'une fois, donc globalThis = module : aucune différence.
+const g = globalThis as typeof globalThis & { __colorRoomDb?: Database.Database };
 
 function resolveDbPath(): string {
   const explicit = process.env.COLOR_ROOM_DB_PATH;
@@ -72,15 +78,37 @@ function migrate(db: Database.Database) {
   db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_crg_sessions_token ON crg_sessions(token);');
 }
 
+function openDb(file: string): Database.Database {
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  const db = new Database(file);
+  // Checkpoint immédiat : fusionne le WAL dans le fichier principal.
+  // Évite qu'un gros .db-wal (490 Ko ici) ralentisse l'ouverture
+  // ou cause des problèmes de verrou sur Windows.
+  try { db.pragma('wal_checkpoint(TRUNCATE)'); } catch { /* non-fatal */ }
+  migrate(db);
+  return db;
+}
+
 export function getDb(): Database.Database {
-  if (dbSingleton) return dbSingleton;
+  // Réutiliser la connexion existante si elle est encore ouverte
+  if (g.__colorRoomDb?.open) return g.__colorRoomDb;
 
   const file = resolveDbPath();
-  fs.mkdirSync(path.dirname(file), { recursive: true });
 
-  const db = new Database(file);
-  migrate(db);
-
-  dbSingleton = db;
-  return db;
+  try {
+    const db = openDb(file);
+    g.__colorRoomDb = db;
+    return db;
+  } catch (err) {
+    // Dernier recours : supprimer les fichiers WAL/SHM verrouillés et réessayer.
+    // Cela peut arriver quand le serveur dev Next.js recharge le module sans
+    // fermer proprement le handle précédent (Windows garde le .db-shm verrouillé).
+    console.warn('[db] Échec ouverture initiale, tentative de nettoyage WAL :', err);
+    for (const ext of ['-shm', '-wal']) {
+      try { fs.unlinkSync(file + ext); } catch { /* fichier absent — ok */ }
+    }
+    const db = openDb(file); // 2e tentative sans les fichiers WAL orphelins
+    g.__colorRoomDb = db;
+    return db;
+  }
 }

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 
 const DEFAULT_BASE_URL = 'http://172.17.50.136:18080';
-const DEFAULT_TIMEOUT_MS = 8000;
+const DEFAULT_TIMEOUT_MS = 3000;
 
 function getBaseUrl(): string {
   const v = process.env.SUPERVISION_API_URL?.trim();
