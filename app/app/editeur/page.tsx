@@ -7,7 +7,7 @@ import TetrisGame from '@/app/_components/TetrisGame';
 import CS150Panel from '@/app/_components/CS150Panel';
 import type { TetrisSnapshot } from '@/app/_components/TetrisGame';
 
-import { Boxes, Gamepad2, Plus, Play, Pause, RotateCcw, Save, Trash2, FolderPlus, X, Lightbulb, Layers, Zap, Palette, Clock, MousePointer2, LayoutGrid, Maximize2, Minimize2, Eye, Star, Heart, Sun, Moon, Flame, Snowflake, Music, Target, Puzzle, Sparkles, Trophy, Rocket, Ghost, Dice1, Brain, Check, GitBranch, Hash, Settings2, Shuffle, Search, Users, Film, Thermometer, type LucideIcon } from 'lucide-react';
+import { Boxes, Gamepad2, Plus, Play, Pause, RotateCcw, Save, Trash2, FolderPlus, X, Lightbulb, Layers, Zap, Palette, Clock, MousePointer2, LayoutGrid, Maximize2, Minimize2, Eye, Star, Heart, Sun, Moon, Flame, Snowflake, Music, Target, Puzzle, Sparkles, Trophy, Rocket, Ghost, Dice1, Brain, Check, GitBranch, Hash, Settings2, Shuffle, Search, Users, Film, Thermometer, ScanLine, type LucideIcon } from 'lucide-react';
 
 type IdFactory = () => string;
 
@@ -843,10 +843,14 @@ export default function EditeurPage() {
   const [status, setStatus] = useState<string>('');
   const [selectedTileIndex, setSelectedTileIndex] = useState<number | null>(null);
   const tetrisSnapRef = useRef<TetrisSnapshot | null>(null);
+  // Refs stables pour les callbacks utilisés dans le keydown handler global
+  const saveActiveGameRef = useRef<(() => Promise<void>) | null>(null);
+  const fitNodesToViewRef = useRef<(() => void) | null>(null);
+  const autoLayoutNodesRef = useRef<(() => void) | null>(null);
 
-  const [viewportHeight, setViewportHeight] = useState<number>(500);
+  const [viewportHeight, setViewportHeight] = useState<number>(360);
   const [resizing, setResizing] = useState<{ active: boolean; y: number; start: number }>(
-    { active: false, y: 0, start: 500 },
+    { active: false, y: 0, start: 360 },
   );
 
   const [linkDrag, setLinkDrag] = useState<{ active: boolean; x: number; y: number; gx: number; gy: number } | null>(null);
@@ -1393,9 +1397,39 @@ export default function EditeurPage() {
         return;
       }
 
+      // Ctrl+S → sauvegarder
+      if (ctrl && e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        void saveActiveGameRef.current?.();
+        return;
+      }
+
       if (e.key === 'Escape') {
         setContextMenu((p) => ({ ...p, open: false }));
         setPendingLink(null);
+        return;
+      }
+
+      // F → fit all nodes in view
+      if (e.key === 'f' || e.key === 'F') {
+        e.preventDefault();
+        fitNodesToViewRef.current?.();
+        return;
+      }
+
+      // L → re-layout nodes
+      if (e.key === 'l' || e.key === 'L') {
+        e.preventDefault();
+        autoLayoutNodesRef.current?.();
+        return;
+      }
+
+      // Home / H → reset zoom
+      if (e.key === 'Home' || e.key === 'h' || e.key === 'H') {
+        e.preventDefault();
+        setGraphZoom(0.5);
+        setGraphPan({ x: 120, y: 80 });
+        setStatus('Zoom réinitialisé');
         return;
       }
 
@@ -2224,6 +2258,36 @@ export default function EditeurPage() {
   }
 
   /** Re-layout : espace les nœuds du jeu actif en colonnes selon la profondeur BFS */
+  /** Zoom/pan pour que tous les nœuds du jeu actif soient visibles */
+  function fitNodesToView() {
+    if (!activeGame || activeGame.nodes.length === 0) return;
+    const bpEl = document.querySelector('.bp') as HTMLElement | null;
+    if (!bpEl) return;
+    const rect = bpEl.getBoundingClientRect();
+    const W = rect.width || 800;
+    const H = rect.height || 500;
+
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    activeGame.nodes.forEach((n) => {
+      const x = n.pos?.x ?? 0;
+      const y = n.pos?.y ?? 0;
+      if (x < minX) minX = x;
+      if (y < minY) minY = y;
+      if (x + 300 > maxX) maxX = x + 300;
+      if (y + 180 > maxY) maxY = y + 180;
+    });
+    const PAD = 60;
+    const graphW = maxX - minX + PAD * 2;
+    const graphH = maxY - minY + PAD * 2;
+    const zoom = Math.max(0.1, Math.min(1.4, Math.min(W / graphW, H / graphH)));
+    setGraphZoom(zoom);
+    setGraphPan({
+      x: (W - graphW * zoom) / 2 - (minX - PAD) * zoom,
+      y: (H - graphH * zoom) / 2 - (minY - PAD) * zoom,
+    });
+    setStatus(`Fit — ${Math.round(zoom * 100)}%`);
+  }
+
   function autoLayoutNodes() {
     if (!activeGameId || !activeGame) return;
     const nodes = activeGame.nodes;
@@ -2303,6 +2367,11 @@ export default function EditeurPage() {
     setStatus('Nœuds réorganisés');
     setTimeout(() => void saveActiveGame(), 200);
   }
+
+  // Mise à jour des refs stables (utilisées dans le keydown handler global)
+  saveActiveGameRef.current = saveActiveGame;
+  fitNodesToViewRef.current = fitNodesToView;
+  autoLayoutNodesRef.current = autoLayoutNodes;
 
   function addUiComponent(kind: UICompKind) {
     if (!activeGameId) return;
@@ -2713,18 +2782,17 @@ export default function EditeurPage() {
 
           <section
             className="ue__center"
-            style={{ gridTemplateRows: `${viewportHeight}px 10px 1fr` }}
             onPointerMove={(e) => {
               if (!resizing.active) return;
               const dy = e.clientY - resizing.y;
-              const next = Math.max(260, Math.min(760, resizing.start + dy));
+              const next = Math.max(220, Math.min(620, resizing.start + dy));
               setViewportHeight(next);
             }}
             onPointerUp={() => {
               setResizing({ active: false, y: 0, start: viewportHeight });
             }}
           >
-            <div className="ue__viewport" style={{ borderRadius: 16, overflow: 'hidden', background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(20px)', border: '1px solid rgba(0,0,0,0.06)' }}>
+            <div className="ue__viewport" style={{ height: viewportHeight, background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(20px)', border: '1px solid rgba(0,0,0,0.06)' }}>
               <div className="panelhead" style={{ background: '#fff', borderBottom: '1px solid rgba(0,0,0,0.06)', padding: '14px 20px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <Eye size={16} color="#1a1a1a" />
@@ -2836,16 +2904,34 @@ export default function EditeurPage() {
                     {activeGame.name}
                   </span>
                 )}
-                <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 4 }}>
+                  {/* Hint clavier */}
+                  <span style={{ fontSize: 10, color: '#bbb', letterSpacing: '0.02em', marginRight: 6, display: 'flex', gap: 4 }}>
+                    <kbd style={{ background: '#f0f0f0', border: '1px solid #ddd', borderRadius: 4, padding: '1px 5px', fontSize: 10, fontFamily: 'monospace', color: '#666' }}>F</kbd>
+                    <kbd style={{ background: '#f0f0f0', border: '1px solid #ddd', borderRadius: 4, padding: '1px 5px', fontSize: 10, fontFamily: 'monospace', color: '#666' }}>L</kbd>
+                    <kbd style={{ background: '#f0f0f0', border: '1px solid #ddd', borderRadius: 4, padding: '1px 5px', fontSize: 10, fontFamily: 'monospace', color: '#666' }}>Del</kbd>
+                  </span>
                   {/* Indicateur de zoom */}
-                  <span style={{ fontSize: 11, color: '#888', fontVariantNumeric: 'tabular-nums', minWidth: 36, textAlign: 'right' }}>
+                  <span style={{ fontSize: 11, color: '#888', fontVariantNumeric: 'tabular-nums', minWidth: 38, textAlign: 'right', fontWeight: 600 }}>
                     {Math.round(graphZoom * 100)}%
                   </span>
+                  {/* Fit all nodes */}
+                  {activeGame && (
+                    <button
+                      className="btn btn--mini"
+                      title="Ajuster la vue à tous les nœuds [F]"
+                      onClick={fitNodesToView}
+                      style={{ padding: '0 8px', height: 28, fontSize: 11, gap: 4 }}
+                    >
+                      <ScanLine size={12} />
+                      <span>Fit</span>
+                    </button>
+                  )}
                   {/* Bouton reset zoom */}
                   <button
                     className="btn btn--mini"
-                    title="Réinitialiser le zoom (100%)"
-                    onClick={() => { setGraphZoom(0.7); setGraphPan({ x: 120, y: 80 }); }}
+                    title="Réinitialiser le zoom [H]"
+                    onClick={() => { setGraphZoom(0.5); setGraphPan({ x: 120, y: 80 }); }}
                     style={{ padding: '0 8px', height: 28, fontSize: 11 }}
                   >
                     <Minimize2 size={12} />
@@ -2854,12 +2940,12 @@ export default function EditeurPage() {
                   {activeGame && (
                     <button
                       className="btn btn--mini"
-                      title="Auto-espacer les nœuds"
+                      title="Auto-espacer les nœuds [L]"
                       onClick={autoLayoutNodes}
                       style={{ padding: '0 8px', height: 28, fontSize: 11, gap: 4 }}
                     >
                       <LayoutGrid size={12} />
-                      <span>Re-layout</span>
+                      <span>Layout</span>
                     </button>
                   )}
                   {editor.expandedGameNodeId && (
