@@ -64,6 +64,9 @@ type EditorNodeKind =
   | 'game_intrus'
   | 'game_chromaticite'
   | 'game_snake'
+  | 'play_sound'
+  | 'on_score_reached'
+  | 'on_plate_click'
   | 'on_timer'
   | 'on_click'
   | 'on_tick'
@@ -339,6 +342,9 @@ const NODE_CATALOG: NodeCatalogItem[] = [
   { kind: 'game_intrus', category: 'Jeux', title: "L'Intrus (Sniper)", defaults: {} },
   { kind: 'game_chromaticite', category: 'Jeux', title: 'Chromaticité CIE', defaults: {} },
   { kind: 'game_snake', category: 'Jeux', title: 'Snake Lumière', defaults: { speed: 350 } },
+  { kind: 'play_sound', category: 'Audio', title: 'Jouer un son', defaults: { sound: 'click' } },
+  { kind: 'on_score_reached', category: 'Évènements', title: 'Score atteint', defaults: { target: 100 } },
+  { kind: 'on_plate_click', category: 'Évènements', title: 'Clic sur dalle', defaults: {} },
   { kind: 'loop_count', category: 'Flux', title: 'Répéter N fois', defaults: { count: 3 } },
   { kind: 'on_timer', category: 'Évènements', title: 'Timer', defaults: { intervalMs: 1000 } },
   { kind: 'on_click', category: 'Évènements', title: 'On Click', defaults: { tileIndex: 0 } },
