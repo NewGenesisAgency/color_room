@@ -52,6 +52,36 @@ const SNAP = 8;
 const snap = (v: number) => Math.round(v / SNAP) * SNAP;
 const uid  = () => Math.random().toString(36).slice(2, 10);
 
+// Anti-superposition des composants UI : séparation AABB avec padding minimal.
+// Le composant "ancré" (déposé/déplacé) reste, les autres s'écartent.
+const UI_GAP = 12;
+function resolveUiOverlaps(comps: UILayoutComponent[], anchorId?: string): UILayoutComponent[] {
+  const items = comps.map(c => ({ ...c }));
+  for (let iter = 0; iter < 18; iter++) {
+    let moved = false;
+    for (let i = 0; i < items.length; i++) {
+      for (let j = i + 1; j < items.length; j++) {
+        const a = items[i], b = items[j];
+        const dx = (a.x + a.width / 2) - (b.x + b.width / 2);
+        const dy = (a.y + a.height / 2) - (b.y + b.height / 2);
+        const penX = (a.width / 2 + b.width / 2 + UI_GAP) - Math.abs(dx);
+        const penY = (a.height / 2 + b.height / 2 + UI_GAP) - Math.abs(dy);
+        if (penX <= 0 || penY <= 0) continue;
+        moved = true;
+        if (penX < penY) {
+          const push = (dx >= 0 ? 1 : -1) * penX;
+          if (a.id === anchorId) b.x -= push; else if (b.id === anchorId) a.x += push; else { a.x += push / 2; b.x -= push / 2; }
+        } else {
+          const push = (dy >= 0 ? 1 : -1) * penY;
+          if (a.id === anchorId) b.y -= push; else if (b.id === anchorId) a.y += push; else { a.y += push / 2; b.y -= push / 2; }
+        }
+      }
+    }
+    if (!moved) break;
+  }
+  return items.map(it => ({ ...it, x: Math.max(0, snap(it.x)), y: Math.max(0, snap(it.y)) }));
+}
+
 const PALETTE: { kind: UICompKind; label: string; Icon: LucideIcon; color: string; w: number; h: number }[] = [
   { kind: 'button',        label: 'Bouton',       Icon: MousePointerClick, color: '#4361ee', w: 160, h: 48 },
   { kind: 'label',         label: 'Texte',        Icon: Type,              color: '#64748b', w: 200, h: 36 },
@@ -145,13 +175,14 @@ export default function UIDesigner({ components, onChange, gameVariables = [] }:
   const [sel, setSel] = useState<string | null>(null);
   const [zoom, setZoom] = useState(1);
   const dragRef = useRef<{ id:string; ox:number; oy:number; cx:number; cy:number } | null>(null);
+  const componentsRef = useRef(components); componentsRef.current = components;
   const selComp = components.find(c => c.id === sel) ?? null;
 
   const add = useCallback((p: typeof PALETTE[0]) => {
     const c: UILayoutComponent = { id: uid(), kind: p.kind, x: snap(CW/2 - p.w/2), y: snap(CH/2 - p.h/2), width: p.w, height: p.h, text: defaultText(p.kind), bgColor: p.kind === 'button' ? '#4361ee' : undefined, textColor: p.kind === 'button' ? '#ffffff' : '#1a1d2e', fontSize: 14,
       ...(p.kind === 'cie_diagram' ? { cieRandom: true, cieTargetX: 0.3127, cieTargetY: 0.3290, cieTolerance: 8, points: 1000 } : {}),
       ...(p.kind === 'dpad' ? { dpadPreset: 'arrows_space' as UIDpadPreset } : {}) };
-    onChange([...components, c]); setSel(c.id);
+    onChange(resolveUiOverlaps([...components, c], c.id)); setSel(c.id);
   }, [components, onChange]);
 
   const upd = useCallback((id: string, patch: Partial<UILayoutComponent>) => onChange(components.map(c => c.id === id ? { ...c, ...patch } : c)), [components, onChange]);
@@ -168,7 +199,7 @@ export default function UIDesigner({ components, onChange, gameVariables = [] }:
       const dy = (ev.clientY - dragRef.current.oy) / zoom;
       onChange(components.map(c => c.id === id ? { ...c, x: snap(Math.max(0, Math.min(CW-20, dragRef.current!.cx+dx))), y: snap(Math.max(0, Math.min(CH-16, dragRef.current!.cy+dy))) } : c));
     };
-    const up = () => { dragRef.current = null; window.removeEventListener('mousemove', mv); window.removeEventListener('mouseup', up); };
+    const up = () => { dragRef.current = null; window.removeEventListener('mousemove', mv); window.removeEventListener('mouseup', up); onChange(resolveUiOverlaps(componentsRef.current, id)); };
     window.addEventListener('mousemove', mv); window.addEventListener('mouseup', up);
   }
 

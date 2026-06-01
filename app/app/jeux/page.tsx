@@ -2025,6 +2025,10 @@ export default function JeuxPage() {
   // Moteur de variables des jeux éditeur : les nœuds écrivent ici, les composants UI lisent.
   const hudVarsRef = useRef<Record<string, number | string>>({});
   const bumpHudVars = () => setHudVarsTick((t) => (t + 1) % 1_000_000);
+  // Walker du graphe en cours : permet de déclencher un sous-graphe (événement UI)
+  // SANS arrêter la boucle principale (on_timer), contrairement à runHudGraphFrom.
+  const hudWalkRef = useRef<((nodeId: string) => void) | null>(null);
+  const fireHudEvent = (nodeId: string) => { hudWalkRef.current?.(nodeId); };
 
   const stopHudGraph = () => {
     hudGraphRunRef.current.stop = true;
@@ -2045,7 +2049,8 @@ export default function JeuxPage() {
 
     const g = buildGraph(run.cfg);
     const start = g.byId.get(String(startNodeId));
-    if (!start || start.enabled === false) return;
+    // Pas de retour anticipé : on construit toujours le walker (pour les événements UI),
+    // même si le jeu n'a pas de nœud "Démarrer" connecté.
 
     const getNum = (o: Record<string, unknown>, key: string, fallback: number): number => {
       const v = Number((o as any)[key]);
@@ -2276,7 +2281,8 @@ export default function JeuxPage() {
       }
     };
 
-    walk(start.id);
+    hudWalkRef.current = walk; // expose le walker pour les événements UI (sans stop)
+    if (start && start.enabled !== false) walk(start.id);
   };
 
   function resetScene() {
@@ -2394,10 +2400,9 @@ export default function JeuxPage() {
     try {
       const g = buildGraph(cfg);
       const begin = g.nodes.find((n) => n.kind === 'event_begin' && n.enabled !== false);
-      if (begin?.id) {
-        // hudRunRef.current is already set above, so runHudGraphFrom works immediately
-        runHudGraphFrom(String(begin.id));
-      }
+      // Toujours appeler runHudGraphFrom : si event_begin existe il démarre la logique,
+      // sinon le walker est quand même construit pour que les événements UI fonctionnent.
+      runHudGraphFrom(begin?.id ? String(begin.id) : '__no_start__');
     } catch {
       // ignore
     }
@@ -4482,7 +4487,7 @@ export default function JeuxPage() {
                           const nodes = Array.isArray(hudRun?.cfg.nodes) ? (hudRun!.cfg.nodes as EditorNode[]) : [];
                           const ev = nodes.find((n) => (n.kind === 'on_ui_click' || n.kind === 'ui_event_click') && n.enabled !== false &&
                             (String(n.params?.buttonId ?? '') === base || String(n.params?.eventType ?? '') === base || String(n.params?.buttonId ?? '') === eventId));
-                          if (ev) runHudGraphFrom(String(ev.id));
+                          if (ev) fireHudEvent(String(ev.id)); // ne coupe PAS la boucle principale
                         },
                       }}
                     />
