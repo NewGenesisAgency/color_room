@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-import { getLatestSession, listPlayers, startNewSession, touchPlayer, type MpSeat } from '@/lib/multiplayer';
+import { getLatestSession, listPlayers, listPlayersWithReady, getSessionMetadata, startNewSession, touchPlayer, type MpSeat } from '@/lib/multiplayer';
 import { getDb } from '@/lib/db';
 
 type StateResponse =
@@ -10,9 +10,15 @@ type StateResponse =
       status: 'active' | 'finished';
       gameId: string;
       updatedAt: string;
-      players: Array<{ seat: MpSeat; name: string; lastSeenAt: string }>;
+      players: Array<{ seat: MpSeat; name: string; lastSeenAt: string; isReady: boolean; score: number }>;
       you: { seat: MpSeat } | null;
       state: unknown;
+      readyBySeat: Record<number, boolean>;
+      roomCode: string | null;
+      roomName: string;
+      mode: string;
+      maxPlayers: number;
+      difficulty: number;
     }
   | { ok: false; error: string };
 
@@ -38,23 +44,17 @@ export async function GET(req: Request) {
     // ignore
   }
 
-  const LOBBY_TIMEOUT_MS = 5 * 60 * 1000; // 5 min sans 2ème joueur → auto-destruction
-
   if (latest.session.status === 'active') {
     try {
       const endsAtMs = Number((latest.state as any)?.endsAtMs ?? 0);
       const durationMs = Number((latest.state as any)?.durationMs ?? 0);
-      const rawCreated = (latest.state as any)?.createdAt ?? latest.session.created_at ?? '';
-      // SQLite format "YYYY-MM-DD HH:MM:SS" → parse as UTC
-      const createdAt = Number(new Date(String(rawCreated).replace(' ', 'T') + (String(rawCreated).includes('T') ? '' : 'Z')));
       const playersNow = listPlayers(latest.session.id);
-      const db = getDb();
-      const nowMs = Date.now();
 
       // lobby -> start when >= 2 players
       if (Number.isFinite(endsAtMs) && endsAtMs <= 0 && playersNow.length >= 2 && Number.isFinite(durationMs) && durationMs > 0) {
+        const db = getDb();
         const st: any = latest.state as any;
-        st.endsAtMs = nowMs + durationMs;
+        st.endsAtMs = Date.now() + durationMs;
         db.prepare("UPDATE crg_mp_sessions SET state_json = ?, updated_at = datetime('now') WHERE id = ?;").run(
           JSON.stringify(st),
           latest.session.id,
@@ -62,14 +62,8 @@ export async function GET(req: Request) {
         latest = getLatestSession() ?? latest;
       }
 
-      // lobby timeout: personne n'a rejoint après 5 minutes → auto-destruction
-      if (Number.isFinite(endsAtMs) && endsAtMs <= 0 && playersNow.length < 2 && Number.isFinite(createdAt) && nowMs - createdAt > LOBBY_TIMEOUT_MS) {
-        db.prepare("UPDATE crg_mp_sessions SET status = 'finished', updated_at = datetime('now') WHERE id = ?;").run(latest.session.id);
-        latest = getLatestSession() ?? latest;
-      }
-
-      // game timer expired
-      if (Number.isFinite(endsAtMs) && endsAtMs > 0 && nowMs >= endsAtMs) {
+      if (Number.isFinite(endsAtMs) && endsAtMs > 0 && Date.now() >= endsAtMs) {
+        const db = getDb();
         db.prepare("UPDATE crg_mp_sessions SET status = 'finished', updated_at = datetime('now') WHERE id = ?;").run(latest.session.id);
         latest = getLatestSession() ?? latest;
       }
@@ -84,11 +78,19 @@ export async function GET(req: Request) {
     if (p && p.session_id === latest.session.id) you = { seat: Number(p.seat) as MpSeat };
   }
 
-  const players = listPlayers(latest.session.id).map((p) => ({
+  const playersRaw = listPlayersWithReady(latest.session.id);
+  const players = playersRaw.map((p) => ({
     seat: Number(p.seat) as MpSeat,
     name: p.name,
     lastSeenAt: p.last_seen_at,
+    isReady: Boolean(p.is_ready),
+    score: Number(p.seat_score ?? 0),
   }));
+
+  const readyBySeat: Record<number, boolean> = {};
+  for (const p of playersRaw) readyBySeat[Number(p.seat)] = Boolean(p.is_ready);
+
+  const meta = getSessionMetadata(latest.session.id);
 
   return NextResponse.json({
     ok: true,
@@ -99,5 +101,11 @@ export async function GET(req: Request) {
     players,
     you,
     state: latest.state,
+    readyBySeat,
+    roomCode: meta?.roomCode ?? null,
+    roomName: meta?.roomName ?? 'Partie',
+    mode: meta?.mode ?? 'versus',
+    maxPlayers: meta?.maxPlayers ?? 8,
+    difficulty: meta?.difficulty ?? 2,
   } satisfies StateResponse);
 }

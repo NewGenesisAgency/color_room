@@ -5,16 +5,16 @@ import './jeux.css';
 
 export const metadata: Metadata = {
   title: 'Jeux',
-  description: 'Serious games ColorRoom — contrôle des LEDs et défis pédagogiques.',
+  description: 'Serious games ColorRoom - contrôle des LEDs et défis pédagogiques.',
   openGraph: {
     title: 'Color Room Games - Jeux',
-    description: 'Serious games ColorRoom — contrôle des LEDs et défis pédagogiques.',
+    description: 'Serious games ColorRoom - contrôle des LEDs et défis pédagogiques.',
     images: [{ url: '/data.png' }],
   },
   twitter: {
     card: 'summary_large_image',
     title: 'Color Room Games - Jeux',
-    description: 'Serious games ColorRoom — contrôle des LEDs et défis pédagogiques.',
+    description: 'Serious games ColorRoom - contrôle des LEDs et défis pédagogiques.',
     images: ['/data.png'],
   },
 };

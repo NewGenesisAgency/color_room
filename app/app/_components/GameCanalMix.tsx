@@ -10,48 +10,48 @@ import type { GameTileProps } from './GameColorSpeed';
    le xy CIE exact par mélange additif.
 ───────────────────────────────────────────────────────────────────────── */
 const CHANNEL_PROFILES: [number, number, number][] = [
-  [0.30, 0.00, 0.50], // 0  Violet-bleu
-  [0.55, 0.10, 0.85], // 1  Violet
-  [0.25, 0.05, 0.95], // 2  Bleu profond
-  [0.05, 0.05, 0.40], // 3  Bleu sombre
-  [0.00, 0.65, 1.00], // 4  Cyan
-  [0.25, 1.00, 0.35], // 5  Vert
-  [0.00, 0.55, 0.12], // 6  Vert foncé
-  [1.00, 1.00, 0.40], // 7  Jaune
-  [1.00, 0.55, 0.00], // 8  Orange
-  [0.75, 0.25, 0.00], // 9  Orange sombre
-  [0.55, 0.00, 0.00], // 10 Rouge-brun
-  [1.00, 0.05, 0.05], // 11 Rouge vif
-  [0.95, 0.00, 0.20], // 12 Rouge
-  [0.90, 0.00, 0.22], // 13 Rouge
-  [0.35, 0.00, 0.00], // 14 Rouge foncé
-  [0.20, 0.00, 0.00], // 15 (dim)
-  [0.10, 0.00, 0.00], // 16 (dim)
-  [0.10, 0.00, 0.00], // 17 (dim)
-  [1.00, 0.58, 0.00], // 18 Orange chaud
-  [1.00, 0.70, 0.10], // 19 Blanc chaud orangé
-  [1.00, 0.78, 0.15], // 20 Blanc chaud
-  [1.00, 0.80, 0.20], // 21 Blanc chaud
-  [1.00, 0.82, 0.22], // 22 Blanc chaud
-  [1.00, 0.92, 0.78], // 23 Blanc très chaud
-  [1.00, 0.97, 0.90], // 24 Blanc chaud
-  [1.00, 1.00, 1.00], // 25 Blanc pur
-  [0.90, 0.90, 0.90], // 26 Blanc neutre
-  [0.80, 0.80, 0.80], // 27 Blanc froid
-  [0.55, 0.55, 0.55], // 28 Gris
-  [0.40, 0.40, 0.40], // 29 Gris foncé
-  [0.78, 0.78, 0.78], // 30 Gris clair
-  [0.92, 0.92, 0.92], // 31 Gris très clair
+  [0.35, 0.00, 0.60], // 0  404nm — Violet foncé
+  [0.55, 0.00, 0.85], // 1  421nm — Violet clair
+  [0.28, 0.00, 0.95], // 2  435nm — Bleu-violet
+  [0.10, 0.04, 0.98], // 3  448nm — Bleu marine
+  [0.00, 0.45, 1.00], // 4  479nm — Bleu turquoise
+  [0.00, 0.95, 0.38], // 5  513nm — Vert clair
+  [0.00, 0.72, 0.18], // 6  ~525nm — Vert foncé
+  [0.50, 1.00, 0.00], // 7  541nm — Jaune-vert (lime)
+  [1.00, 0.72, 0.00], // 8  593nm — Orange/ambre
+  [1.00, 0.38, 0.00], // 9  605nm — Orange-rouge (rouge/orangé marron)
+  [0.92, 0.06, 0.00], // 10 629nm — Rouge (un peu foncé)
+  [1.00, 0.03, 0.00], // 11 642nm — Rouge pétant
+  [0.96, 0.00, 0.05], // 12 658nm — Rouge cerise
+  [0.92, 0.00, 0.06], // 13 658nm — Rouge cerise+
+  [0.55, 0.00, 0.00], // 14 698nm — Rouge foncé
+  [0.26, 0.00, 0.00], // 15 731nm — Rouge très foncé (near-IR)
+  [0.12, 0.00, 0.00], // 16 758nm — Rouge invisible (IR)
+  [0.06, 0.00, 0.00], // 17 780nm — Rouge invisible (IR)
+  [1.00, 0.52, 0.00], // 18 — Jaune orange (phosphore chaud)
+  [1.00, 0.65, 0.06], // 19 — Jaune orange clair
+  [1.00, 0.68, 0.10], // 20 — Jaune orange clair (dim)
+  [1.00, 0.72, 0.12], // 21 — Jaune orange clair (dim2)
+  [1.00, 0.75, 0.14], // 22 — Jaune orange clair (dim3)
+  [1.00, 0.90, 0.62], // 23 — Blanc chaud orangé
+  [1.00, 0.96, 0.85], // 24 — Blanc légèrement jaunis
+  [1.00, 1.00, 1.00], // 25 — Blanc pur
+  [1.00, 1.00, 0.98], // 26 — Blanc (dim)
+  [0.98, 0.98, 0.96], // 27 — Blanc (dim2)
+  [0.62, 0.62, 0.62], // 28 — Gris
+  [0.50, 0.50, 0.50], // 29 — Gris foncé
+  [0.82, 0.82, 0.80], // 30 — Blanc/Gris
+  [0.92, 0.92, 0.90], // 31 — Blanc dim
 ];
 
 const CHANNEL_NAMES = [
-  'Violet-bleu','Violet','Bleu profond','Bleu sombre','Cyan',
-  'Vert','Vert foncé','Jaune','Orange','Orange sombre',
-  'Rouge-brun','Rouge vif','Rouge','Rouge (2)','Rouge foncé',
-  'dim','dim','dim',
-  'Orange chaud','Blanc orangé','Blanc chaud (1)','Blanc chaud (2)','Blanc chaud (3)',
-  'Blanc très chaud','Blanc chaud','Blanc pur','Blanc neutre','Blanc froid',
-  'Gris','Gris foncé','Gris clair','Gris très clair',
+  'Violet foncé 404nm','Violet clair 421nm','Bleu-violet 435nm','Bleu marine 448nm','Bleu 479nm',
+  'Vert clair 513nm','Vert foncé','Jaune-vert 541nm','Orange 593nm','Orange-rouge 605nm',
+  'Rouge 629nm','Rouge pétant 642nm','Rouge cerise 658nm','Rouge cerise+ 658nm','Rouge foncé 698nm',
+  'Rouge IR 731nm','IR 758nm','IR 780nm',
+  'Jaune orange','Jaune orange clair','Jaune orange (dim)','Jaune orange (dim2)','Jaune orange (dim3)',
+  'Blanc chaud','Blanc jaunis','Blanc','Blanc (dim)','Blanc (dim2)',
+  'Gris','Gris foncé','Blanc/Gris','Blanc dim',
 ];
 
 /* Canaux intéressants (bonne diversité chromatique, pas trop sombres) */

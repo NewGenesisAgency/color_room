@@ -1,2 +1,0 @@
-lien WeTransfer de l'exécutable avec un README expliquant un minimum l'application et l'API
-https://we.tl/t-k7aKzldw1C

@@ -3,17 +3,18 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { GameTileProps } from './GameColorSpeed';
 
-// ── Colour helpers ────────────────────────────────────────────────────────────
+// ── Types ─────────────────────────────────────────────────────────────────────
 
 type RGB = { r: number; g: number; b: number };
+type Mode = 'cacher' | 'révéler';
 
-function apparent(surface: RGB, illum: RGB): RGB {
-  return {
-    r: Math.round(surface.r * illum.r / 255),
-    g: Math.round(surface.g * illum.g / 255),
-    b: Math.round(surface.b * illum.b / 255),
-  };
+interface Round {
+  wordIdx: number;
+  mode: Mode;
+  startIllum: RGB;
 }
+
+// ── Colour helpers ─────────────────────────────────────────────────────────────
 
 function colorDist(a: RGB, b: RGB): number {
   const dr = a.r - b.r, dg = a.g - b.g, db = a.b - b.b;
@@ -24,132 +25,89 @@ function css(c: RGB): string {
   return `rgb(${c.r},${c.g},${c.b})`;
 }
 
-function brightness(c: RGB): number {
-  return 0.299 * c.r + 0.587 * c.g + 0.114 * c.b;
-}
+// ── 50 physics/light vocabulary words with distinct colours ───────────────────
 
-// ── Fiche definitions ─────────────────────────────────────────────────────────
-//
-// Each pair has one equal channel.  Under the pure illumination of that
-// channel the two apparent colours become identical (metamerism).
-// CACHER rounds: find that illumination → text disappears.
-// RÉVÉLER rounds: start with tiles already showing the HIDE illumination
-//   (text invisible on physical card) → find a different illumination to
-//   restore maximum contrast.
-
-type Mode = 'cacher' | 'révéler';
-
-interface Fiche {
-  id: string;
-  title: string;
-  bg: RGB;
-  fg: RGB;
-  text: string;
-  mode: Mode;
-  startIllum: RGB;   // illumination displayed when round begins
-  targetIllum: RGB;  // illumination that wins the round
-  equalChannel: 'R' | 'G' | 'B';
-  hint: string;
-}
-
-const FICHES: Fiche[] = [
-  // ── Pair 1 : G=80 ─────────────────────────────────────────────────────────
-  {
-    id: 'c1', title: 'Bleu & Orangé',
-    bg: { r: 20, g: 80, b: 210 }, fg: { r: 210, g: 80, b: 25 },
-    text: 'LUMIÈRE', mode: 'cacher',
-    startIllum: { r: 255, g: 255, b: 255 },
-    targetIllum: { r: 0, g: 255, b: 0 },
-    equalChannel: 'G',
-    hint: 'Ces deux couleurs ont la même valeur verte (G = 80).',
-  },
-  {
-    id: 'r1', title: 'Révèle le secret',
-    bg: { r: 20, g: 80, b: 210 }, fg: { r: 210, g: 80, b: 25 },
-    text: 'LUMIÈRE', mode: 'révéler',
-    startIllum: { r: 0, g: 255, b: 0 },   // start hidden
-    targetIllum: { r: 255, g: 0, b: 0 },  // red maximises R difference
-    equalChannel: 'G',
-    hint: 'Le vert les cache — essayez le rouge ou le bleu.',
-  },
-  // ── Pair 2 : B=110 ────────────────────────────────────────────────────────
-  {
-    id: 'c2', title: 'Cramoisi & Émeraude',
-    bg: { r: 200, g: 45, b: 110 }, fg: { r: 40, g: 200, b: 110 },
-    text: 'SECRET', mode: 'cacher',
-    startIllum: { r: 255, g: 255, b: 255 },
-    targetIllum: { r: 0, g: 0, b: 255 },
-    equalChannel: 'B',
-    hint: 'Les deux couleurs partagent la même composante bleue (B = 110).',
-  },
-  {
-    id: 'r2', title: 'La révélation bleue',
-    bg: { r: 200, g: 45, b: 110 }, fg: { r: 40, g: 200, b: 110 },
-    text: 'SECRET', mode: 'révéler',
-    startIllum: { r: 0, g: 0, b: 255 },
-    targetIllum: { r: 255, g: 0, b: 0 },
-    equalChannel: 'B',
-    hint: 'Le bleu les unifie — essayez le rouge ou le vert.',
-  },
-  // ── Pair 3 : R=135 ────────────────────────────────────────────────────────
-  {
-    id: 'c3', title: 'Chartreuse & Violet',
-    bg: { r: 135, g: 210, b: 30 }, fg: { r: 135, g: 20, b: 210 },
-    text: 'MÉTAMÈRE', mode: 'cacher',
-    startIllum: { r: 255, g: 255, b: 255 },
-    targetIllum: { r: 255, g: 0, b: 0 },
-    equalChannel: 'R',
-    hint: 'Rouge identique des deux côtés (R = 135).',
-  },
-  {
-    id: 'r3', title: 'Révèle le vert caché',
-    bg: { r: 135, g: 210, b: 30 }, fg: { r: 135, g: 20, b: 210 },
-    text: 'MÉTAMÈRE', mode: 'révéler',
-    startIllum: { r: 255, g: 0, b: 0 },
-    targetIllum: { r: 0, g: 255, b: 0 },
-    equalChannel: 'R',
-    hint: 'Le rouge les fond — le vert ou le bleu les sépare.',
-  },
-  // ── Pair 4 : G=115 ────────────────────────────────────────────────────────
-  {
-    id: 'c4', title: 'Ambre & Azur',
-    bg: { r: 220, g: 115, b: 20 }, fg: { r: 20, g: 115, b: 220 },
-    text: 'INVISIBLE', mode: 'cacher',
-    startIllum: { r: 255, g: 255, b: 255 },
-    targetIllum: { r: 0, g: 255, b: 0 },
-    equalChannel: 'G',
-    hint: 'Canal vert commun (G = 115) — la lumière verte est la clé.',
-  },
-  {
-    id: 'r4', title: 'L\'Ambre contre l\'Azur',
-    bg: { r: 220, g: 115, b: 20 }, fg: { r: 20, g: 115, b: 220 },
-    text: 'INVISIBLE', mode: 'révéler',
-    startIllum: { r: 0, g: 255, b: 0 },
-    targetIllum: { r: 255, g: 0, b: 0 },
-    equalChannel: 'G',
-    hint: 'Sous lumière verte tout se fond — essayez le rouge.',
-  },
+const PHYSICS_WORDS: { word: string; fg: RGB }[] = [
+  { word: 'PHOTON',          fg: { r: 255, g: 220, b: 50  } },
+  { word: 'PRISME',          fg: { r: 80,  g: 200, b: 255 } },
+  { word: 'HALO',            fg: { r: 255, g: 170, b: 80  } },
+  { word: 'FOYER',           fg: { r: 255, g: 80,  b: 80  } },
+  { word: 'MIROIR',          fg: { r: 180, g: 180, b: 255 } },
+  { word: 'SPECTRE',         fg: { r: 80,  g: 255, b: 140 } },
+  { word: 'CORONA',          fg: { r: 255, g: 200, b: 0   } },
+  { word: 'MIRAGE',          fg: { r: 0,   g: 200, b: 220 } },
+  { word: 'DIOPTRE',         fg: { r: 200, g: 100, b: 255 } },
+  { word: 'CAUSTIQUE',       fg: { r: 255, g: 120, b: 0   } },
+  { word: 'VERGENCE',        fg: { r: 0,   g: 180, b: 255 } },
+  { word: 'VISIBLE',         fg: { r: 100, g: 255, b: 100 } },
+  { word: 'RÉFRACTION',      fg: { r: 255, g: 80,  b: 200 } },
+  { word: 'DIFFRACTION',     fg: { r: 80,  g: 255, b: 200 } },
+  { word: 'POLARISATION',    fg: { r: 200, g: 200, b: 50  } },
+  { word: 'INTERFÉRENCE',    fg: { r: 50,  g: 150, b: 255 } },
+  { word: 'DISPERSION',      fg: { r: 255, g: 50,  b: 100 } },
+  { word: 'RÉFLEXION',       fg: { r: 180, g: 255, b: 80  } },
+  { word: 'ABSORPTION',      fg: { r: 255, g: 140, b: 50  } },
+  { word: 'ÉMISSION',        fg: { r: 100, g: 220, b: 255 } },
+  { word: 'DIFFUSION',       fg: { r: 220, g: 100, b: 255 } },
+  { word: 'COHÉRENCE',       fg: { r: 255, g: 255, b: 100 } },
+  { word: 'FRÉQUENCE',       fg: { r: 100, g: 255, b: 180 } },
+  { word: 'AMPLITUDE',       fg: { r: 255, g: 100, b: 180 } },
+  { word: 'LUMINANCE',       fg: { r: 200, g: 220, b: 255 } },
+  { word: 'IRRADIANCE',      fg: { r: 255, g: 180, b: 100 } },
+  { word: 'ILLUMINANCE',     fg: { r: 100, g: 180, b: 255 } },
+  { word: 'RÉFLECTANCE',     fg: { r: 180, g: 255, b: 180 } },
+  { word: 'IRIDESCENCE',     fg: { r: 255, g: 100, b: 255 } },
+  { word: 'SCINTILLATION',   fg: { r: 255, g: 255, b: 180 } },
+  { word: 'FLUORESCENCE',    fg: { r: 80,  g: 255, b: 80  } },
+  { word: 'DICHROÏSME',      fg: { r: 255, g: 50,  b: 50  } },
+  { word: 'ABERRATION',      fg: { r: 50,  g: 50,  b: 255 } },
+  { word: 'CHROMINANCE',     fg: { r: 255, g: 200, b: 100 } },
+  { word: 'RAYONNEMENT',     fg: { r: 100, g: 200, b: 200 } },
+  { word: 'PHOSPHORESCENCE', fg: { r: 180, g: 255, b: 50  } },
+  { word: 'OPACITÉ',         fg: { r: 255, g: 150, b: 150 } },
+  { word: 'TRANSPARENCE',    fg: { r: 150, g: 255, b: 255 } },
+  { word: 'BIRÉFRINGENCE',   fg: { r: 200, g: 150, b: 255 } },
+  { word: 'RÉFRINGENCE',     fg: { r: 255, g: 200, b: 150 } },
+  { word: 'BIOLUMINESCENCE', fg: { r: 80,  g: 255, b: 180 } },
+  { word: 'MONOCHROMATIQUE', fg: { r: 255, g: 80,  b: 160 } },
+  { word: 'POLYCHROMATIQUE', fg: { r: 160, g: 80,  b: 255 } },
+  { word: 'ACHROMATIQUE',    fg: { r: 200, g: 200, b: 200 } },
+  { word: 'COLORIMÉTRIE',    fg: { r: 255, g: 160, b: 80  } },
+  { word: 'PHOTOMÉTRIE',     fg: { r: 80,  g: 160, b: 255 } },
+  { word: 'RADIOMÉTRIE',     fg: { r: 255, g: 255, b: 80  } },
+  { word: 'CHROMATICITÉ',    fg: { r: 80,  g: 255, b: 255 } },
+  { word: 'SYNCHROTRON',     fg: { r: 255, g: 50,  b: 150 } },
+  { word: 'HOLOGRAMME',      fg: { r: 150, g: 50,  b: 255 } },
 ];
 
-// Shuffled order for 8 rounds
-function shuffleOrder(): number[] {
-  const arr = FICHES.map((_, i) => i);
-  for (let i = arr.length - 1; i > 0; i--) {
+// ── Constants ──────────────────────────────────────────────────────────────────
+
+const TOTAL_ROUNDS    = 8;
+const ROUND_TIME      = 90;
+const HIDE_WIN_DIST   = 0.08;
+const REVEAL_WIN_DIST = 0.45;
+
+// ── Round generation ───────────────────────────────────────────────────────────
+
+function generateRounds(): Round[] {
+  const indices = Array.from({ length: PHYSICS_WORDS.length }, (_, i) => i);
+  for (let i = indices.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
-    [arr[i], arr[j]] = [arr[j], arr[i]];
+    [indices[i], indices[j]] = [indices[j], indices[i]];
   }
-  return arr;
+  return indices.slice(0, TOTAL_ROUNDS).map((wordIdx, i) => {
+    const mode: Mode = i % 2 === 0 ? 'cacher' : 'révéler';
+    const fg = PHYSICS_WORDS[wordIdx].fg;
+    const startIllum: RGB = mode === 'cacher'
+      ? { r: 255, g: 255, b: 255 }
+      : { ...fg };
+    return { wordIdx, mode, startIllum };
+  });
 }
 
-// ── Constants ─────────────────────────────────────────────────────────────────
+// ── Shared styles ──────────────────────────────────────────────────────────────
 
-const TOTAL_ROUNDS = FICHES.length;
-const HIDE_WIN_THRESHOLD  = 0.06;  // similarity ≥ 94 %  → text invisible
-const REVEAL_WIN_THRESHOLD = 0.50; // distance  ≥ 50 %  → text clearly visible
-const ROUND_TIME = 90;
-
-/* ── Styles ──────────────────────────────────────────────────────────── */
-const M: Record<string, React.CSSProperties> = {
+const S: Record<string, React.CSSProperties> = {
   wrap: {
     background: 'linear-gradient(160deg,rgba(8,12,24,.94) 0%,rgba(10,14,32,.90) 100%)',
     backdropFilter: 'blur(28px)', WebkitBackdropFilter: 'blur(28px)',
@@ -157,76 +115,50 @@ const M: Record<string, React.CSSProperties> = {
     borderRadius: 20, overflow: 'hidden',
     fontFamily: 'system-ui,-apple-system,sans-serif', color: '#e8eaf0',
   },
-  readyRow: {
-    display: 'flex', alignItems: 'flex-start', gap: 20, padding: '18px 22px',
-  },
-  tag: {
-    display: 'inline-block',
-    background: 'linear-gradient(135deg,rgba(124,58,237,.28),rgba(6,214,160,.18))',
-    border: '1px solid rgba(124,58,237,.4)', borderRadius: 8,
-    padding: '3px 10px', fontSize: 12, fontWeight: 800, color: '#a78bfa',
-    marginBottom: 8, letterSpacing: '.04em',
-  },
-  rules: {
-    fontSize: 13, color: 'rgba(255,255,255,.62)', lineHeight: 1.65, margin: '0 0 10px',
-  },
   playBtn: {
     padding: '11px 26px', borderRadius: 14, border: 'none',
     background: 'linear-gradient(135deg,#7c3aed,#06d6a0)',
-    boxShadow: '0 4px 20px rgba(124,58,237,.40), inset 0 1px 0 rgba(255,255,255,.15)',
-    color: '#fff', fontWeight: 800, fontSize: 15, cursor: 'pointer', letterSpacing: '.02em',
+    boxShadow: '0 4px 20px rgba(124,58,237,.40)',
+    color: '#fff', fontWeight: 800, fontSize: 15, cursor: 'pointer',
   },
   quitBtn: {
     padding: '10px 20px', borderRadius: 14,
     border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.06)',
     color: 'rgba(255,255,255,.7)', fontWeight: 700, fontSize: 13, cursor: 'pointer',
   },
-  finRow: {
-    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-    gap: 20, padding: '16px 22px', flexWrap: 'wrap' as const,
+  glass: {
+    background: 'rgba(255,255,255,.05)',
+    border: '1px solid rgba(255,255,255,.08)',
+    borderRadius: 12,
   },
-  statGrid: { display: 'flex', gap: 10, flexWrap: 'wrap' as const },
-  statCard: {
-    background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.08)',
-    borderRadius: 12, padding: '8px 16px', textAlign: 'center' as const, minWidth: 72,
-  },
-  statLbl: {
-    fontSize: 10, color: 'rgba(255,255,255,.38)', fontWeight: 700,
-    textTransform: 'uppercase' as const, letterSpacing: '.08em', marginBottom: 3,
-  },
-  statVal: { fontSize: 22, fontWeight: 900 },
   stopBtn: {
     padding: '4px 12px', borderRadius: 8,
     border: '1px solid rgba(255,255,255,.10)', background: 'rgba(255,255,255,.05)',
     color: 'rgba(255,255,255,.5)', cursor: 'pointer', fontSize: 12,
   },
-  glassCard: {
-    background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.08)', borderRadius: 12,
-  },
 };
 
-// ── Component ─────────────────────────────────────────────────────────────────
+// ── Component ──────────────────────────────────────────────────────────────────
 
 export default function GameMetamerisme({
   onSendColor, onTurnOffAll, onQuit, tileCount = 42,
 }: GameTileProps) {
-  const [phase, setPhase] = useState<'ready' | 'playing' | 'result' | 'finished'>('ready');
-  const [order,     setOrder]     = useState<number[]>([]);
-  const [roundIdx,  setRoundIdx]  = useState(0);
-  const [illum,     setIllum]     = useState<RGB>({ r: 255, g: 255, b: 255 });
-  const [timeLeft,  setTimeLeft]  = useState(ROUND_TIME);
-  const [hintShown, setHintShown] = useState(false);
+  const [phase,      setPhase]      = useState<'ready' | 'playing' | 'result' | 'finished'>('ready');
+  const [rounds,     setRounds]     = useState<Round[]>([]);
+  const [roundIdx,   setRoundIdx]   = useState(0);
+  const [illum,      setIllum]      = useState<RGB>({ r: 255, g: 255, b: 255 });
+  const [timeLeft,   setTimeLeft]   = useState(ROUND_TIME);
+  const [hintShown,  setHintShown]  = useState(false);
   const [roundScore, setRoundScore] = useState(0);
   const [totalScore, setTotalScore] = useState(0);
   const [validated,  setValidated]  = useState(false);
   const [autoAdv,    setAutoAdv]    = useState(5);
 
-  const numTiles   = Math.min(tileCount, 42);
-  const timerRef   = useRef<number>(0);
-  const hwRef      = useRef<number>(0);
-  const lastSendMs = useRef(0);
+  const numTiles = Math.min(tileCount, 42);
+  const timerRef = useRef<number>(0);
+  const hwRef    = useRef<number>(0);
 
-  // ── Hardware sync (debounced 40 ms) ──────────────────────────────────────
+  // Tiles always show the current illumination — same colour as the card background
   const sendIllumToTiles = useCallback((il: RGB) => {
     window.clearTimeout(hwRef.current);
     hwRef.current = window.setTimeout(() => {
@@ -236,39 +168,30 @@ export default function GameMetamerisme({
 
   useEffect(() => () => {
     window.clearTimeout(hwRef.current);
-    window.clearTimeout(timerRef.current);
+    window.clearInterval(timerRef.current);
     onTurnOffAll();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Derived state ─────────────────────────────────────────────────────────
-  const fiche: Fiche | null = order.length > 0 ? FICHES[order[roundIdx]] : null;
-
-  const appBg = fiche ? apparent(fiche.bg, illum) : { r: 0, g: 0, b: 0 };
-  const appFg = fiche ? apparent(fiche.fg, illum) : { r: 0, g: 0, b: 0 };
-  const dist  = colorDist(appBg, appFg);
-
-  // Similarity (0 = very different, 1 = identical)
-  const similarity = 1 - dist;
-
-  const hasWon = fiche
-    ? fiche.mode === 'cacher'
-      ? dist   <= HIDE_WIN_THRESHOLD
-      : dist   >= REVEAL_WIN_THRESHOLD
+  // ── Derived ──────────────────────────────────────────────────────────────────
+  const round = rounds[roundIdx] ?? null;
+  const entry = round ? PHYSICS_WORDS[round.wordIdx] : null;
+  const dist  = entry ? colorDist(illum, entry.fg) : 0;
+  const hasWon = round
+    ? round.mode === 'cacher' ? dist <= HIDE_WIN_DIST : dist >= REVEAL_WIN_DIST
     : false;
+  const contrastPct = Math.round(dist * 100);
 
-  // ── Start / restart ───────────────────────────────────────────────────────
+  // ── Game flow ─────────────────────────────────────────────────────────────────
   function startGame() {
-    const ord = shuffleOrder();
-    setOrder(ord);
+    const r = generateRounds();
+    setRounds(r);
     setRoundIdx(0);
     setTotalScore(0);
     setPhase('playing');
     setValidated(false);
     setHintShown(false);
-    setTimeLeft(ROUND_TIME);
-    const startIl = FICHES[ord[0]].startIllum;
-    setIllum(startIl);
-    sendIllumToTiles(startIl);
+    setIllum(r[0].startIllum);
+    sendIllumToTiles(r[0].startIllum);
     launchTimer();
   }
 
@@ -280,39 +203,39 @@ export default function GameMetamerisme({
       t--;
       setTimeLeft(t);
       if (t === Math.floor(ROUND_TIME * 0.4)) setHintShown(true);
-      if (t <= 0) {
-        window.clearInterval(timerRef.current);
-        validate(0); // time out → 0 pts
-      }
+      if (t <= 0) { window.clearInterval(timerRef.current); validate(0); }
     }, 1000) as unknown as number;
   }
 
-  // ── Slider change ─────────────────────────────────────────────────────────
-  function changeIllum(channel: 'r' | 'g' | 'b', val: number) {
-    const next = { ...illum, [channel]: val };
+  function changeIllum(ch: 'r' | 'g' | 'b', val: number) {
+    const next = { ...illum, [ch]: val };
     setIllum(next);
     sendIllumToTiles(next);
   }
 
-  // ── Validate ──────────────────────────────────────────────────────────────
+  function computeScore(): number {
+    const timeBonus = Math.max(0, timeLeft) / ROUND_TIME;
+    let accuracy = 0;
+    if (round?.mode === 'cacher') {
+      accuracy = Math.max(0, 1 - dist / 0.5);
+    } else {
+      accuracy = Math.max(0, (dist - 0.3) / 0.7);
+    }
+    return Math.round(700 * accuracy + 300 * timeBonus);
+  }
+
   function validate(forcePts?: number) {
     if (validated) return;
     window.clearInterval(timerRef.current);
     setValidated(true);
-
-    const pts = forcePts !== undefined
-      ? forcePts
-      : computeScore();
+    const pts = forcePts !== undefined ? forcePts : computeScore();
     setRoundScore(pts);
     setPhase('result');
-
-    // Reveal target on tiles briefly
-    if (fiche) {
-      const tgt = fiche.targetIllum;
-      for (let i = 0; i < numTiles; i++) onSendColor(i, tgt.r, tgt.g, tgt.b, 80);
+    // Flash the winning target colour on tiles
+    if (round && entry) {
+      const target = round.mode === 'cacher' ? entry.fg : { r: 255, g: 255, b: 255 };
+      for (let i = 0; i < numTiles; i++) onSendColor(i, target.r, target.g, target.b, 80);
     }
-
-    // Auto-advance counter
     let n = 5;
     setAutoAdv(n);
     const id = window.setInterval(() => {
@@ -320,21 +243,6 @@ export default function GameMetamerisme({
       setAutoAdv(n);
       if (n <= 0) { window.clearInterval(id); advanceRound(pts); }
     }, 1000);
-  }
-
-  function computeScore(): number {
-    if (!fiche) return 0;
-    const bonus_time = Math.max(0, timeLeft) / ROUND_TIME; // 0‥1
-    let accuracy = 0;
-
-    if (fiche.mode === 'cacher') {
-      // Full marks when dist=0, 0 pts when dist≥0.5
-      accuracy = Math.max(0, 1 - dist / 0.5);
-    } else {
-      // Full marks when dist=1, 0 pts when dist<0.3
-      accuracy = Math.max(0, (dist - 0.3) / 0.7);
-    }
-    return Math.round(700 * accuracy + 300 * bonus_time);
   }
 
   function advanceRound(pts: number) {
@@ -350,14 +258,13 @@ export default function GameMetamerisme({
     setRoundIdx(next);
     setValidated(false);
     setHintShown(false);
-    const startIl = FICHES[order[next]].startIllum;
+    const startIl = rounds[next].startIllum;
     setIllum(startIl);
     sendIllumToTiles(startIl);
     setPhase('playing');
     launchTimer();
   }
 
-  // ── Preset illumination buttons ───────────────────────────────────────────
   const PRESETS: { label: string; col: RGB }[] = [
     { label: 'Blanc',   col: { r: 255, g: 255, b: 255 } },
     { label: 'Rouge',   col: { r: 255, g: 0,   b: 0   } },
@@ -368,74 +275,77 @@ export default function GameMetamerisme({
     { label: 'Magenta', col: { r: 255, g: 0,   b: 255 } },
   ];
 
-  /* ── READY ── */
+  // ── READY ─────────────────────────────────────────────────────────────────────
   if (phase === 'ready') return (
-    <div style={M.wrap}>
-      <div style={M.readyRow}>
+    <div style={S.wrap}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 20, padding: '18px 22px' }}>
         <div style={{ flex: 1 }}>
-          <span style={M.tag}>🃏 Métamérie</span>
-          <p style={M.rules}>
-            Une fiche colorée est posée sur les dalles.{' '}
-            <strong style={{ color: '#a78bfa' }}>CACHER :</strong> trouvez l&apos;éclairage qui fond le texte.{' '}
-            <strong style={{ color: '#f59e0b' }}>RÉVÉLER :</strong> le texte est déjà caché — faites-le réapparaître.
-            <span style={{ color: 'rgba(255,255,255,.35)', marginLeft: 6 }}>{TOTAL_ROUNDS} manches · {ROUND_TIME}s · {TOTAL_ROUNDS * 1000} pts max</span>
+          <span style={{
+            display: 'inline-block',
+            background: 'linear-gradient(135deg,rgba(124,58,237,.28),rgba(6,214,160,.18))',
+            border: '1px solid rgba(124,58,237,.4)', borderRadius: 8,
+            padding: '3px 10px', fontSize: 12, fontWeight: 800, color: '#a78bfa', marginBottom: 8,
+          }}>
+            🔬 Spectre de Mots
+          </span>
+          <p style={{ fontSize: 13, color: 'rgba(255,255,255,.62)', lineHeight: 1.65, margin: '0 0 10px' }}>
+            Un terme de physique lumineuse s&apos;affiche dans une couleur précise.
+            Les dalles illuminent le fond avec la même couleur que l&apos;écran.{' '}
+            <strong style={{ color: '#a78bfa' }}>CACHER :</strong> ajustez l&apos;éclairage jusqu&apos;à rendre le mot invisible.{' '}
+            <strong style={{ color: '#f59e0b' }}>RÉVÉLER :</strong> le mot est déjà fondu — faites-le réapparaître.
+          </p>
+          <p style={{ fontSize: 12, color: 'rgba(255,255,255,.35)', margin: 0 }}>
+            {TOTAL_ROUNDS} manches · {ROUND_TIME}s/manche · {TOTAL_ROUNDS * 1000} pts max
           </p>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flexShrink: 0 }}>
-          <button onClick={startGame} style={M.playBtn}>Jouer</button>
-          <button onClick={onQuit}    style={M.quitBtn}>Quitter</button>
+          <button onClick={startGame} style={S.playBtn}>Jouer</button>
+          <button onClick={onQuit}    style={S.quitBtn}>Quitter</button>
         </div>
       </div>
     </div>
   );
 
-  /* ── FINISHED ── */
+  // ── FINISHED ──────────────────────────────────────────────────────────────────
   if (phase === 'finished') {
     const pct = Math.round(totalScore / (TOTAL_ROUNDS * 1000) * 100);
     return (
-      <div style={M.wrap}>
-        <div style={M.finRow}>
-          <div style={M.statGrid}>
-            {([
-              ['Score',   totalScore, '#a78bfa'],
-              ['Pct%',    pct,        '#06d6a0'],
-              ['Manches', TOTAL_ROUNDS, '#fff' ],
-            ] as [string, number, string][]).map(([k, v, c]) => (
-              <div key={k} style={M.statCard}>
-                <div style={M.statLbl}>{k}</div>
-                <div style={{ ...M.statVal, color: c }}>{k === 'Pct%' ? `${v}%` : v}</div>
-              </div>
-            ))}
+      <div style={S.wrap}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 20, padding: '20px 22px', flexWrap: 'wrap' }}>
+          <div>
+            <div style={{ fontSize: 11, color: 'rgba(255,255,255,.4)', fontWeight: 700, letterSpacing: '.08em', marginBottom: 10 }}>RÉSULTATS FINAUX</div>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+              {([['Score', totalScore, '#a78bfa'], ['Réussite', `${pct}%`, '#06d6a0'], ['Manches', TOTAL_ROUNDS, '#fff']] as [string, string | number, string][]).map(([k, v, c]) => (
+                <div key={k} style={{ background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.08)', borderRadius: 12, padding: '8px 16px', textAlign: 'center', minWidth: 80 }}>
+                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,.38)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 3 }}>{k}</div>
+                  <div style={{ fontSize: 22, fontWeight: 900, color: c }}>{v}</div>
+                </div>
+              ))}
+            </div>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flexShrink: 0 }}>
-            <button onClick={startGame} style={M.playBtn}>Rejouer</button>
-            <button onClick={onQuit}    style={M.quitBtn}>Menu</button>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <button onClick={startGame} style={S.playBtn}>Rejouer</button>
+            <button onClick={onQuit}    style={S.quitBtn}>Menu</button>
           </div>
         </div>
       </div>
     );
   }
 
-  if (!fiche) return null;
+  if (!round || !entry) return null;
 
-  const appBgUnder255  = apparent(fiche.bg, { r: 255, g: 255, b: 255 }); // = original
-  const appFgUnder255  = apparent(fiche.fg, { r: 255, g: 255, b: 255 }); // = original
-
-  const textContrastDark = brightness(appBg) > 100;
-  const simPct = Math.round(similarity * 100);
-  const timerPct = timeLeft / ROUND_TIME * 100;
+  const modeLabel  = round.mode === 'cacher' ? 'CACHER' : 'RÉVÉLER';
+  const modeColor  = round.mode === 'cacher' ? '#7c3aed' : '#f59e0b';
+  const modeBg     = round.mode === 'cacher' ? 'rgba(124,58,237,.25)' : 'rgba(245,158,11,.20)';
+  const timerPct   = timeLeft / ROUND_TIME * 100;
   const timerColor = timeLeft > 30 ? '#4ade80' : timeLeft > 15 ? '#fbbf24' : '#ef4444';
 
-  const modeLabel = fiche.mode === 'cacher' ? 'CACHER' : 'RÉVÉLER';
-  const modeColor = fiche.mode === 'cacher' ? '#7c3aed' : '#f59e0b';
-  const modeBg    = fiche.mode === 'cacher' ? 'rgba(124,58,237,.25)' : 'rgba(245,158,11,.20)';
-
-  /* ── PLAYING / RESULT ── */
+  // ── PLAYING / RESULT ──────────────────────────────────────────────────────────
   return (
-    <div style={M.wrap}>
+    <div style={S.wrap}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14, padding: '16px 18px' }}>
 
-        {/* ── HUD ── */}
+        {/* HUD */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: modeColor, background: modeBg, border: `1px solid ${modeColor}44`, padding: '3px 9px', borderRadius: 6 }}>
             {modeLabel}
@@ -450,98 +360,102 @@ export default function GameMetamerisme({
             <div style={{ fontSize: 10, color: timerColor, marginTop: 2, textAlign: 'right', fontWeight: 700 }}>{timeLeft}s</div>
           </div>
           <div style={{ fontWeight: 900, fontSize: 16, color: '#a78bfa' }}>{totalScore} pts</div>
-          <button onClick={() => validate()} style={M.stopBtn}>⏹</button>
+          <button onClick={() => validate()} style={S.stopBtn}>⏹</button>
         </div>
 
-        {/* ── Card title ── */}
-        <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', opacity: 0.85 }}>{fiche.title}</div>
-
-        {/* ── Two card previews ── */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-
-          {/* White light reference */}
-          <div style={{ ...M.glassCard, overflow: 'hidden' }}>
-            <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,.45)', background: 'rgba(255,255,255,.06)', padding: '4px 10px', letterSpacing: 0.5 }}>
-              LUMIÈRE BLANCHE
-            </div>
-            <div style={{
-              padding: '18px 12px',
-              background: css(appBgUnder255),
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              minHeight: 72,
-            }}>
-              <span style={{
-                color: css(appFgUnder255),
-                fontWeight: 900, fontSize: 20, letterSpacing: 2,
-                textShadow: '0 1px 3px rgba(0,0,0,0.3)',
-              }}>{fiche.text}</span>
-            </div>
-            <div style={{ display: 'flex', gap: 4, padding: 6, background: 'rgba(0,0,0,0.2)' }}>
-              <div style={{ flex: 1, height: 14, borderRadius: 3, background: css(appBgUnder255), border: '1px solid rgba(255,255,255,.15)' }} />
-              <div style={{ flex: 1, height: 14, borderRadius: 3, background: css(appFgUnder255), border: '1px solid rgba(255,255,255,.15)' }} />
+        {/* Word display — fond = illum = couleur des dalles */}
+        <div style={{
+          ...S.glass,
+          overflow: 'hidden',
+          border: `2px solid ${hasWon ? '#4ade80' : 'rgba(255,255,255,.12)'}`,
+          transition: 'border-color 0.2s',
+        }}>
+          <div style={{
+            fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,.45)',
+            background: 'rgba(255,255,255,.06)', padding: '5px 12px', letterSpacing: 0.5,
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          }}>
+            <span>FOND = COULEUR DES DALLES</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <div style={{ width: 14, height: 14, borderRadius: 3, background: css(illum), border: '1px solid rgba(255,255,255,.3)' }} />
+              <span style={{ fontFamily: 'monospace', fontSize: 10, color: 'rgba(255,255,255,.55)' }}>
+                rgb({illum.r}, {illum.g}, {illum.b})
+              </span>
             </div>
           </div>
 
-          {/* Under player illumination */}
-          <div style={{ ...M.glassCard, overflow: 'hidden', border: `2px solid ${hasWon ? '#4ade80' : 'rgba(255,255,255,.12)'}`, transition: 'border-color 0.2s' }}>
-            <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,.45)', background: 'rgba(255,255,255,.06)', padding: '4px 10px', letterSpacing: 0.5, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span>VOTRE ÉCLAIRAGE</span>
-              <span style={{ color: css(illum), fontWeight: 800 }}>■</span>
-            </div>
-            <div style={{
-              padding: '18px 12px',
-              background: css(appBg),
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              minHeight: 72,
-              transition: 'background 0.08s',
+          {/* The word — background mirrors tile colour exactly */}
+          <div style={{
+            padding: '36px 24px',
+            background: css(illum),
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            minHeight: 110,
+            transition: 'background 0.06s',
+          }}>
+            <span style={{
+              color: css(entry.fg),
+              fontWeight: 900, fontSize: 30, letterSpacing: 5,
+              fontFamily: 'monospace',
+              transition: 'color 0.06s',
+              userSelect: 'none',
             }}>
-              <span style={{
-                color: css(appFg),
-                fontWeight: 900, fontSize: 20, letterSpacing: 2,
-                transition: 'color 0.08s',
-                textShadow: '0 1px 3px rgba(0,0,0,0.3)',
-              }}>{fiche.text}</span>
+              {entry.word}
+            </span>
+          </div>
+
+          {/* Colour legend */}
+          <div style={{ display: 'flex', background: 'rgba(0,0,0,.25)' }}>
+            <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px' }}>
+              <div style={{ width: 12, height: 12, borderRadius: 3, background: css(illum), border: '1px solid rgba(255,255,255,.2)', flexShrink: 0 }} />
+              <span style={{ fontSize: 10, color: 'rgba(255,255,255,.4)' }}>Fond · dalles</span>
             </div>
-            <div style={{ display: 'flex', gap: 4, padding: 6, background: 'rgba(0,0,0,0.2)' }}>
-              <div style={{ flex: 1, height: 14, borderRadius: 3, background: css(appBg), border: '1px solid rgba(255,255,255,.15)', transition: 'background 0.08s' }} />
-              <div style={{ flex: 1, height: 14, borderRadius: 3, background: css(appFg), border: '1px solid rgba(255,255,255,.15)', transition: 'background 0.08s' }} />
+            <div style={{ width: 1, background: 'rgba(255,255,255,.08)' }} />
+            <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px' }}>
+              <div style={{ width: 12, height: 12, borderRadius: 3, background: css(entry.fg), border: '1px solid rgba(255,255,255,.2)', flexShrink: 0 }} />
+              <span style={{ fontSize: 10, color: 'rgba(255,255,255,.4)' }}>
+                Mot <span style={{ fontFamily: 'monospace' }}>rgb({entry.fg.r},{entry.fg.g},{entry.fg.b})</span> (fixe)
+              </span>
             </div>
           </div>
         </div>
 
-        {/* ── Similarity gauge ── */}
-        <div style={{ ...M.glassCard, padding: '8px 12px' }}>
+        {/* Distance gauge */}
+        <div style={{ ...S.glass, padding: '8px 12px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'rgba(255,255,255,.5)', marginBottom: 5 }}>
-            <span>{fiche.mode === 'cacher' ? 'Similarité des couleurs apparentes' : 'Contraste des couleurs apparentes'}</span>
+            <span>
+              {round.mode === 'cacher' ? 'Distance fond → mot (↓ pour cacher)' : 'Distance fond → mot (↑ pour révéler)'}
+            </span>
             <span style={{ fontWeight: 700, color: hasWon ? '#4ade80' : '#fff' }}>
-              {fiche.mode === 'cacher' ? `${simPct}%` : `${Math.round(dist * 100)}%`}
-              {hasWon && ' ✓'}
+              {contrastPct}%{hasWon ? ' ✓' : ''}
             </span>
           </div>
           <div style={{ height: 8, borderRadius: 4, background: 'rgba(255,255,255,.08)', overflow: 'hidden' }}>
             <div style={{
               height: '100%',
-              width: fiche.mode === 'cacher' ? `${simPct}%` : `${Math.round(dist * 100)}%`,
+              width: `${contrastPct}%`,
               background: hasWon
                 ? '#4ade80'
-                : fiche.mode === 'cacher'
-                ? `hsl(${simPct * 1.2},80%,55%)`
-                : `hsl(${Math.round(dist * 120)},80%,55%)`,
-              transition: 'width 0.1s, background 0.1s',
-              borderRadius: 4,
+                : round.mode === 'cacher'
+                  ? `hsl(${120 - contrastPct * 1.2},80%,55%)`
+                  : `hsl(${contrastPct * 1.2},80%,55%)`,
+              transition: 'width 0.08s, background 0.08s', borderRadius: 4,
             }} />
           </div>
-          {fiche.mode === 'cacher'
-            ? <div style={{ fontSize: 10, color: 'rgba(255,255,255,.3)', marginTop: 3 }}>100% = couleurs identiques (texte invisible)</div>
-            : <div style={{ fontSize: 10, color: 'rgba(255,255,255,.3)', marginTop: 3 }}>100% = contraste maximal (texte très lisible)</div>}
+          <div style={{ fontSize: 10, color: 'rgba(255,255,255,.3)', marginTop: 3 }}>
+            {round.mode === 'cacher'
+              ? `Cible : < ${Math.round(HIDE_WIN_DIST * 100)}% — rendez le fond identique à la couleur du mot`
+              : `Cible : > ${Math.round(REVEAL_WIN_DIST * 100)}% — éloignez le fond de la couleur du mot`}
+          </div>
         </div>
 
-        {/* ── Preset buttons ── */}
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' as const }}>
+        {/* Presets */}
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           {PRESETS.map(p => (
-            <button key={p.label} onClick={() => { setIllum(p.col); sendIllumToTiles(p.col); }}
+            <button key={p.label}
+              onClick={() => { setIllum(p.col); sendIllumToTiles(p.col); }}
               style={{
-                padding: '5px 12px', borderRadius: 8, border: `1px solid rgba(255,255,255,.12)`,
+                padding: '5px 12px', borderRadius: 8,
+                border: '1px solid rgba(255,255,255,.12)',
                 background: `rgba(${p.col.r},${p.col.g},${p.col.b},0.18)`,
                 color: '#fff', fontSize: 12, cursor: 'pointer', fontWeight: 600,
               }}>
@@ -550,49 +464,59 @@ export default function GameMetamerisme({
           ))}
         </div>
 
-        {/* ── RGB sliders ── */}
-        <div style={{ ...M.glassCard, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {([['r', '#ef4444', 'R'], ['g', '#4ade80', 'G'], ['b', '#60a5fa', 'B']] as const).map(([ch, color, label]) => (
-            <div key={ch} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <span style={{ width: 14, fontWeight: 800, color, fontSize: 13 }}>{label}</span>
-              <input type="range" min={0} max={255} step={1} value={illum[ch]}
-                onChange={e => changeIllum(ch, Number(e.target.value))}
-                style={{ flex: 1, accentColor: color }} />
-              <span style={{ width: 30, textAlign: 'right', fontSize: 12, fontWeight: 700, color, fontFamily: 'monospace' }}>{illum[ch]}</span>
+        {/* RGB sliders */}
+        <div style={{ ...S.glass, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {(['r', 'g', 'b'] as const).map((ch, i) => {
+            const color = ['#ef4444', '#4ade80', '#60a5fa'][i];
+            const label = ['R', 'G', 'B'][i];
+            return (
+              <div key={ch} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{ width: 14, fontWeight: 800, color, fontSize: 13 }}>{label}</span>
+                <input type="range" min={0} max={255} step={1} value={illum[ch]}
+                  onChange={e => changeIllum(ch, Number(e.target.value))}
+                  style={{ flex: 1, accentColor: color }} />
+                <span style={{ width: 30, textAlign: 'right', fontSize: 12, fontWeight: 700, color, fontFamily: 'monospace' }}>{illum[ch]}</span>
+              </div>
+            );
+          })}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, paddingTop: 6, borderTop: '1px solid rgba(255,255,255,.06)', marginTop: 2 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+              <div style={{ width: 28, height: 28, borderRadius: 7, background: css(illum), border: '1px solid rgba(255,255,255,.2)' }} />
+              <span style={{ fontSize: 10, color: 'rgba(255,255,255,.4)' }}>Fond (dalles)</span>
             </div>
-          ))}
-          {/* Illumination swatch row */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingTop: 4 }}>
-            <div style={{ width: 28, height: 28, borderRadius: 7, background: css(illum), border: '1px solid rgba(255,255,255,.2)', flexShrink: 0 }} />
-            <div style={{ fontSize: 11, color: 'rgba(255,255,255,.45)' }}>
-              Éclairage actuel — les dalles reflètent cette teinte sur la fiche physique
+            <div style={{ flex: 1 }} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+              <div style={{ width: 22, height: 22, borderRadius: 5, background: css(entry.fg), border: '1px solid rgba(255,255,255,.2)' }} />
+              <span style={{ fontSize: 10, color: 'rgba(255,255,255,.4)' }}>Mot (fixe)</span>
             </div>
           </div>
         </div>
 
-        {/* ── Hint ── */}
+        {/* Hint */}
         {hintShown && phase === 'playing' && (
-          <div style={{ padding: '8px 12px', borderRadius: 8, background: 'rgba(251,191,36,.10)', border: '1px solid rgba(251,191,36,.3)', fontSize: 12, color: '#fbbf24' }}>
-            💡 {fiche.hint}
+          <div style={{ padding: '8px 12px', borderRadius: 8, background: 'rgba(251,191,36,.10)', border: '1px solid rgba(251,191,36,.3)', fontSize: 12, color: '#fbbf24', lineHeight: 1.5 }}>
+            💡{' '}
+            {round.mode === 'cacher'
+              ? `La couleur du mot est rgb(${entry.fg.r}, ${entry.fg.g}, ${entry.fg.b}). Amenez les dalles à cette même teinte pour le faire disparaître.`
+              : `Le mot était caché car le fond correspondait à rgb(${entry.fg.r}, ${entry.fg.g}, ${entry.fg.b}). Éloignez-vous de cette couleur.`}
           </div>
         )}
 
-        {/* ── Validate button ── */}
+        {/* Validate */}
         {phase === 'playing' && (
-          <button onClick={() => validate()}
-            style={{
-              padding: '11px', borderRadius: 11, border: 'none',
-              background: hasWon ? '#4ade80' : 'linear-gradient(135deg,#7c3aed,#06d6a0)',
-              color: hasWon ? '#000' : '#fff', fontWeight: 700, fontSize: 14, cursor: 'pointer',
-            }}>
+          <button onClick={() => validate()} style={{
+            padding: '11px', borderRadius: 11, border: 'none',
+            background: hasWon ? '#4ade80' : 'linear-gradient(135deg,#7c3aed,#06d6a0)',
+            color: hasWon ? '#000' : '#fff', fontWeight: 700, fontSize: 14, cursor: 'pointer',
+          }}>
             {hasWon ? '✓ Parfait — Valider !' : 'Valider ma réponse'}
           </button>
         )}
 
-        {/* ── Result panel ── */}
+        {/* Result */}
         {phase === 'result' && (
           <div style={{
-            ...M.glassCard,
+            ...S.glass,
             background: roundScore >= 700 ? 'rgba(74,222,128,.10)' : roundScore >= 400 ? 'rgba(251,191,36,.10)' : 'rgba(239,68,68,.08)',
             border: `1px solid ${roundScore >= 700 ? '#4ade8033' : roundScore >= 400 ? '#fbbf2433' : '#ef444433'}`,
             padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 8,
@@ -600,21 +524,16 @@ export default function GameMetamerisme({
             <div style={{ fontWeight: 800, fontSize: 15, color: roundScore >= 700 ? '#4ade80' : roundScore >= 400 ? '#fbbf24' : '#ef4444' }}>
               {roundScore >= 700 ? '🎯 Excellent !' : roundScore >= 400 ? '✅ Bien joué' : '🎨 Presque…'}
             </div>
-            <div style={{ fontSize: 12, color: 'rgba(255,255,255,.65)' }}>
-              La solution : éclairage <strong style={{ color: '#fff' }}>
-                {fiche.equalChannel === 'R' && fiche.mode === 'cacher' ? 'rouge pur' :
-                 fiche.equalChannel === 'G' && fiche.mode === 'cacher' ? 'vert pur' :
-                 fiche.equalChannel === 'B' && fiche.mode === 'cacher' ? 'bleu pur' :
-                 fiche.mode === 'révéler' ? 'canal opposé au canal commun' : '—'}
-              </strong><br />
-              {fiche.mode === 'cacher'
-                ? `Canal commun ${fiche.equalChannel} = ${(fiche.bg as Record<string,number>)[fiche.equalChannel.toLowerCase()]} — sous lumière pure ${fiche.equalChannel}, les deux couleurs deviennent identiques.`
-                : `Sous l'éclairage du canal ${fiche.equalChannel}, les couleurs se fondaient. Un autre canal les sépare à nouveau.`}
+            <div style={{ fontSize: 12, color: 'rgba(255,255,255,.65)', lineHeight: 1.5 }}>
+              {round.mode === 'cacher'
+                ? `Pour masquer « ${entry.word} », le fond devait correspondre exactement à sa couleur rgb(${entry.fg.r}, ${entry.fg.g}, ${entry.fg.b}). Les dalles auraient dû briller dans cette teinte.`
+                : `Pour révéler « ${entry.word} », il fallait éloigner la couleur des dalles de rgb(${entry.fg.r}, ${entry.fg.g}, ${entry.fg.b}) pour créer un contraste suffisant.`}
             </div>
             <div style={{ fontSize: 20, fontWeight: 800, color: '#fff' }}>+{roundScore} pts</div>
             <div style={{ fontSize: 12, color: 'rgba(255,255,255,.4)' }}>Prochain round dans {autoAdv}s…</div>
           </div>
         )}
+
       </div>
     </div>
   );

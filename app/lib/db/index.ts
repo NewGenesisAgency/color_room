@@ -2,13 +2,7 @@ import Database from 'better-sqlite3';
 import fs from 'node:fs';
 import path from 'node:path';
 
-// ── Singleton sur globalThis ───────────────────────────────────────────────────
-// En mode dev Next.js, les modules serveur sont reconstruits à chaque hot-reload
-// MAIS globalThis survit. Sans ça, chaque reload crée un nouveau handle
-// better-sqlite3 qui tente d'ouvrir le fichier encore verrouillé par l'ancien
-// handle → SQLITE_CANTOPEN / "unable to open database file" sur Windows.
-// En production le module n'est chargé qu'une fois, donc globalThis = module : aucune différence.
-const g = globalThis as typeof globalThis & { __colorRoomDb?: Database.Database };
+let dbSingleton: Database.Database | null = null;
 
 function resolveDbPath(): string {
   const explicit = process.env.COLOR_ROOM_DB_PATH;
@@ -62,53 +56,27 @@ function migrate(db: Database.Database) {
   );
   db.exec('CREATE INDEX IF NOT EXISTS idx_crg_games_updated ON crg_games(updated_at);');
 
-  // crg_users uses real column names: name (not username), user_type (not role)
-  db.exec(
-    "CREATE TABLE IF NOT EXISTS crg_users (id TEXT PRIMARY KEY, name TEXT NOT NULL UNIQUE, user_type TEXT NOT NULL DEFAULT 'apprenant', password_hash TEXT, niveau TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')));",
-  );
-  db.exec('CREATE INDEX IF NOT EXISTS idx_crg_users_type ON crg_users(user_type);');
-
-  // Colonnes ajoutées après la création initiale de la table
-  try { db.exec('ALTER TABLE crg_users ADD COLUMN password_hash TEXT;'); } catch { /* existe déjà */ }
-  try { db.exec('ALTER TABLE crg_users ADD COLUMN niveau TEXT;'); } catch { /* existe déjà */ }
-
-  db.exec(
-    "CREATE TABLE IF NOT EXISTS crg_sessions (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, token TEXT NOT NULL UNIQUE, expires_at TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now')), FOREIGN KEY(user_id) REFERENCES crg_users(id));",
-  );
-  db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_crg_sessions_token ON crg_sessions(token);');
-}
-
-function openDb(file: string): Database.Database {
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  const db = new Database(file);
-  // Checkpoint immédiat : fusionne le WAL dans le fichier principal.
-  // Évite qu'un gros .db-wal (490 Ko ici) ralentisse l'ouverture
-  // ou cause des problèmes de verrou sur Windows.
-  try { db.pragma('wal_checkpoint(TRUNCATE)'); } catch { /* non-fatal */ }
-  migrate(db);
-  return db;
+  // ─── Room system additions ────────────────────────────────────────────────
+  try { db.exec("ALTER TABLE crg_mp_sessions ADD COLUMN room_code TEXT;"); } catch { /* already exists */ }
+  try { db.exec("ALTER TABLE crg_mp_sessions ADD COLUMN room_name TEXT DEFAULT 'Partie';"); } catch { /* already exists */ }
+  try { db.exec("ALTER TABLE crg_mp_sessions ADD COLUMN max_players INTEGER DEFAULT 8;"); } catch { /* already exists */ }
+  try { db.exec("ALTER TABLE crg_mp_sessions ADD COLUMN difficulty INTEGER DEFAULT 2;"); } catch { /* already exists */ }
+  try { db.exec("ALTER TABLE crg_mp_sessions ADD COLUMN mode TEXT DEFAULT 'versus';"); } catch { /* already exists */ }
+  try { db.exec("ALTER TABLE crg_mp_sessions ADD COLUMN settings_json TEXT DEFAULT '{}';"); } catch { /* already exists */ }
+  try { db.exec("ALTER TABLE crg_mp_players ADD COLUMN is_ready INTEGER DEFAULT 0;"); } catch { /* already exists */ }
+  try { db.exec("ALTER TABLE crg_mp_players ADD COLUMN seat_score INTEGER DEFAULT 0;"); } catch { /* already exists */ }
+  db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_crg_mp_sessions_room_code ON crg_mp_sessions(room_code) WHERE room_code IS NOT NULL;");
 }
 
 export function getDb(): Database.Database {
-  // Réutiliser la connexion existante si elle est encore ouverte
-  if (g.__colorRoomDb?.open) return g.__colorRoomDb;
+  if (dbSingleton) return dbSingleton;
 
   const file = resolveDbPath();
+  fs.mkdirSync(path.dirname(file), { recursive: true });
 
-  try {
-    const db = openDb(file);
-    g.__colorRoomDb = db;
-    return db;
-  } catch (err) {
-    // Dernier recours : supprimer les fichiers WAL/SHM verrouillés et réessayer.
-    // Cela peut arriver quand le serveur dev Next.js recharge le module sans
-    // fermer proprement le handle précédent (Windows garde le .db-shm verrouillé).
-    console.warn('[db] Échec ouverture initiale, tentative de nettoyage WAL :', err);
-    for (const ext of ['-shm', '-wal']) {
-      try { fs.unlinkSync(file + ext); } catch { /* fichier absent — ok */ }
-    }
-    const db = openDb(file); // 2e tentative sans les fichiers WAL orphelins
-    g.__colorRoomDb = db;
-    return db;
-  }
+  const db = new Database(file);
+  migrate(db);
+
+  dbSingleton = db;
+  return db;
 }

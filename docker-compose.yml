@@ -9,7 +9,11 @@ services:
       - COLOR_ROOM_PORT=3000
       - COLOR_ROOM_DB_PATH=/data/ColorRoomDB.db
     volumes:
-      - ../SupervisionAPI/data/ColorRoomDB.db:/data/ColorRoomDB.db
+      # On monte le DOSSIER contenant la base (et ses fichiers -wal / -shm du mode WAL),
+      # pas un fichier unique : un bind-mount de fichier absent crée un dossier vide et
+      # casse l'ouverture SQLite. Le dossier ./app/data contient la base réelle.
+      # Pour partager la base avec SupervisionAPI (.NET), remplacer par : ../SupervisionAPI/data:/data
+      - ./app/data:/data
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:3000/api/health"]

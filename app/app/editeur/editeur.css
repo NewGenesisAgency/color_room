@@ -76,7 +76,7 @@
   box-sizing: border-box;
 }
 
-/* Inputs / form elements — restore padding stripped by the universal reset */
+/* Inputs / form elements - restore padding stripped by the universal reset */
 .editeur input:not([type='range']):not([type='color']):not([type='checkbox']):not([type='radio']),
 .editeur select,
 .editeur textarea {
@@ -545,7 +545,7 @@
 .viewport {
   height: 100%;
   position: relative;
-  /* Room3D a son propre background sombre — pas de padding ici */
+  /* Room3D a son propre background sombre - pas de padding ici */
 }
 
  .viewport__split {
@@ -1309,7 +1309,7 @@ input[type='checkbox']:focus-visible {
   box-shadow: 0 0 0 3px rgba(67,97,238,0.18), inset 0 1px 0 rgba(255,255,255,0.9);
 }
 
-/* ---- g-btn system — Liquid Glass ---- */
+/* ---- g-btn system - Liquid Glass ---- */
 .g-btn {
   display: inline-flex;
   align-items: center;
@@ -2139,12 +2139,12 @@ input[type='range'].slider-intensity::-moz-range-progress {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   THÈME ÉDITEUR — Panneaux clairs, canvas blueprint clair, viewport 3D sombre
+   THÈME ÉDITEUR - Panneaux clairs, canvas blueprint clair, viewport 3D sombre
    Le panneau gauche, droit et les headers sont blancs/gris très clair.
-   Seul le viewport 3D (Room3D) reste sombre — c'est intentionnel.
+   Seul le viewport 3D (Room3D) reste sombre - c'est intentionnel.
    ═══════════════════════════════════════════════════════════════════════════ */
 
-/* ── Variables racine — thème clair ────────────────────────────────────── */
+/* ── Variables racine - thème clair ────────────────────────────────────── */
 .editeur {
   --c-bg:      #f2f4f8;
   --c-dark:    #1a1d2e;
@@ -2159,7 +2159,7 @@ input[type='range'].slider-intensity::-moz-range-progress {
   color:       var(--c-content);
 }
 
-/* ── Topbar — blanc ─────────────────────────────────────────────────────── */
+/* ── Topbar - blanc ─────────────────────────────────────────────────────── */
 .topbar {
   background: rgba(255,255,255,0.92);
   border-bottom: 1px solid rgba(0,0,0,0.07);
@@ -2192,7 +2192,7 @@ input[type='range'].slider-intensity::-moz-range-progress {
   border-radius: 0;
 }
 
-/* ── Panel heads — clairs ───────────────────────────────────────────────── */
+/* ── Panel heads - clairs ───────────────────────────────────────────────── */
 .panelhead {
   background: #fff;
   border-bottom: 1px solid rgba(0,0,0,0.07);
@@ -2303,7 +2303,7 @@ input[type='range'].slider-intensity::-moz-range-progress {
   color: var(--c-content);
 }
 
-/* ── Blueprint Canvas — style clair professionnel ───────────────────────── */
+/* ── Blueprint Canvas - style clair professionnel ───────────────────────── */
 .bp {
   border: 1px solid rgba(0,0,0,0.08);
   background:
@@ -2326,7 +2326,7 @@ input[type='range'].slider-intensity::-moz-range-progress {
 
 .bp-empty__hint { color: rgba(180,190,210,0.30); }
 
-/* ── Nœuds — dark cards UE5 ─────────────────────────────────────────────── */
+/* ── Nœuds - dark cards UE5 ─────────────────────────────────────────────── */
 .bp-node {
   background: #23262f;
   border: 1.5px solid rgba(255,255,255,0.08);
@@ -2357,7 +2357,7 @@ input[type='range'].slider-intensity::-moz-range-progress {
     inset 0 1px 0 rgba(255,255,255,0.05) !important;
 }
 
-/* En-tête du nœud — conserve la couleur de catégorie (inline style) mais assombri */
+/* En-tête du nœud - conserve la couleur de catégorie (inline style) mais assombri */
 .bp-node__header {
   filter: brightness(0.88) saturate(1.15);
 }
@@ -2490,12 +2490,12 @@ input[type='range'].slider-intensity::-moz-range-progress {
   box-shadow: 0 0 8px rgba(79,158,232,0.55);
 }
 
-/* Pin out — flèche dans l'autre sens */
+/* Pin out - flèche dans l'autre sens */
 .bp-pin--out .bp-dot {
   clip-path: polygon(40% 15%, 100% 15%, 100% 85%, 40% 85%, 0% 50%);
 }
 
-/* ── Wires — courbes de Bézier solides style UE5 ─────────────────────────── */
+/* ── Wires - courbes de Bézier solides style UE5 ─────────────────────────── */
 .bp-wire {
   stroke: rgba(190,200,220,0.65);
   stroke-width: 2.5;
@@ -2619,9 +2619,9 @@ input[type='range'].slider-intensity::-moz-range-progress {
   box-shadow: 0 0 0 3px rgba(67,97,238,0.12), inset 0 1px 0 rgba(255,255,255,1);
 }
 
-/* Splitter — déjà défini ci-dessus, pas de surcharge sombre ici */
+/* Splitter - déjà défini ci-dessus, pas de surcharge sombre ici */
 
-/* Viewport panes — tiles sombre, ui clair */
+/* Viewport panes - tiles sombre, ui clair */
 .viewport__pane {
   border: 1px solid rgba(0,0,0,0.08);
 }
@@ -2629,7 +2629,7 @@ input[type='range'].slider-intensity::-moz-range-progress {
   border-color: rgba(0,0,0,0.15);
 }
 
-/* Texte général — thème clair */
+/* Texte général - thème clair */
 .editeur .ue { color: var(--c-content); }
 .editeur .ue .panelhead strong,
 .editeur .ue .list__title,
@@ -2648,3 +2648,55 @@ input[type='range'].slider-intensity::-moz-range-progress {
   border-radius: 999px;
 }
 .editeur ::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.24); }
+
+/* ---- Scene selector - liquid glass ---- */
+.editeur .scene-selector {
+  width: 100%;
+  padding: 11px 38px 11px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,0.72);
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%231a1d2e' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 12px center / 16px 16px,
+    rgba(255,255,255,0.62);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  color: var(--c-content);
+  font-size: 13px;
+  font-family: inherit;
+  font-weight: 600;
+  outline: none;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.88),
+    inset 0 -1px 0 rgba(0,0,0,0.03),
+    0 2px 8px rgba(0,0,0,0.06),
+    0 1px 2px rgba(0,0,0,0.04);
+  transition: border-color 160ms, box-shadow 160ms, background-color 160ms;
+  margin-bottom: 10px;
+}
+
+.editeur .scene-selector:hover {
+  border-color: rgba(255,255,255,0.95);
+  background-color: rgba(255,255,255,0.82);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,1),
+    0 4px 14px rgba(67,97,238,0.10),
+    0 1px 4px rgba(0,0,0,0.06);
+}
+
+.editeur .scene-selector:focus {
+  border-color: rgba(67,97,238,0.35);
+  background-color: rgba(255,255,255,0.92);
+  box-shadow:
+    0 0 0 3px rgba(67,97,238,0.12),
+    inset 0 1px 0 rgba(255,255,255,1),
+    0 2px 8px rgba(0,0,0,0.06);
+}
+
+.editeur .scene-selector option {
+  background: #fff;
+  color: var(--c-content);
+  font-weight: 500;
+}

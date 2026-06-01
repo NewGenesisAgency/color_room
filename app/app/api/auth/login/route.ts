@@ -1,90 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
-import { pbkdf2Sync, randomBytes } from 'crypto';
-
-function verifyPassword(password: string, stored: string): boolean {
-  const [salt, hash] = stored.split(':');
-  if (!salt || !hash) return false;
-  const verify = pbkdf2Sync(password, salt, 100_000, 64, 'sha512').toString('hex');
-  return verify === hash;
-}
+import { verifyPassword, createSession } from '@/lib/auth';
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
-    const { username, password, niveau, role } = body as {
-      username?: string;
-      password?: string;
-      niveau?: string;
-      role?: string;
-    };
-
-    if (!username?.trim()) {
-      return NextResponse.json({ error: 'Nom requis' }, { status: 400 });
-    }
+    const { username, password } = (await req.json()) as { username?: string; password?: string };
+    if (!username?.trim()) return NextResponse.json({ error: 'Nom requis' }, { status: 400 });
+    if (!password) return NextResponse.json({ error: 'Mot de passe requis' }, { status: 400 });
 
     const db = getDb();
+    const user = db.prepare(
+      "SELECT id, name, user_type, password_hash, niveau, COALESCE(avatar_color,'#4361ee') as avatar_color, COALESCE(avatar_icon,'User') as avatar_icon FROM crg_users WHERE name = ?"
+    ).get(username.trim()) as { id: string; name: string; user_type: string; password_hash: string | null; niveau: string | null; avatar_color: string; avatar_icon: string } | undefined;
 
-    if (role === 'enseignant') {
-      if (!password) {
-        return NextResponse.json({ error: 'Mot de passe requis' }, { status: 400 });
-      }
-      const user = db
-        .prepare("SELECT * FROM crg_users WHERE name = ? AND user_type = 'enseignant'")
-        .get(username.trim()) as { id: string; name: string; user_type: string; password_hash: string } | undefined;
+    if (!user) return NextResponse.json({ error: 'Identifiants incorrects' }, { status: 401 });
+    if (!user.password_hash) return NextResponse.json({ error: 'Ce compte n\'a pas de mot de passe. Contactez un administrateur.' }, { status: 401 });
+    if (!verifyPassword(password, user.password_hash)) return NextResponse.json({ error: 'Identifiants incorrects' }, { status: 401 });
 
-      if (!user || !verifyPassword(password, user.password_hash)) {
-        return NextResponse.json({ error: 'Identifiants incorrects' }, { status: 401 });
-      }
-
-      const token = randomBytes(32).toString('hex');
-      const expiresAt = new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString();
-      const sessionId = randomBytes(16).toString('hex');
-      db.prepare('INSERT INTO crg_sessions (id, user_id, token, expires_at) VALUES (?, ?, ?, ?)').run(
-        sessionId, user.id, token, expiresAt,
-      );
-
-      const res = NextResponse.json({
-        ok: true,
-        user: { id: user.id, username: user.name, role: 'enseignant', niveau: null },
-      });
-      res.cookies.set('crg_session', token, {
-        httpOnly: true, maxAge: 7 * 24 * 3600, path: '/', sameSite: 'lax',
-      });
-      return res;
-    }
-
-    // Apprenant — no password, session only
-    let user = db
-      .prepare("SELECT * FROM crg_users WHERE name = ? AND user_type = 'apprenant'")
-      .get(username.trim()) as { id: string; name: string; user_type: string; niveau: string } | undefined;
-
-    if (!user) {
-      const userId = randomBytes(16).toString('hex');
-      db.prepare('INSERT INTO crg_users (id, name, user_type, niveau) VALUES (?, ?, ?, ?)').run(
-        userId, username.trim(), 'apprenant', niveau ?? 'lycee',
-      );
-      user = db.prepare('SELECT * FROM crg_users WHERE id = ?').get(userId) as typeof user;
-    }
-
-    const token = randomBytes(32).toString('hex');
-    const expiresAt = new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString();
-    const sessionId = randomBytes(16).toString('hex');
-    db.prepare('INSERT INTO crg_sessions (id, user_id, token, expires_at) VALUES (?, ?, ?, ?)').run(
-      sessionId, user!.id, token, expiresAt,
-    );
-
+    const token = createSession(user.id);
     const res = NextResponse.json({
       ok: true,
-      user: { id: user!.id, username: user!.name, role: 'apprenant', niveau: user!.niveau },
+      user: { id: user.id, username: user.name, role: user.user_type, niveau: user.niveau, avatarColor: user.avatar_color, avatarIcon: user.avatar_icon },
     });
-    res.cookies.set('crg_session', token, {
-      httpOnly: true, maxAge: 7 * 24 * 3600, path: '/', sameSite: 'lax',
-    });
+    res.cookies.set('crg_session', token, { httpOnly: true, maxAge: 7 * 24 * 3600, path: '/', sameSite: 'lax' });
     return res;
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    console.error('[login] error:', msg);
-    return NextResponse.json({ error: 'Erreur serveur', detail: msg }, { status: 500 });
+    return NextResponse.json({ error: 'Erreur serveur', detail: String(err) }, { status: 500 });
   }
 }

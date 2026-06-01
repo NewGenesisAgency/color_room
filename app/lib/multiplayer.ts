@@ -288,3 +288,209 @@ export function stopSession(token: string): { sessionId: string } | null {
   db.prepare("UPDATE crg_mp_sessions SET status = 'finished', updated_at = datetime('now') WHERE id = ?;").run(sessionRow.id);
   return { sessionId: sessionRow.id };
 }
+
+// ─── Room system ─────────────────────────────────────────────────────────────
+
+export type MpRoomSettings = {
+  name: string;
+  gameId: string;
+  mode: 'versus' | 'coop' | 'solo';
+  maxPlayers: number;
+  durationSec: number;
+  difficulty: 1 | 2 | 3;
+};
+
+export type MpPlayerRowFull = MpPlayerRow & {
+  is_ready: number;
+  seat_score: number;
+};
+
+function generateRoomCode(): string {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let code = '';
+  for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)];
+  return code;
+}
+
+export function createRoom(
+  settings: MpRoomSettings,
+  hostName?: string,
+): { sessionId: string; roomCode: string; token: string; seat: MpSeat } | null {
+  const db = getDb();
+
+  // Finish any active session
+  db.prepare("UPDATE crg_mp_sessions SET status = 'finished', updated_at = datetime('now') WHERE status = 'active';").run();
+
+  const sessionId = randomId();
+  const durationMs = (settings.durationSec > 0 ? settings.durationSec : 60) * 1000;
+  const nowMs = Date.now();
+
+  const state: MpSessionState = {
+    gameId: 'split-screen',
+    createdAt: new Date(nowMs).toISOString(),
+    durationMs,
+    endsAtMs: 0, // lobby mode
+    channelBySeat: {},
+    targetValueBySeat: {},
+    submittedValueBySeat: {},
+    score: 0,
+  };
+
+  let roomCode = generateRoomCode();
+  // Ensure uniqueness
+  for (let i = 0; i < 10; i++) {
+    const existing = db.prepare('SELECT id FROM crg_mp_sessions WHERE room_code = ? AND status = ?').get(roomCode, 'active');
+    if (!existing) break;
+    roomCode = generateRoomCode();
+  }
+
+  db.prepare(`
+    INSERT INTO crg_mp_sessions(id, status, game_id, state_json, updated_at, room_code, room_name, max_players, difficulty, mode, settings_json)
+    VALUES(?, 'active', ?, ?, datetime('now'), ?, ?, ?, ?, ?, ?)
+  `).run(
+    sessionId,
+    settings.gameId || 'split-screen',
+    JSON.stringify(state),
+    roomCode,
+    settings.name.trim() || 'Partie',
+    Math.min(8, Math.max(2, settings.maxPlayers)),
+    settings.difficulty,
+    settings.mode,
+    JSON.stringify(settings),
+  );
+
+  // Join host as seat 1
+  const token = randomId();
+  const playerId = randomId();
+  const safeName = (hostName && hostName.trim().length > 0 ? hostName.trim() : 'Hôte') as string;
+  const channel = pickUniqueTintChannel(new Set());
+
+  state.channelBySeat[1 as MpSeat] = channel;
+  state.targetValueBySeat[1 as MpSeat] = randomValue255();
+  state.submittedValueBySeat[1 as MpSeat] = 0;
+
+  db.prepare("UPDATE crg_mp_sessions SET state_json = ?, updated_at = datetime('now') WHERE id = ?;").run(
+    JSON.stringify(state), sessionId,
+  );
+
+  db.prepare(`
+    INSERT INTO crg_mp_players(id, session_id, token, name, seat, updated_at, last_seen_at, is_ready, seat_score)
+    VALUES(?, ?, ?, ?, 1, datetime('now'), datetime('now'), 0, 0)
+  `).run(playerId, sessionId, token, safeName);
+
+  return { sessionId, roomCode, token, seat: 1 };
+}
+
+export function joinByCode(
+  code: string,
+  name?: string,
+): { sessionId: string; token: string; seat: MpSeat; roomName: string; roomCode: string } | null {
+  const db = getDb();
+
+  const session = db.prepare(`
+    SELECT id, status, state_json, room_name, room_code, max_players
+    FROM crg_mp_sessions
+    WHERE room_code = ? AND status = 'active'
+    ORDER BY created_at DESC LIMIT 1
+  `).get(code.toUpperCase()) as (MpSessionRow & { room_name: string; room_code: string; max_players: number }) | undefined;
+
+  if (!session) return null;
+
+  let st: MpSessionState;
+  try { st = JSON.parse(session.state_json) as MpSessionState; } catch { return null; }
+  if (isExpired(st, Date.now())) return null;
+
+  const players = listPlayersForSession(session.id);
+  const maxP = Number(session.max_players) || 8;
+  if (players.length >= maxP) return null; // room full
+
+  const takenSeats = new Set(players.map(p => p.seat));
+  let seat: MpSeat | null = null;
+  for (let s = 1; s <= 8; s++) {
+    if (!takenSeats.has(s)) { seat = s as MpSeat; break; }
+  }
+  if (!seat) return null;
+
+  const token = randomId();
+  const playerId = randomId();
+  const safeName = (name && name.trim().length > 0 ? name.trim() : `Joueur${seat}`) as string;
+
+  const used = new Set<number>(Object.values(st.channelBySeat ?? {}).map(Number).filter(n => n >= 1 && n <= 32));
+  if (!st.channelBySeat) st.channelBySeat = {};
+  if (!st.targetValueBySeat) st.targetValueBySeat = {};
+  if (!st.submittedValueBySeat) st.submittedValueBySeat = {};
+  st.channelBySeat[seat] = pickUniqueTintChannel(used);
+  st.targetValueBySeat[seat] = randomValue255();
+  st.submittedValueBySeat[seat] = 0;
+
+  db.prepare("UPDATE crg_mp_sessions SET state_json = ?, updated_at = datetime('now') WHERE id = ?;").run(
+    JSON.stringify(st), session.id,
+  );
+
+  db.prepare(`
+    INSERT INTO crg_mp_players(id, session_id, token, name, seat, updated_at, last_seen_at, is_ready, seat_score)
+    VALUES(?, ?, ?, ?, ?, datetime('now'), datetime('now'), 0, 0)
+  `).run(playerId, session.id, token, safeName, seat);
+
+  return { sessionId: session.id, token, seat, roomName: session.room_name ?? 'Partie', roomCode: session.room_code ?? code };
+}
+
+function listPlayersForSession(sessionId: string): MpPlayerRowFull[] {
+  const db = getDb();
+  return db.prepare(`
+    SELECT id, session_id, created_at, updated_at, token, name, seat, last_seen_at,
+           COALESCE(is_ready, 0) as is_ready, COALESCE(seat_score, 0) as seat_score
+    FROM crg_mp_players
+    WHERE session_id = ?
+    ORDER BY seat ASC
+  `).all(sessionId) as MpPlayerRowFull[];
+}
+
+export function listPlayersWithReady(sessionId: string): MpPlayerRowFull[] {
+  const db = getDb();
+  return db.prepare(`
+    SELECT id, session_id, created_at, updated_at, token, name, seat, last_seen_at,
+           COALESCE(is_ready, 0) as is_ready, COALESCE(seat_score, 0) as seat_score
+    FROM crg_mp_players
+    WHERE session_id = ? AND last_seen_at >= datetime('now', '-20 seconds')
+    ORDER BY seat ASC
+  `).all(sessionId) as MpPlayerRowFull[];
+}
+
+export function setPlayerReady(token: string, ready: boolean): boolean {
+  const db = getDb();
+  const result = db.prepare(`
+    UPDATE crg_mp_players SET is_ready = ?, updated_at = datetime('now')
+    WHERE token = ?
+  `).run(ready ? 1 : 0, token);
+  return result.changes > 0;
+}
+
+export function startRoomGame(token: string): { sessionId: string } | null {
+  const player = touchPlayer(token);
+  if (!player || Number(player.seat) !== 1) return null; // host only
+
+  const db = getDb();
+  const sessionRow = db.prepare('SELECT id, status, state_json FROM crg_mp_sessions WHERE id = ?;')
+    .get(player.session_id) as { id: string; status: string; state_json: string } | undefined;
+  if (!sessionRow || sessionRow.status !== 'active') return null;
+
+  let st: MpSessionState;
+  try { st = JSON.parse(sessionRow.state_json) as MpSessionState; } catch { return null; }
+
+  st.endsAtMs = Date.now() + (st.durationMs || 2 * 60 * 1000);
+  db.prepare("UPDATE crg_mp_sessions SET state_json = ?, updated_at = datetime('now') WHERE id = ?;")
+    .run(JSON.stringify(st), sessionRow.id);
+
+  return { sessionId: sessionRow.id };
+}
+
+export function getSessionMetadata(sessionId: string): {
+  roomCode: string | null; roomName: string; mode: string; maxPlayers: number; difficulty: number;
+} | null {
+  const db = getDb();
+  const row = db.prepare('SELECT room_code, room_name, mode, max_players, difficulty FROM crg_mp_sessions WHERE id = ?;')
+    .get(sessionId) as { room_code: string | null; room_name: string; mode: string; max_players: number; difficulty: number } | undefined;
+  if (!row) return null;
+  return { roomCode: row.room_code, roomName: row.room_name ?? 'Partie', mode: row.mode ?? 'versus', maxPlayers: row.max_players ?? 8, difficulty: row.difficulty ?? 2 };
+}

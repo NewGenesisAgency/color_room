@@ -1,20 +1,27 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import TetrisGame from '@/app/_components/TetrisGame';
+import dynamic from 'next/dynamic';
 import type { TetrisSnapshot } from '@/app/_components/TetrisGame';
-import GameColorSpeed from '@/app/_components/GameColorSpeed';
-import GameMaitreDuBlanc from '@/app/_components/GameMaitreDuBlanc';
-import GamePuissance4 from '@/app/_components/GamePuissance4';
-import GameChasseurGamut from '@/app/_components/GameChasseurGamut';
-import GameMetamerisme from '@/app/_components/GameMetamerisme';
-import GameChromaticite from '@/app/_games/chromaticity-diagram/ChromaticityDiagram';
-import GameCanalMix from '@/app/_components/GameCanalMix';
+import type { UILayoutComponent } from '@/app/editeur/UIDesigner';
 import NavigationMenu from '@/app/_components/NavigationMenu';
-import Room3D from '@/app/_components/Room3D';
 import LoginScreen from '@/app/_components/LoginScreen';
-import SpectrePage from '@/app/spectre/page';
-import ChromaticitePage from '@/app/chromaticite/page';
+
+// Modules lourds (3D Three.js, jeux, pages spectre/chromaticité) chargés à la
+// demande : ils n'alourdissent plus le bundle initial de /jeux, ce qui accélère
+// nettement la navigation vers/depuis cette page.
+const TetrisGame = dynamic(() => import('@/app/_components/TetrisGame'), { ssr: false });
+const GameColorSpeed = dynamic(() => import('@/app/_components/GameColorSpeed'), { ssr: false });
+const GameMaitreDuBlanc = dynamic(() => import('@/app/_components/GameMaitreDuBlanc'), { ssr: false });
+const GamePuissance4 = dynamic(() => import('@/app/_components/GamePuissance4'), { ssr: false });
+const GameChasseurGamut = dynamic(() => import('@/app/_components/GameChasseurGamut'), { ssr: false });
+const GameMetamerisme = dynamic(() => import('@/app/_components/GameMetamerisme'), { ssr: false });
+const GameChromaticite = dynamic(() => import('@/app/_games/chromaticity-diagram/ChromaticityDiagram'), { ssr: false });
+const GameCanalMix = dynamic(() => import('@/app/_components/GameCanalMix'), { ssr: false });
+const Room3D = dynamic(() => import('@/app/_components/Room3D'), { ssr: false, loading: () => <div style={{ height: 420 }} /> });
+const CieMeasureWidget = dynamic(() => import('@/app/_components/CieMeasureWidget'), { ssr: false });
+const SpectrePage = dynamic(() => import('@/app/spectre/page'), { ssr: false });
+const ChromaticitePage = dynamic(() => import('@/app/chromaticite/page'), { ssr: false });
 import {
   Activity,
   AlertTriangle,
@@ -50,6 +57,11 @@ import {
   Zap,
   Grid,
   Crosshair,
+  Search,
+  X,
+  ChevronDown,
+  ChevronUp,
+  Users,
 } from 'lucide-react';
 
 type UserType = 'apprenant' | 'enseignant';
@@ -139,6 +151,7 @@ type EditorGameConfigV1 = {
     targetColor?: string;
     widgets?: UiWidget[];
   };
+  uiLayout?: UILayoutComponent[];
   nodes?: unknown[];
   edges?: unknown[];
 };
@@ -332,7 +345,8 @@ function parseEditorGameConfig(raw: unknown): EditorGameConfigV1 | null {
       }
     : undefined;
   const tileCount = typeof o.tileCount === 'number' && Number.isFinite(o.tileCount) ? o.tileCount : undefined;
-  return { version: 1, tileCount, ui, nodes: o.nodes, edges: o.edges } satisfies EditorGameConfigV1;
+  const uiLayout = Array.isArray(o.uiLayout) ? (o.uiLayout as UILayoutComponent[]) : undefined;
+  return { version: 1, tileCount, ui, uiLayout, nodes: o.nodes, edges: o.edges } satisfies EditorGameConfigV1;
 }
 
 function parseCustomConfig(raw: unknown): CustomGameConfigV1 {
@@ -474,7 +488,7 @@ const MP_TINT_NAMES: string[] = [
 
 function seatTintLabel(channel1to32?: number): string {
   const n = Number(channel1to32);
-  if (!Number.isFinite(n) || n < 1 || n > 32) return '—';
+  if (!Number.isFinite(n) || n < 1 || n > 32) return '-';
   const name = MP_TINT_NAMES[n - 1] ?? '';
   return name ? `Canal ${n}: ${name}` : `Canal ${n}`;
 }
@@ -716,6 +730,73 @@ function spectrum32ToRgb255(channels32: number[]): TargetColor {
   };
 }
 
+// ── Overlay UI des jeux éditeur (uiLayout dessiné dans /editeur) ───────────────
+const HUD_CANVAS_W = 860;
+const HUD_CANVAS_H = 500;
+
+function renderHudComp(
+  c: UILayoutComponent,
+  onSendColor: (idx: number, r: number, g: number, b: number, intensity: number) => void,
+): React.ReactNode {
+  const base: React.CSSProperties = {
+    width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+    boxSizing: 'border-box', overflow: 'hidden', fontSize: c.fontSize ?? 14, color: c.textColor ?? '#1a1d2e',
+  };
+  switch (c.kind) {
+    case 'cie_diagram':
+      return (
+        <div style={{ width: '100%', height: '100%', overflow: 'auto', background: '#fff', borderRadius: 14, border: '1px solid rgba(0,0,0,0.08)', padding: 10, boxSizing: 'border-box' }}>
+          <CieMeasureWidget
+            targetX={c.cieTargetX} targetY={c.cieTargetY} tolerance={c.cieTolerance}
+            randomTarget={c.cieRandom} points={c.points} width={c.width - 20} height={undefined}
+            onSendColor={onSendColor}
+          />
+        </div>
+      );
+    case 'button':        return <div style={{ ...base, background: c.bgColor ?? '#4361ee', color: c.textColor ?? '#fff', borderRadius: 12, fontWeight: 700 }}>{c.text || 'Bouton'}</div>;
+    case 'label':         return <div style={{ ...base, justifyContent: 'flex-start', paddingLeft: 4, fontWeight: 600 }}>{c.text || 'Texte'}</div>;
+    case 'slider':        return <div style={{ ...base, flexDirection: 'column', gap: 4, padding: '0 10px' }}><span style={{ fontSize: 11, fontWeight: 700, alignSelf: 'flex-start' }}>{c.text || 'Slider'}</span><input type="range" style={{ width: '100%' }} readOnly /></div>;
+    case 'score_display': return <div style={{ ...base, flexDirection: 'column', background: 'rgba(255,255,255,0.9)', borderRadius: 14, border: '1px solid rgba(67,97,238,0.2)' }}><span style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{c.text || 'Score'}</span><span style={{ fontSize: 26, fontWeight: 900, color: '#4361ee', lineHeight: 1 }}>0</span></div>;
+    case 'timer_display': return <div style={{ ...base, flexDirection: 'column', background: 'rgba(255,255,255,0.9)', borderRadius: 14, border: '1px solid rgba(239,68,68,0.2)' }}><span style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Temps</span><span style={{ fontSize: 26, fontWeight: 900, color: '#ef4444', lineHeight: 1 }}>30s</span></div>;
+    case 'round_badge':   return <div style={{ ...base, background: 'rgba(67,97,238,0.09)', borderRadius: 12, fontWeight: 800, color: '#4361ee' }}>Manche 1/5</div>;
+    case 'color_swatch':  return <div style={{ ...base, borderRadius: 12, background: c.bgColor ?? '#ff2aa6', boxShadow: '0 0 20px ' + (c.bgColor ?? '#ff2aa6') }} />;
+    case 'progress_bar':  return <div style={{ ...base, background: 'rgba(0,0,0,0.07)', borderRadius: 999, overflow: 'hidden', padding: 0 }}><div style={{ width: '55%', height: '100%', background: 'linear-gradient(90deg,#059669,#06d6a0)', borderRadius: 999 }} /></div>;
+    default:              return null;
+  }
+}
+
+function HudUiOverlay({
+  components, onSendColor,
+}: {
+  components: UILayoutComponent[];
+  onSendColor: (idx: number, r: number, g: number, b: number, intensity: number) => void;
+}) {
+  const wrapRef = useRef<HTMLDivElement | null>(null);
+  const [scale, setScale] = useState(0.5);
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el) return;
+    const update = () => setScale(Math.min(1, el.clientWidth / HUD_CANVAS_W));
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  // Hauteur réelle utilisée = bas du composant le plus bas (évite un grand vide).
+  const usedH = components.reduce((m, c) => Math.max(m, c.y + c.height), 0) || HUD_CANVAS_H;
+  return (
+    <div ref={wrapRef} style={{ width: '100%', height: usedH * scale, position: 'relative', overflow: 'hidden' }}>
+      <div style={{ position: 'absolute', top: 0, left: 0, width: HUD_CANVAS_W, height: usedH, transform: `scale(${scale})`, transformOrigin: 'top left' }}>
+        {components.map((c) => (
+          <div key={c.id} style={{ position: 'absolute', left: c.x, top: c.y, width: c.width, height: c.height }}>
+            {renderHudComp(c, onSendColor)}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function JeuxPage() {
   const [dbGames, setDbGames] = useState<
     Array<{ id: string; name: string; kind: string; createdAt: string; updatedAt: string; config: unknown }>
@@ -735,6 +816,11 @@ export default function JeuxPage() {
   const [sessionChecked, setSessionChecked] = useState(false);
 
   const [currentUser, setCurrentUser] = useState<string | null>(null);
+  const [userAvatarColor, setUserAvatarColor] = useState('#4361ee');
+  const [userAvatarIcon, setUserAvatarIcon] = useState('U');
+  const [userClasses, setUserClasses] = useState<string[]>([]);
+  const [gameSearch, setGameSearch] = useState('');
+  const [gameVisibleCount, setGameVisibleCount] = useState(4);
   const [score, setScore] = useState<number>(0);
   const [gamesCompleted, setGamesCompleted] = useState<number>(0);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
@@ -755,10 +841,10 @@ export default function JeuxPage() {
   const [beginnerRgb, setBeginnerRgb] = useState<TargetColor>({ r: 0, g: 0, b: 0 });
 
   const [instrument, setInstrument] = useState({
-    colorTemp: '—',
-    cri: '—',
-    power: '—',
-    apiLatency: '—',
+    colorTemp: '-',
+    cri: '-',
+    power: '-',
+    apiLatency: '-',
   });
 
   const [secretRevealed, setSecretRevealed] = useState<boolean>(false);
@@ -878,7 +964,7 @@ export default function JeuxPage() {
   const hwCurrentCtrlRef   = useRef<AbortController | null>(null); // pour annuler le POST en cours
   const hwFetchGenRef      = useRef(0);        // génération : invalide les callbacks orphelins
   const tetrisSnapRef = useRef<TetrisSnapshot | null>(null);
-  // State canonique des dalles pendant les jeux — équivalent tetrisSnapRef
+  // State canonique des dalles pendant les jeux - équivalent tetrisSnapRef
   const gameColorStateRef = useRef<Array<{r:number;g:number;b:number;intensity:number}|null>>(new Array(42).fill(null));
   // Batch visuel (rAF) pour mettre à jour la 3D sans bloquer le fil principal
   const visualBatchRef = useRef<Map<number,{r:number;g:number;b:number;intensity:number}>>(new Map());
@@ -949,7 +1035,7 @@ export default function JeuxPage() {
     hwInFlightRef.current = true;
 
     // Timeout auto-cancel : 1500ms max.
-    // force:true est envoyé SYSTÉMATIQUEMENT — le serveur purge immédiatement
+    // force:true est envoyé SYSTÉMATIQUEMENT - le serveur purge immédiatement
     // sa file interne (waiters stale) avant de traiter ce batch.
     // Sans ça, les anciennes requêtes s'accumulent dans la file du serveur et
     // saturent la connexion TCP de supervision.exe → ralentissement exponentiel.
@@ -962,10 +1048,10 @@ export default function JeuxPage() {
       cache: 'no-store',
       signal: ctrl.signal,
     })
-      .catch(() => {/* AbortError ou réseau — ignoré */})
+      .catch(() => {/* AbortError ou réseau - ignoré */})
       .finally(() => {
         window.clearTimeout(autoAbortTimer);
-        if (hwFetchGenRef.current !== gen) return; // callback orphelin — ignorer
+        if (hwFetchGenRef.current !== gen) return; // callback orphelin - ignorer
         const next = hwPendingPlatesRef.current;
         hwPendingPlatesRef.current = null;
         if (next && next.length > 0) {
@@ -1387,6 +1473,12 @@ export default function JeuxPage() {
           setCurrentUser(data.user.username);
           setUserType(data.user.role as UserType);
           if (data.user.niveau) setNiveau(data.user.niveau as Niveau);
+          if (data.user.avatarColor) setUserAvatarColor(data.user.avatarColor);
+          if (data.user.avatarIcon) setUserAvatarIcon((data.user.avatarIcon as string).slice(0, 1).toUpperCase() || 'U');
+          // Fetch classes membership
+          void fetch('/api/auth/me/classes', { cache: 'no-store' })
+            .then(r => r.json()).then(d => { if (d.classes) setUserClasses(d.classes.map((c: {name:string}) => c.name)); })
+            .catch(() => {});
           setView('main');
         }
         setSessionChecked(true);
@@ -1515,7 +1607,7 @@ export default function JeuxPage() {
         if (!json || json.ok !== true || !Array.isArray(json.games)) return;
         if (alive) setDbGames(json.games);
       } catch {
-        // ignore — réseau indisponible ou API pas encore prête
+        // ignore - réseau indisponible ou API pas encore prête
       } finally {
         if (alive) {
           // Polling DB réduit : 60s au lieu de 30s
@@ -1599,7 +1691,7 @@ export default function JeuxPage() {
       const cri = inferCriFromSpectre(spectreFromApi || [], { r: rBand, g: gBand, b: bBand });
 
       setInstrument({
-        colorTemp: tempK > 0 ? `${tempK}K` : '—',
+        colorTemp: tempK > 0 ? `${tempK}K` : '-',
         cri: `${cri}`,
         power: `${Math.floor(sum * 3)}W`,
         apiLatency,
@@ -2804,7 +2896,7 @@ export default function JeuxPage() {
     }).catch(() => {});
   }
 
-  // Send colors to multiple plates — one request per plate to avoid overloading the server
+  // Send colors to multiple plates - one request per plate to avoid overloading the server
   function sendColorsToPlates(platesData: { plateId: number; rgb: TargetColor; intensity: number }[]) {
     for (const { plateId, rgb, intensity } of platesData) {
       const channels32 = rgbToChannels32(rgb, intensity);
@@ -2929,7 +3021,7 @@ export default function JeuxPage() {
       setSimonPhase('gameover');
       const finalScore = simonScore + (simonLevel * 10);
       setMessage(`Game Over! Score: ${finalScore}`);
-      awardPoints(finalScore, `Simon terminé! Niveau ${simonLevel} — +${finalScore} points.`);
+      awardPoints(finalScore, `Simon terminé! Niveau ${simonLevel} - +${finalScore} points.`);
       
       // Update high score
       if (finalScore > simonHighScore) {
@@ -3081,7 +3173,7 @@ export default function JeuxPage() {
     const maxError = Math.sqrt(3 * Math.pow(255, 2));
     const accuracy = Math.max(0, 100 - (error / maxError) * 100);
     const points = Math.floor(accuracy * 2);
-    award(points, `Précision: ${accuracy.toFixed(1)}% — +${points} points.`);
+    award(points, `Précision: ${accuracy.toFixed(1)}% - +${points} points.`);
   }
 
   function adjustWhiteBalance(temp: number) {
@@ -3114,7 +3206,7 @@ export default function JeuxPage() {
     const error = Math.abs(currentTemp - targetTemp.temp);
     const accuracy = Math.max(0, 100 - error / 50);
     const points = Math.floor(accuracy * 1.5);
-    award(points, `Écart: ${error}K — Précision: ${accuracy.toFixed(1)}% — +${points} points.`);
+    award(points, `Écart: ${error}K - Précision: ${accuracy.toFixed(1)}% - +${points} points.`);
   }
 
   function adjustLED(index: number, value: number) {
@@ -3237,7 +3329,7 @@ export default function JeuxPage() {
   function validateSpectrum() {
     const totalLEDs = Object.keys(ledValues).length;
     const points = totalLEDs * 5;
-    award(points, `Spectre validé! ${totalLEDs} LED configurées — +${points} points.`);
+    award(points, `Spectre validé! ${totalLEDs} LED configurées - +${points} points.`);
   }
 
   function loadScene(sceneName: string) {
@@ -3306,7 +3398,7 @@ export default function JeuxPage() {
       return;
     }
     // When a builtin game handler is active (Color Speed, Maître du Blanc, etc.)
-    // skip the free-play toggle — the game manages its own plate state
+    // skip the free-play toggle - the game manages its own plate state
     if (gameClickHandlerRef.current) {
       gameClickHandlerRef.current(index);
       return;
@@ -3325,7 +3417,7 @@ export default function JeuxPage() {
 
       const plaqueId = PLATE_ID_BY_INDEX[index] ?? 1;
       if (isOn) {
-        // Utilise le profil blanc (canal 26) via rgbToChannels32 — valeurs 0-100
+        // Utilise le profil blanc (canal 26) via rgbToChannels32 - valeurs 0-100
         const channels32 = rgbToChannels32({ r: 255, g: 255, b: 255 }, masterIntensity);
         for (let canalIndex = 0; canalIndex < 32; canalIndex++) {
           scheduleSetCanal(plaqueId, canalIndex, channels32[canalIndex] ?? 0);
@@ -3422,11 +3514,11 @@ export default function JeuxPage() {
             </div>
             {/* Session ID */}
             <code style={{ display: 'block', color: 'rgba(26,29,46,0.4)', fontSize: 11, fontFamily: 'monospace', marginBottom: 16 }}>
-              ID : {mpJoinPrompt.sessionId || '—'}
+              ID : {mpJoinPrompt.sessionId || '-'}
             </code>
             {/* Body */}
             <div style={{ fontSize: 14, color: 'rgba(26,29,46,0.75)', lineHeight: 1.6 }}>
-              Un autre poste a lancé le jeu <strong style={{ color: '#1a1d2e' }}>Multijoueur — Teintes</strong>.
+              Un autre poste a lancé le jeu <strong style={{ color: '#1a1d2e' }}>Multijoueur - Teintes</strong>.
               <br />
               Voulez-vous rejoindre ? La partie démarrera automatiquement dès qu'il y aura 2 joueurs.
             </div>
@@ -3544,165 +3636,172 @@ export default function JeuxPage() {
 
       {view === 'login' ? (
         <LoginScreen
-          loginStep={loginStep}
-          setLoginStep={setLoginStep}
-          userType={userType}
-          setUserType={setUserType}
-          username={username}
-          setUsername={setUsername}
-          password={password}
-          setPassword={setPassword}
-          niveau={niveau}
-          setNiveau={setNiveau}
-          message={message}
-          loginLoading={loginLoading}
-          hasTeacher={hasTeacher}
           sessionChecked={sessionChecked}
-          onLogin={login}
-          onSetup={setupTeacher}
+          onSuccess={(user) => {
+            setCurrentUser(user.username);
+            setUserType((user.role === 'enseignant' || user.role === 'formateur') ? 'enseignant' : 'apprenant');
+            if (user.niveau) setNiveau(user.niveau as Niveau);
+            if (user.avatarColor) setUserAvatarColor(user.avatarColor);
+            if (user.avatarIcon) setUserAvatarIcon(user.avatarIcon.slice(0, 1).toUpperCase() || 'U');
+            void fetch('/api/auth/me/classes', { cache: 'no-store' })
+              .then(r => r.json()).then(d => { if (d.classes) setUserClasses(d.classes.map((c: {name:string}) => c.name)); })
+              .catch(() => {});
+            setView('main');
+          }}
         />
       ) : (
         <div className="container">
           <div className="dashboard" style={{ paddingTop: 4 }}>
             <div className="panel glass">
+              {/* ── Profil utilisateur redesign ────────────────────────── */}
               <div className="section">
-                <h3>
-                  <Award size={18} /> Profil Utilisateur
-                </h3>
-                <div className="stats-box">
-                  <div className="stat-row">
-                    <span className="stat-label">Utilisateur</span>
-                    <span className="stat-value">{currentUser || '-'}</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 16px', borderRadius: 18, background: 'rgba(255,255,255,0.65)', border: '1px solid rgba(255,255,255,0.85)', backdropFilter: 'blur(20px)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.95), 0 3px 12px rgba(0,0,0,0.06)', marginBottom: 12 }}>
+                  {/* Avatar */}
+                  <div style={{ width: 52, height: 52, borderRadius: '50%', background: `linear-gradient(135deg, ${userAvatarColor}, ${userAvatarColor}99)`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, fontWeight: 900, color: '#fff', flexShrink: 0, boxShadow: `0 0 0 3px rgba(255,255,255,0.8), 0 4px 14px ${userAvatarColor}55` }}>
+                    {userAvatarIcon}
                   </div>
-                  <div className="stat-row">
-                    <span className="stat-label">Niveau</span>
-                    <span className="stat-value">{niveau}</span>
-                  </div>
-                  <div className="stat-row">
-                    <span className="stat-label">Score</span>
-                    <span className="stat-value" style={{ position: 'relative' }}>
-                      {score}
-                      {scorePlusValue > 0 ? (
-                        <span key={scorePlusAnimKey} className="mp-plusone">
-                          +{scorePlusValue}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 800, fontSize: 15, color: 'var(--text)', letterSpacing: '-0.01em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {currentUser || '-'}
+                    </div>
+                    <div style={{ display: 'flex', gap: 5, marginTop: 4, flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 6, background: 'rgba(67,97,238,0.10)', color: 'var(--accent)', border: '1px solid rgba(67,97,238,0.2)' }}>
+                        <span style={{ display:'flex', alignItems:'center', gap:4 }}>{userType === 'enseignant' ? <><Award size={11} /> Enseignant</> : <><Star size={11} /> Eleve</>}</span>
+                      </span>
+                      <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 6, background: 'rgba(0,0,0,0.05)', color: 'var(--text-2)', border: '1px solid rgba(0,0,0,0.07)' }}>
+                        {niveau}
+                      </span>
+                      {userClasses.length > 0 && (
+                        <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 6, background: 'rgba(5,150,105,0.10)', color: '#059669', border: '1px solid rgba(5,150,105,0.2)' }}>
+                          <span style={{ display:'flex', alignItems:'center', gap:4 }}><Users size={11} /> {userClasses[0]}</span>
                         </span>
-                      ) : null}
-                    </span>
+                      )}
+                    </div>
                   </div>
-                  <div className="stat-row">
-                    <span className="stat-label">Jeux réussis</span>
-                    <span className="stat-value">{gamesCompleted}</span>
+                </div>
+                {/* Stats row */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                  <div style={{ padding: '12px 14px', borderRadius: 14, background: 'rgba(255,255,255,0.65)', border: '1px solid rgba(255,255,255,0.85)', backdropFilter: 'blur(16px)', boxShadow: 'inset 0 1px 0 #fff' }}>
+                    <div style={{ fontSize: 10, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.07em', color: 'var(--text-3)', marginBottom: 5 }}>Score</div>
+                    <div style={{ fontSize: 24, fontWeight: 900, color: 'var(--accent)', letterSpacing: '-0.02em', position: 'relative' }}>
+                      {score}
+                      {scorePlusValue > 0 ? <span key={scorePlusAnimKey} className="mp-plusone">+{scorePlusValue}</span> : null}
+                    </div>
+                  </div>
+                  <div style={{ padding: '12px 14px', borderRadius: 14, background: 'rgba(255,255,255,0.65)', border: '1px solid rgba(255,255,255,0.85)', backdropFilter: 'blur(16px)', boxShadow: 'inset 0 1px 0 #fff' }}>
+                    <div style={{ fontSize: 10, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.07em', color: 'var(--text-3)', marginBottom: 5 }}>Réussis</div>
+                    <div style={{ fontSize: 24, fontWeight: 900, color: '#059669', letterSpacing: '-0.02em' }}>{gamesCompleted}</div>
                   </div>
                 </div>
               </div>
 
               <div className="section">
-                <h3>
-                  <Gamepad2 size={18} /> Sélection du Jeu
-                </h3>
-
-                {/* Tetris Lumière — toujours disponible */}
-                <div
-                  className={`game-card${tetrisStandalone ? ' selected' : ''}`}
-                  style={{ marginBottom: 8 }}
-                  onClick={() => {
-                    setTetrisStandalone(true);
-                    setCustomRun(null);
-                    setHudRun(null);
-                    setCurrentGame(null);
-                    setGameActive(true);
-                    setMessage('Tetris Lumière: ← → déplacer, ↑ tourner, Espace drop');
-                  }}
-                  role="button"
-                  tabIndex={0}
-                >
-                  <div className="game-icon" style={{ background: 'linear-gradient(135deg, #4361ee, #6366f1)' }}>
-                    <Gamepad2 size={20} color="#fff" />
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
-                      <h4>Tetris Lumière</h4>
-                      <span style={{ fontSize: 10, fontWeight: 700, color: '#a0aeff', background: 'rgba(67,97,238,0.18)', padding: '2px 7px', borderRadius: 5 }}>natif</span>
-                    </div>
-                    <p>Tetris interactif sur les dalles lumineuses</p>
-                  </div>
-                  <button
-                    className="play-btn"
-                    style={{ background: tetrisStandalone ? '#4361ee' : 'rgba(67,97,238,0.2)', color: '#fff' }}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setTetrisStandalone(true);
-                      setCustomRun(null);
-                      setHudRun(null);
-                      setCurrentGame(null);
-                      setGameActive(true);
-                      setMessage('Tetris Lumière: ← → déplacer, ↑ tourner, Espace drop');
-                    }}
-                  >
-                    <Play size={15} />
-                  </button>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                  <h3 style={{ margin: 0 }}><Gamepad2 size={18} /> Sélection du Jeu</h3>
                 </div>
 
-                {/* Simon — jeu de mémoire */}
-                <div
-                  className={`game-card${simonActive ? ' selected' : ''}`}
-                  style={{ marginBottom: 8 }}
-                  onClick={() => {
-                    setTetrisStandalone(false);
-                    setCustomRun(null);
-                    setHudRun(null);
-                    setCurrentGame(null);
-                    setGameActive(true);
-                    startSimonGame();
-                  }}
-                  role="button"
-                  tabIndex={0}
-                >
-                  <div className="game-icon" style={{ background: 'linear-gradient(135deg, #ef476f, #f72585)' }}>
-                    <Brain size={20} color="#fff" />
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
-                      <h4>Simon Lumière</h4>
-                      <span style={{ fontSize: 10, fontWeight: 700, color: '#ef476f', background: 'rgba(239,71,111,0.18)', padding: '2px 7px', borderRadius: 5 }}>natif</span>
-                    </div>
-                    <p>Mémorisez et reproduisez les séquences lumineuses</p>
-                  </div>
-                  <button
-                    className="play-btn"
-                    style={{ background: simonActive ? '#ef476f' : 'rgba(239,71,111,0.2)', color: '#fff' }}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setTetrisStandalone(false);
-                      setCustomRun(null);
-                      setHudRun(null);
-                      setCurrentGame(null);
-                      setGameActive(true);
-                      startSimonGame();
-                    }}
-                  >
-                    <Play size={15} />
-                  </button>
+                {/* Barre de recherche */}
+                <div style={{ position: 'relative', marginBottom: 12 }}>
+                  <Search size={14} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-3)', pointerEvents: 'none' }} />
+                  <input
+                    type="text"
+                    placeholder="Rechercher un jeu…"
+                    value={gameSearch}
+                    onChange={e => setGameSearch(e.target.value)}
+                    style={{ width: '100%', paddingLeft: 34, paddingRight: 12, paddingTop: 9, paddingBottom: 9, borderRadius: 12, border: '1px solid rgba(0,0,0,0.09)', background: 'rgba(255,255,255,0.72)', backdropFilter: 'blur(12px)', fontSize: 13, fontFamily: 'inherit', fontWeight: 500, outline: 'none', color: 'var(--text)', boxSizing: 'border-box', transition: 'all 160ms', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.9)' }}
+                  />
+                  {gameSearch && (
+                    <button onClick={() => setGameSearch('')} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', display: 'flex', alignItems: 'center', padding: 2 }}>
+                      <X size={13} />
+                    </button>
+                  )}
                 </div>
 
-                {/* Color Speed */}
-                {(['color-speed', 'maitre-blanc', 'puissance4', 'chasseur-gamut', 'metamere', 'chromaticite-jeu', 'canal-mix'] as const).map((gameId) => {
-                  const META: Record<string, { title: string; desc: string; Icon: any; grad: string; accent: string }> = {
-                    'color-speed':      { title: 'Color Speed',        desc: "Cliquez la dalle qui s'allume — réflexes !",            Icon: Zap,       grad: 'linear-gradient(135deg,#4361ee,#7c3aed)', accent: '#7c3aed' },
+                {/* Liste unifiée de tous les jeux - recherche + chargement progressif (4 par 4) */}
+                {(() => {
+                  const ICONS_MAP: Record<string, any> = { Lightbulb, Gamepad2, Star, Heart, Sun, Moon, Flame, Snowflake, Music, Target, Puzzle, Sparkles, Trophy, Rocket, Ghost, Palette, Zap };
+                  const BATCH = 4;
+
+                  type GameCard = {
+                    key: string;
+                    title: string;
+                    desc: string;
+                    Icon: any;
+                    iconBg: string;
+                    iconColor: string;
+                    badgeLabel: string;
+                    accent: string;
+                    selected: boolean;
+                    launch: () => void;
+                  };
+
+                  const nativeCards: GameCard[] = [
+                    {
+                      key: 'tetris',
+                      title: 'Tetris Lumière',
+                      desc: 'Tetris interactif sur les dalles lumineuses',
+                      Icon: Gamepad2,
+                      iconBg: 'linear-gradient(135deg, #4361ee, #6366f1)',
+                      iconColor: '#fff',
+                      badgeLabel: 'natif',
+                      accent: '#4361ee',
+                      selected: tetrisStandalone,
+                      launch: () => {
+                        setTetrisStandalone(true);
+                        setCustomRun(null);
+                        setHudRun(null);
+                        setCurrentGame(null);
+                        setSimonActive(false);
+                        setActiveBuiltinGame(null);
+                        setGameActive(true);
+                        setMessage('Tetris Lumière: flèches déplacer, haut tourner, Espace drop');
+                      },
+                    },
+                    {
+                      key: 'simon',
+                      title: 'Simon Lumière',
+                      desc: 'Mémorisez et reproduisez les séquences lumineuses',
+                      Icon: Brain,
+                      iconBg: 'linear-gradient(135deg, #ef476f, #f72585)',
+                      iconColor: '#fff',
+                      badgeLabel: 'natif',
+                      accent: '#ef476f',
+                      selected: simonActive,
+                      launch: () => {
+                        setTetrisStandalone(false);
+                        setCustomRun(null);
+                        setHudRun(null);
+                        setCurrentGame(null);
+                        setActiveBuiltinGame(null);
+                        setGameActive(true);
+                        startSimonGame();
+                      },
+                    },
+                  ];
+
+                  const BUILTIN_META: Record<string, { title: string; desc: string; Icon: any; grad: string; accent: string }> = {
+                    'color-speed':      { title: 'Color Speed',        desc: "Cliquez la dalle qui s'allume - réflexes !",            Icon: Zap,       grad: 'linear-gradient(135deg,#4361ee,#7c3aed)', accent: '#7c3aed' },
                     'maitre-blanc':     { title: 'Le Maître du Blanc', desc: 'Recréez la teinte cible en dosant R, G, B',              Icon: Sun,       grad: 'linear-gradient(135deg,#f59e0b,#ef4444)', accent: '#f59e0b' },
                     'puissance4':       { title: 'Puissance 4',        desc: 'Alignez 4 couleurs sur la matrice 6×7',                  Icon: Grid,      grad: 'linear-gradient(135deg,#ff2828,#2850ff)', accent: '#ff2828' },
                     'chasseur-gamut':   { title: 'Chasseur de Gamut',  desc: 'Localisez la couleur sur le diagramme CIE 1931',         Icon: Crosshair, grad: 'linear-gradient(135deg,#06d6a0,#4361ee)', accent: '#06d6a0' },
-                    'metamere':         { title: 'Métamérie',           desc: "Trouvez l'éclairage qui cache ou révèle le texte",       Icon: Sparkles,  grad: 'linear-gradient(135deg,#7c3aed,#06d6a0)', accent: '#06d6a0' },
+                    'metamere':         { title: 'Métamérie',          desc: "Trouvez l'éclairage qui cache ou révèle le texte",       Icon: Sparkles,  grad: 'linear-gradient(135deg,#7c3aed,#06d6a0)', accent: '#06d6a0' },
                     'chromaticite-jeu': { title: 'Chromaticité CIE',   desc: 'Mémorisez la couleur 5s puis retrouvez x, y, z sur le diagramme', Icon: Crosshair, grad: 'linear-gradient(135deg,#81e6d9,#4361ee)', accent: '#81e6d9' },
-                    'canal-mix':        { title: 'Mix de Canaux',       desc: '3 canaux LED aléatoires → retrouvez la couleur sur le diagramme CIE', Icon: Palette,  grad: 'linear-gradient(135deg,#f97316,#7c3aed)', accent: '#f97316' },
+                    'canal-mix':        { title: 'Mix de Canaux',      desc: '3 canaux LED aléatoires - retrouvez la couleur sur le diagramme CIE', Icon: Palette,  grad: 'linear-gradient(135deg,#f97316,#7c3aed)', accent: '#f97316' },
                   };
-                  const m = META[gameId];
-                  const isSelected = activeBuiltinGame === gameId;
-                  return (
-                    <div key={gameId}
-                      className={`game-card${isSelected ? ' selected' : ''}`}
-                      style={{ marginBottom: 8 }}
-                      onClick={() => {
+
+                  const builtinCards: GameCard[] = (['color-speed', 'maitre-blanc', 'puissance4', 'chasseur-gamut', 'metamere', 'chromaticite-jeu', 'canal-mix'] as const).map((gameId) => {
+                    const m = BUILTIN_META[gameId];
+                    return {
+                      key: `builtin:${gameId}`,
+                      title: m.title,
+                      desc: m.desc,
+                      Icon: m.Icon,
+                      iconBg: m.grad,
+                      iconColor: '#fff',
+                      badgeLabel: 'natif',
+                      accent: m.accent,
+                      selected: activeBuiltinGame === gameId,
+                      launch: () => {
                         setTetrisStandalone(false);
                         setCustomRun(null);
                         setHudRun(null);
@@ -3710,123 +3809,121 @@ export default function JeuxPage() {
                         setSimonActive(false);
                         setActiveBuiltinGame(gameId);
                         setGameActive(true);
-                        setMessage(m.title + " — c'est parti !");
-                      }}
-                      role="button" tabIndex={0}
-                    >
-                      <div className="game-icon" style={{ background: m.grad }}><m.Icon size={20} color="#fff" /></div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
-                          <h4>{m.title}</h4>
-                          <span style={{ fontSize: 10, fontWeight: 700, color: m.accent, background: `${m.accent}22`, padding: '2px 7px', borderRadius: 5 }}>natif</span>
-                        </div>
-                        <p>{m.desc}</p>
-                      </div>
-                      <button className="play-btn"
-                        style={{ background: isSelected ? m.accent : `${m.accent}33`, color: '#fff' }}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setTetrisStandalone(false);
-                          setCustomRun(null);
-                          setHudRun(null);
-                          setCurrentGame(null);
-                          setSimonActive(false);
-                          setActiveBuiltinGame(gameId);
-                          setGameActive(true);
-                          setMessage(m.title + " — c'est parti !");
-                        }}
-                      ><Play size={15} /></button>
+                        setMessage(m.title + " - c'est parti !");
+                      },
+                    };
+                  });
+
+                  const spectreCard: GameCard = {
+                    key: 'spectre',
+                    title: 'Spectre Chromatique',
+                    desc: "Mémorisez et reproduisez une couleur - jusqu'à 8 joueurs",
+                    Icon: Palette,
+                    iconBg: 'linear-gradient(135deg,#8b5cf6,#06d6a0)',
+                    iconColor: '#fff',
+                    badgeLabel: 'multi',
+                    accent: '#8b5cf6',
+                    selected: false,
+                    launch: () => setActiveView('spectre'),
+                  };
+
+                  const dbCards: GameCard[] = dbGames.map((g) => {
+                    const isEditor = String(g.kind) === 'editor';
+                    const cfg = g.config as any;
+                    const nodeCount = Array.isArray(cfg?.nodes) ? cfg.nodes.length : 0;
+                    const tileCount = typeof cfg?.tileCount === 'number' ? cfg.tileCount : 42;
+                    const iconName: string = typeof cfg?.icon === 'string' ? cfg.icon : 'Lightbulb';
+                    const GIcon = ICONS_MAP[iconName] ?? Lightbulb;
+                    const accentColor = typeof cfg?.accentColor === 'string' ? cfg.accentColor : (isEditor ? '#a0aeff' : '#c4b5fd');
+                    const iconBg = typeof cfg?.bgColor === 'string' ? cfg.bgColor : (isEditor ? 'linear-gradient(135deg,#1a2045,#2d1060)' : 'linear-gradient(135deg,#1a1040,#0d0830)');
+                    const description = typeof cfg?.description === 'string' && cfg.description ? cfg.description : `${nodeCount} nœud${nodeCount !== 1 ? 's' : ''} · ${tileCount} dalles`;
+                    return {
+                      key: `db:${g.id}`,
+                      title: g.name,
+                      desc: description,
+                      Icon: GIcon,
+                      iconBg,
+                      iconColor: accentColor,
+                      badgeLabel: isEditor ? 'éditeur' : 'custom',
+                      accent: accentColor,
+                      selected: false,
+                      launch: () => isEditor ? startHudFromDb({ id: g.id, name: g.name, config: g.config }) : startCustomFromDb({ id: g.id, name: g.name, config: g.config }),
+                    };
+                  });
+
+                  const allCards: GameCard[] = [...nativeCards, ...builtinCards, spectreCard, ...dbCards];
+
+                  const q = gameSearch.toLowerCase().trim();
+                  const filtered = q
+                    ? allCards.filter(c => c.title.toLowerCase().includes(q) || c.desc.toLowerCase().includes(q))
+                    : allCards;
+                  const visible = q ? filtered : filtered.slice(0, gameVisibleCount);
+
+                  if (filtered.length === 0) return (
+                    <div style={{ padding: '16px', borderRadius: 14, textAlign: 'center', background: 'rgba(0,0,0,0.03)', border: '1px dashed rgba(0,0,0,0.1)' }}>
+                      <p style={{ margin: 0, fontSize: 13, color: 'var(--text-3)' }}>{q ? `Aucun jeu pour « ${gameSearch} »` : 'Aucun jeu disponible.'}</p>
                     </div>
                   );
-                })}
 
-                {/* Spectre Chromatique */}
-                <div
-                  className="game-card"
-                  style={{ marginBottom: 8 }}
-                  onClick={() => setActiveView('spectre')}
-                  role="button" tabIndex={0}
-                >
-                  <div className="game-icon" style={{ background: 'linear-gradient(135deg,#8b5cf6,#06d6a0)' }}>
-                    <Palette size={20} color="#fff" />
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
-                      <h4>Spectre Chromatique</h4>
-                      <span style={{ fontSize: 10, fontWeight: 700, color: '#8b5cf6', background: '#8b5cf622', padding: '2px 7px', borderRadius: 5 }}>multi</span>
-                    </div>
-                    <p>Mémorisez et reproduisez une couleur — jusqu'à 8 joueurs</p>
-                  </div>
-                  <button className="play-btn"
-                    style={{ background: '#8b5cf633', color: '#fff' }}
-                    onClick={(e) => { e.stopPropagation(); setActiveView('spectre'); }}
-                  ><Play size={15} /></button>
-                </div>
-
-
-                {dbGamesLoading ? (
-                  <div style={{ padding: 20, textAlign: 'center', opacity: 0.75 }}>Chargement des jeux...</div>
-                ) : dbGames.length === 0 ? (
-                  <div className="glass" style={{ padding: 24, borderRadius: 18, textAlign: 'center' }}>
-                    <p style={{ margin: 0, opacity: 0.8 }}>Aucun jeu disponible.</p>
-                    <p style={{ margin: '8px 0 0', fontSize: 13, opacity: 0.6 }}>Créez votre premier jeu dans l'éditeur !</p>
-                  </div>
-                ) : (
-                  <div style={{ display: 'grid', gap: 8 }}>
-                    {dbGames.map((g) => {
-                      const isEditor = String(g.kind) === 'editor';
-                      const cfg = g.config as any;
-                      const nodeCount = Array.isArray(cfg?.nodes) ? cfg.nodes.length : 0;
-                      const tileCount = typeof cfg?.tileCount === 'number' ? cfg.tileCount : 42;
-                      const iconName: string = typeof cfg?.icon === 'string' ? cfg.icon : 'Lightbulb';
-                      const ICON_LOOKUP: Record<string, any> = { Lightbulb, Gamepad2, Star, Heart, Sun, Moon, Flame, Snowflake, Music, Target, Puzzle, Sparkles, Trophy, Rocket, Ghost, Palette, Zap };
-                      const GIcon = ICON_LOOKUP[iconName] ?? Lightbulb;
-                      const accentColor = typeof cfg?.accentColor === 'string' ? cfg.accentColor : (isEditor ? '#a0aeff' : '#c4b5fd');
-                      const iconBg = typeof cfg?.bgColor === 'string' ? cfg.bgColor : (isEditor ? '#1a2045' : '#1a1040');
-                      const description = typeof cfg?.description === 'string' && cfg.description ? cfg.description : `${nodeCount} nœud${nodeCount !== 1 ? 's' : ''} · ${tileCount} dalles`;
-                      return (
-                        <div
-                          key={g.id}
-                          className="game-card"
-                          onClick={() => {
-                            if (isEditor) {
-                              startHudFromDb({ id: g.id, name: g.name, config: g.config });
-                            } else {
-                              startCustomFromDb({ id: g.id, name: g.name, config: g.config });
-                            }
-                          }}
-                          role="button"
-                          tabIndex={0}
-                        >
-                          <div className="game-icon" style={{ background: iconBg }}>
-                            <GIcon size={20} color={accentColor} />
-                          </div>
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
-                              <h4>{g.name}</h4>
-                              <span style={{ fontSize: 10, fontWeight: 700, color: '#c4b5fd', background: 'rgba(124,58,237,0.18)', padding: '2px 7px', borderRadius: 5 }}>custom</span>
-                            </div>
-                            <p style={{ color: 'var(--text-2)', fontSize: 12, margin: '2px 0 0', lineHeight: 1.4, whiteSpace: 'pre-line' }}>{description}</p>
-                          </div>
-                          <button
-                            className="play-btn"
-                            style={{ background: 'rgba(255,255,255,0.08)', color: '#fff' }}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (isEditor) {
-                                startHudFromDb({ id: g.id, name: g.name, config: g.config });
-                              } else {
-                                startCustomFromDb({ id: g.id, name: g.name, config: g.config });
-                              }
-                            }}
+                  return (
+                    <>
+                      {dbGamesLoading && (
+                        <div style={{ padding: '10px 0', textAlign: 'center', fontSize: 12, color: 'var(--text-3)' }}>Chargement des jeux...</div>
+                      )}
+                      <div style={{ display: 'grid', gap: 8 }}>
+                        {visible.map((c) => (
+                          <div key={c.key}
+                            className={`game-card${c.selected ? ' selected' : ''}`}
+                            onClick={c.launch}
+                            role="button" tabIndex={0}
                           >
-                            <Play size={15} />
-                          </button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
+                            <div className="game-icon" style={{ background: c.iconBg }}>
+                              <c.Icon size={20} color={c.iconColor} />
+                            </div>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
+                                <h4>{c.title}</h4>
+                                <span style={{ fontSize: 10, fontWeight: 700, color: c.accent, background: `${c.accent}22`, padding: '2px 7px', borderRadius: 5 }}>{c.badgeLabel}</span>
+                              </div>
+                              <p style={{ fontSize: 12, margin: 0, lineHeight: 1.35 }}>{c.desc}</p>
+                            </div>
+                            <button className="play-btn"
+                              style={{ background: c.accent, color: '#fff', boxShadow: c.selected ? `0 0 0 2px ${c.accent}80, 0 4px 14px ${c.accent}66` : `0 3px 10px ${c.accent}55` }}
+                              onClick={(e) => { e.stopPropagation(); c.launch(); }}
+                            ><Play size={15} /></button>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Chargement progressif 4 par 4 (masqué pendant une recherche) */}
+                      {!q && (
+                        <>
+                          <div style={{ display:'flex', gap:6, marginTop:8 }}>
+                            {gameVisibleCount < filtered.length && (
+                              <button
+                                onClick={() => setGameVisibleCount(v => v + BATCH)}
+                                style={{ flex:1, padding: '9px 14px', borderRadius: 12, border: '1.5px dashed rgba(67,97,238,0.3)', background: 'rgba(67,97,238,0.05)', color: 'var(--accent)', fontWeight: 700, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', transition: 'all 140ms', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}
+                              >
+                                <ChevronDown size={14} /> Charger {Math.min(BATCH, filtered.length - gameVisibleCount)} de plus
+                              </button>
+                            )}
+                            {gameVisibleCount > BATCH && (
+                              <button
+                                onClick={() => setGameVisibleCount(BATCH)}
+                                style={{ padding: '9px 12px', borderRadius: 12, border: '1.5px solid rgba(0,0,0,0.08)', background: 'rgba(255,255,255,0.6)', color: 'var(--text-3)', fontWeight: 600, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', transition: 'all 140ms', display: 'flex', alignItems: 'center', gap: 4 }}
+                              >
+                                <ChevronUp size={14} /> Réduire
+                              </button>
+                            )}
+                          </div>
+                          <p style={{ margin: '8px 2px 0', fontSize: 11, color: 'var(--text-3)', textAlign: 'center' }}>
+                            {Math.min(gameVisibleCount, filtered.length)} / {filtered.length} jeux
+                          </p>
+                        </>
+                      )}
+                    </>
+                  );
+                })()}
               </div>
 
               <div className="section">
@@ -3852,8 +3949,6 @@ export default function JeuxPage() {
               <h3>
                 <Lightbulb size={18} /> Zone de Jeu - ColorRoom
               </h3>
-
-              <div className="message-box">{message}</div>
 
               <Room3D
                 plateColors={plateColors}
@@ -3980,7 +4075,7 @@ export default function JeuxPage() {
                   </div>
                 ) : null}
 
-                {/* Tetris Lumière standalone — toujours dispo */}
+                {/* Tetris Lumière standalone - toujours dispo */}
                 {gameActive && tetrisStandalone && (
                   <div style={{ marginTop: 12, borderRadius: 18, overflow: 'hidden', border: '1px solid rgba(0,0,0,0.08)' }}>
                     <TetrisGame
@@ -3991,7 +4086,7 @@ export default function JeuxPage() {
                   </div>
                 )}
 
-                {/* Simon Lumière — panneau de jeu dédié */}
+                {/* Simon Lumière - panneau de jeu dédié */}
                 {gameActive && simonActive && (
                   <div style={{ marginTop: 12, borderRadius: 18, padding: 20, background: 'rgba(10,10,20,0.95)', border: '1px solid rgba(239,71,111,0.25)' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
@@ -4066,7 +4161,7 @@ export default function JeuxPage() {
 
                 {/* Nouveaux jeux natifs */}
                 {gameActive && activeBuiltinGame && (() => {
-                  // Flush visuel via rAF — ne déclenche qu'un seul setPlateColors par frame
+                  // Flush visuel via rAF - ne déclenche qu'un seul setPlateColors par frame
                   const flushVisual = () => {
                     const snap = new Map(visualBatchRef.current);
                     visualBatchRef.current.clear();
@@ -4180,6 +4275,21 @@ export default function JeuxPage() {
                   );
                 })()}
 
+                {/* Interface du jeu éditeur (composants UI dessinés dans /editeur, dont le diagramme CIE) */}
+                {gameActive && !tetrisStandalone && hudRun && Array.isArray(hudRun.cfg.uiLayout) && hudRun.cfg.uiLayout.length > 0 && (
+                  <div className="section" style={{ marginTop: 12 }}>
+                    <h3 style={{ marginTop: 0 }}><Gamepad2 size={16} /> Interface du jeu</h3>
+                    <HudUiOverlay
+                      components={hudRun.cfg.uiLayout}
+                      onSendColor={(idx, r, g, b, intensity) => {
+                        const plateId = PLATE_ID_BY_INDEX[idx];
+                        if (!plateId) return;
+                        sendRgbToPlate({ r, g, b }, intensity, plateId);
+                      }}
+                    />
+                  </div>
+                )}
+
                 {gameActive && mpStatus === 'active' ? (
                   <div
                     className="mp-area"
@@ -4198,7 +4308,7 @@ export default function JeuxPage() {
                       <div className="glass" style={{ padding: 14, borderRadius: 18, marginTop: 12 }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
                           <strong>Lobby</strong>
-                          <span style={{ opacity: 0.75, fontSize: 12 }}>Session: {mpSessionId || '—'}</span>
+                          <span style={{ opacity: 0.75, fontSize: 12 }}>Session: {mpSessionId || '-'}</span>
                         </div>
                         <div style={{ marginTop: 6, fontSize: 13, opacity: 0.9 }}>
                           Joueurs connectés: {mpPlayers.length}/8. Le chrono démarre automatiquement dès qu'il y a 2 joueurs.
@@ -4294,7 +4404,7 @@ export default function JeuxPage() {
                           );
                         })()
                       ) : (
-                        <div style={{ marginTop: 10, opacity: 0.75 }}>—</div>
+                        <div style={{ marginTop: 10, opacity: 0.75 }}>-</div>
                       )}
                     </div>
 
@@ -4322,13 +4432,13 @@ export default function JeuxPage() {
                           );
                         })()
                       ) : (
-                        <div style={{ marginTop: 10, opacity: 0.75 }}>—</div>
+                        <div style={{ marginTop: 10, opacity: 0.75 }}>-</div>
                       )}
                     </div>
 
                     <div className="led-slider led-slider--special">
                       <label>
-                        <span>Ton slider ({mpState && mpSeat ? seatTintLabel(mpState.channelBySeat?.[mpSeat]) : '—'})</span>
+                        <span>Ton slider ({mpState && mpSeat ? seatTintLabel(mpState.channelBySeat?.[mpSeat]) : '-'})</span>
                         <span>{clamp255(mpValue)}</span>
                       </label>
                       <input
@@ -4346,7 +4456,7 @@ export default function JeuxPage() {
                     </div>
 
                     <div style={{ marginTop: 10, fontSize: 12, opacity: 0.75 }}>
-                      Session: {mpSessionId ? mpSessionId : '—'} • Ton siège: {mpSeat ?? '—'}
+                      Session: {mpSessionId ? mpSessionId : '-'} • Ton siège: {mpSeat ?? '-'}
                     </div>
                   </div>
                 ) : null}
@@ -4903,8 +5013,8 @@ export default function JeuxPage() {
                 <div className="leaderboard">
                   {leaderboard.length === 0 ? (
                     <div className="leaderboard-item">
-                      <span>—</span>
-                      <span>—</span>
+                      <span>-</span>
+                      <span>-</span>
                     </div>
                   ) : (
                     leaderboard.map((e, idx) => (
@@ -5005,7 +5115,7 @@ export default function JeuxPage() {
               width: '90%'
             }}
           >
-            <div style={{ fontSize: 48, marginBottom: 16 }}>🏆</div>
+            <div style={{ display:'flex', justifyContent:'center', marginBottom: 16, color:'#4361ee' }}><Trophy size={48} /></div>
             <h2 style={{
               fontSize: 28,
               fontWeight: 800,
@@ -5068,7 +5178,7 @@ export default function JeuxPage() {
                   e.currentTarget.style.boxShadow = '0 4px 15px rgba(34, 197, 94, 0.3)';
                 }}
               >
-                🔄 Relancer
+                <RefreshCcw size={16} /> Relancer
               </button>
               <button
                 onClick={() => {
@@ -5098,7 +5208,7 @@ export default function JeuxPage() {
                   e.currentTarget.style.background = 'rgba(255,255,255,0.05)';
                 }}
               >
-                ✕ Quitter
+                <X size={16} /> Quitter
               </button>
             </div>
           </div>

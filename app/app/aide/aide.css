@@ -1,0 +1,388 @@
+@font-face {
+  font-family: 'BricolageGrotesque';
+  src: url('/fonts/BricolageGrotesque.ttf') format('truetype');
+  font-weight: 200 800;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* ============================================================
+   ColorRoom /aide — Design system (mirrors /jeux)
+   ============================================================ */
+
+.aide {
+  /* Background */
+  --bg:         #f2f4f8;
+  --bg-2:       #ffffff;
+  --bg-3:       #eef1f8;
+
+  /* Surfaces — liquid glass */
+  --surface:    rgba(255,255,255,0.72);
+  --surface-2:  rgba(255,255,255,0.86);
+  --surface-3:  rgba(255,255,255,0.96);
+
+  /* Borders */
+  --border:     rgba(0,0,0,0.07);
+  --border-2:   rgba(0,0,0,0.11);
+  --border-3:   rgba(0,0,0,0.18);
+
+  /* Text */
+  --text:       #1a1d2e;
+  --text-2:     rgba(26,29,46,0.62);
+  --text-3:     rgba(26,29,46,0.38);
+
+  /* Accent */
+  --accent:     #4361ee;
+  --accent-dim: rgba(67,97,238,0.10);
+  --accent-glow:rgba(67,97,238,0.22);
+
+  /* Status */
+  --success:    #059669;
+  --danger:     #dc2626;
+  --warning:    #d97706;
+
+  background:
+    radial-gradient(ellipse 80% 50% at 20% 0%,  rgba(67,97,238,0.07) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 40% at 80% 100%, rgba(99,102,241,0.06) 0%, transparent 55%),
+    var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  font-family: 'BricolageGrotesque', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  font-optical-sizing: auto;
+  font-size: 15px;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+}
+
+.aide * {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+/* ---- Header ---- */
+.aide .aide-header {
+  padding: 20px 32px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border);
+  background: rgba(255,255,255,0.82);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  box-shadow: 0 1px 0 rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.04);
+}
+
+.aide .aide-header-brand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.aide .aide-logo-dots {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+}
+
+.aide .aide-logo-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  box-shadow: 0 0 8px currentColor;
+}
+
+.aide .aide-header-brand h1 {
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  background: linear-gradient(135deg, var(--accent) 0%, #7c3aed 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  line-height: 1.2;
+}
+
+.aide .aide-header-brand p {
+  font-size: 12px;
+  color: var(--text-3);
+  margin-top: 2px;
+}
+
+.aide .aide-back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-2);
+  text-decoration: none;
+  padding: 8px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--border-2);
+  background: rgba(255,255,255,0.7);
+  transition: all 160ms;
+}
+
+.aide .aide-back-link:hover {
+  color: var(--accent);
+  border-color: rgba(67,97,238,0.25);
+  background: rgba(67,97,238,0.06);
+}
+
+/* ---- Main container ---- */
+.aide .aide-container {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 40px 24px 80px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+/* ---- Section cards ---- */
+.aide .aide-card {
+  padding: 32px;
+  border-radius: 22px;
+  background: var(--surface-2);
+  backdrop-filter: blur(28px) saturate(180%);
+  -webkit-backdrop-filter: blur(28px) saturate(180%);
+  border: 1px solid rgba(255,255,255,0.82);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.95),
+    inset 0 -1px 0 rgba(0,0,0,0.03),
+    0 4px 24px rgba(0,0,0,0.07),
+    0 1px 4px rgba(0,0,0,0.04);
+
+  /* Hidden by default — JS adds .visible */
+  opacity: 0;
+  transform: translateY(12px);
+  filter: blur(3px);
+  transition: opacity 0.4s ease, transform 0.4s ease, filter 0.4s ease;
+}
+
+.aide .aide-card.visible {
+  opacity: 1;
+  transform: translateY(0);
+  filter: blur(0);
+}
+
+/* ---- Section heading ---- */
+.aide .aide-section-heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.aide .aide-section-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, var(--accent-dim), rgba(124,58,237,0.08));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--accent);
+  border: 1px solid rgba(67,97,238,0.12);
+}
+
+.aide .aide-section-heading h2 {
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  color: var(--text);
+}
+
+/* ---- Body text ---- */
+.aide .aide-card p {
+  color: var(--text-2);
+  font-size: 14px;
+  line-height: 1.75;
+  margin-bottom: 12px;
+}
+
+.aide .aide-card p:last-child {
+  margin-bottom: 0;
+}
+
+.aide .aide-card strong {
+  color: var(--text);
+  font-weight: 700;
+}
+
+/* ---- Lists ---- */
+.aide .aide-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.aide .aide-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 14px;
+  color: var(--text-2);
+  line-height: 1.6;
+}
+
+.aide .aide-list li::before {
+  content: '';
+  display: block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  flex-shrink: 0;
+  margin-top: 7px;
+  opacity: 0.7;
+}
+
+.aide .aide-list li strong {
+  color: var(--text);
+  font-weight: 700;
+}
+
+/* ---- Tables ---- */
+.aide .aide-table-wrap {
+  overflow-x: auto;
+  margin-top: 12px;
+  border-radius: 14px;
+  border: 1px solid var(--border-2);
+}
+
+.aide .aide-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.aide .aide-table th {
+  background: rgba(67,97,238,0.06);
+  color: var(--text-2);
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 11px 16px;
+  text-align: left;
+  border-bottom: 1px solid var(--border-2);
+}
+
+.aide .aide-table td {
+  padding: 11px 16px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-2);
+  vertical-align: top;
+  line-height: 1.55;
+}
+
+.aide .aide-table tr:last-child td {
+  border-bottom: none;
+}
+
+.aide .aide-table tr:hover td {
+  background: rgba(67,97,238,0.03);
+}
+
+.aide .aide-table td:first-child {
+  font-weight: 700;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+/* ---- Channel list (specs) ---- */
+.aide .aide-channel-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.aide .aide-channel-card {
+  padding: 16px 18px;
+  border-radius: 14px;
+  background: var(--surface);
+  border: 1px solid rgba(255,255,255,0.75);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.9), 0 2px 8px rgba(0,0,0,0.05);
+}
+
+.aide .aide-channel-card h4 {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+
+.aide .aide-channel-card p {
+  font-size: 12px;
+  color: var(--text-2);
+  margin-bottom: 0;
+}
+
+/* ---- Tip / note box ---- */
+.aide .aide-note {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 14px 18px;
+  border-radius: 12px;
+  background: rgba(67,97,238,0.06);
+  border: 1px solid rgba(67,97,238,0.14);
+  margin-top: 16px;
+  font-size: 13px;
+  color: var(--text-2);
+  line-height: 1.6;
+}
+
+.aide .aide-note-icon {
+  flex-shrink: 0;
+  color: var(--accent);
+  margin-top: 2px;
+}
+
+/* ---- Role badge ---- */
+.aide .aide-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.aide .aide-badge--enseignant {
+  background: rgba(124,58,237,0.10);
+  color: #7c3aed;
+  border: 1px solid rgba(124,58,237,0.18);
+}
+
+.aide .aide-badge--admin {
+  background: rgba(67,97,238,0.10);
+  color: var(--accent);
+  border: 1px solid rgba(67,97,238,0.18);
+}
+
+/* ---- Scrollbar ---- */
+.aide ::-webkit-scrollbar { width: 6px; }
+.aide ::-webkit-scrollbar-track { background: transparent; }
+.aide ::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.12); border-radius: 999px; }
+.aide ::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.2); }
+
+/* ---- Responsive ---- */
+@media (max-width: 640px) {
+  .aide .aide-header { padding: 14px 16px; }
+  .aide .aide-container { padding: 24px 12px 60px; }
+  .aide .aide-card { padding: 22px 18px; }
+  .aide .aide-channel-grid { grid-template-columns: 1fr; }
+  .aide .aide-header-brand h1 { font-size: 17px; }
+}

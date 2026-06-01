@@ -2,10 +2,17 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
-import Room3D from '@/app/_components/Room3D';
-import TetrisGame from '@/app/_components/TetrisGame';
-import CS150Panel from '@/app/_components/CS150Panel';
+import dynamic from 'next/dynamic';
 import type { TetrisSnapshot } from '@/app/_components/TetrisGame';
+import type { UILayoutComponent } from './UIDesigner';
+
+// Modules lourds (3D Three.js, éditeur Python/Pyodide, designer UI, panneau CS150)
+// chargés à la demande pour alléger le bundle initial de /editeur.
+const Room3D = dynamic(() => import('@/app/_components/Room3D'), { ssr: false });
+const TetrisGame = dynamic(() => import('@/app/_components/TetrisGame'), { ssr: false });
+const CS150Panel = dynamic(() => import('@/app/_components/CS150Panel'), { ssr: false });
+const PythonEditor = dynamic(() => import('./PythonEditor'), { ssr: false });
+const UIDesigner = dynamic(() => import('./UIDesigner'), { ssr: false });
 
 import { Boxes, Gamepad2, Plus, Play, Pause, RotateCcw, Save, Trash2, FolderPlus, X, Lightbulb, Layers, Zap, Palette, Clock, MousePointer2, LayoutGrid, Maximize2, Minimize2, Eye, Star, Heart, Sun, Moon, Flame, Snowflake, Music, Target, Puzzle, Sparkles, Trophy, Rocket, Ghost, Dice1, Brain, Check, GitBranch, Hash, Settings2, Shuffle, Search, Users, Film, Thermometer, ScanLine, Wifi, WifiOff, type LucideIcon } from 'lucide-react';
 
@@ -133,7 +140,45 @@ type EditorNodeKind =
   | 'measure_on_result'
   | 'measure_compare'
   | 'measure_show_cie'
-  | 'measure_target_xy';
+  | 'measure_target_xy'
+  // ─── Logique de jeu (custom game engine) ────────────────────────────────────
+  | 'round_start'
+  | 'round_end'
+  | 'next_round'
+  | 'get_round'
+  // ─── Couleur / science ──────────────────────────────────────────────────────
+  | 'gen_target_color'
+  | 'color_distance'
+  | 'color_match_score'
+  | 'show_target_on_plates'
+  | 'get_player_rgb'
+  // ─── Chronomètre async ──────────────────────────────────────────────────────
+  | 'countdown_start'
+  | 'countdown_stop'
+  | 'on_countdown_end'
+  // ─── Flux async ─────────────────────────────────────────────────────────────
+  | 'wait_event'
+  | 'emit_event'
+  | 'on_submit_answer'
+  // ─── Hardware direct ────────────────────────────────────────────────────────
+  | 'hardware_flash'
+  | 'hardware_send_color'
+  // ─── Score étendu ───────────────────────────────────────────────────────────
+  | 'score_reset'
+  | 'score_set'
+  | 'score_get'
+  // ─── Variables couleur ──────────────────────────────────────────────────────
+  | 'var_color_set'
+  | 'var_color_get'
+  | 'array_create' | 'array_get' | 'array_set' | 'array_fill' | 'array_length'
+  | 'array_push' | 'array_pop' | 'array_shuffle' | 'array_contains' | 'array_index_of' | 'array_literal'
+  | 'for_range' | 'for_each_array' | 'break_loop'
+  | 'tile_set_var' | 'tile_get_var' | 'tiles_from_array'
+  | 'math_mod' | 'math_floor' | 'math_ceil' | 'math_round' | 'math_abs'
+  | 'math_min' | 'math_max' | 'math_pow' | 'math_sqrt'
+  | 'grid_create' | 'grid_get' | 'grid_set' | 'grid_clear' | 'grid_sync_tiles' | 'grid_check_4_in_row'
+  | 'string_concat' | 'string_from_num'
+  | 'define_sub' | 'call_sub';
 
 type EditorNode = {
   id: string;
@@ -183,6 +228,8 @@ type GameDoc = {
   nodes: EditorNode[];
   edges: GraphEdge[];
   uiComponents?: GameUIComponent[];
+  pythonCode?: string;
+  uiLayout?: UILayoutComponent[];
 };
 
 type GraphEdge = {
@@ -268,44 +315,44 @@ const NODE_CATALOG: NodeCatalogItem[] = [
   { kind: 'random_int', category: 'Aléatoire', title: 'Entier aléatoire', defaults: { min: 0, max: 41, varName: 'rand' } },
   { kind: 'game_tetris_block', category: 'Jeux', title: 'Tetris Blocs', defaults: { speed: 500, cols: 6, rows: 7 } },
   // ─── Blocs Tetris ───────────────────────────────────────────────────────────
-  { kind: 'tetris_on_line_clear', category: 'Tetris', title: '⬛ Ligne effacée', defaults: { lines: 1 } },
-  { kind: 'tetris_on_level_up', category: 'Tetris', title: '⬆ Niveau supérieur', defaults: { level: 2 } },
-  { kind: 'tetris_on_game_over', category: 'Tetris', title: '💀 Game Over', defaults: {} },
-  { kind: 'tetris_set_speed', category: 'Tetris', title: '⚡ Changer vitesse', defaults: { speedMs: 300 } },
+  { kind: 'tetris_on_line_clear', category: 'Tetris', title: 'Ligne effacée', defaults: { lines: 1 } },
+  { kind: 'tetris_on_level_up', category: 'Tetris', title: 'Niveau supérieur', defaults: { level: 2 } },
+  { kind: 'tetris_on_game_over', category: 'Tetris', title: 'Game Over', defaults: {} },
+  { kind: 'tetris_set_speed', category: 'Tetris', title: 'Changer vitesse', defaults: { speedMs: 300 } },
   // ─── Blocs Simon ────────────────────────────────────────────────────────────
-  { kind: 'simon_on_success', category: 'Simon', title: '✅ Séquence réussie', defaults: { step: 1 } },
-  { kind: 'simon_on_fail', category: 'Simon', title: '❌ Erreur séquence', defaults: {} },
-  { kind: 'simon_on_complete', category: 'Simon', title: '🏆 Simon terminé', defaults: {} },
-  { kind: 'simon_set_speed', category: 'Simon', title: '⚡ Changer vitesse', defaults: { speedMs: 600 } },
+  { kind: 'simon_on_success', category: 'Simon', title: 'Séquence réussie', defaults: { step: 1 } },
+  { kind: 'simon_on_fail', category: 'Simon', title: 'Erreur séquence', defaults: {} },
+  { kind: 'simon_on_complete', category: 'Simon', title: 'Simon terminé', defaults: {} },
+  { kind: 'simon_set_speed', category: 'Simon', title: 'Changer vitesse', defaults: { speedMs: 600 } },
   // ─── Blocs Memory ───────────────────────────────────────────────────────────
-  { kind: 'memory_on_match', category: 'Mémoire', title: '✅ Paire trouvée', defaults: { pairIndex: 0 } },
-  { kind: 'memory_on_fail', category: 'Mémoire', title: '❌ Mauvaise paire', defaults: {} },
-  { kind: 'memory_on_complete', category: 'Mémoire', title: '🏆 Memory terminé', defaults: {} },
+  { kind: 'memory_on_match', category: 'Mémoire', title: 'Paire trouvée', defaults: { pairIndex: 0 } },
+  { kind: 'memory_on_fail', category: 'Mémoire', title: 'Mauvaise paire', defaults: {} },
+  { kind: 'memory_on_complete', category: 'Mémoire', title: 'Memory terminé', defaults: {} },
   // ─── Blocs Spectre ──────────────────────────────────────────────────────────
-  { kind: 'spectrum_on_submit', category: 'Spectre', title: '📍 Réponse soumise', defaults: { seat: 0 } },
-  { kind: 'spectrum_on_round_end', category: 'Spectre', title: '🔁 Fin de manche', defaults: { round: 1 } },
-  { kind: 'spectrum_on_game_over', category: 'Spectre', title: '🏆 Partie terminée', defaults: {} },
+  { kind: 'spectrum_on_submit', category: 'Spectre', title: 'Réponse soumise', defaults: { seat: 0 } },
+  { kind: 'spectrum_on_round_end', category: 'Spectre', title: 'Fin de manche', defaults: { round: 1 } },
+  { kind: 'spectrum_on_game_over', category: 'Spectre', title: 'Partie terminée', defaults: {} },
   // ─── Blocs Color Speed ──────────────────────────────────────────────────────
-  { kind: 'cspeed_on_hit', category: 'Color Speed', title: '🎯 Dalle correcte', defaults: { tileIndex: 0 } },
-  { kind: 'cspeed_on_miss', category: 'Color Speed', title: '💥 Mauvaise dalle', defaults: {} },
-  { kind: 'cspeed_on_time_up', category: 'Color Speed', title: '⏱ Temps écoulé', defaults: {} },
+  { kind: 'cspeed_on_hit', category: 'Color Speed', title: 'Dalle correcte', defaults: { tileIndex: 0 } },
+  { kind: 'cspeed_on_miss', category: 'Color Speed', title: 'Mauvaise dalle', defaults: {} },
+  { kind: 'cspeed_on_time_up', category: 'Color Speed', title: 'Temps écoulé', defaults: {} },
   // ─── Blocs Puissance 4 ──────────────────────────────────────────────────────
-  { kind: 'p4_on_win', category: 'Puissance 4', title: '🏆 Victoire', defaults: { player: 1 } },
-  { kind: 'p4_on_draw', category: 'Puissance 4', title: '🤝 Match nul', defaults: {} },
-  { kind: 'p4_set_color', category: 'Puissance 4', title: '🎨 Couleur joueur', defaults: { player: 1, color: '#f59e0b' } },
+  { kind: 'p4_on_win', category: 'Puissance 4', title: 'Victoire', defaults: { player: 1 } },
+  { kind: 'p4_on_draw', category: 'Puissance 4', title: 'Match nul', defaults: {} },
+  { kind: 'p4_set_color', category: 'Puissance 4', title: 'Couleur joueur', defaults: { player: 1, color: '#f59e0b' } },
   // ─── Blocs Chasseur Gamut ───────────────────────────────────────────────────
-  { kind: 'gamut_on_hit', category: 'Chasseur Gamut', title: '✅ Identifié', defaults: { round: 1 } },
-  { kind: 'gamut_on_miss', category: 'Chasseur Gamut', title: '❌ Manqué', defaults: {} },
-  { kind: 'gamut_on_complete', category: 'Chasseur Gamut', title: '🏆 Jeu terminé', defaults: {} },
+  { kind: 'gamut_on_hit', category: 'Chasseur Gamut', title: 'Identifié', defaults: { round: 1 } },
+  { kind: 'gamut_on_miss', category: 'Chasseur Gamut', title: 'Manqué', defaults: {} },
+  { kind: 'gamut_on_complete', category: 'Chasseur Gamut', title: 'Jeu terminé', defaults: {} },
   // ─── Interface ──────────────────────────────────────────────────────────────
-  { kind: 'ui_button', category: 'Interface', title: '🔘 Bouton', defaults: { label: 'Cliquer', color: '#4361ee', id: 'btn1' } },
-  { kind: 'ui_label', category: 'Interface', title: '🏷 Étiquette', defaults: { text: 'Texte', size: 16, color: '#1a1d2e' } },
-  { kind: 'ui_counter', category: 'Interface', title: '🔢 Compteur', defaults: { label: 'Score', value: 0, id: 'counter1' } },
-  { kind: 'ui_timer_display', category: 'Interface', title: '⏱ Minuterie', defaults: { durationSec: 60, id: 'timer1' } },
-  { kind: 'ui_progress', category: 'Interface', title: '📊 Barre de progression', defaults: { label: 'Vie', id: 'progress1', value: 100, max: 100 } },
-  { kind: 'ui_show', category: 'Interface', title: '👁 Afficher élément', defaults: { targetId: 'btn1' } },
-  { kind: 'ui_hide', category: 'Interface', title: '🙈 Masquer élément', defaults: { targetId: 'btn1' } },
-  { kind: 'on_ui_click', category: 'Évènements', title: '🖱 Clic sur bouton UI', defaults: { buttonId: 'btn1' } },
+  { kind: 'ui_button', category: 'Interface', title: 'Bouton', defaults: { label: 'Cliquer', color: '#4361ee', id: 'btn1' } },
+  { kind: 'ui_label', category: 'Interface', title: 'Étiquette', defaults: { text: 'Texte', size: 16, color: '#1a1d2e' } },
+  { kind: 'ui_counter', category: 'Interface', title: 'Compteur', defaults: { label: 'Score', value: 0, id: 'counter1' } },
+  { kind: 'ui_timer_display', category: 'Interface', title: 'Minuterie', defaults: { durationSec: 60, id: 'timer1' } },
+  { kind: 'ui_progress', category: 'Interface', title: 'Barre de progression', defaults: { label: 'Vie', id: 'progress1', value: 100, max: 100 } },
+  { kind: 'ui_show', category: 'Interface', title: 'Afficher élément', defaults: { targetId: 'btn1' } },
+  { kind: 'ui_hide', category: 'Interface', title: 'Masquer élément', defaults: { targetId: 'btn1' } },
+  { kind: 'on_ui_click', category: 'Évènements', title: 'Clic sur bouton UI', defaults: { buttonId: 'btn1' } },
   { kind: 'cs150_connect', category: 'Colorimètre', title: 'CS150 Connect', defaults: {} },
   { kind: 'cs150_measure', category: 'Colorimètre', title: 'CS150 Mesurer', defaults: {} },
   { kind: 'cs150_read_xyz', category: 'Colorimètre', title: 'CS150 Lire XYZ', defaults: {} },
@@ -323,14 +370,79 @@ const NODE_CATALOG: NodeCatalogItem[] = [
     calibId: 'single_calib_001', targetChannel: 1
   }},
   // ─── Mesure colorimétrique dans les jeux ────────────────────────────────────
-  { kind: 'measure_start', category: 'Mesure Jeu', title: '📡 Lancer mesure', defaults: { deviceId: 'cs150', timeoutSec: 5 } },
-  { kind: 'measure_on_result', category: 'Mesure Jeu', title: '✅ Résultat reçu', defaults: { varX: 'meas_x', varY: 'meas_y', varLv: 'meas_lv' } },
-  { kind: 'measure_compare', category: 'Mesure Jeu', title: '🎯 Comparer couleur', defaults: { targetX: 0.3127, targetY: 0.3290, toleranceDeltaE: 5 } },
-  { kind: 'measure_show_cie', category: 'Mesure Jeu', title: '🌈 Afficher CIE 1931', defaults: { showTarget: true, showResult: true } },
-  { kind: 'measure_target_xy', category: 'Mesure Jeu', title: '🎯 Cible chromatique', defaults: { x: 0.3127, y: 0.3290, label: 'D65', toleranceDeltaE: 3 } },
+  { kind: 'measure_start', category: 'Mesure Jeu', title: 'Lancer mesure', defaults: { deviceId: 'cs150', timeoutSec: 5 } },
+  { kind: 'measure_on_result', category: 'Mesure Jeu', title: 'Résultat reçu', defaults: { varX: 'meas_x', varY: 'meas_y', varLv: 'meas_lv' } },
+  { kind: 'measure_compare', category: 'Mesure Jeu', title: 'Comparer couleur', defaults: { targetX: 0.3127, targetY: 0.3290, toleranceDeltaE: 5 } },
+  { kind: 'measure_show_cie', category: 'Mesure Jeu', title: 'Afficher CIE 1931', defaults: { showTarget: true, showResult: true } },
+  { kind: 'measure_target_xy', category: 'Mesure Jeu', title: 'Cible chromatique', defaults: { x: 0.3127, y: 0.3290, label: 'D65', toleranceDeltaE: 3 } },
+  // ─── Logique de jeu (moteur custom) ─────────────────────────────────────────
+  { kind: 'round_start',           category: 'Jeu',       title: 'Début de manche',          defaults: { totalRounds: 5, genTarget: false, resetScore: false } },
+  { kind: 'round_end',             category: 'Jeu',       title: 'Fin de manche',             defaults: {} },
+  { kind: 'next_round',            category: 'Jeu',       title: 'Manche suivante',            defaults: {} },
+  { kind: 'get_round',             category: 'Jeu',       title: 'N° de manche',               defaults: { varName: 'round' } },
+  // ─── Couleur / science ──────────────────────────────────────────────────────
+  { kind: 'gen_target_color',      category: 'Couleur',   title: 'Générer cible couleur',     defaults: { mode: 'random', varName: 'target', displayOnPlates: true, displaySeconds: 3 } },
+  { kind: 'color_distance',        category: 'Couleur',   title: 'Distance ΔE couleur',       defaults: { colorAVar: 'target', colorBVar: 'player', varName: 'deltaE', method: 'deltaE76' } },
+  { kind: 'color_match_score',     category: 'Couleur',   title: 'Score correspondance',      defaults: { deltaEVar: 'deltaE', maxDeltaE: 50, maxScore: 100, varName: 'matchScore' } },
+  { kind: 'show_target_on_plates', category: 'Couleur',   title: 'Afficher cible dalles',     defaults: { varName: 'target', plates: 'all', intensity: 0.85 } },
+  { kind: 'get_player_rgb',        category: 'Couleur',   title: 'Lire sliders joueur',       defaults: { varR: 'playerR', varG: 'playerG', varB: 'playerB', varColor: 'player' } },
+  // ─── Chronomètre async ──────────────────────────────────────────────────────
+  { kind: 'countdown_start',       category: 'Jeu',       title: 'Démarrer compte à rebours', defaults: { seconds: 30, varName: 'countdown' } },
+  { kind: 'countdown_stop',        category: 'Jeu',       title: 'Arrêter chronomètre',       defaults: { varName: 'countdown' } },
+  { kind: 'on_countdown_end',      category: 'Évènements', title: 'Chronomètre terminé',      defaults: { varName: 'countdown' } },
+  // ─── Flux async ─────────────────────────────────────────────────────────────
+  { kind: 'wait_event',            category: 'Flux',      title: 'Attendre événement',        defaults: { eventType: 'submit', timeoutMs: 30000 } },
+  { kind: 'emit_event',            category: 'Flux',      title: 'Émettre événement',         defaults: { eventType: 'submit' } },
+  { kind: 'on_submit_answer',      category: 'Évènements', title: 'Réponse soumise',          defaults: {} },
+  // ─── Hardware direct ────────────────────────────────────────────────────────
+  { kind: 'hardware_flash',        category: 'Hardware',  title: 'Flash dalles',             defaults: { color: '#ffffff', intensity: 1.0, durationMs: 200 } },
+  { kind: 'hardware_send_color',   category: 'Hardware',  title: 'Couleur directe dalles',   defaults: { varName: 'target', plates: 'all', intensity: 0.85 } },
+  // ─── Score étendu ───────────────────────────────────────────────────────────
+  { kind: 'score_reset',           category: 'Variables', title: 'Réinitialiser score',      defaults: {} },
+  { kind: 'score_set',             category: 'Variables', title: 'Définir score',             defaults: { value: 0 } },
+  { kind: 'score_get',             category: 'Variables', title: 'Lire score',                defaults: { varName: 'score' } },
+  // ─── Variables couleur ──────────────────────────────────────────────────────
+  { kind: 'var_color_set',         category: 'Variables', title: 'Set Variable Couleur',     defaults: { name: 'color1', value: '#ff2200' } },
+  { kind: 'var_color_get',         category: 'Variables', title: 'Get Variable Couleur',     defaults: { name: 'color1', varName: 'myColor' } },
+  { kind: 'array_create',    category: 'Tableaux', title: 'Créer tableau',         defaults: { name: 'arr', size: 42, initValue: 0 } },
+  { kind: 'array_get',       category: 'Tableaux', title: 'tableau[i] → var',     defaults: { arrayName: 'arr', indexVar: 'i', outVar: 'item' } },
+  { kind: 'array_set',       category: 'Tableaux', title: 'tableau[i] = var',      defaults: { arrayName: 'arr', indexVar: 'i', valueVar: 'val' } },
+  { kind: 'array_fill',      category: 'Tableaux', title: 'Remplir tableau',       defaults: { arrayName: 'arr', value: 0 } },
+  { kind: 'array_length',    category: 'Tableaux', title: 'Longueur tableau',      defaults: { arrayName: 'arr', outVar: 'len' } },
+  { kind: 'array_push',      category: 'Tableaux', title: 'Push tableau',          defaults: { arrayName: 'arr', valueVar: 'val' } },
+  { kind: 'array_pop',       category: 'Tableaux', title: 'Pop tableau',           defaults: { arrayName: 'arr', outVar: 'item' } },
+  { kind: 'array_shuffle',   category: 'Tableaux', title: 'Mélanger tableau',     defaults: { arrayName: 'arr' } },
+  { kind: 'array_contains',  category: 'Tableaux', title: 'Contient valeur?',      defaults: { arrayName: 'arr', valueVar: 'val', outVar: 'found' } },
+  { kind: 'array_index_of',  category: 'Tableaux', title: 'Index de valeur',       defaults: { arrayName: 'arr', valueVar: 'val', outVar: 'idx' } },
+  { kind: 'array_literal',   category: 'Tableaux', title: 'Tableau fixe (valeurs)', defaults: { name: 'arr', values: '0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0' } },
+  { kind: 'for_range',       category: 'Boucles',  title: 'Pour i = N à M',       defaults: { varName: 'i', start: 0, end: 41, step: 1, bodyNodeId: '' } },
+  { kind: 'for_each_array',  category: 'Boucles',  title: 'Pour chaque élément',  defaults: { arrayName: 'arr', varName: 'item', indexVar: 'idx', bodyNodeId: '' } },
+  { kind: 'break_loop',      category: 'Boucles',  title: 'Sortir boucle',        defaults: {} },
+  { kind: 'tile_set_var',    category: 'Dalles',   title: 'Dalle[var] = couleur',  defaults: { indexVar: 'i', colorVar: 'color', intensity: 0.85 } },
+  { kind: 'tile_get_var',    category: 'Dalles',   title: 'Lire dalle[var]',       defaults: { indexVar: 'i', outColorVar: 'tileColor' } },
+  { kind: 'tiles_from_array',category: 'Dalles',   title: 'Array → dalles',        defaults: { arrayName: 'arr', intensity: 0.85, bgColor: '#000000' } },
+  { kind: 'math_mod',   category: 'Maths', title: 'a % b (modulo)',  defaults: { aVar: 'a', bVar: 'b', outVar: 'result' } },
+  { kind: 'math_floor', category: 'Maths', title: '⌊floor⌋',         defaults: { varName: 'x', outVar: 'result' } },
+  { kind: 'math_ceil',  category: 'Maths', title: '⌈ceil⌉',          defaults: { varName: 'x', outVar: 'result' } },
+  { kind: 'math_round', category: 'Maths', title: 'round(x)',         defaults: { varName: 'x', outVar: 'result' } },
+  { kind: 'math_abs',   category: 'Maths', title: '|x| absolu',       defaults: { varName: 'x', outVar: 'result' } },
+  { kind: 'math_min',   category: 'Maths', title: 'min(a,b)',          defaults: { aVar: 'a', bVar: 'b', outVar: 'result' } },
+  { kind: 'math_max',   category: 'Maths', title: 'max(a,b)',          defaults: { aVar: 'a', bVar: 'b', outVar: 'result' } },
+  { kind: 'math_pow',   category: 'Maths', title: 'a ^ b puissance',   defaults: { aVar: 'a', bVar: 'b', outVar: 'result' } },
+  { kind: 'math_sqrt',  category: 'Maths', title: '√x racine',         defaults: { varName: 'x', outVar: 'result' } },
+  { kind: 'grid_create',        category: 'Grille', title: 'Créer grille 2D',        defaults: { name: 'grid', cols: 6, rows: 7, initValue: null } },
+  { kind: 'grid_get',           category: 'Grille', title: 'grille[col,row] → var', defaults: { name: 'grid', colVar: 'col', rowVar: 'row', outVar: 'cell' } },
+  { kind: 'grid_set',           category: 'Grille', title: 'grille[col,row] = var', defaults: { name: 'grid', colVar: 'col', rowVar: 'row', valueVar: 'val' } },
+  { kind: 'grid_clear',         category: 'Grille', title: 'Effacer grille',         defaults: { name: 'grid', initValue: null } },
+  { kind: 'grid_sync_tiles',    category: 'Grille', title: 'Grille → dalles LED',    defaults: { name: 'grid', bgColor: '#000000', bgIntensity: 0 } },
+  { kind: 'grid_check_4_in_row',category: 'Grille', title: 'Vérifier 4-en-ligne',   defaults: { name: 'grid', valueVar: 'lastColor', outVar: 'hasWon' } },
+  { kind: 'string_concat',   category: 'Variables', title: 'Concat a + b',           defaults: { aVar: 'a', bVar: 'b', outVar: 'result' } },
+  { kind: 'string_from_num', category: 'Variables', title: 'Nombre -> Texte',    defaults: { varName: 'x', outVar: 'text', decimals: 0 } },
+  { kind: 'define_sub', category: 'Flux', title: 'Définir sous-programme',          defaults: { name: 'mySub' } },
+  { kind: 'call_sub',   category: 'Flux', title: 'Appeler sous-programme',           defaults: { name: 'mySub' } },
 ];
 
-/** Kinds that are native built-in games — shown in catalog but NOT addable to canvas */
+/** Kinds that are native built-in games - shown in catalog but NOT addable to canvas */
 const NATIVE_GAME_KINDS: Set<EditorNodeKind> = new Set([
   'game_tetris', 'game_simon', 'game_memory', 'game_spectrum',
   'game_color_speed', 'game_maitre_blanc', 'game_puissance4', 'game_chasseur_gamut',
@@ -516,6 +628,51 @@ function getNum(params: Record<string, unknown>, key: string, fallback: number):
 function getColor(params: Record<string, unknown>, key: string, fallback: string): string {
   const raw = params[key];
   return isHexColor(raw) ? raw : fallback;
+}
+
+// ── Color science helpers ─────────────────────────────────────────────────────
+
+function rgbToLab(hex: string): [number, number, number] {
+  const { r, g, b } = hexToRgb(hex);
+  let R = r / 255, G = g / 255, B = b / 255;
+  R = R > 0.04045 ? Math.pow((R + 0.055) / 1.055, 2.4) : R / 12.92;
+  G = G > 0.04045 ? Math.pow((G + 0.055) / 1.055, 2.4) : G / 12.92;
+  B = B > 0.04045 ? Math.pow((B + 0.055) / 1.055, 2.4) : B / 12.92;
+  const X = R * 0.4124 + G * 0.3576 + B * 0.1805;
+  const Y = R * 0.2126 + G * 0.7152 + B * 0.0722;
+  const Z = R * 0.0193 + G * 0.1192 + B * 0.9505;
+  const f = (t: number) => t > 0.008856 ? Math.cbrt(t) : 7.787 * t + 16 / 116;
+  const L = 116 * f(Y) - 16;
+  const a = 500 * (f(X / 0.9505) - f(Y));
+  const bL = 200 * (f(Y) - f(Z / 1.089));
+  return [L, a, bL];
+}
+
+function colorDistanceDeltaE(hexA: string, hexB: string): number {
+  const [L1, a1, b1] = rgbToLab(hexA);
+  const [L2, a2, b2] = rgbToLab(hexB);
+  return Math.sqrt((L1 - L2) ** 2 + (a1 - a2) ** 2 + (b1 - b2) ** 2);
+}
+
+function blackbodyToHex(kelvin: number): string {
+  const temp = Math.max(1000, Math.min(40000, kelvin)) / 100;
+  let r: number, g: number, b: number;
+  r = temp <= 66 ? 255 : Math.max(0, Math.min(255, 329.698727446 * Math.pow(temp - 60, -0.1332047592)));
+  if (temp <= 66) {
+    g = Math.max(0, Math.min(255, 99.4708025861 * Math.log(temp) - 161.1195681661));
+  } else {
+    g = Math.max(0, Math.min(255, 288.1221695283 * Math.pow(temp - 60, -0.0755148492)));
+  }
+  b = temp >= 66 ? 255 : temp <= 19 ? 0 : Math.max(0, Math.min(255, 138.5177312231 * Math.log(temp - 10) - 305.0447927307));
+  return rgbToHex(r, g, b);
+}
+
+function hslToRgb(h: number, s: number, l: number): { r: number; g: number; b: number } {
+  s /= 100; l /= 100;
+  const k = (n: number) => (n + h / 30) % 12;
+  const a = s * Math.min(l, 1 - l);
+  const f = (n: number) => l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
+  return { r: Math.round(f(0) * 255), g: Math.round(f(8) * 255), b: Math.round(f(4) * 255) };
 }
 
 function applyRenderNode(tiles: TileState[], node: EditorNode, tSeconds: number) {
@@ -794,7 +951,7 @@ function rgbToChannels32(rgb: { r: number; g: number; b: number }, masterIntensi
   return channels;
 }
 
-// Hardware batch: module-level ref holder — actual refs are inside the component
+// Hardware batch: module-level ref holder - actual refs are inside the component
 // sendRgbToHardware is defined inside EditeurPage and exposed via a module-level ref
 type HwPlateUpdate = { plateId: number; channels: { index: number; value: number }[] };
 let _scheduleSetCanal: (plaqueId: number, canalIndex: number, intensity: number) => void = () => {};
@@ -827,6 +984,7 @@ export default function EditeurPage() {
   const [viewMode, setViewMode] = useState<ViewMode>('split');
   const [showGameOverlay, setShowGameOverlay] = useState(false);
   const [isPlaying, setIsPlaying] = useState<boolean>(true);
+  const [editorTab, setEditorTab] = useState<'canvas' | 'python' | 'ui'>('canvas');
   const [visualComponents, setVisualComponents] = useState<VisualComponent[]>([]);
   const [selectedVisualComponent, setSelectedVisualComponent] = useState<string | null>(null);
   const [showGrid, setShowGrid] = useState<boolean>(true);
@@ -1096,7 +1254,7 @@ export default function EditeurPage() {
     const start = performance.now();
     const id = window.setInterval(() => {
       setT((performance.now() - start) / 1000);
-    }, 100); // 10 fps — suffisant pour l'aperçu des tuiles, évite le flood de re-renders
+    }, 100); // 10 fps - suffisant pour l'aperçu des tuiles, évite le flood de re-renders
     return () => window.clearInterval(id);
   }, []);
 
@@ -1180,17 +1338,75 @@ export default function EditeurPage() {
   };
 
   const runtimeTilesRef = useRef<TileState[]>(Array.from({ length: 42 }, () => ({ color: '#000000', intensity: 0 })));
-  const runtimeVariablesRef = useRef<Record<string, number>>({});
+  const runtimeVariablesRef = useRef<Record<string, number | string>>({});
   const runtimeScoreRef = useRef<number>(0);
   const runtimeTickTimersRef = useRef<ReturnType<typeof setInterval>[]>([]);
   const tetrisStateRef = useRef<TetrisState | null>(null);
   const fireRuntimeClickRef = useRef<((idx: number) => void) | null>(null);
   const [runtimeTiles, setRuntimeTiles] = useState<TileState[]>(Array.from({ length: 42 }, () => ({ color: '#000000', intensity: 0 })));
   const [runtimeScore, setRuntimeScore] = useState(0);
+  const runtimeAbortRef = useRef<AbortController | null>(null);
+  const runtimeEventBusRef = useRef<Map<string, Array<(data: unknown) => void>>>(new Map());
+  const runtimeRoundRef = useRef<{ current: number; total: number }>({ current: 0, total: 5 });
+  const runtimeColorVarsRef = useRef<Record<string, string>>({});
+  const runtimeArraysRef = useRef<Record<string, Array<number | string | null>>>({});
+  const runtimeSubsRef   = useRef<Record<string, string>>({});
+  const runtimeCountdownsRef = useRef<Map<string, ReturnType<typeof setInterval>>>(new Map());
+  const runtimePlayerRgbRef = useRef<{ r: number; g: number; b: number }>({ r: 128, g: 128, b: 128 });
+  const runtimeLastKeyRef   = useRef<string>('');
+  const [runtimeRound, setRuntimeRound] = useState({ current: 0, total: 5 });
+  const [runtimeCountdownValue, setRuntimeCountdownValue] = useState(0);
+
+  // Keyboard listener for Python games
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const map: Record<string, string> = {
+        ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down',
+        ' ': 'space', q: 'left', d: 'right', z: 'up', s: 'down',
+        Q: 'left', D: 'right', Z: 'up', S: 'down',
+      };
+      if (map[e.key]) { e.preventDefault(); runtimeLastKeyRef.current = map[e.key]; }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
+
+  const pyBridge = useMemo(() => ({
+    sendColor: (plateId: number, r: number, g: number, b: number, intensity: number) => {
+      sendRgbToHardware({ r, g, b }, Math.round(intensity * 100), [plateId]);
+    },
+    // setTile: 0-based index, updates visual tile + hardware without re-render
+    setTile: (idx: number, r: number, g: number, b: number, intensity: number) => {
+      const hex = rgbToHex(r, g, b);
+      if (idx >= 0 && idx < runtimeTilesRef.current.length) {
+        runtimeTilesRef.current[idx] = { color: hex, intensity: Math.max(0, Math.min(1, intensity)) };
+      }
+      const plateId = PLATE_ID_BY_INDEX[idx];
+      if (plateId) sendRgbToHardware({ r, g, b }, Math.round(intensity * 100), [plateId]);
+    },
+    // flush: commit all setTile calls to React state (one re-render)
+    flush: () => { setRuntimeTiles([...runtimeTilesRef.current]); },
+    // getKey: read-and-clear the last pressed key
+    getKey: (): string => { const k = runtimeLastKeyRef.current; runtimeLastKeyRef.current = ''; return k; },
+    setVariable: (name: string, value: number | string) => { runtimeVariablesRef.current[name] = value; },
+    getVariable: (name: string): number | string => runtimeVariablesRef.current[name] ?? 0,
+    addScore: (points: number) => { runtimeScoreRef.current += points; setRuntimeScore(runtimeScoreRef.current); },
+    getScore: (): number => runtimeScoreRef.current,
+    emitEvent: (type: string) => {
+      const ls = runtimeEventBusRef.current.get(type) ?? [];
+      ls.forEach((fn: (d: unknown) => void) => fn({}));
+      runtimeEventBusRef.current.delete(type);
+    },
+  }), []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const hasRuntimeEvents = useMemo(() => {
     if (!activeGame) return false;
-    return activeGame.nodes.some(n => ['on_tick', 'on_tile_click'].includes(n.kind));
+    return activeGame.nodes.some(n => [
+      'on_tick', 'on_tile_click', 'on_submit_answer', 'on_countdown_end',
+      'event_begin', 'round_start', 'gen_target_color', 'countdown_start',
+      'wait_event', 'hardware_flash', 'hardware_send_color', 'show_target_on_plates',
+      'for_range', 'for_each_array', 'array_create', 'grid_create', 'tiles_from_array', 'grid_sync_tiles',
+    ].includes(n.kind));
   }, [activeGame]);
 
   // Send runtime tiles to hardware
@@ -1222,8 +1438,67 @@ export default function EditeurPage() {
     setRuntimeScore(0);
 
     const game = activeGame;
+    const abort = new AbortController();
+    runtimeAbortRef.current = abort;
+    const signal = abort.signal;
 
-    function executeNode(nodeId: string, depth = 0): void {
+    // Reset all runtime state
+    runtimeRoundRef.current = { current: 0, total: 5 };
+    runtimeColorVarsRef.current = {};
+    runtimeArraysRef.current = {};
+    runtimeSubsRef.current = {};
+    runtimeCountdownsRef.current.forEach(t => clearInterval(t));
+    runtimeCountdownsRef.current.clear();
+    runtimeEventBusRef.current.clear();
+    setRuntimeRound({ current: 0, total: 5 });
+    setRuntimeCountdownValue(0);
+
+    // ── Event bus helpers ────────────────────────────────────────────────────
+    function emitEvent(eventType: string, data: unknown = {}) {
+      const listeners = runtimeEventBusRef.current.get(eventType) ?? [];
+      runtimeEventBusRef.current.delete(eventType);
+      listeners.forEach(fn => fn(data));
+    }
+
+    function waitForEvent(eventType: string, timeoutMs = 30000): Promise<unknown> {
+      return new Promise((resolve, reject) => {
+        if (signal.aborted) { reject(new DOMException('Aborted', 'AbortError')); return; }
+        const listeners = runtimeEventBusRef.current.get(eventType) ?? [];
+        listeners.push(resolve);
+        runtimeEventBusRef.current.set(eventType, listeners);
+        const timer = setTimeout(() => {
+          const ls = runtimeEventBusRef.current.get(eventType) ?? [];
+          runtimeEventBusRef.current.set(eventType, ls.filter(l => l !== resolve));
+          resolve(null); // timeout = null data
+        }, timeoutMs);
+        signal.addEventListener('abort', () => {
+          clearTimeout(timer);
+          const ls = runtimeEventBusRef.current.get(eventType) ?? [];
+          runtimeEventBusRef.current.set(eventType, ls.filter(l => l !== resolve));
+          reject(new DOMException('Aborted', 'AbortError'));
+        });
+      });
+    }
+
+    function sleep(ms: number): Promise<void> {
+      return new Promise((resolve, reject) => {
+        if (signal.aborted) { reject(new DOMException('Aborted', 'AbortError')); return; }
+        const t = setTimeout(resolve, ms);
+        signal.addEventListener('abort', () => { clearTimeout(t); reject(new DOMException('Aborted', 'AbortError')); });
+      });
+    }
+
+    // ── Send helpers ─────────────────────────────────────────────────────────
+    const allPlateIds = PLATE_ID_BY_INDEX.filter(Boolean) as number[];
+
+    function sendColorToHardware(hexColor: string, intensity: number, plateIds: number[]) {
+      const rgb = hexToRgb255(hexColor);
+      const i100 = Math.round(clamp01(intensity) * 100);
+      sendRgbToHardware(rgb, i100, plateIds);
+    }
+
+    // ── Sync executeNode (handles fill/tile/variables/score/etc.) ────────────
+    function executeNodeSync(nodeId: string, depth = 0): void {
       if (depth > 50) return;
       const node = game.nodes.find(n => n.id === nodeId);
       if (!node || !node.enabled) return;
@@ -1252,15 +1527,82 @@ export default function EditeurPage() {
         }
         case 'variable_set': {
           const name = String(node.params.name ?? 'x');
-          let val = getNum(node.params, 'value', 0);
+          let val: number | string = getNum(node.params, 'value', 0);
           const op = String(node.params.op ?? 'set');
-          if (op === 'add') val = (vars[name] ?? 0) + val;
-          else if (op === 'sub') val = (vars[name] ?? 0) - val;
+          const prev = typeof vars[name] === 'number' ? (vars[name] as number) : 0;
+          if (op === 'add') val = prev + (val as number);
+          else if (op === 'sub') val = prev - (val as number);
           vars[name] = val;
+          break;
+        }
+        case 'var_color_set': {
+          const name = String(node.params.name ?? 'color1');
+          const value = getColor(node.params, 'value', '#ff2200');
+          runtimeColorVarsRef.current[name] = value;
+          break;
+        }
+        case 'var_color_get': {
+          const name = String(node.params.name ?? 'color1');
+          const varName = String(node.params.varName ?? 'myColor');
+          const color = runtimeColorVarsRef.current[name] ?? '#ffffff';
+          runtimeColorVarsRef.current[varName] = color;
           break;
         }
         case 'add_score': {
           runtimeScoreRef.current += getNum(node.params, 'amount', 1);
+          setRuntimeScore(runtimeScoreRef.current);
+          break;
+        }
+        case 'score_reset': {
+          runtimeScoreRef.current = 0;
+          setRuntimeScore(0);
+          break;
+        }
+        case 'score_set': {
+          runtimeScoreRef.current = getNum(node.params, 'value', 0);
+          setRuntimeScore(runtimeScoreRef.current);
+          break;
+        }
+        case 'score_get': {
+          const varName = String(node.params.varName ?? 'score');
+          vars[varName] = runtimeScoreRef.current;
+          break;
+        }
+        case 'get_round': {
+          const varName = String(node.params.varName ?? 'round');
+          vars[varName] = runtimeRoundRef.current.current;
+          break;
+        }
+        case 'get_player_rgb': {
+          const { r, g, b } = runtimePlayerRgbRef.current;
+          const varR = String(node.params.varR ?? 'playerR');
+          const varG = String(node.params.varG ?? 'playerG');
+          const varB = String(node.params.varB ?? 'playerB');
+          const varColor = String(node.params.varColor ?? 'player');
+          vars[varR] = r;
+          vars[varG] = g;
+          vars[varB] = b;
+          runtimeColorVarsRef.current[varColor] = rgbToHex(r, g, b);
+          break;
+        }
+        case 'color_distance': {
+          const aName = String(node.params.colorAVar ?? 'target');
+          const bName = String(node.params.colorBVar ?? 'player');
+          const varName = String(node.params.varName ?? 'deltaE');
+          const colorA = runtimeColorVarsRef.current[aName] ?? '#ffffff';
+          const colorB = runtimeColorVarsRef.current[bName] ?? '#000000';
+          vars[varName] = colorDistanceDeltaE(colorA, colorB);
+          break;
+        }
+        case 'color_match_score': {
+          const deltaEVar = String(node.params.deltaEVar ?? 'deltaE');
+          const maxDE = Math.max(1, getNum(node.params, 'maxDeltaE', 50));
+          const maxScore = getNum(node.params, 'maxScore', 100);
+          const varName = String(node.params.varName ?? 'matchScore');
+          const de = typeof vars[deltaEVar] === 'number' ? (vars[deltaEVar] as number) : 0;
+          const score = Math.max(0, Math.round(maxScore * (1 - Math.min(de, maxDE) / maxDE)));
+          vars[varName] = score;
+          runtimeScoreRef.current += score;
           setRuntimeScore(runtimeScoreRef.current);
           break;
         }
@@ -1275,7 +1617,8 @@ export default function EditeurPage() {
           const condVar = String(node.params.varName ?? '');
           const condOp = String(node.params.op ?? 'gt');
           const condVal = getNum(node.params, 'value', 0);
-          const varVal = vars[condVar] ?? 0;
+          const rawVal = vars[condVar];
+          const varVal = typeof rawVal === 'number' ? rawVal : 0;
           let condResult = false;
           if (condOp === 'gt') condResult = varVal > condVal;
           else if (condOp === 'lt') condResult = varVal < condVal;
@@ -1285,8 +1628,8 @@ export default function EditeurPage() {
           else if (condOp === 'neq') condResult = varVal !== condVal;
           const trueTarget = String(node.params.trueTarget ?? '');
           const falseTarget = String(node.params.falseTarget ?? '');
-          if (condResult && trueTarget) executeNode(trueTarget, depth + 1);
-          else if (!condResult && falseTarget) executeNode(falseTarget, depth + 1);
+          if (condResult && trueTarget) executeNodeSync(trueTarget, depth + 1);
+          else if (!condResult && falseTarget) executeNodeSync(falseTarget, depth + 1);
           setRuntimeTiles([...runtimeTilesRef.current]);
           return;
         }
@@ -1311,62 +1654,45 @@ export default function EditeurPage() {
           }
           const ts = tetrisStateRef.current;
           if (ts.gameOver) break;
-
           const spawnPiece = () => {
             const p = PIECES[Math.floor(Math.random() * PIECES.length)];
             ts.piece = { shape: p.shape, x: Math.floor((COLS - p.shape[0].length) / 2), y: 0, color: p.color };
           };
-
           const hasCollision = (piece: NonNullable<typeof ts.piece>, dx: number, dy: number) => {
             for (let r = 0; r < piece.shape.length; r++) {
               for (let c = 0; c < piece.shape[r].length; c++) {
                 if (!piece.shape[r][c]) continue;
-                const nr = piece.y + r + dy;
-                const nc = piece.x + c + dx;
+                const nr = piece.y + r + dy; const nc = piece.x + c + dx;
                 if (nr >= ROWS || nc < 0 || nc >= COLS) return true;
                 if (nr >= 0 && ts.grid[nr][nc]) return true;
               }
             }
             return false;
           };
-
           if (!ts.piece) spawnPiece();
           if (!ts.piece) break;
-
           if (hasCollision(ts.piece, 0, 1)) {
             for (let r = 0; r < ts.piece.shape.length; r++) {
               for (let c = 0; c < ts.piece.shape[r].length; c++) {
                 if (!ts.piece.shape[r][c]) continue;
-                const gr = ts.piece.y + r;
-                const gc = ts.piece.x + c;
+                const gr = ts.piece.y + r; const gc = ts.piece.x + c;
                 if (gr < 0) { ts.gameOver = true; break; }
                 if (gr < ROWS && gc < COLS) ts.grid[gr][gc] = ts.piece.color;
               }
             }
             ts.piece = null;
             let linesCleared = 0;
-            ts.grid = ts.grid.filter(row => {
-              const full = row.every(cell => cell !== null);
-              if (full) linesCleared++;
-              return !full;
-            });
+            ts.grid = ts.grid.filter(row => { const full = row.every(cell => cell !== null); if (full) linesCleared++; return !full; });
             while (ts.grid.length < ROWS) ts.grid.unshift(Array(COLS).fill(null));
-            if (linesCleared > 0) {
-              runtimeScoreRef.current += linesCleared * 100;
-              setRuntimeScore(runtimeScoreRef.current);
-            }
+            if (linesCleared > 0) { runtimeScoreRef.current += linesCleared * 100; setRuntimeScore(runtimeScoreRef.current); }
             if (!ts.gameOver) spawnPiece();
-          } else {
-            ts.piece.y++;
-          }
-
+          } else { ts.piece.y++; }
           const merged = ts.grid.map(row => [...row]);
           if (ts.piece) {
             for (let r = 0; r < ts.piece.shape.length; r++) {
               for (let c = 0; c < ts.piece.shape[r].length; c++) {
                 if (!ts.piece.shape[r][c]) continue;
-                const gr = ts.piece.y + r;
-                const gc = ts.piece.x + c;
+                const gr = ts.piece.y + r; const gc = ts.piece.x + c;
                 if (gr >= 0 && gr < ROWS && gc < COLS) merged[gr][gc] = ts.piece.color;
               }
             }
@@ -1379,50 +1705,422 @@ export default function EditeurPage() {
               tiles[tileIdx] = cell ? { color: cell, intensity: 0.9 } : { color: '#050510', intensity: 0.05 };
             }
           }
-          if (ts.gameOver) {
-            for (let i = 0; i < tiles.length; i++) tiles[i] = { color: '#ff0000', intensity: 0.8 };
+          if (ts.gameOver) { for (let i = 0; i < tiles.length; i++) tiles[i] = { color: '#ff0000', intensity: 0.8 }; }
+          break;
+        }
+        case 'array_create': {
+          const an = String(node.params.name ?? 'arr');
+          const as_ = Math.max(0, Math.round(getNum(node.params, 'size', 42)));
+          const av = node.params.initValue !== undefined ? (node.params.initValue as number | string | null) : null;
+          runtimeArraysRef.current[an] = Array.from({ length: as_ }, () => av);
+          break;
+        }
+        case 'array_get': {
+          const ag_arr = runtimeArraysRef.current[String(node.params.arrayName ?? 'arr')] ?? [];
+          const ag_idx = Math.round(Number(runtimeVariablesRef.current[String(node.params.indexVar ?? 'i')] ?? 0));
+          const ag_out = String(node.params.outVar ?? 'item');
+          runtimeVariablesRef.current[ag_out] = (ag_idx >= 0 && ag_idx < ag_arr.length && ag_arr[ag_idx] !== null) ? (ag_arr[ag_idx] as number | string) : 0;
+          break;
+        }
+        case 'array_set': {
+          const as2_arr = runtimeArraysRef.current[String(node.params.arrayName ?? 'arr')];
+          if (!as2_arr) break;
+          const as2_idx = Math.round(Number(runtimeVariablesRef.current[String(node.params.indexVar ?? 'i')] ?? 0));
+          const as2_val = runtimeVariablesRef.current[String(node.params.valueVar ?? 'val')] ?? getNum(node.params, 'value', 0);
+          if (as2_idx >= 0 && as2_idx < as2_arr.length) as2_arr[as2_idx] = as2_val;
+          break;
+        }
+        case 'array_fill': {
+          const af_arr = runtimeArraysRef.current[String(node.params.arrayName ?? 'arr')];
+          if (!af_arr) break;
+          const af_vv = String(node.params.valueVar ?? '');
+          const af_val = (af_vv && runtimeVariablesRef.current[af_vv] !== undefined) ? runtimeVariablesRef.current[af_vv] : (node.params.value ?? 0);
+          af_arr.fill(af_val as number | string | null);
+          break;
+        }
+        case 'array_length': {
+          const al_arr = runtimeArraysRef.current[String(node.params.arrayName ?? 'arr')] ?? [];
+          runtimeVariablesRef.current[String(node.params.outVar ?? 'len')] = al_arr.length;
+          break;
+        }
+        case 'array_push': {
+          const ap_arr = runtimeArraysRef.current[String(node.params.arrayName ?? 'arr')];
+          if (!ap_arr) break;
+          const ap_val = runtimeVariablesRef.current[String(node.params.valueVar ?? 'val')] ?? 0;
+          ap_arr.push(ap_val);
+          break;
+        }
+        case 'array_pop': {
+          const apo_arr = runtimeArraysRef.current[String(node.params.arrayName ?? 'arr')];
+          if (!apo_arr) break;
+          const apo_v = apo_arr.pop();
+          runtimeVariablesRef.current[String(node.params.outVar ?? 'item')] = apo_v !== undefined && apo_v !== null ? (apo_v as number | string) : 0;
+          break;
+        }
+        case 'array_shuffle': {
+          const ash_arr = runtimeArraysRef.current[String(node.params.arrayName ?? 'arr')];
+          if (!ash_arr) break;
+          for (let k = ash_arr.length - 1; k > 0; k--) { const j = Math.floor(Math.random() * (k + 1)); [ash_arr[k], ash_arr[j]] = [ash_arr[j], ash_arr[k]]; }
+          break;
+        }
+        case 'array_contains': {
+          const ac_arr = runtimeArraysRef.current[String(node.params.arrayName ?? 'arr')] ?? [];
+          const ac_needle = runtimeVariablesRef.current[String(node.params.valueVar ?? 'val')] ?? 0;
+          runtimeVariablesRef.current[String(node.params.outVar ?? 'found')] = ac_arr.includes(ac_needle as any) ? 1 : 0;
+          break;
+        }
+        case 'array_index_of': {
+          const aio_arr = runtimeArraysRef.current[String(node.params.arrayName ?? 'arr')] ?? [];
+          const aio_needle = runtimeVariablesRef.current[String(node.params.valueVar ?? 'val')] ?? 0;
+          runtimeVariablesRef.current[String(node.params.outVar ?? 'idx')] = aio_arr.indexOf(aio_needle as any);
+          break;
+        }
+        case 'array_literal': {
+          const alName = String(node.params.name ?? 'arr');
+          const alRaw  = String(node.params.values ?? '');
+          runtimeArraysRef.current[alName] = alRaw.split(',').map(v => {
+            const t = v.trim();
+            if (t === 'null' || t === '') return null;
+            const n = Number(t);
+            return Number.isFinite(n) ? n : t;
+          });
+          break;
+        }
+        case 'tile_set_var': {
+          const tsv_idx = Math.round(Number(runtimeVariablesRef.current[String(node.params.indexVar ?? 'i')] ?? 0));
+          if (tsv_idx >= 0 && tsv_idx < tiles.length) {
+            const tsv_c = runtimeColorVarsRef.current[String(node.params.colorVar ?? 'color')] ?? getColor(node.params, 'defaultColor', '#ffffff');
+            tiles[tsv_idx] = { color: tsv_c, intensity: clamp01(getNum(node.params, 'intensity', 0.85)) };
           }
           break;
         }
-        default:
+        case 'tile_get_var': {
+          const tgv_idx = Math.round(Number(runtimeVariablesRef.current[String(node.params.indexVar ?? 'i')] ?? 0));
+          if (tgv_idx >= 0 && tgv_idx < tiles.length) runtimeColorVarsRef.current[String(node.params.outColorVar ?? 'tileColor')] = tiles[tgv_idx].color;
           break;
+        }
+        case 'tiles_from_array': {
+          const tfa_arr = runtimeArraysRef.current[String(node.params.arrayName ?? 'arr')] ?? [];
+          const tfa_bg = getColor(node.params, 'bgColor', '#000000');
+          const tfa_bi = clamp01(getNum(node.params, 'bgIntensity', 0));
+          const tfa_i  = clamp01(getNum(node.params, 'intensity', 0.85));
+          for (let k = 0; k < Math.min(tfa_arr.length, tiles.length); k++) {
+            const v = tfa_arr[k];
+            tiles[k] = (v === null || v === 0 || v === '') ? { color: tfa_bg, intensity: tfa_bi } : typeof v === 'string' && v.startsWith('#') ? { color: v, intensity: tfa_i } : { color: '#ffffff', intensity: tfa_i };
+          }
+          setRuntimeTiles([...tiles]);
+          break;
+        }
+        case 'math_mod':   { const vm = runtimeVariablesRef.current; const _b = Number(vm[String(node.params.bVar??'b')]??1)||1; vm[String(node.params.outVar??'result')] = Number(vm[String(node.params.aVar??'a')]??0) % _b; break; }
+        case 'math_floor': { const vm2 = runtimeVariablesRef.current; vm2[String(node.params.outVar??'result')] = Math.floor(Number(vm2[String(node.params.varName??'x')]??0)); break; }
+        case 'math_ceil':  { const vm3 = runtimeVariablesRef.current; vm3[String(node.params.outVar??'result')] = Math.ceil(Number(vm3[String(node.params.varName??'x')]??0)); break; }
+        case 'math_round': { const vm4 = runtimeVariablesRef.current; vm4[String(node.params.outVar??'result')] = Math.round(Number(vm4[String(node.params.varName??'x')]??0)); break; }
+        case 'math_abs':   { const vm5 = runtimeVariablesRef.current; vm5[String(node.params.outVar??'result')] = Math.abs(Number(vm5[String(node.params.varName??'x')]??0)); break; }
+        case 'math_min':   { const vm6 = runtimeVariablesRef.current; vm6[String(node.params.outVar??'result')] = Math.min(Number(vm6[String(node.params.aVar??'a')]??0), Number(vm6[String(node.params.bVar??'b')]??0)); break; }
+        case 'math_max':   { const vm7 = runtimeVariablesRef.current; vm7[String(node.params.outVar??'result')] = Math.max(Number(vm7[String(node.params.aVar??'a')]??0), Number(vm7[String(node.params.bVar??'b')]??0)); break; }
+        case 'math_pow':   { const vm8 = runtimeVariablesRef.current; vm8[String(node.params.outVar??'result')] = Math.pow(Number(vm8[String(node.params.aVar??'a')]??0), Number(vm8[String(node.params.bVar??'b')]??1)); break; }
+        case 'math_sqrt':  { const vm9 = runtimeVariablesRef.current; vm9[String(node.params.outVar??'result')] = Math.sqrt(Math.max(0,Number(vm9[String(node.params.varName??'x')]??0))); break; }
+        case 'string_concat':   { const vsc = runtimeVariablesRef.current; vsc[String(node.params.outVar??'result')] = String(vsc[String(node.params.aVar??'a')]??'') + String(vsc[String(node.params.bVar??'b')]??''); break; }
+        case 'string_from_num': { const vsn = runtimeVariablesRef.current; const dec = Math.max(0,Math.round(getNum(node.params,'decimals',0))); vsn[String(node.params.outVar??'text')] = Number(vsn[String(node.params.varName??'x')]??0).toFixed(dec); break; }
+        case 'grid_create': {
+          const gcn = String(node.params.name??'grid'); const gcc = Math.max(1,Math.round(getNum(node.params,'cols',6))); const gcr = Math.max(1,Math.round(getNum(node.params,'rows',7)));
+          const gcv = node.params.initValue !== undefined ? (node.params.initValue as number|string|null) : null;
+          runtimeArraysRef.current[gcn] = Array.from({length:gcc*gcr},()=>gcv);
+          runtimeVariablesRef.current[gcn+'_cols'] = gcc; runtimeVariablesRef.current[gcn+'_rows'] = gcr;
+          break;
+        }
+        case 'grid_get': {
+          const ggn = String(node.params.name??'grid'); const ggcols = Number(runtimeVariablesRef.current[ggn+'_cols']??6);
+          const ggc = Math.round(Number(runtimeVariablesRef.current[String(node.params.colVar??'col')]??0));
+          const ggr = Math.round(Number(runtimeVariablesRef.current[String(node.params.rowVar??'row')]??0));
+          const ggarr = runtimeArraysRef.current[ggn]??[]; const ggv = ggarr[ggr*ggcols+ggc];
+          runtimeVariablesRef.current[String(node.params.outVar??'cell')] = ggv !== null && ggv !== undefined ? (ggv as number|string) : 0;
+          break;
+        }
+        case 'grid_set': {
+          const gsn = String(node.params.name??'grid'); const gscols = Number(runtimeVariablesRef.current[gsn+'_cols']??6);
+          const gsc = Math.round(Number(runtimeVariablesRef.current[String(node.params.colVar??'col')]??0));
+          const gsr = Math.round(Number(runtimeVariablesRef.current[String(node.params.rowVar??'row')]??0));
+          const gsarr = runtimeArraysRef.current[gsn]; const gsval = runtimeVariablesRef.current[String(node.params.valueVar??'val')]??0;
+          if (gsarr && gsr*gscols+gsc >= 0 && gsr*gscols+gsc < gsarr.length) gsarr[gsr*gscols+gsc] = gsval;
+          break;
+        }
+        case 'grid_clear': {
+          const gcln = String(node.params.name??'grid'); const gclv = node.params.initValue !== undefined ? (node.params.initValue as number|string|null) : null;
+          const gclarr = runtimeArraysRef.current[gcln]; if (gclarr) gclarr.fill(gclv);
+          break;
+        }
+        case 'grid_sync_tiles': {
+          const gstn = String(node.params.name??'grid'); const gstarr = runtimeArraysRef.current[gstn]??[];
+          const gstbg = getColor(node.params,'bgColor','#000000'); const gstbi = clamp01(getNum(node.params,'bgIntensity',0));
+          for (let k=0; k<Math.min(gstarr.length,tiles.length); k++) {
+            const v = gstarr[k];
+            tiles[k] = (v===null||v===0||v==='') ? {color:gstbg,intensity:gstbi} : typeof v==='string'&&v.startsWith('#') ? {color:v,intensity:0.85} : {color:'#ffffff',intensity:0.85};
+          }
+          setRuntimeTiles([...tiles]);
+          break;
+        }
+        case 'grid_check_4_in_row': {
+          const g4n = String(node.params.name??'grid'); const g4arr = runtimeArraysRef.current[g4n]??[];
+          const g4cols = Number(runtimeVariablesRef.current[g4n+'_cols']??6); const g4rows = Number(runtimeVariablesRef.current[g4n+'_rows']??7);
+          const g4tv = runtimeVariablesRef.current[String(node.params.valueVar??'lastColor')]??null;
+          const g4get = (c:number,r:number) => g4arr[r*g4cols+c];
+          const g4chk = (c:number,r:number,dc:number,dr:number) => { for(let k=0;k<4;k++){const nc=c+k*dc,nr=r+k*dr;if(nc<0||nc>=g4cols||nr<0||nr>=g4rows||g4get(nc,nr)!==g4tv)return false;}return true;};
+          let g4won=false;
+          g4outer:for(let r=0;r<g4rows&&!g4won;r++)for(let c=0;c<g4cols;c++){if(g4get(c,r)!==g4tv)continue;if(g4chk(c,r,1,0)||g4chk(c,r,0,1)||g4chk(c,r,1,1)||g4chk(c,r,1,-1)){g4won=true;break g4outer;}}
+          runtimeVariablesRef.current[String(node.params.outVar??'hasWon')] = g4won?1:0;
+          break;
+        }
+        case 'define_sub': case 'break_loop': break;
+        case 'call_sub': {
+          const cst = runtimeSubsRef.current[String(node.params.name??'mySub')];
+          if (cst) executeNodeSync(cst, depth+1);
+          break;
+        }
+        default: break;
       }
 
-      // Follow all outgoing exec edges
       const outgoing = game.edges.filter(e => e.from === nodeId);
-      for (const edge of outgoing) executeNode(edge.to, depth + 1);
-
+      for (const edge of outgoing) executeNodeSync(edge.to, depth + 1);
       setRuntimeTiles([...runtimeTilesRef.current]);
     }
 
-    // Wire click handler
+    // ── Async executeNode ─────────────────────────────────────────────────────
+    async function executeNodeAsync(nodeId: string, depth = 0): Promise<void> {
+      if (signal.aborted || depth > 100) return;
+      const node = game.nodes.find(n => n.id === nodeId);
+      if (!node || !node.enabled) return;
+
+      try {
+        switch (node.kind) {
+          case 'wait': {
+            const ms = Math.max(0, getNum(node.params, 'seconds', 1)) * 1000;
+            await sleep(ms);
+            break;
+          }
+          case 'wait_event': {
+            const eventType = String(node.params.eventType ?? 'submit');
+            const timeoutMs = Math.max(100, getNum(node.params, 'timeoutMs', 30000));
+            await waitForEvent(eventType, timeoutMs);
+            break;
+          }
+          case 'emit_event': {
+            emitEvent(String(node.params.eventType ?? 'submit'));
+            break;
+          }
+          case 'round_start': {
+            const total = Math.max(1, Math.round(getNum(node.params, 'totalRounds', 5)));
+            runtimeRoundRef.current.total = total;
+            runtimeRoundRef.current.current += 1;
+            setRuntimeRound({ current: runtimeRoundRef.current.current, total });
+            if (node.params.resetScore) { runtimeScoreRef.current = 0; setRuntimeScore(0); }
+            break;
+          }
+          case 'round_end': {
+            emitEvent('round_end', { round: runtimeRoundRef.current.current });
+            break;
+          }
+          case 'next_round': {
+            runtimeRoundRef.current.current += 1;
+            setRuntimeRound({ ...runtimeRoundRef.current });
+            break;
+          }
+          case 'gen_target_color': {
+            const mode = String(node.params.mode ?? 'random');
+            const varName = String(node.params.varName ?? 'target');
+            let color: string;
+            if (mode === 'blackbody') {
+              const temps = [1900, 2700, 3000, 4000, 5000, 6500, 10000];
+              color = blackbodyToHex(temps[Math.floor(Math.random() * temps.length)]);
+            } else if (mode === 'pastel') {
+              const h = Math.floor(Math.random() * 360);
+              const s = 40 + Math.floor(Math.random() * 30);
+              const l = 60 + Math.floor(Math.random() * 20);
+              const { r, g, b } = hslToRgb(h, s, l);
+              color = rgbToHex(r, g, b);
+            } else {
+              color = rgbToHex(Math.floor(Math.random() * 256), Math.floor(Math.random() * 256), Math.floor(Math.random() * 256));
+            }
+            runtimeColorVarsRef.current[varName] = color;
+            if (node.params.displayOnPlates) {
+              sendColorToHardware(color, 0.85, allPlateIds);
+              const tiles = runtimeTilesRef.current;
+              for (let i = 0; i < tiles.length; i++) tiles[i] = { color, intensity: 0.85 };
+              setRuntimeTiles([...tiles]);
+              const displayMs = getNum(node.params, 'displaySeconds', 3) * 1000;
+              if (displayMs > 0) await sleep(displayMs);
+            }
+            break;
+          }
+          case 'show_target_on_plates': {
+            const varName = String(node.params.varName ?? 'target');
+            const color = runtimeColorVarsRef.current[varName] ?? '#ffffff';
+            const intensity = clamp01(getNum(node.params, 'intensity', 0.85));
+            sendColorToHardware(color, intensity, allPlateIds);
+            const tiles = runtimeTilesRef.current;
+            for (let i = 0; i < tiles.length; i++) tiles[i] = { color, intensity };
+            setRuntimeTiles([...tiles]);
+            break;
+          }
+          case 'hardware_send_color': {
+            const varName = String(node.params.varName ?? 'target');
+            const color = runtimeColorVarsRef.current[varName] ?? getColor(node.params, 'color', '#ffffff');
+            const intensity = clamp01(getNum(node.params, 'intensity', 0.85));
+            sendColorToHardware(color, intensity, allPlateIds);
+            const tiles = runtimeTilesRef.current;
+            for (let i = 0; i < tiles.length; i++) tiles[i] = { color, intensity };
+            setRuntimeTiles([...tiles]);
+            break;
+          }
+          case 'hardware_flash': {
+            const flashColor = getColor(node.params, 'color', '#ffffff');
+            const flashIntensity = clamp01(getNum(node.params, 'intensity', 1.0));
+            const durationMs = Math.max(50, getNum(node.params, 'durationMs', 200));
+            sendColorToHardware(flashColor, flashIntensity, allPlateIds);
+            const tiles = runtimeTilesRef.current;
+            const prevTiles = tiles.map(t => ({ ...t }));
+            for (let i = 0; i < tiles.length; i++) tiles[i] = { color: flashColor, intensity: flashIntensity };
+            setRuntimeTiles([...tiles]);
+            await sleep(durationMs);
+            prevTiles.forEach((t, i) => { tiles[i] = t; });
+            setRuntimeTiles([...tiles]);
+            break;
+          }
+          case 'countdown_start': {
+            const totalSec = Math.max(1, getNum(node.params, 'seconds', 30));
+            const varName = String(node.params.varName ?? 'countdown');
+            const endTime = Date.now() + totalSec * 1000;
+            runtimeVariablesRef.current[varName] = totalSec;
+            setRuntimeCountdownValue(totalSec);
+            if (runtimeCountdownsRef.current.has(varName)) {
+              clearInterval(runtimeCountdownsRef.current.get(varName)!);
+            }
+            const cdTimer = setInterval(() => {
+              const remaining = Math.max(0, (endTime - Date.now()) / 1000);
+              runtimeVariablesRef.current[varName] = remaining;
+              setRuntimeCountdownValue(remaining);
+              if (remaining <= 0) {
+                clearInterval(cdTimer);
+                runtimeCountdownsRef.current.delete(varName);
+                emitEvent('countdown_end_' + varName);
+                game.nodes.filter(n => n.kind === 'on_countdown_end' && n.enabled && String(n.params.varName ?? 'countdown') === varName)
+                  .forEach(n => game.edges.filter(e => e.from === n.id).forEach(e => { executeNodeAsync(e.to, 0).catch(() => {}); }));
+              }
+            }, 200);
+            runtimeTickTimersRef.current.push(cdTimer);
+            runtimeCountdownsRef.current.set(varName, cdTimer);
+            break;
+          }
+          case 'for_range': {
+            const fri = String(node.params.varName??'i');
+            const frs = Math.round(getNum(node.params,'start',0));
+            const fre = Math.round(getNum(node.params,'end',41));
+            const frst = Math.max(1,Math.round(Math.abs(getNum(node.params,'step',1))));
+            const frb = String(node.params.bodyNodeId??'');
+            const frMax = Math.min(10000, Math.abs(fre-frs)+2);
+            let frIter = 0;
+            const frDir = frs <= fre ? 1 : -1;
+            for (let i=frs; (frDir>0?i<=fre:i>=fre) && !signal.aborted && frIter++<frMax; i+=frDir*frst) {
+              runtimeVariablesRef.current[fri] = i;
+              if (frb) await executeNodeAsync(frb, depth+1);
+              if (signal.aborted) return;
+            }
+            const frOut = game.edges.filter(e=>e.from===nodeId);
+            for (const edge of frOut) { await executeNodeAsync(edge.to, depth+1); if(signal.aborted)return; }
+            return;
+          }
+          case 'for_each_array': {
+            const feaArr = runtimeArraysRef.current[String(node.params.arrayName??'arr')]??[];
+            const feaVar = String(node.params.varName??'item');
+            const feaIdx = node.params.indexVar as string|undefined;
+            const feaBody = String(node.params.bodyNodeId??'');
+            for (let k=0; k<feaArr.length && !signal.aborted; k++) {
+              runtimeVariablesRef.current[feaVar] = feaArr[k] !== null ? (feaArr[k] as number|string) : 0;
+              if (feaIdx) runtimeVariablesRef.current[feaIdx] = k;
+              if (feaBody) await executeNodeAsync(feaBody, depth+1);
+            }
+            const feaOut = game.edges.filter(e=>e.from===nodeId);
+            for (const edge of feaOut) { await executeNodeAsync(edge.to, depth+1); if(signal.aborted)return; }
+            return;
+          }
+          case 'call_sub': {
+            const cst2 = runtimeSubsRef.current[String(node.params.name??'mySub')];
+            if (cst2) await executeNodeAsync(cst2, depth+1);
+            break;
+          }
+          case 'countdown_stop': {
+            const varName = String(node.params.varName ?? 'countdown');
+            const t = runtimeCountdownsRef.current.get(varName);
+            if (t) { clearInterval(t); runtimeCountdownsRef.current.delete(varName); }
+            break;
+          }
+          default: {
+            executeNodeSync(nodeId, 0);
+            return;
+          }
+        }
+      } catch (e) {
+        if ((e as Error).name === 'AbortError') return;
+        console.warn('[runtime] node error', nodeId, e);
+        return;
+      }
+
+      if (signal.aborted) return;
+      const outgoing = game.edges.filter(e => e.from === nodeId);
+      for (const edge of outgoing) {
+        await executeNodeAsync(edge.to, depth + 1);
+        if (signal.aborted) return;
+      }
+    }
+
+    // ── Wire click handler ────────────────────────────────────────────────────
     fireRuntimeClickRef.current = (tileIndex: number) => {
+      runtimeVariablesRef.current['clickedTile'] = tileIndex;
       game.nodes
         .filter(n => n.kind === 'on_tile_click' && n.enabled)
         .forEach(node => {
-          runtimeVariablesRef.current['clickedTile'] = tileIndex;
-          game.edges.filter(e => e.from === node.id).forEach(e => executeNode(e.to));
+          game.edges.filter(e => e.from === node.id).forEach(e => executeNodeAsync(e.to, 0).catch(() => {}));
         });
     };
 
-    // Fire event_begin
-    game.nodes.filter(n => n.kind === 'event_begin' && n.enabled).forEach(n => {
-      game.edges.filter(e => e.from === n.id).forEach(e => executeNode(e.to));
+    // ── Wire submit handler ────────────────────────────────────────────────────
+    (window as any).__colorroom_submit = () => {
+      emitEvent('submit');
+      game.nodes.filter(n => n.kind === 'on_submit_answer' && n.enabled)
+        .forEach(n => game.edges.filter(e => e.from === n.id).forEach(e => executeNodeAsync(e.to, 0).catch(() => {})));
+    };
+
+    // ── Index define_sub nodes ────────────────────────────────────────────────
+    game.nodes.filter(n => n.kind === 'define_sub' && n.enabled).forEach(n => {
+      const sName = String(n.params.name ?? 'mySub');
+      const fEdge = game.edges.find(e => e.from === n.id);
+      if (fEdge) runtimeSubsRef.current[sName] = fEdge.to;
     });
 
-    // Set up on_tick timers
+    // ── Fire event_begin ──────────────────────────────────────────────────────
+    game.nodes.filter(n => n.kind === 'event_begin' && n.enabled).forEach(n => {
+      game.edges.filter(e => e.from === n.id).forEach(e => executeNodeAsync(e.to, 0).catch(() => {}));
+    });
+
+    // ── Set up on_tick timers ──────────────────────────────────────────────────
     game.nodes.filter(n => n.kind === 'on_tick' && n.enabled).forEach(node => {
       const intervalMs = Math.max(50, getNum(node.params, 'intervalMs', 1000));
       const timer = setInterval(() => {
-        game.edges.filter(e => e.from === node.id).forEach(e => executeNode(e.to));
+        if (signal.aborted) { clearInterval(timer); return; }
+        game.edges.filter(e => e.from === node.id).forEach(e => executeNodeAsync(e.to, 0).catch(() => {}));
       }, intervalMs);
       runtimeTickTimersRef.current.push(timer);
     });
 
     return () => {
+      abort.abort();
+      runtimeAbortRef.current = null;
       runtimeTickTimersRef.current.forEach(t => clearInterval(t));
       runtimeTickTimersRef.current = [];
+      runtimeCountdownsRef.current.forEach(t => clearInterval(t));
+      runtimeCountdownsRef.current.clear();
       fireRuntimeClickRef.current = null;
+      delete (window as any).__colorroom_submit;
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeGame?.id, activeGame?.nodes.length, activeGame?.edges.length, isPlaying, hasRuntimeEvents]);
@@ -1494,7 +2192,7 @@ export default function EditeurPage() {
         const game = editor.games.find((g) => g.id === editor.activeGameId);
         const targetNode = game?.nodes.find((n) => n.id === nodeId);
         if (targetNode?.kind === 'event_begin') {
-          setStatus('⛔ Impossible de supprimer l\'évènement de départ');
+          setStatus('Impossible de supprimer l\'évènement de départ');
           return;
         }
         commit((cur) => {
@@ -1591,7 +2289,7 @@ export default function EditeurPage() {
     sendRgbToHardware(rgb, intensity100, allPlateIds);
   }, [activeGame, editor.selectedNodeId, isPlaying, t]);
 
-  // Map Tetris grid to hardware tiles — throttled to 500ms interval (not every frame)
+  // Map Tetris grid to hardware tiles - throttled to 500ms interval (not every frame)
   useEffect(() => {
     if (!activeTetrisNode || !isPlaying) return;
 
@@ -1696,6 +2394,7 @@ export default function EditeurPage() {
       accentColor: g.accentColor,
       nodes: g.nodes,
       edges: g.edges,
+      uiLayout: g.uiLayout ?? [],
     };
   };
 
@@ -1708,6 +2407,7 @@ export default function EditeurPage() {
     accentColor?: string;
     nodes: EditorNode[];
     edges: GraphEdge[];
+    uiLayout: UILayoutComponent[];
   } | null => {
     if (!config || typeof config !== 'object') return null;
     const o = config as any;
@@ -1720,7 +2420,8 @@ export default function EditeurPage() {
     const description = typeof o.description === 'string' ? o.description : undefined;
     const bgColor = typeof o.bgColor === 'string' ? o.bgColor : undefined;
     const accentColor = typeof o.accentColor === 'string' ? o.accentColor : undefined;
-    return { tileCount, icon, difficulty, description, bgColor, accentColor, nodes, edges };
+    const uiLayout = Array.isArray(o.uiLayout) ? (o.uiLayout as UILayoutComponent[]) : [];
+    return { tileCount, icon, difficulty, description, bgColor, accentColor, nodes, edges, uiLayout };
   };
 
   const createDbGame = async (name: string, initialGame: GameDoc): Promise<string | null> => {
@@ -2082,6 +2783,7 @@ export default function EditeurPage() {
               accentColor: cfg.accentColor,
               nodes: cfg.nodes,
               edges: cfg.edges,
+              uiLayout: cfg.uiLayout,
             } satisfies GameDoc;
           })
           .filter(Boolean) as GameDoc[];
@@ -2126,7 +2828,7 @@ export default function EditeurPage() {
       return;
     }
     setDirty(false);
-    setStatus('Sauvegardé ✓');
+    setStatus('Sauvegardé ');
   };
 
   // Auto-save every 3 seconds when dirty
@@ -2136,7 +2838,7 @@ export default function EditeurPage() {
       void saveDbGame(activeGame).then((ok) => {
         if (ok) {
           setDirty(false);
-          setStatus('Auto-sauvegardé ✓');
+          setStatus('Auto-sauvegardé ');
         }
       });
     }, 3000);
@@ -2162,7 +2864,7 @@ export default function EditeurPage() {
         visibleNodeIds: undefined,
       };
     });
-    setStatus('Jeu supprimé ✓');
+    setStatus('Jeu supprimé ');
 
     // DB en arrière-plan (non bloquant pour l'UI)
     void deleteDbGame(deletedId).then((ok) => {
@@ -2339,7 +3041,7 @@ export default function EditeurPage() {
       x: (W - graphW * zoom) / 2 - (minX - PAD) * zoom,
       y: (H - graphH * zoom) / 2 - (minY - PAD) * zoom,
     });
-    setStatus(`Fit — ${Math.round(zoom * 100)}%`);
+    setStatus(`Fit - ${Math.round(zoom * 100)}%`);
   }
 
   function autoLayoutNodes() {
@@ -2559,7 +3261,7 @@ export default function EditeurPage() {
               </button>
             </div>
 
-            {/* Liste des jeux — scrollable */}
+            {/* Liste des jeux - scrollable */}
             <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: '6px 8px' }}>
               <div style={{ display: 'grid', gap: 4 }}>
                 {games.length === 0 && (
@@ -2855,7 +3557,7 @@ export default function EditeurPage() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   {/* Indicateur statut API supervision */}
                   <div
-                    title={hwReachable === 'ok' ? 'Supervision API joignable' : hwReachable === 'error' ? 'Supervision API inaccessible — vérifiez SUPERVISION_API_URL' : 'Vérification...'}
+                    title={hwReachable === 'ok' ? 'Supervision API joignable' : hwReachable === 'error' ? 'Supervision API inaccessible - vérifiez SUPERVISION_API_URL' : 'Vérification...'}
                     style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 8px', borderRadius: 8, fontSize: 11, fontWeight: 600,
                       background: hwReachable === 'ok' ? 'rgba(6,214,160,0.12)' : hwReachable === 'error' ? 'rgba(255,80,80,0.12)' : 'rgba(160,160,160,0.1)',
                       color: hwReachable === 'ok' ? '#06d6a0' : hwReachable === 'error' ? '#ff5050' : '#888',
@@ -2887,6 +3589,37 @@ export default function EditeurPage() {
                   {hasRuntimeEvents && runtimeScore > 0 && (
                     <div style={{ background: '#ffd600', color: '#1a1a1a', borderRadius: 8, padding: '3px 10px', fontSize: 13, fontWeight: 700, letterSpacing: '0.02em' }}>
                       Score: {runtimeScore}
+                    </div>
+                  )}
+                  {hasRuntimeEvents && runtimeRound.total > 0 && runtimeRound.current > 0 && (
+                    <div style={{ background: 'rgba(67,97,238,0.12)', color: '#4361ee', borderRadius: 8, padding: '3px 10px', fontSize: 13, fontWeight: 700, border: '1px solid rgba(67,97,238,0.25)' }}>
+                      Manche {runtimeRound.current}/{runtimeRound.total}
+                    </div>
+                  )}
+                  {hasRuntimeEvents && runtimeCountdownValue > 0 && (
+                    <div style={{ background: runtimeCountdownValue <= 5 ? 'rgba(239,68,68,0.12)' : 'rgba(0,0,0,0.06)', color: runtimeCountdownValue <= 5 ? '#ef4444' : '#333', borderRadius: 8, padding: '3px 10px', fontSize: 13, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
+                      {Math.ceil(runtimeCountdownValue)}s
+                    </div>
+                  )}
+                  {hasRuntimeEvents && isPlaying && activeGame?.nodes.some(n => n.kind === 'get_player_rgb' && n.enabled) && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(255,255,255,0.9)', borderRadius: 10, padding: '4px 10px', border: '1px solid rgba(0,0,0,0.1)' }}>
+                      {(['r','g','b'] as const).map((ch, i) => (
+                        <label key={ch} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <span style={{ fontSize: 11, fontWeight: 700, color: ['#ef4444','#22c55e','#3b82f6'][i], width: 12 }}>{ch.toUpperCase()}</span>
+                          <input type="range" min={0} max={255} step={1} style={{ width: 60 }}
+                            value={runtimePlayerRgbRef.current[ch]}
+                            onChange={(e) => {
+                              runtimePlayerRgbRef.current = { ...runtimePlayerRgbRef.current, [ch]: Number(e.target.value) };
+                            }} />
+                        </label>
+                      ))}
+                      <button
+                        className="g-btn g-btn--sm"
+                        style={{ background: '#22c55e', color: '#fff', border: 'none', fontSize: 12, padding: '4px 10px', borderRadius: 8 }}
+                        onClick={() => (window as any).__colorroom_submit?.()}
+                      >
+                        Soumettre
+                      </button>
                     </div>
                   )}
                 </div>
@@ -3033,7 +3766,16 @@ export default function EditeurPage() {
                   )}
                 </div>
               </div>
-              <div className="panelbody">
+              {/* Tab switcher */}
+              <div style={{ display: 'flex', gap: 4, padding: '6px 12px', borderBottom: '1px solid rgba(0,0,0,0.07)', background: 'rgba(255,255,255,0.55)', flexShrink: 0 }}>
+                {(['canvas', 'python', 'ui'] as const).map(tab => (
+                  <button key={tab} type="button" onClick={() => setEditorTab(tab)}
+                    style={{ padding: '5px 13px', borderRadius: 8, border: '1px solid rgba(0,0,0,0.09)', background: editorTab === tab ? 'rgba(67,97,238,0.11)' : 'rgba(255,255,255,0.7)', color: editorTab === tab ? '#4361ee' : '#777', fontWeight: 700, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', transition: 'all 120ms' }}>
+                    {tab === 'canvas' ? 'Nœuds' : tab === 'python' ? 'Python' : 'Interface'}
+                  </button>
+                ))}
+              </div>
+              <div className="panelbody" style={{ display: editorTab === 'canvas' ? undefined : 'none' }}>
                 <div
                   className="bp"
                   onDoubleClick={(e) => {
@@ -3233,7 +3975,7 @@ export default function EditeurPage() {
                                         key={n.kind}
                                         className="bp-menu__item"
                                         style={{ opacity: 0.45, cursor: 'not-allowed', userSelect: 'none' }}
-                                        title="Jeu natif — non recréable via l'éditeur"
+                                        title="Jeu natif - non recréable via l'éditeur"
                                       >
                                         <span className="bp-menu__title">{n.title}</span>
                                         <span className="bp-menu__meta" style={{ color: '#a855f7', opacity: 0.7, fontSize: 10 }}>natif</span>
@@ -3548,7 +4290,7 @@ export default function EditeurPage() {
                                 const visibleIds = [n.id, ...freshNodes.map(nd => nd.id)];
                                 return { ...cur, games: newGames, expandedGameNodeId: n.id, visibleNodeIds: visibleIds };
                               });
-                              setStatus(`🔄 ${n.name} régénéré — ${freshNodes.length} nœuds`);
+                              setStatus(`${n.name} régénéré - ${freshNodes.length} nœuds`);
                             }
                           }}
                         >
@@ -4344,7 +5086,7 @@ export default function EditeurPage() {
                             ) : (
                               <div className="bp-pin bp-pin--in" style={{ opacity: 0.35 }}>
                                 <span className="bp-dot" />
-                                <span className="bp-pin__label">—</span>
+                                <span className="bp-pin__label">-</span>
                               </div>
                             )}
                             <div
@@ -4405,6 +5147,25 @@ export default function EditeurPage() {
                   </div>
                 </div>
               </div>
+              {editorTab === 'python' && activeGame && (
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+                  <PythonEditor
+                    code={activeGame.pythonCode ?? ''}
+                    onChange={code => commit(cur => ({ ...cur, games: cur.games.map(g => g.id === cur.activeGameId ? { ...g, pythonCode: code } : g) }))}
+                    bridge={pyBridge}
+                    tileCount={Math.max(1, Math.round(Number(activeGame.tileCount ?? 42)))}
+                  />
+                </div>
+              )}
+              {editorTab === 'ui' && activeGame && (
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+                  <UIDesigner
+                    components={activeGame.uiLayout ?? []}
+                    onChange={comps => commit(cur => ({ ...cur, games: cur.games.map(g => g.id === cur.activeGameId ? { ...g, uiLayout: comps } : g) }))}
+                    gameVariables={Object.keys(runtimeVariablesRef.current)}
+                  />
+                </div>
+              )}
             </div>
           </section>
 
@@ -4414,7 +5175,7 @@ export default function EditeurPage() {
                 <Settings2 size={16} color="#1a1a1a" />
                 <strong style={{ fontSize: 14, fontWeight: 800, letterSpacing: '-0.02em', color: '#1a1a1a' }}>Paramètres</strong>
               </div>
-              <span style={{ fontSize: 12, fontWeight: 600, color: '#666' }}>{selectedNode ? labelNodeKind(selectedNode.kind) : '—'}</span>
+              <span style={{ fontSize: 12, fontWeight: 600, color: '#666' }}>{selectedNode ? labelNodeKind(selectedNode.kind) : '-'}</span>
             </div>
 
             <div className="panelbody" style={{ padding: 20 }}>
@@ -5236,7 +5997,7 @@ export default function EditeurPage() {
                   ) : selectedNode.kind === 'tetris_on_line_clear' ? (
                     <div style={{ display: 'grid', gap: 12 }}>
                       <div style={{ padding: 12, borderRadius: 10, background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.18)' }}>
-                        <p style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.5 }}>🎯 Déclenché quand le joueur efface une ou plusieurs lignes.</p>
+                        <p style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.5 }}>Déclenché quand le joueur efface une ou plusieurs lignes.</p>
                       </div>
                       <label style={{ display: 'grid', gap: 4 }}>
                         <span className="g-label">Lignes minimum</span>
@@ -5248,7 +6009,7 @@ export default function EditeurPage() {
                   ) : selectedNode.kind === 'tetris_on_level_up' ? (
                     <div style={{ display: 'grid', gap: 12 }}>
                       <div style={{ padding: 12, borderRadius: 10, background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.18)' }}>
-                        <p style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.5 }}>⬆ Déclenché quand le joueur atteint un nouveau niveau.</p>
+                        <p style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.5 }}>Déclenché quand le joueur atteint un nouveau niveau.</p>
                       </div>
                       <label style={{ display: 'grid', gap: 4 }}>
                         <span className="g-label">Niveau déclencheur</span>
@@ -5259,7 +6020,7 @@ export default function EditeurPage() {
                     </div>
                   ) : selectedNode.kind === 'tetris_on_game_over' ? (
                     <div style={{ padding: 12, borderRadius: 10, background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.18)' }}>
-                      <p style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.5 }}>💀 Déclenché quand le joueur perd (plateau plein). Pas de paramètre.</p>
+                      <p style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.5 }}>Déclenché quand le joueur perd (plateau plein). Pas de paramètre.</p>
                     </div>
                   ) : selectedNode.kind === 'tetris_set_speed' ? (
                     <div style={{ display: 'grid', gap: 12 }}>
@@ -5276,7 +6037,7 @@ export default function EditeurPage() {
                   ) : selectedNode.kind === 'simon_on_success' ? (
                     <div style={{ display: 'grid', gap: 12 }}>
                       <div style={{ padding: 12, borderRadius: 10, background: 'rgba(244,63,94,0.08)', border: '1px solid rgba(244,63,94,0.18)' }}>
-                        <p style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.5 }}>✅ Déclenché quand le joueur répète correctement la séquence.</p>
+                        <p style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.5 }}>Déclenché quand le joueur répète correctement la séquence.</p>
                       </div>
                       <label style={{ display: 'grid', gap: 4 }}>
                         <span className="g-label">Étape (0 = toutes)</span>
@@ -5287,11 +6048,11 @@ export default function EditeurPage() {
                     </div>
                   ) : selectedNode.kind === 'simon_on_fail' ? (
                     <div style={{ padding: 12, borderRadius: 10, background: 'rgba(244,63,94,0.08)', border: '1px solid rgba(244,63,94,0.18)' }}>
-                      <p style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.5 }}>❌ Déclenché quand le joueur tape la mauvaise couleur.</p>
+                      <p style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.5 }}>Déclenché quand le joueur tape la mauvaise couleur.</p>
                     </div>
                   ) : selectedNode.kind === 'simon_on_complete' ? (
                     <div style={{ padding: 12, borderRadius: 10, background: 'rgba(244,63,94,0.08)', border: '1px solid rgba(244,63,94,0.18)' }}>
-                      <p style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.5 }}>🏆 Déclenché quand toutes les séquences sont complétées.</p>
+                      <p style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.5 }}>Déclenché quand toutes les séquences sont complétées.</p>
                     </div>
                   ) : selectedNode.kind === 'simon_set_speed' ? (
                     <div style={{ display: 'grid', gap: 12 }}>
@@ -5308,7 +6069,7 @@ export default function EditeurPage() {
                   ) : selectedNode.kind === 'memory_on_match' ? (
                     <div style={{ display: 'grid', gap: 12 }}>
                       <div style={{ padding: 12, borderRadius: 10, background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.18)' }}>
-                        <p style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.5 }}>✅ Déclenché quand une paire de dalles identiques est trouvée.</p>
+                        <p style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.5 }}>Déclenché quand une paire de dalles identiques est trouvée.</p>
                       </div>
                       <label style={{ display: 'grid', gap: 4 }}>
                         <span className="g-label">Index de paire (0 = toutes)</span>
@@ -5319,16 +6080,16 @@ export default function EditeurPage() {
                     </div>
                   ) : selectedNode.kind === 'memory_on_fail' ? (
                     <div style={{ padding: 12, borderRadius: 10, background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.18)' }}>
-                      <p style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.5 }}>❌ Déclenché quand le joueur retourne deux dalles différentes.</p>
+                      <p style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.5 }}>Déclenché quand le joueur retourne deux dalles différentes.</p>
                     </div>
                   ) : selectedNode.kind === 'memory_on_complete' ? (
                     <div style={{ padding: 12, borderRadius: 10, background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.18)' }}>
-                      <p style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.5 }}>🏆 Déclenché quand toutes les paires sont trouvées.</p>
+                      <p style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.5 }}>Déclenché quand toutes les paires sont trouvées.</p>
                     </div>
                   ) : selectedNode.kind === 'spectrum_on_submit' ? (
                     <div style={{ display: 'grid', gap: 12 }}>
                       <div style={{ padding: 12, borderRadius: 10, background: 'rgba(6,182,212,0.08)', border: '1px solid rgba(6,182,212,0.18)' }}>
-                        <p style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.5 }}>📍 Déclenché quand un joueur soumet sa réponse.</p>
+                        <p style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.5 }}>Déclenché quand un joueur soumet sa réponse.</p>
                       </div>
                       <label style={{ display: 'grid', gap: 4 }}>
                         <span className="g-label">Siège (0 = tous)</span>
@@ -5339,16 +6100,16 @@ export default function EditeurPage() {
                     </div>
                   ) : selectedNode.kind === 'spectrum_on_round_end' ? (
                     <div style={{ padding: 12, borderRadius: 10, background: 'rgba(6,182,212,0.08)', border: '1px solid rgba(6,182,212,0.18)' }}>
-                      <p style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.5 }}>🔔 Déclenché à la fin de chaque round de Spectre Chromatique.</p>
+                      <p style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.5 }}>Déclenché à la fin de chaque round de Spectre Chromatique.</p>
                     </div>
                   ) : selectedNode.kind === 'spectrum_on_game_over' ? (
                     <div style={{ padding: 12, borderRadius: 10, background: 'rgba(6,182,212,0.08)', border: '1px solid rgba(6,182,212,0.18)' }}>
-                      <p style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.5 }}>🏁 Déclenché à la fin de la partie Spectre.</p>
+                      <p style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.5 }}>Déclenché à la fin de la partie Spectre.</p>
                     </div>
                   ) : selectedNode.kind === 'cspeed_on_hit' ? (
                     <div style={{ display: 'grid', gap: 12 }}>
                       <div style={{ padding: 12, borderRadius: 10, background: 'rgba(249,115,22,0.08)', border: '1px solid rgba(249,115,22,0.18)' }}>
-                        <p style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.5 }}>🎯 Déclenché quand le joueur tape la bonne dalle colorée.</p>
+                        <p style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.5 }}>Déclenché quand le joueur tape la bonne dalle colorée.</p>
                       </div>
                       <label style={{ display: 'grid', gap: 4 }}>
                         <span className="g-label">Index dalle (0 = toutes)</span>
@@ -5359,16 +6120,16 @@ export default function EditeurPage() {
                     </div>
                   ) : selectedNode.kind === 'cspeed_on_miss' ? (
                     <div style={{ padding: 12, borderRadius: 10, background: 'rgba(249,115,22,0.08)', border: '1px solid rgba(249,115,22,0.18)' }}>
-                      <p style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.5 }}>💥 Déclenché quand le joueur tape la mauvaise dalle.</p>
+                      <p style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.5 }}>Déclenché quand le joueur tape la mauvaise dalle.</p>
                     </div>
                   ) : selectedNode.kind === 'cspeed_on_time_up' ? (
                     <div style={{ padding: 12, borderRadius: 10, background: 'rgba(249,115,22,0.08)', border: '1px solid rgba(249,115,22,0.18)' }}>
-                      <p style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.5 }}>⏱ Déclenché quand le temps de la partie Color Speed est écoulé.</p>
+                      <p style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.5 }}>Déclenché quand le temps de la partie Color Speed est écoulé.</p>
                     </div>
                   ) : selectedNode.kind === 'p4_on_win' ? (
                     <div style={{ display: 'grid', gap: 12 }}>
                       <div style={{ padding: 12, borderRadius: 10, background: 'rgba(234,179,8,0.08)', border: '1px solid rgba(234,179,8,0.18)' }}>
-                        <p style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.5 }}>🏆 Déclenché quand un joueur gagne à Puissance 4.</p>
+                        <p style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.5 }}>Déclenché quand un joueur gagne à Puissance 4.</p>
                       </div>
                       <label style={{ display: 'grid', gap: 4 }}>
                         <span className="g-label">Joueur (1 ou 2, 0 = tous)</span>
@@ -5379,7 +6140,7 @@ export default function EditeurPage() {
                     </div>
                   ) : selectedNode.kind === 'p4_on_draw' ? (
                     <div style={{ padding: 12, borderRadius: 10, background: 'rgba(234,179,8,0.08)', border: '1px solid rgba(234,179,8,0.18)' }}>
-                      <p style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.5 }}>🤝 Déclenché quand la partie se termine par un match nul.</p>
+                      <p style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.5 }}>Déclenché quand la partie se termine par un match nul.</p>
                     </div>
                   ) : selectedNode.kind === 'p4_set_color' ? (
                     <div style={{ display: 'grid', gap: 12 }}>
@@ -5405,7 +6166,7 @@ export default function EditeurPage() {
                   ) : selectedNode.kind === 'gamut_on_hit' ? (
                     <div style={{ display: 'grid', gap: 12 }}>
                       <div style={{ padding: 12, borderRadius: 10, background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.18)' }}>
-                        <p style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.5 }}>✅ Déclenché quand le joueur identifie correctement une couleur hors-gamut.</p>
+                        <p style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.5 }}>Déclenché quand le joueur identifie correctement une couleur hors-gamut.</p>
                       </div>
                       <label style={{ display: 'grid', gap: 4 }}>
                         <span className="g-label">Round (0 = tous)</span>
@@ -5416,16 +6177,16 @@ export default function EditeurPage() {
                     </div>
                   ) : selectedNode.kind === 'gamut_on_miss' ? (
                     <div style={{ padding: 12, borderRadius: 10, background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.18)' }}>
-                      <p style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.5 }}>❌ Déclenché quand le joueur rate l&apos;identification hors-gamut.</p>
+                      <p style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.5 }}>Déclenché quand le joueur rate l&apos;identification hors-gamut.</p>
                     </div>
                   ) : selectedNode.kind === 'gamut_on_complete' ? (
                     <div style={{ padding: 12, borderRadius: 10, background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.18)' }}>
-                      <p style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.5 }}>🏆 Déclenché quand toutes les rounds du Chasseur de Gamut sont terminées.</p>
+                      <p style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.5 }}>Déclenché quand toutes les rounds du Chasseur de Gamut sont terminées.</p>
                     </div>
                   ) : selectedNode.kind === 'measure_start' ? (
                     <div style={{ display: 'grid', gap: 12 }}>
                       <div style={{ padding: 12, borderRadius: 10, background: 'rgba(14,165,233,0.08)', border: '1px solid rgba(14,165,233,0.2)' }}>
-                        <p style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.5 }}>📡 Lance une mesure colorimétrique via le CS-150. Connectez la sortie à <strong>measure_on_result</strong>.</p>
+                        <p style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.5 }}>Lance une mesure colorimétrique via le CS-150. Connectez la sortie à <strong>measure_on_result</strong>.</p>
                       </div>
                       <label style={{ display: 'grid', gap: 4 }}>
                         <span className="g-label">Timeout (sec)</span>
@@ -5437,7 +6198,7 @@ export default function EditeurPage() {
                   ) : selectedNode.kind === 'measure_on_result' ? (
                     <div style={{ display: 'grid', gap: 12 }}>
                       <div style={{ padding: 12, borderRadius: 10, background: 'rgba(14,165,233,0.08)', border: '1px solid rgba(14,165,233,0.2)' }}>
-                        <p style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.5 }}>✅ Déclenché quand la mesure CS-150 est reçue. Les coordonnées CIE xy et la luminance Lv sont stockées dans des variables.</p>
+                        <p style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.5 }}>Déclenché quand la mesure CS-150 est reçue. Les coordonnées CIE xy et la luminance Lv sont stockées dans des variables.</p>
                       </div>
                       <label style={{ display: 'grid', gap: 4 }}>
                         <span className="g-label">Variable x</span>
@@ -5461,7 +6222,7 @@ export default function EditeurPage() {
                   ) : selectedNode.kind === 'measure_compare' ? (
                     <div style={{ display: 'grid', gap: 12 }}>
                       <div style={{ padding: 12, borderRadius: 10, background: 'rgba(14,165,233,0.08)', border: '1px solid rgba(14,165,233,0.2)' }}>
-                        <p style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.5 }}>🎯 Compare la dernière mesure à une cible CIE xy. Retourne vrai si ΔE &lt; tolérance.</p>
+                        <p style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.5 }}>Compare la dernière mesure à une cible CIE xy. Retourne vrai si ΔE &lt; tolérance.</p>
                       </div>
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                         <label style={{ display: 'grid', gap: 4 }}>
@@ -5490,7 +6251,7 @@ export default function EditeurPage() {
                   ) : selectedNode.kind === 'measure_show_cie' ? (
                     <div style={{ display: 'grid', gap: 12 }}>
                       <div style={{ padding: 12, borderRadius: 10, background: 'rgba(14,165,233,0.08)', border: '1px solid rgba(14,165,233,0.2)' }}>
-                        <p style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.5 }}>🌈 Affiche un diagramme CIE 1931 avec la mesure et la cible dans l&apos;interface du jeu.</p>
+                        <p style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.5 }}>Affiche un diagramme CIE 1931 avec la mesure et la cible dans l&apos;interface du jeu.</p>
                       </div>
                       <label style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
                         <input type="checkbox" className="g-check"
@@ -5538,7 +6299,7 @@ export default function EditeurPage() {
                   ) : selectedNode.kind === 'ui_button' ? (
                     <div style={{ display: 'grid', gap: 12 }}>
                       <div style={{ padding: 12, borderRadius: 10, background: 'rgba(236,72,153,0.08)', border: '1px solid rgba(236,72,153,0.18)' }}>
-                        <p style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.5 }}>🔘 Bouton cliquable affiché dans l&apos;interface du jeu. Utilisez <strong>on_ui_click</strong> pour déclencher des actions.</p>
+                        <p style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.5 }}>Bouton cliquable affiché dans l&apos;interface du jeu. Utilisez <strong>on_ui_click</strong> pour déclencher des actions.</p>
                       </div>
                       <label style={{ display: 'grid', gap: 4 }}>
                         <span className="g-label">ID du bouton</span>
@@ -5591,7 +6352,7 @@ export default function EditeurPage() {
                   ) : selectedNode.kind === 'ui_counter' ? (
                     <div style={{ display: 'grid', gap: 12 }}>
                       <div style={{ padding: 12, borderRadius: 10, background: 'rgba(236,72,153,0.08)', border: '1px solid rgba(236,72,153,0.18)' }}>
-                        <p style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.5 }}>🔢 Affiche un compteur numérique (score, vies, etc.) dans l&apos;interface du jeu.</p>
+                        <p style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.5 }}>Affiche un compteur numérique (score, vies, etc.) dans l&apos;interface du jeu.</p>
                       </div>
                       <label style={{ display: 'grid', gap: 4 }}>
                         <span className="g-label">ID du compteur</span>
@@ -5666,7 +6427,7 @@ export default function EditeurPage() {
                     <div style={{ display: 'grid', gap: 12 }}>
                       <div style={{ padding: 12, borderRadius: 10, background: 'rgba(236,72,153,0.08)', border: '1px solid rgba(236,72,153,0.18)' }}>
                         <p style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.5 }}>
-                          {selectedNode.kind === 'ui_show' ? '👁 Affiche un élément UI caché.' : '🙈 Masque un élément UI visible.'}
+                          {selectedNode.kind === 'ui_show' ? 'Affiche un élément UI caché.' : 'Masque un élément UI visible.'}
                         </p>
                       </div>
                       <label style={{ display: 'grid', gap: 4 }}>
@@ -5680,7 +6441,7 @@ export default function EditeurPage() {
                   ) : selectedNode.kind === 'on_ui_click' ? (
                     <div style={{ display: 'grid', gap: 12 }}>
                       <div style={{ padding: 12, borderRadius: 10, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.18)' }}>
-                        <p style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.5 }}>🖱 Évènement déclenché quand le joueur clique sur un bouton UI. Reliez à une séquence d&apos;actions.</p>
+                        <p style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.5 }}>Évènement déclenché quand le joueur clique sur un bouton UI. Reliez à une séquence d&apos;actions.</p>
                       </div>
                       <label style={{ display: 'grid', gap: 4 }}>
                         <span className="g-label">ID du bouton</span>
@@ -5702,6 +6463,649 @@ export default function EditeurPage() {
                          'Nœud de calcul. Connectez les entrées A et B.'}
                       </p>
                     </div>
+                  ) : selectedNode.kind === 'round_start' ? (
+                    <div style={{ display: 'grid', gap: 12 }}>
+                      <div style={{ padding: 12, borderRadius: 10, background: 'rgba(67,97,238,0.08)', border: '1px solid rgba(67,97,238,0.18)' }}>
+                        <p style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.5 }}>Démarre une manche. Incrémente le compteur de manches. Connectez à <strong>gen_target_color</strong> pour générer la couleur cible.</p>
+                      </div>
+                      <label style={{ display: 'grid', gap: 4 }}>
+                        <span className="g-label">Nombre total de manches</span>
+                        <input className="g-input" type="number" min={1} max={99} style={{ height: 36, fontSize: 13 }}
+                          value={getNum(selectedNode.params, 'totalRounds', 5)}
+                          onChange={(e) => updateSelectedParams({ totalRounds: Number(e.target.value) })} />
+                      </label>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                        <input type="checkbox" checked={Boolean(selectedNode.params.resetScore)} onChange={(e) => updateSelectedParams({ resetScore: e.target.checked })} />
+                        <span style={{ fontSize: 13 }}>Réinitialiser le score au début</span>
+                      </label>
+                    </div>
+                  ) : selectedNode.kind === 'round_end' ? (
+                    <div style={{ padding: 12, borderRadius: 10, background: 'rgba(67,97,238,0.08)', border: '1px solid rgba(67,97,238,0.18)' }}>
+                      <p style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.5 }}>Marque la fin d&apos;une manche. Émet l&apos;événement <code>round_end</code>. Connectez à <strong>next_round</strong> ou aux nœuds de score.</p>
+                    </div>
+                  ) : selectedNode.kind === 'next_round' ? (
+                    <div style={{ padding: 12, borderRadius: 10, background: 'rgba(67,97,238,0.08)', border: '1px solid rgba(67,97,238,0.18)' }}>
+                      <p style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.5 }}>Passe à la manche suivante. Incrémente le compteur de manches et continue l&apos;exécution.</p>
+                    </div>
+                  ) : selectedNode.kind === 'get_round' ? (
+                    <div style={{ display: 'grid', gap: 12 }}>
+                      <div style={{ padding: 12, borderRadius: 10, background: 'rgba(67,97,238,0.08)', border: '1px solid rgba(67,97,238,0.18)' }}>
+                        <p style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.5 }}>Lit le numéro de manche courant et le stocke dans une variable.</p>
+                      </div>
+                      <label style={{ display: 'grid', gap: 4 }}>
+                        <span className="g-label">Variable destination</span>
+                        <input className="g-input" style={{ height: 36, fontSize: 13 }}
+                          value={String(selectedNode.params.varName ?? 'round')}
+                          onChange={(e) => updateSelectedParams({ varName: e.target.value })} />
+                      </label>
+                    </div>
+                  ) : selectedNode.kind === 'gen_target_color' ? (
+                    <div style={{ display: 'grid', gap: 12 }}>
+                      <div style={{ padding: 12, borderRadius: 10, background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.18)' }}>
+                        <p style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.5 }}>Génère une couleur cible aléatoire et la stocke dans une variable. Peut l&apos;afficher directement sur les dalles.</p>
+                      </div>
+                      <label style={{ display: 'grid', gap: 4 }}>
+                        <span className="g-label">Mode de génération</span>
+                        <select className="g-input" style={{ height: 36, fontSize: 13 }}
+                          value={String(selectedNode.params.mode ?? 'random')}
+                          onChange={(e) => updateSelectedParams({ mode: e.target.value })}>
+                          <option value="random">Aléatoire (RGB)</option>
+                          <option value="blackbody">Température de corps noir</option>
+                          <option value="pastel">Pastel</option>
+                        </select>
+                      </label>
+                      <label style={{ display: 'grid', gap: 4 }}>
+                        <span className="g-label">Variable destination</span>
+                        <input className="g-input" style={{ height: 36, fontSize: 13 }}
+                          value={String(selectedNode.params.varName ?? 'target')}
+                          onChange={(e) => updateSelectedParams({ varName: e.target.value })} />
+                      </label>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                        <input type="checkbox" checked={Boolean(selectedNode.params.displayOnPlates ?? true)} onChange={(e) => updateSelectedParams({ displayOnPlates: e.target.checked })} />
+                        <span style={{ fontSize: 13 }}>Afficher sur les dalles</span>
+                      </label>
+                      {Boolean(selectedNode.params.displayOnPlates ?? true) && (
+                        <label style={{ display: 'grid', gap: 4 }}>
+                          <span className="g-label">Durée d&apos;affichage (secondes)</span>
+                          <input className="g-input" type="number" step={0.5} min={0} max={30} style={{ height: 36, fontSize: 13 }}
+                            value={getNum(selectedNode.params, 'displaySeconds', 3)}
+                            onChange={(e) => updateSelectedParams({ displaySeconds: Number(e.target.value) })} />
+                        </label>
+                      )}
+                    </div>
+                  ) : selectedNode.kind === 'color_distance' ? (
+                    <div style={{ display: 'grid', gap: 12 }}>
+                      <div style={{ padding: 12, borderRadius: 10, background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.18)' }}>
+                        <p style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.5 }}>Calcule la distance ΔE CIE76 entre deux couleurs stockées dans des variables. Résultat : 0 = identique, 100+ = très différent.</p>
+                      </div>
+                      <label style={{ display: 'grid', gap: 4 }}>
+                        <span className="g-label">Variable couleur A (cible)</span>
+                        <input className="g-input" style={{ height: 36, fontSize: 13 }}
+                          value={String(selectedNode.params.colorAVar ?? 'target')}
+                          onChange={(e) => updateSelectedParams({ colorAVar: e.target.value })} />
+                      </label>
+                      <label style={{ display: 'grid', gap: 4 }}>
+                        <span className="g-label">Variable couleur B (joueur)</span>
+                        <input className="g-input" style={{ height: 36, fontSize: 13 }}
+                          value={String(selectedNode.params.colorBVar ?? 'player')}
+                          onChange={(e) => updateSelectedParams({ colorBVar: e.target.value })} />
+                      </label>
+                      <label style={{ display: 'grid', gap: 4 }}>
+                        <span className="g-label">Variable résultat (ΔE)</span>
+                        <input className="g-input" style={{ height: 36, fontSize: 13 }}
+                          value={String(selectedNode.params.varName ?? 'deltaE')}
+                          onChange={(e) => updateSelectedParams({ varName: e.target.value })} />
+                      </label>
+                    </div>
+                  ) : selectedNode.kind === 'color_match_score' ? (
+                    <div style={{ display: 'grid', gap: 12 }}>
+                      <div style={{ padding: 12, borderRadius: 10, background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.18)' }}>
+                        <p style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.5 }}>Convertit un ΔE en score (0–maxScore). Ajoute automatiquement le score au total. ΔE = 0 → score max. ΔE ≥ maxΔE → 0 points.</p>
+                      </div>
+                      <label style={{ display: 'grid', gap: 4 }}>
+                        <span className="g-label">Variable ΔE source</span>
+                        <input className="g-input" style={{ height: 36, fontSize: 13 }}
+                          value={String(selectedNode.params.deltaEVar ?? 'deltaE')}
+                          onChange={(e) => updateSelectedParams({ deltaEVar: e.target.value })} />
+                      </label>
+                      <label style={{ display: 'grid', gap: 4 }}>
+                        <span className="g-label">ΔE maximal (= 0 points)</span>
+                        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                          <input type="range" min={5} max={100} step={1} style={{ flex: 1 }}
+                            value={getNum(selectedNode.params, 'maxDeltaE', 50)}
+                            onChange={(e) => updateSelectedParams({ maxDeltaE: Number(e.target.value) })} />
+                          <span style={{ fontSize: 12, fontWeight: 700, minWidth: 30 }}>ΔE {getNum(selectedNode.params, 'maxDeltaE', 50)}</span>
+                        </div>
+                      </label>
+                      <label style={{ display: 'grid', gap: 4 }}>
+                        <span className="g-label">Score maximal</span>
+                        <input className="g-input" type="number" min={1} max={10000} style={{ height: 36, fontSize: 13 }}
+                          value={getNum(selectedNode.params, 'maxScore', 100)}
+                          onChange={(e) => updateSelectedParams({ maxScore: Number(e.target.value) })} />
+                      </label>
+                    </div>
+                  ) : selectedNode.kind === 'show_target_on_plates' || selectedNode.kind === 'hardware_send_color' ? (
+                    <div style={{ display: 'grid', gap: 12 }}>
+                      <label style={{ display: 'grid', gap: 4 }}>
+                        <span className="g-label">Variable couleur source</span>
+                        <input className="g-input" style={{ height: 36, fontSize: 13 }}
+                          value={String(selectedNode.params.varName ?? 'target')}
+                          onChange={(e) => updateSelectedParams({ varName: e.target.value })} />
+                      </label>
+                      <label style={{ display: 'grid', gap: 4 }}>
+                        <span className="g-label">Intensité</span>
+                        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                          <input type="range" min={0} max={1} step={0.05} style={{ flex: 1 }}
+                            value={clamp01(getNum(selectedNode.params, 'intensity', 0.85))}
+                            onChange={(e) => updateSelectedParams({ intensity: Number(e.target.value) })} />
+                          <span style={{ fontSize: 12, fontWeight: 700, minWidth: 36 }}>{Math.round(clamp01(getNum(selectedNode.params, 'intensity', 0.85)) * 100)}%</span>
+                        </div>
+                      </label>
+                    </div>
+                  ) : selectedNode.kind === 'hardware_flash' ? (
+                    <div style={{ display: 'grid', gap: 12 }}>
+                      <div style={{ padding: 12, borderRadius: 10, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)' }}>
+                        <p style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.5 }}>Flash instantané sur toutes les dalles, puis retour à l&apos;état précédent. Utile pour la rétroaction (bonne/mauvaise réponse).</p>
+                      </div>
+                      <label style={{ display: 'grid', gap: 4 }}>
+                        <span className="g-label">Couleur du flash</span>
+                        <input type="color" value={getColor(selectedNode.params, 'color', '#ffffff')}
+                          onChange={(e) => updateSelectedParams({ color: e.target.value })}
+                          style={{ width: '100%', height: 36, borderRadius: 8, border: '1px solid rgba(0,0,0,0.1)', cursor: 'pointer' }} />
+                      </label>
+                      <label style={{ display: 'grid', gap: 4 }}>
+                        <span className="g-label">Durée (ms)</span>
+                        <input className="g-input" type="number" min={50} max={2000} style={{ height: 36, fontSize: 13 }}
+                          value={getNum(selectedNode.params, 'durationMs', 200)}
+                          onChange={(e) => updateSelectedParams({ durationMs: Number(e.target.value) })} />
+                      </label>
+                    </div>
+                  ) : selectedNode.kind === 'get_player_rgb' ? (
+                    <div style={{ display: 'grid', gap: 12 }}>
+                      <div style={{ padding: 12, borderRadius: 10, background: 'rgba(6,182,212,0.08)', border: '1px solid rgba(6,182,212,0.18)' }}>
+                        <p style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.5 }}>Lit les valeurs actuelles des sliders RGB du joueur et les stocke dans des variables. La couleur combinée est aussi stockée.</p>
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                        <label style={{ display: 'grid', gap: 4 }}>
+                          <span className="g-label">Var R</span>
+                          <input className="g-input" style={{ height: 36, fontSize: 13 }} value={String(selectedNode.params.varR ?? 'playerR')} onChange={(e) => updateSelectedParams({ varR: e.target.value })} />
+                        </label>
+                        <label style={{ display: 'grid', gap: 4 }}>
+                          <span className="g-label">Var G</span>
+                          <input className="g-input" style={{ height: 36, fontSize: 13 }} value={String(selectedNode.params.varG ?? 'playerG')} onChange={(e) => updateSelectedParams({ varG: e.target.value })} />
+                        </label>
+                        <label style={{ display: 'grid', gap: 4 }}>
+                          <span className="g-label">Var B</span>
+                          <input className="g-input" style={{ height: 36, fontSize: 13 }} value={String(selectedNode.params.varB ?? 'playerB')} onChange={(e) => updateSelectedParams({ varB: e.target.value })} />
+                        </label>
+                        <label style={{ display: 'grid', gap: 4 }}>
+                          <span className="g-label">Var couleur</span>
+                          <input className="g-input" style={{ height: 36, fontSize: 13 }} value={String(selectedNode.params.varColor ?? 'player')} onChange={(e) => updateSelectedParams({ varColor: e.target.value })} />
+                        </label>
+                      </div>
+                    </div>
+                  ) : selectedNode.kind === 'countdown_start' ? (
+                    <div style={{ display: 'grid', gap: 12 }}>
+                      <div style={{ padding: 12, borderRadius: 10, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.18)' }}>
+                        <p style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.5 }}>Démarre un compte à rebours. À zéro, déclenche les nœuds <strong>on_countdown_end</strong> avec le même nom de variable.</p>
+                      </div>
+                      <label style={{ display: 'grid', gap: 4 }}>
+                        <span className="g-label">Durée (secondes)</span>
+                        <input className="g-input" type="number" min={1} max={600} style={{ height: 36, fontSize: 13 }}
+                          value={getNum(selectedNode.params, 'seconds', 30)}
+                          onChange={(e) => updateSelectedParams({ seconds: Number(e.target.value) })} />
+                      </label>
+                      <label style={{ display: 'grid', gap: 4 }}>
+                        <span className="g-label">Nom du chronomètre (variable)</span>
+                        <input className="g-input" style={{ height: 36, fontSize: 13 }}
+                          value={String(selectedNode.params.varName ?? 'countdown')}
+                          onChange={(e) => updateSelectedParams({ varName: e.target.value })} />
+                      </label>
+                    </div>
+                  ) : selectedNode.kind === 'countdown_stop' || selectedNode.kind === 'on_countdown_end' ? (
+                    <div style={{ display: 'grid', gap: 12 }}>
+                      <label style={{ display: 'grid', gap: 4 }}>
+                        <span className="g-label">Nom du chronomètre (variable)</span>
+                        <input className="g-input" style={{ height: 36, fontSize: 13 }}
+                          value={String(selectedNode.params.varName ?? 'countdown')}
+                          onChange={(e) => updateSelectedParams({ varName: e.target.value })} />
+                      </label>
+                    </div>
+                  ) : selectedNode.kind === 'wait_event' ? (
+                    <div style={{ display: 'grid', gap: 12 }}>
+                      <div style={{ padding: 12, borderRadius: 10, background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.18)' }}>
+                        <p style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.5 }}>Suspend l&apos;exécution jusqu&apos;à ce que l&apos;événement spécifié soit émis (par <strong>emit_event</strong> ou <strong>on_submit_answer</strong>). Timeout = reprise automatique.</p>
+                      </div>
+                      <label style={{ display: 'grid', gap: 4 }}>
+                        <span className="g-label">Type d&apos;événement</span>
+                        <input className="g-input" style={{ height: 36, fontSize: 13 }}
+                          value={String(selectedNode.params.eventType ?? 'submit')}
+                          onChange={(e) => updateSelectedParams({ eventType: e.target.value })} />
+                      </label>
+                      <label style={{ display: 'grid', gap: 4 }}>
+                        <span className="g-label">Timeout (ms, 0 = infini)</span>
+                        <input className="g-input" type="number" min={0} style={{ height: 36, fontSize: 13 }}
+                          value={getNum(selectedNode.params, 'timeoutMs', 30000)}
+                          onChange={(e) => updateSelectedParams({ timeoutMs: Number(e.target.value) })} />
+                      </label>
+                    </div>
+                  ) : selectedNode.kind === 'emit_event' ? (
+                    <div style={{ display: 'grid', gap: 12 }}>
+                      <label style={{ display: 'grid', gap: 4 }}>
+                        <span className="g-label">Type d&apos;événement à émettre</span>
+                        <input className="g-input" style={{ height: 36, fontSize: 13 }}
+                          value={String(selectedNode.params.eventType ?? 'submit')}
+                          onChange={(e) => updateSelectedParams({ eventType: e.target.value })} />
+                      </label>
+                    </div>
+                  ) : selectedNode.kind === 'on_submit_answer' ? (
+                    <div style={{ padding: 12, borderRadius: 10, background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.18)' }}>
+                      <p style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.5 }}>Déclenché quand le joueur soumet sa réponse (bouton &quot;Soumettre&quot; ou appel à <code>window.__colorroom_submit()</code>). Les sliders joueur doivent être lus via <strong>get_player_rgb</strong>.</p>
+                    </div>
+                  ) : selectedNode.kind === 'score_reset' ? (
+                    <div style={{ padding: 12, borderRadius: 10, background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.18)' }}>
+                      <p style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.5 }}>Remet le score à zéro.</p>
+                    </div>
+                  ) : selectedNode.kind === 'score_set' ? (
+                    <div style={{ display: 'grid', gap: 12 }}>
+                      <label style={{ display: 'grid', gap: 4 }}>
+                        <span className="g-label">Valeur du score</span>
+                        <input className="g-input" type="number" style={{ height: 36, fontSize: 13 }}
+                          value={getNum(selectedNode.params, 'value', 0)}
+                          onChange={(e) => updateSelectedParams({ value: Number(e.target.value) })} />
+                      </label>
+                    </div>
+                  ) : selectedNode.kind === 'score_get' ? (
+                    <div style={{ display: 'grid', gap: 12 }}>
+                      <label style={{ display: 'grid', gap: 4 }}>
+                        <span className="g-label">Variable destination</span>
+                        <input className="g-input" style={{ height: 36, fontSize: 13 }}
+                          value={String(selectedNode.params.varName ?? 'score')}
+                          onChange={(e) => updateSelectedParams({ varName: e.target.value })} />
+                      </label>
+                    </div>
+                  ) : selectedNode.kind === 'var_color_set' ? (
+                    <div style={{ display: 'grid', gap: 12 }}>
+                      <label style={{ display: 'grid', gap: 4 }}>
+                        <span className="g-label">Nom de la variable couleur</span>
+                        <input className="g-input" style={{ height: 36, fontSize: 13 }}
+                          value={String(selectedNode.params.name ?? 'color1')}
+                          onChange={(e) => updateSelectedParams({ name: e.target.value })} />
+                      </label>
+                      <label style={{ display: 'grid', gap: 4 }}>
+                        <span className="g-label">Valeur initiale</span>
+                        <input type="color" value={getColor(selectedNode.params, 'value', '#ff2200')}
+                          onChange={(e) => updateSelectedParams({ value: e.target.value })}
+                          style={{ width: '100%', height: 36, borderRadius: 8, border: '1px solid rgba(0,0,0,0.1)', cursor: 'pointer' }} />
+                      </label>
+                    </div>
+                  ) : selectedNode.kind === 'var_color_get' ? (
+                    <div style={{ display: 'grid', gap: 12 }}>
+                      <label style={{ display: 'grid', gap: 4 }}>
+                        <span className="g-label">Variable source</span>
+                        <input className="g-input" style={{ height: 36, fontSize: 13 }}
+                          value={String(selectedNode.params.name ?? 'color1')}
+                          onChange={(e) => updateSelectedParams({ name: e.target.value })} />
+                      </label>
+                      <label style={{ display: 'grid', gap: 4 }}>
+                        <span className="g-label">Variable destination</span>
+                        <input className="g-input" style={{ height: 36, fontSize: 13 }}
+                          value={String(selectedNode.params.varName ?? 'myColor')}
+                          onChange={(e) => updateSelectedParams({ varName: e.target.value })} />
+                      </label>
+                    </div>
+
+                  ) : selectedNode.kind === 'array_literal' ? (
+                    <div style={{ display: 'grid', gap: 12 }}>
+                      <div style={{ padding: 10, borderRadius: 10, background: 'rgba(99,102,241,0.07)', border: '1px solid rgba(99,102,241,0.18)', fontSize: 12, color: 'var(--c-content)', lineHeight: 1.5 }}>
+                        Tableau initialisé avec des valeurs fixes. Séparez par des virgules. Utilisez <code>null</code> pour une cellule vide.
+                      </div>
+                      <label style={{ display: 'grid', gap: 4 }}>
+                        <span className="g-label">Nom du tableau</span>
+                        <input className="g-input" style={{ height: 36, fontSize: 13 }}
+                          value={String(selectedNode.params.name ?? 'arr')}
+                          onChange={(e) => updateSelectedParams({ name: e.target.value })} />
+                      </label>
+                      <label style={{ display: 'grid', gap: 4 }}>
+                        <span className="g-label">Valeurs (séparées par virgules)</span>
+                        <textarea className="g-input" rows={4} style={{ fontSize: 12, fontFamily: 'monospace', resize: 'vertical', lineHeight: 1.5 }}
+                          value={String(selectedNode.params.values ?? '')}
+                          placeholder="1,0,1,0,null,1,..."
+                          onChange={(e) => updateSelectedParams({ values: e.target.value })} />
+                      </label>
+                      <div style={{ fontSize: 11, color: 'var(--c-content)', opacity: 0.5 }}>
+                        Longueur actuelle : {String(selectedNode.params.values ?? '').split(',').filter(v => v.trim() !== '').length} éléments
+                      </div>
+                    </div>
+
+                  ) : selectedNode.kind === 'for_range' ? (
+                    <div style={{ display: 'grid', gap: 12 }}>
+                      <div style={{ padding: 10, borderRadius: 10, background: 'rgba(99,102,241,0.07)', border: '1px solid rgba(99,102,241,0.18)', fontSize: 12, lineHeight: 1.5 }}>
+                        Exécute le <strong>Corps de boucle</strong> pour chaque valeur de <em>i</em>. Après la boucle, suit les connexions normales.
+                      </div>
+                      <label style={{ display: 'grid', gap: 4 }}>
+                        <span className="g-label">Variable compteur (i)</span>
+                        <input className="g-input" style={{ height: 36, fontSize: 13 }}
+                          value={String(selectedNode.params.varName ?? 'i')}
+                          onChange={(e) => updateSelectedParams({ varName: e.target.value })} />
+                      </label>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+                        <label style={{ display: 'grid', gap: 4 }}>
+                          <span className="g-label">Début</span>
+                          <input className="g-input" type="number" style={{ height: 36, fontSize: 13 }}
+                            value={getNum(selectedNode.params, 'start', 0)}
+                            onChange={(e) => updateSelectedParams({ start: Number(e.target.value) })} />
+                        </label>
+                        <label style={{ display: 'grid', gap: 4 }}>
+                          <span className="g-label">Fin (inclus)</span>
+                          <input className="g-input" type="number" style={{ height: 36, fontSize: 13 }}
+                            value={getNum(selectedNode.params, 'end', 41)}
+                            onChange={(e) => updateSelectedParams({ end: Number(e.target.value) })} />
+                        </label>
+                        <label style={{ display: 'grid', gap: 4 }}>
+                          <span className="g-label">Pas</span>
+                          <input className="g-input" type="number" min={1} style={{ height: 36, fontSize: 13 }}
+                            value={getNum(selectedNode.params, 'step', 1)}
+                            onChange={(e) => updateSelectedParams({ step: Math.max(1, Number(e.target.value)) })} />
+                        </label>
+                      </div>
+                      <label style={{ display: 'grid', gap: 4 }}>
+                        <span className="g-label">Corps de boucle (nœud exécuté à chaque tour)</span>
+                        <select className="g-input" style={{ height: 36, fontSize: 13 }}
+                          value={String(selectedNode.params.bodyNodeId ?? '')}
+                          onChange={(e) => updateSelectedParams({ bodyNodeId: e.target.value })}>
+                          <option value="">- Aucun -</option>
+                          {activeGame?.nodes.filter(n => n.id !== selectedNode.id).map(n => (
+                            <option key={n.id} value={n.id}>{n.name} ({n.kind})</option>
+                          ))}
+                        </select>
+                      </label>
+                      <div style={{ padding: 8, borderRadius: 8, background: 'rgba(0,0,0,0.04)', fontSize: 11, opacity: 0.6 }}>
+                        Plage : {getNum(selectedNode.params,'start',0)} → {getNum(selectedNode.params,'end',41)}, pas {getNum(selectedNode.params,'step',1)} → {Math.max(0, Math.floor((getNum(selectedNode.params,'end',41) - getNum(selectedNode.params,'start',0)) / Math.max(1,getNum(selectedNode.params,'step',1))) + 1)} itérations
+                      </div>
+                    </div>
+
+                  ) : selectedNode.kind === 'for_each_array' ? (
+                    <div style={{ display: 'grid', gap: 12 }}>
+                      <div style={{ padding: 10, borderRadius: 10, background: 'rgba(99,102,241,0.07)', border: '1px solid rgba(99,102,241,0.18)', fontSize: 12, lineHeight: 1.5 }}>
+                        Itère sur chaque élément d&apos;un tableau. La variable <em>item</em> contient la valeur courante.
+                      </div>
+                      <label style={{ display: 'grid', gap: 4 }}>
+                        <span className="g-label">Tableau source</span>
+                        <input className="g-input" style={{ height: 36, fontSize: 13 }}
+                          value={String(selectedNode.params.arrayName ?? 'arr')}
+                          onChange={(e) => updateSelectedParams({ arrayName: e.target.value })} />
+                      </label>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                        <label style={{ display: 'grid', gap: 4 }}>
+                          <span className="g-label">Variable valeur</span>
+                          <input className="g-input" style={{ height: 36, fontSize: 13 }}
+                            value={String(selectedNode.params.varName ?? 'item')}
+                            onChange={(e) => updateSelectedParams({ varName: e.target.value })} />
+                        </label>
+                        <label style={{ display: 'grid', gap: 4 }}>
+                          <span className="g-label">Variable index (optionnel)</span>
+                          <input className="g-input" style={{ height: 36, fontSize: 13 }}
+                            value={String(selectedNode.params.indexVar ?? '')}
+                            placeholder="idx"
+                            onChange={(e) => updateSelectedParams({ indexVar: e.target.value || undefined })} />
+                        </label>
+                      </div>
+                      <label style={{ display: 'grid', gap: 4 }}>
+                        <span className="g-label">Corps de boucle (nœud exécuté à chaque élément)</span>
+                        <select className="g-input" style={{ height: 36, fontSize: 13 }}
+                          value={String(selectedNode.params.bodyNodeId ?? '')}
+                          onChange={(e) => updateSelectedParams({ bodyNodeId: e.target.value })}>
+                          <option value="">- Aucun -</option>
+                          {activeGame?.nodes.filter(n => n.id !== selectedNode.id).map(n => (
+                            <option key={n.id} value={n.id}>{n.name} ({n.kind})</option>
+                          ))}
+                        </select>
+                      </label>
+                    </div>
+
+                  ) : selectedNode.kind === 'array_create' ? (
+                    <div style={{ display: 'grid', gap: 12 }}>
+                      <label style={{ display: 'grid', gap: 4 }}>
+                        <span className="g-label">Nom du tableau</span>
+                        <input className="g-input" style={{ height: 36, fontSize: 13 }}
+                          value={String(selectedNode.params.name ?? 'arr')}
+                          onChange={(e) => updateSelectedParams({ name: e.target.value })} />
+                      </label>
+                      <label style={{ display: 'grid', gap: 4 }}>
+                        <span className="g-label">Taille</span>
+                        <input className="g-input" type="number" min={0} max={10000} style={{ height: 36, fontSize: 13 }}
+                          value={getNum(selectedNode.params, 'size', 42)}
+                          onChange={(e) => updateSelectedParams({ size: Number(e.target.value) })} />
+                      </label>
+                      <label style={{ display: 'grid', gap: 4 }}>
+                        <span className="g-label">Valeur initiale (null = vide)</span>
+                        <input className="g-input" style={{ height: 36, fontSize: 13 }}
+                          value={selectedNode.params.initValue === null || selectedNode.params.initValue === undefined ? 'null' : String(selectedNode.params.initValue)}
+                          onChange={(e) => { const v = e.target.value; updateSelectedParams({ initValue: v === 'null' ? null : isNaN(Number(v)) ? v : Number(v) }); }} />
+                      </label>
+                    </div>
+
+                  ) : selectedNode.kind === 'array_get' || selectedNode.kind === 'tile_get_var' ? (
+                    <div style={{ display: 'grid', gap: 12 }}>
+                      {selectedNode.kind === 'array_get' && <label style={{ display: 'grid', gap: 4 }}><span className="g-label">Tableau</span><input className="g-input" style={{ height: 36, fontSize: 13 }} value={String(selectedNode.params.arrayName ?? 'arr')} onChange={(e) => updateSelectedParams({ arrayName: e.target.value })} /></label>}
+                      <label style={{ display: 'grid', gap: 4 }}>
+                        <span className="g-label">Variable index</span>
+                        <input className="g-input" style={{ height: 36, fontSize: 13 }}
+                          value={String(selectedNode.params.indexVar ?? 'i')}
+                          onChange={(e) => updateSelectedParams({ indexVar: e.target.value })} />
+                      </label>
+                      <label style={{ display: 'grid', gap: 4 }}>
+                        <span className="g-label">Variable résultat</span>
+                        <input className="g-input" style={{ height: 36, fontSize: 13 }}
+                          value={String(selectedNode.params[selectedNode.kind === 'tile_get_var' ? 'outColorVar' : 'outVar'] ?? (selectedNode.kind === 'tile_get_var' ? 'tileColor' : 'item'))}
+                          onChange={(e) => updateSelectedParams({ [selectedNode.kind === 'tile_get_var' ? 'outColorVar' : 'outVar']: e.target.value })} />
+                      </label>
+                    </div>
+
+                  ) : selectedNode.kind === 'array_set' || selectedNode.kind === 'tile_set_var' ? (
+                    <div style={{ display: 'grid', gap: 12 }}>
+                      {selectedNode.kind === 'array_set' && <label style={{ display: 'grid', gap: 4 }}><span className="g-label">Tableau</span><input className="g-input" style={{ height: 36, fontSize: 13 }} value={String(selectedNode.params.arrayName ?? 'arr')} onChange={(e) => updateSelectedParams({ arrayName: e.target.value })} /></label>}
+                      <label style={{ display: 'grid', gap: 4 }}>
+                        <span className="g-label">Variable index</span>
+                        <input className="g-input" style={{ height: 36, fontSize: 13 }}
+                          value={String(selectedNode.params.indexVar ?? 'i')}
+                          onChange={(e) => updateSelectedParams({ indexVar: e.target.value })} />
+                      </label>
+                      {selectedNode.kind === 'array_set' && (
+                        <label style={{ display: 'grid', gap: 4 }}>
+                          <span className="g-label">Variable valeur</span>
+                          <input className="g-input" style={{ height: 36, fontSize: 13 }}
+                            value={String(selectedNode.params.valueVar ?? 'val')}
+                            onChange={(e) => updateSelectedParams({ valueVar: e.target.value })} />
+                        </label>
+                      )}
+                      {selectedNode.kind === 'tile_set_var' && (
+                        <>
+                          <label style={{ display: 'grid', gap: 4 }}>
+                            <span className="g-label">Variable couleur (color var)</span>
+                            <input className="g-input" style={{ height: 36, fontSize: 13 }}
+                              value={String(selectedNode.params.colorVar ?? 'color')}
+                              onChange={(e) => updateSelectedParams({ colorVar: e.target.value })} />
+                          </label>
+                          <label style={{ display: 'grid', gap: 4 }}>
+                            <span className="g-label">Intensité (0–1)</span>
+                            <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                              <input type="range" min={0} max={1} step={0.05} style={{ flex: 1 }}
+                                value={clamp01(getNum(selectedNode.params, 'intensity', 0.85))}
+                                onChange={(e) => updateSelectedParams({ intensity: Number(e.target.value) })} />
+                              <span style={{ fontSize: 12, fontWeight: 700, minWidth: 36 }}>{Math.round(clamp01(getNum(selectedNode.params, 'intensity', 0.85)) * 100)}%</span>
+                            </div>
+                          </label>
+                        </>
+                      )}
+                    </div>
+
+                  ) : selectedNode.kind === 'tiles_from_array' || selectedNode.kind === 'grid_sync_tiles' ? (
+                    <div style={{ display: 'grid', gap: 12 }}>
+                      <div style={{ padding: 10, borderRadius: 10, background: 'rgba(67,97,238,0.07)', border: '1px solid rgba(67,97,238,0.18)', fontSize: 12, lineHeight: 1.5 }}>
+                        {selectedNode.kind === 'tiles_from_array' ? 'Synchronise un tableau 1D de couleurs vers les 42 dalles LED.' : 'Synchronise une grille 2D vers les dalles LED (colonne-majeur).'}
+                      </div>
+                      <label style={{ display: 'grid', gap: 4 }}>
+                        <span className="g-label">{selectedNode.kind === 'grid_sync_tiles' ? 'Nom de la grille' : 'Nom du tableau'}</span>
+                        <input className="g-input" style={{ height: 36, fontSize: 13 }}
+                          value={String(selectedNode.params[selectedNode.kind === 'grid_sync_tiles' ? 'name' : 'arrayName'] ?? (selectedNode.kind === 'grid_sync_tiles' ? 'grid' : 'arr'))}
+                          onChange={(e) => updateSelectedParams({ [selectedNode.kind === 'grid_sync_tiles' ? 'name' : 'arrayName']: e.target.value })} />
+                      </label>
+                      <label style={{ display: 'grid', gap: 4 }}>
+                        <span className="g-label">Couleur fond (cellule nulle)</span>
+                        <input type="color" value={getColor(selectedNode.params, 'bgColor', '#000000')}
+                          onChange={(e) => updateSelectedParams({ bgColor: e.target.value })}
+                          style={{ width: '100%', height: 36, borderRadius: 8, border: '1px solid rgba(0,0,0,0.1)', cursor: 'pointer' }} />
+                      </label>
+                      {selectedNode.kind === 'tiles_from_array' && (
+                        <label style={{ display: 'grid', gap: 4 }}>
+                          <span className="g-label">Intensité des dalles actives</span>
+                          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                            <input type="range" min={0} max={1} step={0.05} style={{ flex: 1 }}
+                              value={clamp01(getNum(selectedNode.params, 'intensity', 0.85))}
+                              onChange={(e) => updateSelectedParams({ intensity: Number(e.target.value) })} />
+                            <span style={{ fontSize: 12, fontWeight: 700, minWidth: 36 }}>{Math.round(clamp01(getNum(selectedNode.params, 'intensity', 0.85)) * 100)}%</span>
+                          </div>
+                        </label>
+                      )}
+                    </div>
+
+                  ) : selectedNode.kind === 'grid_create' ? (
+                    <div style={{ display: 'grid', gap: 12 }}>
+                      <label style={{ display: 'grid', gap: 4 }}>
+                        <span className="g-label">Nom de la grille</span>
+                        <input className="g-input" style={{ height: 36, fontSize: 13 }}
+                          value={String(selectedNode.params.name ?? 'grid')}
+                          onChange={(e) => updateSelectedParams({ name: e.target.value })} />
+                      </label>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                        <label style={{ display: 'grid', gap: 4 }}>
+                          <span className="g-label">Colonnes</span>
+                          <input className="g-input" type="number" min={1} max={42} style={{ height: 36, fontSize: 13 }}
+                            value={getNum(selectedNode.params, 'cols', 6)}
+                            onChange={(e) => updateSelectedParams({ cols: Number(e.target.value) })} />
+                        </label>
+                        <label style={{ display: 'grid', gap: 4 }}>
+                          <span className="g-label">Lignes</span>
+                          <input className="g-input" type="number" min={1} max={42} style={{ height: 36, fontSize: 13 }}
+                            value={getNum(selectedNode.params, 'rows', 7)}
+                            onChange={(e) => updateSelectedParams({ rows: Number(e.target.value) })} />
+                        </label>
+                      </div>
+                      <div style={{ padding: 8, borderRadius: 8, background: 'rgba(0,0,0,0.04)', fontSize: 11, opacity: 0.6 }}>
+                        {getNum(selectedNode.params,'cols',6)} × {getNum(selectedNode.params,'rows',7)} = {getNum(selectedNode.params,'cols',6) * getNum(selectedNode.params,'rows',7)} cellules - variables auto : <code>{String(selectedNode.params.name??'grid')}_cols</code>, <code>{String(selectedNode.params.name??'grid')}_rows</code>
+                      </div>
+                      <label style={{ display: 'grid', gap: 4 }}>
+                        <span className="g-label">Valeur initiale (null = vide)</span>
+                        <input className="g-input" style={{ height: 36, fontSize: 13 }}
+                          value={selectedNode.params.initValue === null || selectedNode.params.initValue === undefined ? 'null' : String(selectedNode.params.initValue)}
+                          onChange={(e) => { const v = e.target.value; updateSelectedParams({ initValue: v === 'null' ? null : isNaN(Number(v)) ? v : Number(v) }); }} />
+                      </label>
+                    </div>
+
+                  ) : selectedNode.kind === 'grid_get' || selectedNode.kind === 'grid_set' ? (
+                    <div style={{ display: 'grid', gap: 12 }}>
+                      <label style={{ display: 'grid', gap: 4 }}>
+                        <span className="g-label">Nom de la grille</span>
+                        <input className="g-input" style={{ height: 36, fontSize: 13 }}
+                          value={String(selectedNode.params.name ?? 'grid')}
+                          onChange={(e) => updateSelectedParams({ name: e.target.value })} />
+                      </label>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                        <label style={{ display: 'grid', gap: 4 }}>
+                          <span className="g-label">Variable colonne</span>
+                          <input className="g-input" style={{ height: 36, fontSize: 13 }}
+                            value={String(selectedNode.params.colVar ?? 'col')}
+                            onChange={(e) => updateSelectedParams({ colVar: e.target.value })} />
+                        </label>
+                        <label style={{ display: 'grid', gap: 4 }}>
+                          <span className="g-label">Variable ligne</span>
+                          <input className="g-input" style={{ height: 36, fontSize: 13 }}
+                            value={String(selectedNode.params.rowVar ?? 'row')}
+                            onChange={(e) => updateSelectedParams({ rowVar: e.target.value })} />
+                        </label>
+                      </div>
+                      {selectedNode.kind === 'grid_get'
+                        ? <label style={{ display: 'grid', gap: 4 }}><span className="g-label">Variable résultat</span><input className="g-input" style={{ height: 36, fontSize: 13 }} value={String(selectedNode.params.outVar ?? 'cell')} onChange={(e) => updateSelectedParams({ outVar: e.target.value })} /></label>
+                        : <label style={{ display: 'grid', gap: 4 }}><span className="g-label">Variable valeur à écrire</span><input className="g-input" style={{ height: 36, fontSize: 13 }} value={String(selectedNode.params.valueVar ?? 'val')} onChange={(e) => updateSelectedParams({ valueVar: e.target.value })} /></label>
+                      }
+                    </div>
+
+                  ) : selectedNode.kind === 'grid_check_4_in_row' ? (
+                    <div style={{ display: 'grid', gap: 12 }}>
+                      <div style={{ padding: 10, borderRadius: 10, background: 'rgba(234,179,8,0.08)', border: '1px solid rgba(234,179,8,0.2)', fontSize: 12, lineHeight: 1.5 }}>
+                        Vérifie si la valeur de <em>valueVar</em> forme 4 cellules consécutives dans la grille (horizontal, vertical, diagonal). Résultat dans <em>outVar</em> : 1 = gagné, 0 = non.
+                      </div>
+                      <label style={{ display: 'grid', gap: 4 }}>
+                        <span className="g-label">Nom de la grille</span>
+                        <input className="g-input" style={{ height: 36, fontSize: 13 }}
+                          value={String(selectedNode.params.name ?? 'grid')}
+                          onChange={(e) => updateSelectedParams({ name: e.target.value })} />
+                      </label>
+                      <label style={{ display: 'grid', gap: 4 }}>
+                        <span className="g-label">Variable valeur à chercher</span>
+                        <input className="g-input" style={{ height: 36, fontSize: 13 }}
+                          value={String(selectedNode.params.valueVar ?? 'lastColor')}
+                          onChange={(e) => updateSelectedParams({ valueVar: e.target.value })} />
+                      </label>
+                      <label style={{ display: 'grid', gap: 4 }}>
+                        <span className="g-label">Variable résultat (0/1)</span>
+                        <input className="g-input" style={{ height: 36, fontSize: 13 }}
+                          value={String(selectedNode.params.outVar ?? 'hasWon')}
+                          onChange={(e) => updateSelectedParams({ outVar: e.target.value })} />
+                      </label>
+                    </div>
+
+                  ) : selectedNode.kind === 'define_sub' || selectedNode.kind === 'call_sub' ? (
+                    <div style={{ display: 'grid', gap: 12 }}>
+                      <div style={{ padding: 10, borderRadius: 10, background: 'rgba(124,58,237,0.07)', border: '1px solid rgba(124,58,237,0.18)', fontSize: 12, lineHeight: 1.5 }}>
+                        {selectedNode.kind === 'define_sub' ? 'Définit un sous-programme réutilisable. Les nœuds connectés en sortie forment le corps du sous-programme.' : 'Appelle un sous-programme défini par un nœud define_sub. L\'exécution revient ensuite à la suite.'}
+                      </div>
+                      <label style={{ display: 'grid', gap: 4 }}>
+                        <span className="g-label">Nom du sous-programme</span>
+                        <input className="g-input" style={{ height: 36, fontSize: 13 }}
+                          value={String(selectedNode.params.name ?? 'mySub')}
+                          onChange={(e) => updateSelectedParams({ name: e.target.value })} />
+                      </label>
+                      {selectedNode.kind === 'call_sub' && (
+                        <div style={{ fontSize: 11, opacity: 0.6 }}>
+                          Sous-programmes définis : {activeGame?.nodes.filter(n => n.kind === 'define_sub').map(n => String(n.params.name ?? 'mySub')).join(', ') || '(aucun)'}
+                        </div>
+                      )}
+                    </div>
+
+                  ) : ['math_mod','math_min','math_max','math_pow'].includes(selectedNode.kind) ? (
+                    <div style={{ display: 'grid', gap: 12 }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                        <label style={{ display: 'grid', gap: 4 }}><span className="g-label">Variable a</span><input className="g-input" style={{ height: 36, fontSize: 13 }} value={String(selectedNode.params.aVar ?? 'a')} onChange={(e) => updateSelectedParams({ aVar: e.target.value })} /></label>
+                        <label style={{ display: 'grid', gap: 4 }}><span className="g-label">Variable b</span><input className="g-input" style={{ height: 36, fontSize: 13 }} value={String(selectedNode.params.bVar ?? 'b')} onChange={(e) => updateSelectedParams({ bVar: e.target.value })} /></label>
+                      </div>
+                      <label style={{ display: 'grid', gap: 4 }}><span className="g-label">Variable résultat</span><input className="g-input" style={{ height: 36, fontSize: 13 }} value={String(selectedNode.params.outVar ?? 'result')} onChange={(e) => updateSelectedParams({ outVar: e.target.value })} /></label>
+                    </div>
+
+                  ) : ['math_floor','math_ceil','math_round','math_abs','math_sqrt'].includes(selectedNode.kind) ? (
+                    <div style={{ display: 'grid', gap: 12 }}>
+                      <label style={{ display: 'grid', gap: 4 }}><span className="g-label">Variable x</span><input className="g-input" style={{ height: 36, fontSize: 13 }} value={String(selectedNode.params.varName ?? 'x')} onChange={(e) => updateSelectedParams({ varName: e.target.value })} /></label>
+                      <label style={{ display: 'grid', gap: 4 }}><span className="g-label">Variable résultat</span><input className="g-input" style={{ height: 36, fontSize: 13 }} value={String(selectedNode.params.outVar ?? 'result')} onChange={(e) => updateSelectedParams({ outVar: e.target.value })} /></label>
+                    </div>
+
+                  ) : selectedNode.kind === 'string_concat' ? (
+                    <div style={{ display: 'grid', gap: 12 }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                        <label style={{ display: 'grid', gap: 4 }}><span className="g-label">Variable a</span><input className="g-input" style={{ height: 36, fontSize: 13 }} value={String(selectedNode.params.aVar ?? 'a')} onChange={(e) => updateSelectedParams({ aVar: e.target.value })} /></label>
+                        <label style={{ display: 'grid', gap: 4 }}><span className="g-label">Variable b</span><input className="g-input" style={{ height: 36, fontSize: 13 }} value={String(selectedNode.params.bVar ?? 'b')} onChange={(e) => updateSelectedParams({ bVar: e.target.value })} /></label>
+                      </div>
+                      <label style={{ display: 'grid', gap: 4 }}><span className="g-label">Variable résultat</span><input className="g-input" style={{ height: 36, fontSize: 13 }} value={String(selectedNode.params.outVar ?? 'result')} onChange={(e) => updateSelectedParams({ outVar: e.target.value })} /></label>
+                    </div>
+
+                  ) : selectedNode.kind === 'string_from_num' ? (
+                    <div style={{ display: 'grid', gap: 12 }}>
+                      <label style={{ display: 'grid', gap: 4 }}><span className="g-label">Variable nombre</span><input className="g-input" style={{ height: 36, fontSize: 13 }} value={String(selectedNode.params.varName ?? 'x')} onChange={(e) => updateSelectedParams({ varName: e.target.value })} /></label>
+                      <label style={{ display: 'grid', gap: 4 }}><span className="g-label">Variable texte résultat</span><input className="g-input" style={{ height: 36, fontSize: 13 }} value={String(selectedNode.params.outVar ?? 'text')} onChange={(e) => updateSelectedParams({ outVar: e.target.value })} /></label>
+                      <label style={{ display: 'grid', gap: 4 }}><span className="g-label">Décimales</span><input className="g-input" type="number" min={0} max={10} style={{ height: 36, fontSize: 13 }} value={getNum(selectedNode.params,'decimals',0)} onChange={(e) => updateSelectedParams({ decimals: Number(e.target.value) })} /></label>
+                    </div>
+
                   ) : (
                     <>
                       <label style={{ display: 'grid', gap: 4 }}>
@@ -6178,7 +7582,7 @@ export default function EditeurPage() {
                 }}
               >
                 <div style={{ display: 'grid', gap: 14, width: '100%', maxWidth: 560 }}>
-                  {/* Grille de dalles — layout physique ColorRoom : 6 cols × 7 rows */}
+                  {/* Grille de dalles - layout physique ColorRoom : 6 cols × 7 rows */}
                   <div style={{ background: '#0a0c14', borderRadius: 16, padding: 14, border: '1px solid #1e2030' }}>
                     {/* Légendes salles */}
                     <div style={{ display: 'flex', gap: 8, marginBottom: 6 }}>

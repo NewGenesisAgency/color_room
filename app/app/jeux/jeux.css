@@ -7,7 +7,7 @@
 }
 
 /* ============================================================
-   ColorRoomGames /jeux — Liquid Glass Design System v3
+   ColorRoomGames /jeux - Liquid Glass Design System v3
    White background with frosted glass surfaces
    ============================================================ */
 
@@ -17,7 +17,7 @@
   --bg-2:       #ffffff;
   --bg-3:       #eef1f8;
 
-  /* Surfaces — liquid glass */
+  /* Surfaces - liquid glass */
   --surface:    rgba(255,255,255,0.72);
   --surface-2:  rgba(255,255,255,0.86);
   --surface-3:  rgba(255,255,255,0.96);
@@ -178,7 +178,7 @@
 }
 
 /* ══════════════════════════════════════════════
-   LOGIN — Nouveau système avancé liquid glass
+   LOGIN - Nouveau système avancé liquid glass
    ══════════════════════════════════════════════ */
 
 .jeux .login-wrap {
@@ -603,19 +603,23 @@
   width: 36px;
   height: 36px;
   border-radius: 10px;
-  border: 1px solid rgba(255,255,255,0.6);
-  background: rgba(255,255,255,0.7);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  border: none;
+  /* background and box-shadow are set via inline style per-game */
+  color: #fff;
   display: grid;
   place-items: center;
   cursor: pointer;
   flex-shrink: 0;
-  transition: all 140ms;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.9), 0 2px 6px rgba(0,0,0,0.06);
+  transition: all 140ms ease;
 }
 
-.jeux .play-btn:hover { transform: scale(1.08); box-shadow: 0 4px 14px rgba(67,97,238,0.18); }
+.jeux .play-btn:hover {
+  transform: scale(1.1);
+  box-shadow: 0 6px 18px rgba(67,97,238,0.5), inset 0 1px 0 rgba(255,255,255,0.28);
+  filter: brightness(1.08);
+}
+
+.jeux .play-btn:active { transform: scale(0.97); }
 
 /* ---- Light plates ---- */
 .jeux .light-plates-grid {
@@ -839,6 +843,54 @@
 .jeux .led-slider--green input[type='range']::-webkit-slider-runnable-track { background: linear-gradient(90deg, rgba(0,0,0,0.05), rgba(5,150,105,0.35)); }
 .jeux .led-slider--blue input[type='range']::-webkit-slider-runnable-track { background: linear-gradient(90deg, rgba(0,0,0,0.05), rgba(67,97,238,0.45)); }
 .jeux .led-slider--intensity input[type='range']::-webkit-slider-runnable-track { background: linear-gradient(90deg, rgba(0,0,0,0.04), rgba(0,0,0,0.22)); }
+
+/* ---- Scene selector - liquid glass ---- */
+.jeux .scene-selector {
+  width: 100%;
+  padding: 11px 38px 11px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,0.72);
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%231a1d2e' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 12px center / 16px 16px,
+    rgba(255,255,255,0.62);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  color: var(--text);
+  font-size: 13px;
+  font-family: inherit;
+  font-weight: 600;
+  outline: none;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.88),
+    inset 0 -1px 0 rgba(0,0,0,0.03),
+    0 2px 8px rgba(0,0,0,0.06),
+    0 1px 2px rgba(0,0,0,0.04);
+  transition: border-color 160ms, box-shadow 160ms, background-color 160ms;
+  margin-bottom: 10px;
+}
+.jeux .scene-selector:hover {
+  border-color: rgba(255,255,255,0.95);
+  background-color: rgba(255,255,255,0.82);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,1),
+    0 4px 14px rgba(67,97,238,0.10),
+    0 1px 4px rgba(0,0,0,0.06);
+}
+.jeux .scene-selector:focus {
+  border-color: rgba(67,97,238,0.35);
+  background-color: rgba(255,255,255,0.92);
+  box-shadow:
+    0 0 0 3px rgba(67,97,238,0.12),
+    inset 0 1px 0 rgba(255,255,255,1);
+}
+.jeux .scene-selector option {
+  background: #fff;
+  color: var(--text);
+  font-weight: 500;
+}
 
 /* ---- Scene scope buttons ---- */
 .jeux .scene-scope { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
@@ -1073,3 +1125,544 @@
 .jeux .panel h3 {
   color: var(--text-3);
 }
+
+/* ══════════════════════════════════════════════
+   ROOM SYSTEM - Liquid Glass Modals
+   ══════════════════════════════════════════════ */
+
+/* ---- Full overlay backdrop ---- */
+.jeux .room-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 18, 35, 0.55);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  z-index: 1100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  animation: roomOverlayIn 220ms ease;
+}
+
+@keyframes roomOverlayIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* ---- Modal card ---- */
+.jeux .room-modal {
+  width: min(520px, 100%);
+  background: rgba(255,255,255,0.92);
+  backdrop-filter: blur(40px) saturate(200%);
+  -webkit-backdrop-filter: blur(40px) saturate(200%);
+  border: 1px solid rgba(255,255,255,0.95);
+  border-radius: 28px;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,1),
+    inset 0 -1px 0 rgba(0,0,0,0.04),
+    0 24px 80px rgba(0,0,0,0.18),
+    0 8px 32px rgba(67,97,238,0.12);
+  overflow: hidden;
+  animation: roomModalIn 280ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes roomModalIn {
+  from { transform: scale(0.92) translateY(16px); opacity: 0; }
+  to   { transform: scale(1) translateY(0); opacity: 1; }
+}
+
+/* ---- Modal wide (lobby) ---- */
+.jeux .room-modal--wide {
+  width: min(680px, 100%);
+}
+
+/* ---- Modal header ---- */
+.jeux .room-modal-header {
+  padding: 28px 32px 20px;
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  border-bottom: 1px solid rgba(0,0,0,0.06);
+}
+
+.jeux .room-modal-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.jeux .room-modal-icon--blue {
+  background: linear-gradient(135deg, rgba(67,97,238,0.15), rgba(67,97,238,0.06));
+  color: var(--accent);
+}
+.jeux .room-modal-icon--green {
+  background: linear-gradient(135deg, rgba(5,150,105,0.15), rgba(5,150,105,0.06));
+  color: #059669;
+}
+.jeux .room-modal-icon--purple {
+  background: linear-gradient(135deg, rgba(124,58,237,0.15), rgba(124,58,237,0.06));
+  color: #7c3aed;
+}
+.jeux .room-modal-icon--gold {
+  background: linear-gradient(135deg, rgba(217,119,6,0.15), rgba(217,119,6,0.06));
+  color: #d97706;
+}
+
+.jeux .room-modal-title {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--text);
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+.jeux .room-modal-sub {
+  font-size: 13px;
+  color: var(--text-2);
+  margin-top: 3px;
+}
+
+/* ---- Modal body ---- */
+.jeux .room-modal-body {
+  padding: 24px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+/* ---- Modal footer ---- */
+.jeux .room-modal-footer {
+  padding: 18px 32px 24px;
+  display: flex;
+  gap: 10px;
+  border-top: 1px solid rgba(0,0,0,0.05);
+}
+
+.jeux .room-modal-footer .btn { margin: 0; }
+
+/* ---- Form field ---- */
+.jeux .room-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.jeux .room-field label {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-2);
+}
+
+.jeux .room-field input,
+.jeux .room-field select {
+  width: 100%;
+  padding: 12px 16px;
+  border: 1px solid var(--border-2);
+  border-radius: 12px;
+  background: rgba(255,255,255,0.72);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  color: var(--text);
+  font-size: 14px;
+  font-family: inherit;
+  font-weight: 500;
+  outline: none;
+  transition: all 160ms;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.9), 0 1px 4px rgba(0,0,0,0.05);
+}
+
+.jeux .room-field input:focus,
+.jeux .room-field select:focus {
+  border-color: rgba(67,97,238,0.4);
+  box-shadow: 0 0 0 3px rgba(67,97,238,0.10), inset 0 1px 0 rgba(255,255,255,1);
+}
+
+/* ---- Code input (big) ---- */
+.jeux .room-code-input {
+  text-align: center !important;
+  font-size: 28px !important;
+  font-weight: 900 !important;
+  letter-spacing: 0.25em !important;
+  text-transform: uppercase !important;
+  padding: 16px !important;
+}
+
+/* ---- Room code display ---- */
+.jeux .room-code-display {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 20px;
+  border-radius: 14px;
+  background: rgba(67,97,238,0.07);
+  border: 1.5px dashed rgba(67,97,238,0.3);
+}
+
+.jeux .room-code-display-value {
+  flex: 1;
+  font-size: 26px;
+  font-weight: 900;
+  letter-spacing: 0.2em;
+  color: var(--accent);
+  font-family: 'BricolageGrotesque', monospace;
+}
+
+.jeux .room-code-copy-btn {
+  padding: 8px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(67,97,238,0.25);
+  background: rgba(67,97,238,0.08);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 140ms;
+}
+.jeux .room-code-copy-btn:hover { background: rgba(67,97,238,0.14); }
+
+/* ---- Mode selector ---- */
+.jeux .room-mode-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.jeux .room-mode-btn {
+  padding: 12px 8px;
+  border-radius: 12px;
+  border: 1.5px solid rgba(255,255,255,0.7);
+  background: rgba(255,255,255,0.6);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-2);
+  text-align: center;
+  transition: all 140ms;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.jeux .room-mode-btn:hover {
+  background: rgba(255,255,255,0.9);
+  color: var(--text);
+}
+
+.jeux .room-mode-btn--active {
+  border-color: rgba(67,97,238,0.35);
+  background: rgba(67,97,238,0.08);
+  color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(67,97,238,0.10);
+}
+
+.jeux .room-mode-emoji { font-size: 20px; }
+
+/* ---- Difficulty selector ---- */
+.jeux .room-diff-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.jeux .room-diff-btn {
+  padding: 10px 8px;
+  border-radius: 12px;
+  border: 1.5px solid rgba(255,255,255,0.7);
+  background: rgba(255,255,255,0.6);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-2);
+  text-align: center;
+  transition: all 140ms;
+}
+
+.jeux .room-diff-btn:hover { background: rgba(255,255,255,0.9); color: var(--text); }
+.jeux .room-diff-btn--active { border-color: rgba(67,97,238,0.35); background: rgba(67,97,238,0.08); color: var(--accent); }
+
+/* ---- Slider field ---- */
+.jeux .room-slider-wrap {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.jeux .room-slider-wrap input[type='range'] {
+  flex: 1;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(0,0,0,0.08);
+  outline: none;
+  cursor: pointer;
+}
+
+.jeux .room-slider-wrap input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  border: 2px solid rgba(67,97,238,0.4);
+  box-shadow: 0 2px 8px rgba(67,97,238,0.25);
+  cursor: pointer;
+}
+
+.jeux .room-slider-value {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--accent);
+  min-width: 28px;
+  text-align: right;
+}
+
+/* ═══════════════════════════════════════════
+   LOBBY
+   ═══════════════════════════════════════════ */
+
+.jeux .lobby-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.jeux .lobby-players {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.jeux .lobby-player {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,0.8);
+  background: rgba(255,255,255,0.72);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.9), 0 2px 6px rgba(0,0,0,0.05);
+  transition: all 160ms;
+  animation: lobbyPlayerIn 300ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes lobbyPlayerIn {
+  from { transform: translateX(-12px) scale(0.97); opacity: 0; }
+  to   { transform: translateX(0) scale(1); opacity: 1; }
+}
+
+.jeux .lobby-player--ready {
+  border-color: rgba(5,150,105,0.3);
+  background: rgba(5,150,105,0.06);
+}
+
+.jeux .lobby-player--empty {
+  border-style: dashed;
+  background: transparent;
+  box-shadow: none;
+  opacity: 0.45;
+}
+
+.jeux .lobby-player-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+.jeux .lobby-player-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.jeux .lobby-player-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.jeux .lobby-player-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 999px;
+  margin-top: 2px;
+}
+
+.jeux .lobby-player-badge--host {
+  background: rgba(217,119,6,0.12);
+  color: #d97706;
+  border: 1px solid rgba(217,119,6,0.2);
+}
+
+.jeux .lobby-player-badge--ready {
+  background: rgba(5,150,105,0.10);
+  color: #059669;
+  border: 1px solid rgba(5,150,105,0.2);
+}
+
+.jeux .lobby-player-badge--waiting {
+  background: rgba(0,0,0,0.04);
+  color: var(--text-3);
+  border: 1px solid rgba(0,0,0,0.08);
+}
+
+.jeux .lobby-player-status {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.jeux .lobby-player-status--ready { color: #059669; }
+.jeux .lobby-player-status--waiting { color: var(--text-3); }
+
+.jeux .lobby-waiting-hint {
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-3);
+  padding: 8px;
+  font-style: italic;
+}
+
+/* ═══════════════════════════════════════════
+   RESULTS SCREEN
+   ═══════════════════════════════════════════ */
+
+.jeux .results-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.jeux .results-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 18px;
+  border-radius: 16px;
+  border: 1px solid rgba(255,255,255,0.8);
+  background: rgba(255,255,255,0.72);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.9), 0 2px 8px rgba(0,0,0,0.06);
+  animation: resultsItemIn 400ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+.jeux .results-item:nth-child(1) { animation-delay: 0ms; }
+.jeux .results-item:nth-child(2) { animation-delay: 80ms; }
+.jeux .results-item:nth-child(3) { animation-delay: 160ms; }
+.jeux .results-item:nth-child(4) { animation-delay: 240ms; }
+.jeux .results-item:nth-child(5) { animation-delay: 320ms; }
+.jeux .results-item:nth-child(6) { animation-delay: 400ms; }
+.jeux .results-item:nth-child(7) { animation-delay: 480ms; }
+.jeux .results-item:nth-child(8) { animation-delay: 560ms; }
+
+@keyframes resultsItemIn {
+  from { transform: translateY(20px) scale(0.95); opacity: 0; }
+  to   { transform: translateY(0) scale(1); opacity: 1; }
+}
+
+.jeux .results-item--gold   { border-color: rgba(234,179,8,0.35); background: rgba(234,179,8,0.07); }
+.jeux .results-item--silver { border-color: rgba(100,116,139,0.3); background: rgba(100,116,139,0.05); }
+.jeux .results-item--bronze { border-color: rgba(180,83,9,0.25); background: rgba(180,83,9,0.05); }
+.jeux .results-item--me     { box-shadow: 0 0 0 2px rgba(67,97,238,0.25), inset 0 1px 0 rgba(255,255,255,0.9); }
+
+.jeux .results-rank {
+  font-size: 22px;
+  width: 36px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.jeux .results-player-name {
+  flex: 1;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.jeux .results-score {
+  font-size: 20px;
+  font-weight: 900;
+  color: var(--accent);
+  letter-spacing: -0.02em;
+}
+
+.jeux .results-score-unit {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-3);
+  margin-left: 2px;
+}
+
+/* ---- Multiplayer button in game list ---- */
+.jeux .mp-room-trigger {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 20px;
+  border-radius: 16px;
+  border: 1.5px solid rgba(67,97,238,0.2);
+  background: linear-gradient(135deg, rgba(67,97,238,0.07) 0%, rgba(124,58,237,0.05) 100%);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  cursor: pointer;
+  transition: all 160ms;
+  font-family: inherit;
+  text-align: left;
+  width: 100%;
+  margin-bottom: 8px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.9), 0 2px 8px rgba(67,97,238,0.08);
+}
+
+.jeux .mp-room-trigger:hover {
+  border-color: rgba(67,97,238,0.35);
+  background: linear-gradient(135deg, rgba(67,97,238,0.11) 0%, rgba(124,58,237,0.08) 100%);
+  transform: translateY(-1px);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,1), 0 6px 20px rgba(67,97,238,0.14);
+}
+
+.jeux .mp-room-trigger-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #4361ee, #7c3aed);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 4px 12px rgba(67,97,238,0.3);
+}
+
+.jeux .mp-room-trigger-text h4 { font-size: 14px; font-weight: 800; color: var(--text); }
+.jeux .mp-room-trigger-text p  { font-size: 12px; color: var(--text-2); margin-top: 2px; }
