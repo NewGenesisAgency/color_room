@@ -150,6 +150,8 @@ type UiWidget = {
 type EditorGameConfigV1 = {
   version: 1;
   tileCount?: number;
+  bgColor?: string;
+  accentColor?: string;
   ui?: {
     title?: string;
     accentColor?: string;
@@ -352,7 +354,9 @@ function parseEditorGameConfig(raw: unknown): EditorGameConfigV1 | null {
     : undefined;
   const tileCount = typeof o.tileCount === 'number' && Number.isFinite(o.tileCount) ? o.tileCount : undefined;
   const uiLayout = Array.isArray(o.uiLayout) ? (o.uiLayout as UILayoutComponent[]) : undefined;
-  return { version: 1, tileCount, ui, uiLayout, nodes: o.nodes, edges: o.edges } satisfies EditorGameConfigV1;
+  const bgColor = typeof o.bgColor === 'string' ? o.bgColor : undefined;
+  const accentColor = typeof o.accentColor === 'string' ? o.accentColor : undefined;
+  return { version: 1, tileCount, bgColor, accentColor, ui, uiLayout, nodes: o.nodes, edges: o.edges } satisfies EditorGameConfigV1;
 }
 
 function parseCustomConfig(raw: unknown): CustomGameConfigV1 {
@@ -864,7 +868,7 @@ export default function JeuxPage() {
   const [gameVisibleCount, setGameVisibleCount] = useState(4);
   // Pop-up "Commencer le jeu" : description + explication avant de lancer
   const [pendingGame, setPendingGame] = useState<
-    { title: string; desc: string; accent: string; iconBg: string; iconColor: string; Icon: React.ComponentType<{ size?: number; color?: string }>; launch: () => void } | null
+    { title: string; desc: string; accent: string; iconBg: string; iconColor: string; Icon: React.ComponentType<{ size?: number; color?: string }>; launch: () => void; howTo?: string } | null
   >(null);
   const [score, setScore] = useState<number>(0);
   const [gamesCompleted, setGamesCompleted] = useState<number>(0);
@@ -3779,6 +3783,7 @@ export default function JeuxPage() {
                     accent: string;
                     selected: boolean;
                     launch: () => void;
+                    howTo?: string;   // explication détaillée "comment jouer"
                   };
 
                   const nativeCards: GameCard[] = [
@@ -3825,15 +3830,15 @@ export default function JeuxPage() {
                     },
                   ];
 
-                  const BUILTIN_META: Record<string, { title: string; desc: string; Icon: any; grad: string; accent: string }> = {
-                    'color-speed':      { title: 'Color Speed',        desc: "Cliquez la dalle qui s'allume - réflexes !",            Icon: Zap,       grad: 'linear-gradient(135deg,#4361ee,#7c3aed)', accent: '#7c3aed' },
-                    'maitre-blanc':     { title: 'Le Maître du Blanc', desc: 'Recréez la teinte cible en dosant R, G, B',              Icon: Sun,       grad: 'linear-gradient(135deg,#f59e0b,#ef4444)', accent: '#f59e0b' },
-                    'puissance4':       { title: 'Puissance 4',        desc: 'Alignez 4 couleurs sur la matrice 6×7',                  Icon: Grid,      grad: 'linear-gradient(135deg,#ff2828,#2850ff)', accent: '#ff2828' },
-                    'metamere':         { title: 'Métamérie',          desc: "Trouvez l'éclairage qui cache ou révèle le texte",       Icon: Sparkles,  grad: 'linear-gradient(135deg,#7c3aed,#06d6a0)', accent: '#06d6a0' },
-                    'chromaticite-jeu': { title: 'Chromaticité CIE',   desc: 'Mémorisez la couleur 5s puis retrouvez x, y, z sur le diagramme', Icon: Crosshair, grad: 'linear-gradient(135deg,#81e6d9,#4361ee)', accent: '#81e6d9' },
-                    'canal-mix':        { title: 'Mix de Canaux',      desc: '3 canaux LED aléatoires - retrouvez la couleur sur le diagramme CIE', Icon: Palette,  grad: 'linear-gradient(135deg,#f97316,#7c3aed)', accent: '#f97316' },
-                    'intrus':           { title: "L'Intrus (Sniper)",  desc: 'Une dalle a une teinte presque invisible - trouvez-la au CS-160', Icon: Crosshair, grad: 'linear-gradient(135deg,#06d6a0,#ef4444)', accent: '#06d6a0' },
-                    'snake':            { title: 'Snake Lumière',       desc: 'Le serpent sur les 42 dalles - flèches ou D-pad tactile', Icon: Gamepad2,  grad: 'linear-gradient(135deg,#16a34a,#06d6a0)', accent: '#16a34a' },
+                  const BUILTIN_META: Record<string, { title: string; desc: string; Icon: any; grad: string; accent: string; howTo: string }> = {
+                    'color-speed':      { title: 'Color Speed',        desc: "Cliquez la dalle qui s'allume - réflexes !",            Icon: Zap,       grad: 'linear-gradient(135deg,#4361ee,#7c3aed)', accent: '#7c3aed', howTo: "Une dalle s'allume au hasard : cliquez-la le plus vite possible. Le rythme accélère, les bonnes touches enchaînent un combo. 60 s pour le meilleur score." },
+                    'maitre-blanc':     { title: 'Le Maître du Blanc', desc: 'Recréez la teinte cible en dosant R, G, B',              Icon: Sun,       grad: 'linear-gradient(135deg,#f59e0b,#ef4444)', accent: '#f59e0b', howTo: "Une couleur cible est affichée. Ajustez les sliders Rouge / Vert / Bleu pour la reproduire sur les dalles. Plus vous êtes précis, plus vous marquez. 10 manches." },
+                    'puissance4':       { title: 'Puissance 4',        desc: 'Alignez 4 couleurs sur la matrice 6×7',                  Icon: Grid,      grad: 'linear-gradient(135deg,#ff2828,#2850ff)', accent: '#ff2828', howTo: "Choisissez 2 joueurs ou contre l'IA (5 niveaux). À tour de rôle, posez un jeton dans une colonne (clic ou flèches + Espace). Alignez-en 4 pour gagner." },
+                    'metamere':         { title: 'Métamérie',          desc: "Trouvez l'éclairage qui cache ou révèle le texte",       Icon: Sparkles,  grad: 'linear-gradient(135deg,#7c3aed,#06d6a0)', accent: '#06d6a0', howTo: "Un texte/motif n'est visible que sous certains éclairages (métamérie). Changez l'illuminant pour le révéler ou le cacher, selon la consigne de la manche." },
+                    'chromaticite-jeu': { title: 'Chromaticité CIE',   desc: 'Mémorisez la couleur 5s puis retrouvez x, y, z sur le diagramme', Icon: Crosshair, grad: 'linear-gradient(135deg,#81e6d9,#4361ee)', accent: '#81e6d9', howTo: "Une couleur s'affiche 5 s : mémorisez-la. Puis placez son point sur le diagramme CIE 1931 (clic ou sliders x/y). Plus vous êtes proche, plus vous marquez. 5 manches." },
+                    'canal-mix':        { title: 'Mix de Canaux',      desc: '3 canaux LED aléatoires - retrouvez la couleur sur le diagramme CIE', Icon: Palette,  grad: 'linear-gradient(135deg,#f97316,#7c3aed)', accent: '#f97316', howTo: "3 canaux LED forment un triangle sur le diagramme CIE. Dosez chaque canal avec les 3 sliders : votre point (le mélange) doit rejoindre la couleur cible dans le triangle." },
+                    'intrus':           { title: "L'Intrus (Sniper)",  desc: 'Une dalle a une teinte presque invisible - trouvez-la au CS-160', Icon: Crosshair, grad: 'linear-gradient(135deg,#06d6a0,#ef4444)', accent: '#06d6a0', howTo: "Toutes les dalles ont la même couleur sauf une (écart minime, invisible à l'écran). Sélectionnez une dalle, mesurez-la au CS-160, comparez les écarts, puis désignez l'intrus. Course contre la montre, écart de plus en plus subtil." },
+                    'snake':            { title: 'Snake Lumière',       desc: 'Le serpent sur les 42 dalles - flèches ou D-pad tactile', Icon: Gamepad2,  grad: 'linear-gradient(135deg,#16a34a,#06d6a0)', accent: '#16a34a', howTo: "Dirigez le serpent avec les flèches (ou le D-pad tactile) sur la grille 6×7. Mangez les pommes pour grandir et marquer, sans toucher les murs ni votre corps." },
                   };
 
                   const builtinCards: GameCard[] = (['color-speed', 'maitre-blanc', 'puissance4', 'metamere', 'chromaticite-jeu', 'canal-mix', 'intrus', 'snake'] as const).map((gameId) => {
@@ -3848,6 +3853,7 @@ export default function JeuxPage() {
                       badgeLabel: 'natif',
                       accent: m.accent,
                       selected: activeBuiltinGame === gameId,
+                      howTo: m.howTo,
                       launch: () => {
                         setTetrisStandalone(false);
                         setCustomRun(null);
@@ -4373,7 +4379,7 @@ export default function JeuxPage() {
                     onComplete: (points: number) => { const pts = Math.max(0, Math.round(points)); setScore((s) => s + pts); setGamesCompleted((v) => v + 1); if (pts > 0) { setScorePlusValue(pts); setScorePlusAnimKey((k) => k + 1); } },
                   };
                   return (
-                    <div style={{ marginTop: 12, borderRadius: 18, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(10,10,18,0.95)' }}>
+                    <div style={{ marginTop: 12, borderRadius: 18, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.08)', background: hudRun?.cfg.bgColor ?? '#0d1119' }}>
                       <Comp {...ta} {...extra} />
                     </div>
                   );
@@ -4381,8 +4387,8 @@ export default function JeuxPage() {
 
                 {/* Interface du jeu éditeur (composants UI dessinés dans /editeur, dont le diagramme CIE) */}
                 {gameActive && !tetrisStandalone && hudRun && Array.isArray(hudRun.cfg.uiLayout) && hudRun.cfg.uiLayout.length > 0 && (
-                  <div className="section" style={{ marginTop: 12 }}>
-                    <h3 style={{ marginTop: 0 }}><Gamepad2 size={16} /> Interface du jeu</h3>
+                  <div style={{ marginTop: 12, borderRadius: 18, padding: 16, background: hudRun?.cfg.bgColor ?? '#0d1119', border: '1px solid rgba(255,255,255,0.08)' }}>
+                    <h3 style={{ marginTop: 0, color: 'rgba(255,255,255,0.85)' }}><Gamepad2 size={16} /> Interface du jeu</h3>
                     <HudUiOverlay
                       components={hudRun.cfg.uiLayout}
                       plate={{
@@ -5225,10 +5231,18 @@ export default function JeuxPage() {
             </div>
             <div style={{ padding: '20px 24px 24px' }}>
               <div style={{ fontSize: 21, fontWeight: 900, color: '#fff', letterSpacing: '-0.02em', marginBottom: 6 }}>{pendingGame.title}</div>
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 13.5, color: 'rgba(255,255,255,0.7)', lineHeight: 1.6, marginBottom: 18 }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 13.5, color: 'rgba(255,255,255,0.72)', lineHeight: 1.6, marginBottom: 14 }}>
                 <Lightbulb size={16} style={{ color: pendingGame.accent, flexShrink: 0, marginTop: 2 }} />
                 <span>{pendingGame.desc}</span>
               </div>
+              {pendingGame.howTo && (
+                <div style={{ padding: '12px 14px', borderRadius: 14, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', marginBottom: 18 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.07em', color: pendingGame.accent, marginBottom: 6 }}>
+                    <Gamepad2 size={13} /> Comment jouer
+                  </div>
+                  <p style={{ margin: 0, fontSize: 13, color: 'rgba(255,255,255,0.78)', lineHeight: 1.6 }}>{pendingGame.howTo}</p>
+                </div>
+              )}
               <div style={{ display: 'flex', gap: 10 }}>
                 <button
                   onClick={() => setPendingGame(null)}

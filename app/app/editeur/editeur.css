@@ -2499,34 +2499,36 @@ input[type='range'].slider-intensity::-moz-range-progress {
   clip-path: polygon(40% 15%, 100% 15%, 100% 85%, 40% 85%, 0% 50%);
 }
 
-/* ── Wires - pointillés ANIMÉS qui défilent (Unreal Engine) ──────────────── */
+/* ── Wires - POINTS lumineux qui circulent (flux de données) ──────────────── */
+/* dasharray "0.1 16" + linecap round => un point rond tous les 16px ; la somme
+   (16) = amplitude de l'offset du keyframe -> circulation sans saccade. */
 .bp-wire {
   fill: none;
-  stroke: rgba(120,150,240,0.88);
-  stroke-width: 2.4;
-  opacity: 0.92;
+  stroke: rgba(130,160,250,0.95);
+  stroke-width: 3.6;
+  opacity: 0.95;
   stroke-linecap: round;
-  stroke-dasharray: 5 11;
-  animation: bp-wire-flow 0.65s linear infinite;
-  filter: drop-shadow(0 0 5px rgba(120,150,240,0.5));
+  stroke-dasharray: 0.1 16;
+  animation: bp-wire-flow 1s linear infinite;
+  filter: drop-shadow(0 0 6px rgba(130,160,250,0.65));
 }
 
 .bp-wire--preview {
-  stroke: rgba(150,180,255,0.96);
-  stroke-width: 2.6;
+  stroke: rgba(160,190,255,1);
+  stroke-width: 3.8;
   opacity: 1;
-  stroke-dasharray: 5 9;
-  animation: bp-wire-flow 0.5s linear infinite;
-  filter: drop-shadow(0 0 8px rgba(120,150,240,0.65));
+  stroke-dasharray: 0.1 13;
+  animation: bp-wire-flow 0.7s linear infinite;
+  filter: drop-shadow(0 0 9px rgba(130,160,250,0.8));
 }
 
 .bp-wire--active {
-  stroke: rgba(185,205,255,0.98);
-  stroke-width: 2.8;
+  stroke: rgba(190,210,255,1);
+  stroke-width: 4.2;
   opacity: 1;
-  stroke-dasharray: 5 11;
-  animation: bp-wire-flow 0.45s linear infinite;
-  filter: drop-shadow(0 0 10px rgba(120,150,240,0.72));
+  stroke-dasharray: 0.1 14;
+  animation: bp-wire-flow 0.6s linear infinite;
+  filter: drop-shadow(0 0 12px rgba(130,160,250,0.85));
 }
 
 /* ── Context menu (clic droit) ───────────────────────────────────────────── */
