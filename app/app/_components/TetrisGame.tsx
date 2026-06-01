@@ -1,6 +1,18 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { ChevronDown, ChevronLeft, ChevronRight, ChevronsDown, RotateCw } from 'lucide-react';
+import TouchControls, { type TouchKey } from './TouchControls';
+
+// Contrôles tactiles : convertit les boutons à l'écran en KeyboardEvent
+// (mêmes touches que le clavier → aucune duplication de logique de jeu).
+const TETRIS_TOUCH: TouchKey[] = [
+  { key: 'ArrowUp',    slot: 'up',    label: <RotateCw size={20} /> },
+  { key: 'ArrowLeft',  slot: 'left',  label: <ChevronLeft size={22} />,  repeat: true },
+  { key: 'ArrowRight', slot: 'right', label: <ChevronRight size={22} />, repeat: true },
+  { key: 'ArrowDown',  slot: 'down',  label: <ChevronDown size={22} />,  repeat: true },
+  { key: ' ',          slot: 'a',     label: <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><ChevronsDown size={18} /> Drop</span>, accent: '#4361ee' },
+];
 
 // ─── Tetrominos ───────────────────────────────────────────────────
 const PIECES: { shape: number[][]; color: string }[] = [
@@ -362,6 +374,9 @@ export default function TetrisGame({
           </div>
         </div>
       </div>
+
+      {/* Contrôles tactiles (tablette / mobile) — masqués sur desktop */}
+      <TouchControls keys={TETRIS_TOUCH} />
 
       {/* Game over banner */}
       {s.over && (

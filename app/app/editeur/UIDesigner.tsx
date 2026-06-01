@@ -1,7 +1,10 @@
 'use client';
 import { useCallback, useRef, useState } from 'react';
 
-export type UICompKind = 'button' | 'label' | 'slider' | 'score_display' | 'timer_display' | 'round_badge' | 'color_swatch' | 'progress_bar' | 'cie_diagram';
+export type UICompKind = 'button' | 'label' | 'slider' | 'score_display' | 'timer_display' | 'round_badge' | 'color_swatch' | 'progress_bar' | 'cie_diagram' | 'dpad';
+
+/** Préréglages de touches pour le D-pad tactile (converties en KeyboardEvent). */
+export type UIDpadPreset = 'arrows_space' | 'lr_space' | 'arrows' | 'lr';
 
 export type UILayoutComponent = {
   id: string;
@@ -22,6 +25,8 @@ export type UILayoutComponent = {
   cieTolerance?: number;
   cieRandom?: boolean;
   points?: number;
+  // Contrôles tactiles (dpad)
+  dpadPreset?: UIDpadPreset;
 };
 
 type Props = {
@@ -46,6 +51,7 @@ const PALETTE = [
   { kind: 'color_swatch' as UICompKind, label: 'Couleur',      icon: '', w: 80,  h: 80 },
   { kind: 'progress_bar' as UICompKind, label: 'Progression',  icon: '', w: 280, h: 32 },
   { kind: 'cie_diagram'  as UICompKind, label: 'Diagramme CIE', icon: '', w: 320, h: 300 },
+  { kind: 'dpad'         as UICompKind, label: 'Contrôles tactiles', icon: '', w: 300, h: 150 },
 ];
 
 function defaultText(k: UICompKind) {
@@ -70,6 +76,17 @@ function Preview({ c }: { c: UILayoutComponent }) {
       </svg>
       <span style={{ fontSize:10, fontWeight:700 }}>Diagramme CIE 1931</span>
     </div>;
+    case 'dpad': {
+      const k: React.CSSProperties = { background:'rgba(28,33,46,0.9)', borderRadius:5, border:'1px solid rgba(255,255,255,0.15)' };
+      return <div style={{ ...base, gap:12, background:'rgba(20,24,34,0.06)', borderRadius:12, border:'1px dashed rgba(0,0,0,0.12)' }}>
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(3,18px)', gridTemplateRows:'repeat(3,18px)', gap:3 }}>
+          <span /><span style={k} /><span />
+          <span style={k} /><span /><span style={k} />
+          <span /><span style={k} /><span />
+        </div>
+        <div style={{ ...k, width:46, height:30, borderRadius:7, background:'#4361ee' }} />
+      </div>;
+    }
   }
 }
 
@@ -81,7 +98,8 @@ export default function UIDesigner({ components, onChange, gameVariables = [] }:
 
   const add = useCallback((p: typeof PALETTE[0]) => {
     const c: UILayoutComponent = { id: uid(), kind: p.kind, x: snap(CW/2 - p.w/2), y: snap(CH/2 - p.h/2), width: p.w, height: p.h, text: defaultText(p.kind), bgColor: p.kind === 'button' ? '#4361ee' : undefined, textColor: p.kind === 'button' ? '#ffffff' : '#1a1d2e', fontSize: 14,
-      ...(p.kind === 'cie_diagram' ? { cieRandom: true, cieTargetX: 0.3127, cieTargetY: 0.3290, cieTolerance: 8, points: 1000 } : {}) };
+      ...(p.kind === 'cie_diagram' ? { cieRandom: true, cieTargetX: 0.3127, cieTargetY: 0.3290, cieTolerance: 8, points: 1000 } : {}),
+      ...(p.kind === 'dpad' ? { dpadPreset: 'arrows_space' as UIDpadPreset } : {}) };
     onChange([...components, c]); setSel(c.id);
   }, [components, onChange]);
 
@@ -159,6 +177,14 @@ export default function UIDesigner({ components, onChange, gameVariables = [] }:
               <label><span style={lbl}>Points</span><input type="number" style={inp} value={selComp.points ?? 1000} onChange={e=>upd(selComp.id,{points:Number(e.target.value)})} /></label>
             </div>
           </>}
+          {selComp.kind==='dpad' && <label><span style={lbl}>Touches émises</span>
+            <select style={inp} value={selComp.dpadPreset ?? 'arrows_space'} onChange={e=>upd(selComp.id,{dpadPreset:e.target.value as UIDpadPreset})}>
+              <option value="arrows_space">Flèches + Espace</option>
+              <option value="arrows">Flèches seules</option>
+              <option value="lr_space">Gauche / Droite + Espace</option>
+              <option value="lr">Gauche / Droite</option>
+            </select>
+          </label>}
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:7 }}>
             <label><span style={lbl}>L</span><input type="number" style={inp} value={selComp.x} onChange={e=>upd(selComp.id,{x:snap(Number(e.target.value))})} /></label>
             <label><span style={lbl}>T</span><input type="number" style={inp} value={selComp.y} onChange={e=>upd(selComp.id,{y:snap(Number(e.target.value))})} /></label>

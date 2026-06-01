@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import type { TetrisSnapshot } from '@/app/_components/TetrisGame';
-import type { UILayoutComponent } from '@/app/editeur/UIDesigner';
+import type { UILayoutComponent, UIDpadPreset } from '@/app/editeur/UIDesigner';
+import type { TouchKey } from '@/app/_components/TouchControls';
 import NavigationMenu from '@/app/_components/NavigationMenu';
 import LoginScreen from '@/app/_components/LoginScreen';
 
@@ -20,6 +21,7 @@ const GameChromaticite = dynamic(() => import('@/app/_games/chromaticity-diagram
 const GameCanalMix = dynamic(() => import('@/app/_components/GameCanalMix'), { ssr: false });
 const Room3D = dynamic(() => import('@/app/_components/Room3D'), { ssr: false, loading: () => <div style={{ height: 420 }} /> });
 const CieMeasureWidget = dynamic(() => import('@/app/_components/CieMeasureWidget'), { ssr: false });
+const TouchControls = dynamic(() => import('@/app/_components/TouchControls'), { ssr: false });
 const SpectrePage = dynamic(() => import('@/app/spectre/page'), { ssr: false });
 const ChromaticitePage = dynamic(() => import('@/app/chromaticite/page'), { ssr: false });
 import {
@@ -61,6 +63,9 @@ import {
   X,
   ChevronDown,
   ChevronUp,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsDown,
   Users,
 } from 'lucide-react';
 
@@ -734,6 +739,24 @@ function spectrum32ToRgb255(channels32: number[]): TargetColor {
 const HUD_CANVAS_W = 860;
 const HUD_CANVAS_H = 500;
 
+// D-pad configurable : selon le préréglage choisi dans l'éditeur, on émet
+// l'ensemble de touches clavier adapté (flèches complètes, gauche/droite, + Espace).
+const HUD_DPAD_UP: TouchKey    = { key: 'ArrowUp',    slot: 'up',    label: <ChevronUp size={20} /> };
+const HUD_DPAD_DOWN: TouchKey  = { key: 'ArrowDown',  slot: 'down',  label: <ChevronDown size={20} />,  repeat: true };
+const HUD_DPAD_LEFT: TouchKey  = { key: 'ArrowLeft',  slot: 'left',  label: <ChevronLeft size={20} />,  repeat: true };
+const HUD_DPAD_RIGHT: TouchKey = { key: 'ArrowRight', slot: 'right', label: <ChevronRight size={20} />, repeat: true };
+const HUD_DPAD_SPACE: TouchKey = { key: ' ',          slot: 'a',     label: <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}><ChevronsDown size={16} /> Action</span>, accent: '#4361ee' };
+
+function hudDpadKeys(preset: UIDpadPreset | undefined): TouchKey[] {
+  switch (preset) {
+    case 'arrows':   return [HUD_DPAD_UP, HUD_DPAD_LEFT, HUD_DPAD_RIGHT, HUD_DPAD_DOWN];
+    case 'lr':       return [HUD_DPAD_LEFT, HUD_DPAD_RIGHT];
+    case 'lr_space': return [HUD_DPAD_LEFT, HUD_DPAD_RIGHT, HUD_DPAD_SPACE];
+    case 'arrows_space':
+    default:         return [HUD_DPAD_UP, HUD_DPAD_LEFT, HUD_DPAD_RIGHT, HUD_DPAD_DOWN, HUD_DPAD_SPACE];
+  }
+}
+
 function renderHudComp(
   c: UILayoutComponent,
   onSendColor: (idx: number, r: number, g: number, b: number, intensity: number) => void,
@@ -761,6 +784,7 @@ function renderHudComp(
     case 'round_badge':   return <div style={{ ...base, background: 'rgba(67,97,238,0.09)', borderRadius: 12, fontWeight: 800, color: '#4361ee' }}>Manche 1/5</div>;
     case 'color_swatch':  return <div style={{ ...base, borderRadius: 12, background: c.bgColor ?? '#ff2aa6', boxShadow: '0 0 20px ' + (c.bgColor ?? '#ff2aa6') }} />;
     case 'progress_bar':  return <div style={{ ...base, background: 'rgba(0,0,0,0.07)', borderRadius: 999, overflow: 'hidden', padding: 0 }}><div style={{ width: '55%', height: '100%', background: 'linear-gradient(90deg,#059669,#06d6a0)', borderRadius: 999 }} /></div>;
+    case 'dpad':          return <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><TouchControls forceShow compact keys={hudDpadKeys(c.dpadPreset)} /></div>;
     default:              return null;
   }
 }
