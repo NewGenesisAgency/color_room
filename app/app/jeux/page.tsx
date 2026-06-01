@@ -772,8 +772,19 @@ type HudPlateActions = {
   onEvent?: (eventId: string) => void;  // clic d'un composant -> lance le graphe depuis le noeud event
 };
 
-function renderHudComp(c: UILayoutComponent, plate: HudPlateActions): React.ReactNode {
+function renderHudComp(c: UILayoutComponent, plate: HudPlateActions, vars: Record<string, number | string>): React.ReactNode {
   const onSendColor = plate.onSendColor;
+  // Valeur live d'une variable liée (varBind) -> permet aux composants d'afficher l'état du jeu
+  const boundNum = (fallback: number): number => {
+    if (!c.varBind) return fallback;
+    const v = Number(vars[c.varBind]);
+    return Number.isFinite(v) ? v : fallback;
+  };
+  const boundStr = (fallback: string): string => {
+    if (!c.varBind) return fallback;
+    const v = vars[c.varBind];
+    return v === undefined ? fallback : String(v);
+  };
   const base: React.CSSProperties = {
     width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center',
     boxSizing: 'border-box', overflow: 'hidden', fontSize: c.fontSize ?? 14, color: c.textColor ?? '#1a1d2e',
@@ -790,42 +801,43 @@ function renderHudComp(c: UILayoutComponent, plate: HudPlateActions): React.Reac
         </div>
       );
     case 'button':        return <button onClick={() => c.eventId && plate.onEvent?.(c.eventId)} style={{ ...base, background: c.bgColor ?? '#4361ee', color: c.textColor ?? '#fff', borderRadius: 12, fontWeight: 700, border: 'none', cursor: c.eventId ? 'pointer' : 'default', fontFamily: 'inherit', fontSize: c.fontSize ?? 14 }}>{c.text || 'Bouton'}</button>;
-    case 'label':         return <div style={{ ...base, justifyContent: 'flex-start', paddingLeft: 4, fontWeight: 600 }}>{c.text || 'Texte'}</div>;
+    case 'label':         return <div style={{ ...base, justifyContent: 'flex-start', paddingLeft: 4, fontWeight: 600 }}>{c.varBind ? boundStr(c.text || '') : (c.text || 'Texte')}</div>;
     case 'slider':        return <div style={{ ...base, flexDirection: 'column', gap: 4, padding: '0 10px' }}><span style={{ fontSize: 11, fontWeight: 700, alignSelf: 'flex-start' }}>{c.text || 'Slider'}</span><input type="range" style={{ width: '100%' }} readOnly /></div>;
-    case 'score_display': return <div style={{ ...base, flexDirection: 'column', background: 'rgba(255,255,255,0.9)', borderRadius: 14, border: '1px solid rgba(67,97,238,0.2)' }}><span style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{c.text || 'Score'}</span><span style={{ fontSize: 26, fontWeight: 900, color: '#4361ee', lineHeight: 1 }}>0</span></div>;
+    case 'score_display': return <div style={{ ...base, flexDirection: 'column', background: 'rgba(255,255,255,0.9)', borderRadius: 14, border: '1px solid rgba(67,97,238,0.2)' }}><span style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{c.text || 'Score'}</span><span style={{ fontSize: 26, fontWeight: 900, color: '#4361ee', lineHeight: 1 }}>{boundNum(0)}</span></div>;
     case 'timer_display': return <div style={{ ...base, flexDirection: 'column', background: 'rgba(255,255,255,0.9)', borderRadius: 14, border: '1px solid rgba(239,68,68,0.2)' }}><span style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Temps</span><span style={{ fontSize: 26, fontWeight: 900, color: '#ef4444', lineHeight: 1 }}>30s</span></div>;
     case 'round_badge':   return <div style={{ ...base, background: 'rgba(67,97,238,0.09)', borderRadius: 12, fontWeight: 800, color: '#4361ee' }}>Manche 1/5</div>;
     case 'color_swatch':  return <div style={{ ...base, borderRadius: 12, background: c.bgColor ?? '#ff2aa6', boxShadow: '0 0 20px ' + (c.bgColor ?? '#ff2aa6') }} />;
-    case 'progress_bar':  return <div style={{ ...base, background: 'rgba(0,0,0,0.07)', borderRadius: 999, overflow: 'hidden', padding: 0 }}><div style={{ width: '55%', height: '100%', background: 'linear-gradient(90deg,#059669,#06d6a0)', borderRadius: 999 }} /></div>;
+    case 'progress_bar':  return <div style={{ ...base, background: 'rgba(0,0,0,0.07)', borderRadius: 999, overflow: 'hidden', padding: 0 }}><div style={{ width: `${Math.max(0, Math.min(100, boundNum(55)))}%`, height: '100%', background: 'linear-gradient(90deg,#059669,#06d6a0)', borderRadius: 999, transition: 'width 0.2s' }} /></div>;
     case 'dpad':          return <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><TouchControls forceShow compact keys={hudDpadKeys(c.dpadPreset)} /></div>;
     case 'shape_rect':    return <div style={{ width: '100%', height: '100%', background: c.bgColor ?? '#334155', borderRadius: 12 }} />;
     case 'shape_circle':  return <div style={{ width: '100%', height: '100%', background: c.bgColor ?? '#334155', borderRadius: '50%' }} />;
     case 'divider':       return <div style={{ ...base, padding: 0 }}><div style={{ width: '100%', height: 2, borderRadius: 2, background: c.bgColor ?? 'rgba(255,255,255,0.4)' }} /></div>;
     case 'image':         return c.src ? <img src={c.src} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 12 }} /> : <div style={{ ...base, borderRadius: 12, background: 'rgba(255,255,255,0.05)', border: '1px dashed rgba(255,255,255,0.2)', color: 'rgba(255,255,255,0.4)', fontSize: 11 }}>Image</div>;
-    case 'heart_life':    return <div style={{ ...base, gap: 4, color: '#ef4444' }}>{[0, 1, 2].map((i) => <svg key={i} width={Math.min(24, c.height - 10)} height={Math.min(24, c.height - 10)} viewBox="0 0 24 24" fill={i < 2 ? '#ef4444' : 'none'} stroke="#ef4444" strokeWidth="2"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.29 1.51 4.04 3 5.5l7 7Z" /></svg>)}</div>;
+    case 'heart_life':    { const lives = c.varBind ? boundNum(3) : 3; const total = Math.max(lives, 3); return <div style={{ ...base, gap: 4, color: '#ef4444' }}>{Array.from({ length: total }, (_, i) => <svg key={i} width={Math.min(24, c.height - 10)} height={Math.min(24, c.height - 10)} viewBox="0 0 24 24" fill={i < lives ? '#ef4444' : 'none'} stroke="#ef4444" strokeWidth="2"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.29 1.51 4.04 3 5.5l7 7Z" /></svg>)}</div>; }
     case 'plate_grid':    return <div style={{ width: '100%', height: '100%', padding: 6, background: '#0d1119', borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', boxSizing: 'border-box' }}>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6,1fr)', gridTemplateRows: 'repeat(7,1fr)', gap: 3, width: '100%', height: '100%' }}>
         {Array.from({ length: 42 }, (_, i) => <span key={i} style={{ borderRadius: 3, background: plate.plateColors?.[i] ?? '#1a1f2e', transition: 'background 0.1s' }} />)}
       </div>
     </div>;
-    case 'gauge_ring': { const v = Math.max(0, Math.min(100, c.value ?? 70)); const acc = c.bgColor ?? '#22d3ee'; const d = Math.max(28, Math.min(c.width, c.height) - 6); return <div style={{ ...base }}><div style={{ width: d, height: d, borderRadius: '50%', background: `conic-gradient(${acc} ${v * 3.6}deg, rgba(255,255,255,0.08) 0)`, display: 'grid', placeItems: 'center' }}><div style={{ width: '66%', height: '66%', borderRadius: '50%', background: '#0d1119', display: 'grid', placeItems: 'center', fontSize: 15, fontWeight: 800, color: acc }}>{v}%</div></div></div>; }
+    case 'gauge_ring': { const v = Math.max(0, Math.min(100, c.varBind ? boundNum(c.value ?? 70) : (c.value ?? 70))); const acc = c.bgColor ?? '#22d3ee'; const d = Math.max(28, Math.min(c.width, c.height) - 6); return <div style={{ ...base }}><div style={{ width: d, height: d, borderRadius: '50%', background: `conic-gradient(${acc} ${v * 3.6}deg, rgba(255,255,255,0.08) 0)`, display: 'grid', placeItems: 'center' }}><div style={{ width: '66%', height: '66%', borderRadius: '50%', background: '#0d1119', display: 'grid', placeItems: 'center', fontSize: 15, fontWeight: 800, color: acc }}>{v}%</div></div></div>; }
     case 'turn_indicator': return <div style={{ ...base, justifyContent: 'flex-start', gap: 8, padding: '0 12px', background: '#141a26', borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', color: '#e8eaf0' }}><span style={{ width: 10, height: 10, borderRadius: '50%', background: c.bgColor ?? '#06d6a0', boxShadow: `0 0 8px ${c.bgColor ?? '#06d6a0'}` }} /><span style={{ fontSize: 13, fontWeight: 700 }}>{c.text || 'À ton tour'}</span></div>;
     case 'players_list': return <div style={{ ...base, flexDirection: 'column', alignItems: 'stretch', justifyContent: 'flex-start', gap: 6, padding: 9, background: '#141a26', borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', overflowY: 'auto' }}>{['Joueur 1', 'Joueur 2', 'Joueur 3'].map((p, i) => <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#cdd3e0' }}><span style={{ width: 8, height: 8, borderRadius: '50%', background: `hsl(${i * 100} 70% 55%)` }} />{p}</div>)}</div>;
     case 'leaderboard': return <div style={{ ...base, flexDirection: 'column', alignItems: 'stretch', justifyContent: 'flex-start', gap: 5, padding: 9, background: '#141a26', borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', overflowY: 'auto' }}>{[['1', 'Lea', '120'], ['2', 'Tom', '95'], ['3', 'Sam', '80']].map((r, i) => <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: i === 0 ? '#f59e0b' : '#cdd3e0', fontWeight: i === 0 ? 800 : 600 }}><span>{r[0]}. {r[1]}</span><span>{r[2]}</span></div>)}</div>;
     case 'button_grid': { const n = Math.max(2, Math.min(6, c.gridCols ?? 4)); const cols = ['#ef4444', '#22c55e', '#3b82f6', '#eab308', '#a855f7', '#06d6a0']; return <div style={{ width: '100%', height: '100%', padding: 6, background: '#0d1119', borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', boxSizing: 'border-box' }}><div style={{ display: 'grid', gridTemplateColumns: `repeat(${n},1fr)`, gridTemplateRows: `repeat(${n},1fr)`, gap: 5, width: '100%', height: '100%' }}>{Array.from({ length: n * n }, (_, i) => <button key={i} onClick={() => c.eventId && plate.onEvent?.(`${c.eventId}:${i}`)} style={{ borderRadius: 8, border: 'none', cursor: 'pointer', background: cols[i % cols.length], opacity: 0.9 }} />)}</div></div>; }
     case 'rgb_sliders': return <div style={{ ...base, flexDirection: 'column', justifyContent: 'center', gap: 9, padding: '8px 12px', background: '#141a26', borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)' }}>{(['#ef4444', '#22c55e', '#3b82f6'] as const).map((col, i) => <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ width: 14, height: 14, borderRadius: 4, background: col, flexShrink: 0 }} /><input type="range" min={0} max={255} defaultValue={128} style={{ flex: 1, accentColor: col }} /></div>)}</div>;
     case 'sprite': { const Ico = SPRITE_ICONS[c.icon ?? 'Smile'] ?? SPRITE_ICONS.Smile; const el = <Ico size={Math.max(16, Math.min(c.width, c.height) - 12)} color={c.bgColor ?? '#f97316'} />; return c.eventId ? <button onClick={() => plate.onEvent?.(c.eventId!)} style={{ ...base, border: 'none', background: 'transparent', cursor: 'pointer' }}>{el}</button> : <div style={{ ...base }}>{el}</div>; }
-    case 'message_box': return <div style={{ ...base, flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'center', gap: 4, padding: '10px 13px', background: '#141a26', borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', color: '#cdd3e0' }}><span style={{ fontSize: 11, fontWeight: 800, color: c.bgColor ?? '#38bdf8' }}>Message</span><span style={{ fontSize: 12.5, lineHeight: 1.4 }}>{c.text || 'Bravo !'}</span></div>;
+    case 'message_box': return <div style={{ ...base, flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'center', gap: 4, padding: '10px 13px', background: '#141a26', borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', color: '#cdd3e0' }}><span style={{ fontSize: 11, fontWeight: 800, color: c.bgColor ?? '#38bdf8' }}>Message</span><span style={{ fontSize: 12.5, lineHeight: 1.4 }}>{c.varBind ? boundStr(c.text || 'Bravo !') : (c.text || 'Bravo !')}</span></div>;
     case 'title_banner': return <div style={{ ...base, background: 'linear-gradient(135deg,#1a2030,#0d1119)', borderRadius: 14, border: '1px solid rgba(255,255,255,0.08)', color: '#fff', fontWeight: 900, fontSize: Math.min(22, c.height / 2.6), letterSpacing: '-0.02em' }}>{c.text || 'TITRE'}</div>;
     default:              return null;
   }
 }
 
 function HudUiOverlay({
-  components, plate,
+  components, plate, vars = {},
 }: {
   components: UILayoutComponent[];
   plate: HudPlateActions;
+  vars?: Record<string, number | string>;
 }) {
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const [scale, setScale] = useState(0.5);
@@ -845,7 +857,7 @@ function HudUiOverlay({
       <div style={{ position: 'absolute', top: 0, left: 0, width: HUD_CANVAS_W, height: usedH, transform: `scale(${scale})`, transformOrigin: 'top left' }}>
         {components.map((c) => (
           <div key={c.id} style={{ position: 'absolute', left: c.x, top: c.y, width: c.width, height: c.height }}>
-            {renderHudComp(c, plate)}
+            {renderHudComp(c, plate, vars)}
           </div>
         ))}
       </div>
@@ -881,6 +893,7 @@ export default function JeuxPage() {
   const [pendingGame, setPendingGame] = useState<
     { title: string; desc: string; accent: string; iconBg: string; iconColor: string; Icon: React.ComponentType<{ size?: number; color?: string }>; launch: () => void; howTo?: string } | null
   >(null);
+  const [hudVarsTick, setHudVarsTick] = useState(0); // re-render de l'overlay quand une variable change
   const [score, setScore] = useState<number>(0);
   const [gamesCompleted, setGamesCompleted] = useState<number>(0);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
@@ -2009,6 +2022,9 @@ export default function JeuxPage() {
   const hudGraphContinuationRef = useRef<(() => void) | null>(null);
   const hudGraphClickHandlersRef = useRef<Map<number, () => void>>(new Map());
   const gameClickHandlerRef = useRef<((idx: number) => void) | null>(null);
+  // Moteur de variables des jeux éditeur : les nœuds écrivent ici, les composants UI lisent.
+  const hudVarsRef = useRef<Record<string, number | string>>({});
+  const bumpHudVars = () => setHudVarsTick((t) => (t + 1) % 1_000_000);
 
   const stopHudGraph = () => {
     hudGraphRunRef.current.stop = true;
@@ -2109,11 +2125,45 @@ export default function JeuxPage() {
 
       const params = (node.params && typeof node.params === 'object' ? node.params : {}) as Record<string, unknown>;
 
-      // ── Pass-through nodes ──
-      if (node.kind === 'ui_event_click' || node.kind === 'ui_event_change' || node.kind === 'ui_event_hover' || node.kind === 'event_begin') {
+      // ── Pass-through nodes (événements + lectures) ──
+      if (node.kind === 'ui_event_click' || node.kind === 'ui_event_change' || node.kind === 'ui_event_hover' || node.kind === 'event_begin'
+        || node.kind === 'on_ui_click' || node.kind === 'variable_get' || node.kind === 'get_score' || node.kind === 'score_get') {
         const nextId = g.out.get(node.id)?.[0];
         if (nextId) walk(nextId);
         return;
+      }
+
+      // ── Variables : écriture dans le store, lu en live par les composants UI ──
+      if (node.kind === 'variable_set' || node.kind === 'var_set' || node.kind === 'set_variable') {
+        const name = String(params.name ?? params.varName ?? 'x');
+        const op = String(params.op ?? 'set');
+        const raw = (params.value as unknown);
+        const num = Number(raw);
+        const cur = Number(hudVarsRef.current[name] ?? 0);
+        if (op === 'add') hudVarsRef.current[name] = cur + (Number.isFinite(num) ? num : 0);
+        else if (op === 'sub') hudVarsRef.current[name] = cur - (Number.isFinite(num) ? num : 0);
+        else if (op === 'mul') hudVarsRef.current[name] = cur * (Number.isFinite(num) ? num : 1);
+        else hudVarsRef.current[name] = Number.isFinite(num) && typeof raw !== 'string' ? num : (raw as any);
+        bumpHudVars();
+        const nextId = g.out.get(node.id)?.[0]; if (nextId) walk(nextId); return;
+      }
+      if (node.kind === 'add_score' || node.kind === 'score_set') {
+        const amount = getNum(params, 'amount', getNum(params, 'value', 1));
+        hudVarsRef.current.score = node.kind === 'score_set' ? amount : Number(hudVarsRef.current.score ?? 0) + amount;
+        bumpHudVars();
+        const nextId = g.out.get(node.id)?.[0]; if (nextId) walk(nextId); return;
+      }
+      if (node.kind === 'score_reset') {
+        hudVarsRef.current.score = 0; bumpHudVars();
+        const nextId = g.out.get(node.id)?.[0]; if (nextId) walk(nextId); return;
+      }
+      if (node.kind === 'random_int') {
+        const min = Math.round(getNum(params, 'min', 0));
+        const max = Math.round(getNum(params, 'max', 41));
+        const name = String(params.varName ?? 'rand');
+        hudVarsRef.current[name] = Math.floor(Math.random() * (Math.max(min, max) - Math.min(min, max) + 1)) + Math.min(min, max);
+        bumpHudVars();
+        const nextId = g.out.get(node.id)?.[0]; if (nextId) walk(nextId); return;
       }
 
       // ── Wait ──
@@ -2332,6 +2382,8 @@ export default function JeuxPage() {
     const showHud = Boolean(cfg.ui && Array.isArray(cfg.ui.widgets) && cfg.ui.widgets.length > 0);
     const newRun = { gameId: game.id, name: game.name, cfg, showHud };
     hudRunRef.current = newRun;
+    hudVarsRef.current = { score: 0 }; // réinitialise le store de variables du jeu
+    setHudVarsTick((t) => t + 1);
     setHudRun(newRun);
     setCustomRun(null);
     setCurrentGame(null);
@@ -4402,6 +4454,7 @@ export default function JeuxPage() {
                     <h3 style={{ marginTop: 0, color: 'rgba(255,255,255,0.85)' }}><Gamepad2 size={16} /> Interface du jeu</h3>
                     <HudUiOverlay
                       components={hudRun.cfg.uiLayout}
+                      vars={{ ...hudVarsRef.current }}
                       plate={{
                         onSendColor: (idx, r, g, b, intensity = 80) => {
                           const plateId = PLATE_ID_BY_INDEX[idx];
