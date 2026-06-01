@@ -67,6 +67,7 @@ type EditorNodeKind =
   | 'play_sound'
   | 'on_score_reached'
   | 'on_plate_click'
+  | 'on_key'
   | 'on_timer'
   | 'on_click'
   | 'on_tick'
@@ -345,6 +346,7 @@ const NODE_CATALOG: NodeCatalogItem[] = [
   { kind: 'play_sound', category: 'Audio', title: 'Jouer un son', defaults: { sound: 'click' } },
   { kind: 'on_score_reached', category: 'Évènements', title: 'Score atteint', defaults: { target: 100 } },
   { kind: 'on_plate_click', category: 'Évènements', title: 'Clic sur dalle', defaults: {} },
+  { kind: 'on_key', category: 'Évènements', title: 'Touche clavier', defaults: { key: 'ArrowLeft' } },
   { kind: 'loop_count', category: 'Flux', title: 'Répéter N fois', defaults: { count: 3 } },
   { kind: 'on_timer', category: 'Évènements', title: 'Timer', defaults: { intervalMs: 1000 } },
   { kind: 'on_click', category: 'Évènements', title: 'On Click', defaults: { tileIndex: 0 } },

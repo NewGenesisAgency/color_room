@@ -2054,6 +2054,25 @@ export default function JeuxPage() {
   // SANS arrêter la boucle principale (on_timer), contrairement à runHudGraphFrom.
   const hudWalkRef = useRef<((nodeId: string) => void) | null>(null);
   const fireHudEvent = (nodeId: string) => { hudWalkRef.current?.(nodeId); };
+  // Grilles 2D des jeux éditeur (grid_create / grid_set / grid_sync_tiles)
+  const hudGridsRef = useRef<Record<string, (string | null)[][]>>({});
+
+  // Clavier -> nœuds on_key : déclenche le sous-graphe correspondant (input de jeu)
+  useEffect(() => {
+    if (!gameActive || !hudRun) return;
+    const onKey = (e: KeyboardEvent) => {
+      const nodes = Array.isArray(hudRunRef.current?.cfg.nodes) ? (hudRunRef.current!.cfg.nodes as EditorNode[]) : [];
+      let matched = false;
+      nodes.forEach((n) => {
+        if (n.kind !== 'on_key' || n.enabled === false) return;
+        const key = String(n.params?.key ?? '');
+        if (!key || key === e.key || key.toLowerCase() === e.key.toLowerCase()) { matched = true; fireHudEvent(String(n.id)); }
+      });
+      if (matched) e.preventDefault();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [gameActive, hudRun]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const stopHudGraph = () => {
     hudGraphRunRef.current.stop = true;
@@ -2157,11 +2176,72 @@ export default function JeuxPage() {
 
       // ── Pass-through nodes (événements + lectures) ──
       if (node.kind === 'ui_event_click' || node.kind === 'ui_event_change' || node.kind === 'ui_event_hover' || node.kind === 'event_begin'
-        || node.kind === 'on_ui_click' || node.kind === 'on_score_reached' || node.kind === 'on_plate_click'
+        || node.kind === 'on_ui_click' || node.kind === 'on_score_reached' || node.kind === 'on_plate_click' || node.kind === 'on_key'
         || node.kind === 'variable_get' || node.kind === 'get_score' || node.kind === 'score_get') {
         const nextId = g.out.get(node.id)?.[0];
         if (nextId) walk(nextId);
         return;
+      }
+
+      // ── Boucle for_range : exécute le corps N fois ──
+      if (node.kind === 'for_range') {
+        const varName = String(params.varName ?? 'i');
+        const start = Math.round(getNum(params, 'start', 0));
+        const end = Math.round(getNum(params, 'end', 0));
+        const step = Math.max(1, Math.round(getNum(params, 'step', 1)));
+        const bodyId = String(params.bodyNodeId ?? '');
+        if (bodyId) {
+          if (start <= end) for (let i = start; i <= end; i += step) { hudVarsRef.current[varName] = i; walk(bodyId); }
+          else for (let i = start; i >= end; i -= step) { hudVarsRef.current[varName] = i; walk(bodyId); }
+        }
+        const nextId = g.out.get(node.id)?.[0]; if (nextId) walk(nextId); return;
+      }
+
+      // ── Grilles 2D ──
+      if (node.kind === 'grid_create') {
+        const name = String(params.name ?? 'grid');
+        const cols = Math.max(1, Math.round(getNum(params, 'cols', 6)));
+        const rows = Math.max(1, Math.round(getNum(params, 'rows', 7)));
+        hudGridsRef.current[name] = Array.from({ length: rows }, () => Array(cols).fill(null) as (string | null)[]);
+        const nextId = g.out.get(node.id)?.[0]; if (nextId) walk(nextId); return;
+      }
+      if (node.kind === 'grid_set') {
+        const name = String(params.name ?? 'grid');
+        const col = Math.round(Number(hudVarsRef.current[String(params.colVar ?? 'col')] ?? 0));
+        const row = Math.round(Number(hudVarsRef.current[String(params.rowVar ?? 'row')] ?? 0));
+        const val = hudVarsRef.current[String(params.valueVar ?? 'val')];
+        const grid = hudGridsRef.current[name];
+        if (grid && grid[row] && col >= 0 && col < grid[row].length) grid[row][col] = (val === undefined || val === '' ? null : String(val));
+        const nextId = g.out.get(node.id)?.[0]; if (nextId) walk(nextId); return;
+      }
+      if (node.kind === 'grid_get') {
+        const name = String(params.name ?? 'grid');
+        const col = Math.round(Number(hudVarsRef.current[String(params.colVar ?? 'col')] ?? 0));
+        const row = Math.round(Number(hudVarsRef.current[String(params.rowVar ?? 'row')] ?? 0));
+        const cell = hudGridsRef.current[name]?.[row]?.[col] ?? null;
+        hudVarsRef.current[String(params.outVar ?? 'cell')] = cell == null ? '' : cell;
+        const nextId = g.out.get(node.id)?.[0]; if (nextId) walk(nextId); return;
+      }
+      if (node.kind === 'grid_clear') {
+        const grid = hudGridsRef.current[String(params.name ?? 'grid')];
+        if (grid) for (const r of grid) r.fill(null);
+        const nextId = g.out.get(node.id)?.[0]; if (nextId) walk(nextId); return;
+      }
+      if (node.kind === 'grid_sync_tiles') {
+        const grid = hudGridsRef.current[String(params.name ?? 'grid')];
+        const bg = getColor(params, 'bgColor', '#000000');
+        if (grid) {
+          for (let r = 0; r < 7; r++) for (let c = 0; c < 6; c++) {
+            const idx = r * 6 + c; const plateId = PLATE_ID_BY_INDEX[idx]; if (!plateId) continue;
+            const cell = grid[r]?.[c] ?? null;
+            const lit = typeof cell === 'string' && cell.length > 0;
+            const col = lit ? (cell as string) : bg;
+            const rgb = parseCssColorToRgb255(col);
+            sendRgbToPlate(rgb, lit ? 85 : 0, plateId);
+            setPlateColor(idx, lit ? col : '#000000', lit);
+          }
+        }
+        const nextId = g.out.get(node.id)?.[0]; if (nextId) walk(nextId); return;
       }
 
       // ── Variables : écriture dans le store, lu en live par les composants UI ──
@@ -2429,6 +2509,7 @@ export default function JeuxPage() {
     const newRun = { gameId: game.id, name: game.name, cfg, showHud };
     hudRunRef.current = newRun;
     hudVarsRef.current = { score: 0 }; // réinitialise le store de variables du jeu
+    hudGridsRef.current = {};           // réinitialise les grilles 2D
     setHudVarsTick((t) => t + 1);
     setHudRun(newRun);
     setCustomRun(null);
