@@ -2,12 +2,12 @@
 
 import { useState, useCallback } from 'react';
 import { 
-  cs150Service, 
+  cs160Service, 
   type XYZ, 
   type Lvxy, 
-  type CS150Status,
+  type CS160Status,
   type CalibType 
-} from '@/app/_services/cs150';
+} from '@/app/_services/cs160';
 import { 
   Plug, 
   Unplug, 
@@ -22,11 +22,11 @@ import {
   ChevronUp
 } from 'lucide-react';
 
-interface CS150PanelProps {
+interface CS160PanelProps {
   className?: string;
 }
 
-export default function CS150Panel({ className = '' }: CS150PanelProps) {
+export default function CS160Panel({ className = '' }: CS160PanelProps) {
   // Connection state
   const [isConnected, setIsConnected] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
@@ -54,29 +54,29 @@ export default function CS150Panel({ className = '' }: CS150PanelProps) {
 
   const log = useCallback((msg: string) => {
     setMessage(msg);
-    console.log('[CS150]', msg);
+    console.log('[CS160]', msg);
   }, []);
 
   // Connect/Disconnect
   const handleConnect = async () => {
     if (isConnected) {
       setIsConnecting(true);
-      const success = await cs150Service.disconnect();
+      const success = await cs160Service.disconnect();
       if (success) {
         setIsConnected(false);
         setDeviceInfo('');
-        log('Déconnecté du CS150');
+        log('Déconnecté du CS160');
       }
       setIsConnecting(false);
     } else {
       setIsConnecting(true);
-      const success = await cs150Service.connect();
+      const success = await cs160Service.connect();
       if (success) {
         setIsConnected(true);
-        const status = await cs150Service.getStatus();
-        setDeviceInfo(status.deviceInfo || 'CS150');
+        const status = await cs160Service.getStatus();
+        setDeviceInfo(status.deviceInfo || 'CS160');
         setActiveCalibCh(status.calibChannel);
-        log('Connecté au CS150');
+        log('Connecté au CS160');
       } else {
         log('Erreur de connexion');
       }
@@ -94,7 +94,7 @@ export default function CS150Panel({ className = '' }: CS150PanelProps) {
     setIsMeasuring(true);
     log('Mesure en cours...');
     
-    const result = await cs150Service.oneShotMeasurement();
+    const result = await cs160Service.oneShotMeasurement();
     
     if (result.xyz || result.lvxy) {
       setLastMeasurement(result);
@@ -113,7 +113,7 @@ export default function CS150Panel({ className = '' }: CS150PanelProps) {
       return;
     }
     
-    const success = await cs150Service.setBacklight(on ? 'on' : 'off');
+    const success = await cs160Service.setBacklight(on ? 'on' : 'off');
     log(success ? `Rétroéclairage ${on ? 'ON' : 'OFF'}` : 'Erreur rétroéclairage');
   };
 
@@ -124,7 +124,7 @@ export default function CS150Panel({ className = '' }: CS150PanelProps) {
       return;
     }
     
-    const success = await cs150Service.setCalibrationCh(ch);
+    const success = await cs160Service.setCalibrationCh(ch);
     if (success) {
       setActiveCalibCh(ch);
       log(`Canal de calibration ${ch} activé`);
@@ -141,7 +141,7 @@ export default function CS150Panel({ className = '' }: CS150PanelProps) {
     setIsMeasuring(true);
     log('Calibration RGB démarrée... Mesurez R, puis G, puis B');
     
-    const success = await cs150Service.performRGBCalibration(
+    const success = await cs160Service.performRGBCalibration(
       trueRed,
       trueGreen,
       trueBlue,
@@ -169,7 +169,7 @@ export default function CS150Panel({ className = '' }: CS150PanelProps) {
     setIsMeasuring(true);
     log('Calibration Single Point démarrée...');
     
-    const success = await cs150Service.performSinglePointCalibration(
+    const success = await cs160Service.performSinglePointCalibration(
       trueWhite,
       calibId,
       targetChannel
@@ -186,7 +186,7 @@ export default function CS150Panel({ className = '' }: CS150PanelProps) {
   };
 
   return (
-    <div className={`cs150-panel ${className}`} style={{ 
+    <div className={`cs160-panel ${className}`} style={{ 
       padding: 16, 
       background: '#fff', 
       borderRadius: 12,
@@ -210,7 +210,7 @@ export default function CS150Panel({ className = '' }: CS150PanelProps) {
             background: isConnected ? '#22c55e' : '#ef4444',
             transition: 'background 0.2s'
           }} />
-          <span style={{ fontWeight: 600, fontSize: 14 }}>CS150 Colorimètre</span>
+          <span style={{ fontWeight: 600, fontSize: 14 }}>CS160 Colorimètre</span>
           {deviceInfo && (
             <span style={{ fontSize: 12, color: '#666' }}>({deviceInfo})</span>
           )}

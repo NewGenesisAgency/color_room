@@ -1,8 +1,9 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { X } from 'lucide-react';
+import { Check, X } from 'lucide-react';
 import type { GameTileProps } from './GameColorSpeed';
+import CieDiagramCanvas, { type CieMarker, type CiePolyline } from './CieDiagramCanvas';
 
 /* ─────────────────────────────────────────────────────────────────────────
    Profils RGB (0-1) des 32 canaux physiques — identiques à chromaticite/page.tsx
@@ -77,6 +78,20 @@ function mixChannelsXy(idxs: number[]): { x: number; y: number } {
     const xyz = rgbLinToXyz(toLinear(r), toLinear(g), toLinear(b));
     X += xyz.X; Y += xyz.Y; Z += xyz.Z;
   }
+  const s = X + Y + Z;
+  if (s < 1e-9) return { x: 0.3127, y: 0.3290 };
+  return { x: X / s, y: Y / s };
+}
+
+/** CIE xy du mélange additif PONDÉRÉ par l'intensité de chaque canal (0-1) */
+function mixWeightedXy(idxs: number[], weights: number[]): { x: number; y: number } {
+  let X = 0, Y = 0, Z = 0;
+  idxs.forEach((i, k) => {
+    const [r, g, b] = CHANNEL_PROFILES[i];
+    const xyz = rgbLinToXyz(toLinear(r), toLinear(g), toLinear(b));
+    const w = weights[k] ?? 0;
+    X += xyz.X * w; Y += xyz.Y * w; Z += xyz.Z * w;
+  });
   const s = X + Y + Z;
   if (s < 1e-9) return { x: 0.3127, y: 0.3290 };
   return { x: X / s, y: Y / s };
@@ -203,17 +218,17 @@ interface GameCanalMixProps extends GameTileProps {
 }
 
 export default function GameCanalMix({
-  onSendColor, onTurnOffAll, onQuit, onSendRawChannels, tileCount = 42,
+  onSendColor, onTurnOffAll, onQuit, onSendRawChannels, tileCount = 42, onComplete,
 }: GameCanalMixProps) {
   const [phase, setPhase] = useState<'ready' | 'playing' | 'result' | 'finished'>('ready');
   const [round, setRound] = useState(0);
   const [roundChans, setRoundChans] = useState<number[]>([]); // 3 channel indices courants
-  const [roundXy, setRoundXy] = useState({ x: 0.3127, y: 0.3290 });
-  const [cursor, setCursor] = useState<{ x: number; y: number } | null>(null);
-  const [confirmed, setConfirmed] = useState<{ x: number; y: number } | null>(null);
+  const [weights, setWeights] = useState<[number, number, number]>([0.5, 0.5, 0.5]); // intensité sliders 0-1
+  const [target, setTarget] = useState<{ x: number; y: number }>({ x: 0.3127, y: 0.3290 }); // cible = mélange à reproduire
   const [dist, setDist] = useState(0);
   const [roundPts, setRoundPts] = useState(0);
   const [totalPts, setTotalPts] = useState(0);
+  useEffect(() => { if (phase === 'finished') onComplete?.(totalPts); }, [phase]); // eslint-disable-line react-hooks/exhaustive-deps
   const [countdown, setCountdown] = useState(AUTO_S);
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -247,21 +262,34 @@ export default function GameCanalMix({
 
   useEffect(() => () => { onTurnOffAll(); window.clearTimeout(hwTimer.current); }, []); // eslint-disable-line
 
-  /* ── Envoyer les 3 canaux aux dalles ── */
-  const sendChannelsToAll = useCallback((idxs: number[]) => {
-    const chs = new Array(32).fill(0);
-    for (const i of idxs) chs[i] = HW_INTENSITY;
-    for (let t = 0; t < numTiles; t++) onSendRawChannels(t, chs);
-  }, [numTiles, onSendRawChannels]);
-
-  /* ── Couleur curseur → dalles (aperçu en temps réel) ── */
-  const sendCursorToTiles = useCallback((x: number, y: number) => {
+  /* ── Aperçu live : envoie les 3 canaux DOSÉS par les sliders aux dalles ── */
+  useEffect(() => {
+    if (phase !== 'playing' || roundChans.length !== 3) return;
     window.clearTimeout(hwTimer.current);
     hwTimer.current = window.setTimeout(() => {
-      const c = xyToRgb255(x, y);
-      if (c) for (let t = 0; t < numTiles; t++) onSendColor(t, c.r, c.g, c.b, 80);
-    }, 30);
-  }, [numTiles, onSendColor]);
+      const chs = new Array(32).fill(0);
+      roundChans.forEach((i, k) => { chs[i] = Math.round((weights[k] ?? 0) * HW_INTENSITY); });
+      for (let t = 0; t < numTiles; t++) onSendRawChannels(t, chs);
+    }, 40);
+  }, [weights, roundChans, phase, numTiles, onSendRawChannels]);
+
+  /* ── Pioche 3 canaux distincts dans la liste intéressante ── */
+  function pick3(): number[] {
+    const pool = [...INTERESTING];
+    for (let i = pool.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [pool[i], pool[j]] = [pool[j], pool[i]];
+    }
+    return pool.slice(0, 3);
+  }
+
+  /* ── Nouvelle manche : la cible est un mélange aléatoire des 3 canaux ── */
+  function newRound(chans: number[]) {
+    const tw = [0.25 + Math.random() * 0.75, 0.25 + Math.random() * 0.75, 0.25 + Math.random() * 0.75];
+    setRoundChans(chans);
+    setTarget(mixWeightedXy(chans, tw));
+    setWeights([0.5, 0.5, 0.5]);
+  }
 
   /* ── Auto-avance après résultat ── */
   useEffect(() => {
@@ -276,93 +304,55 @@ export default function GameCanalMix({
         setTotalPts(s => s + roundPts);
         const next = round + 1;
         if (next >= TOTAL_ROUNDS) { onTurnOffAll(); setPhase('finished'); }
-        else {
-          const chans = pick3();
-          setRoundChans(chans);
-          setRoundXy(mixChannelsXy(chans));
-          setRound(next);
-          setCursor(null); setConfirmed(null);
-          setPhase('playing');
-          sendChannelsToAll(chans);
-        }
+        else { newRound(pick3()); setRound(next); setPhase('playing'); }
       }
     }, 1000);
     return () => window.clearInterval(id);
   }, [phase]); // eslint-disable-line
 
-  /* ── Pioche 3 canaux distincts dans la liste intéressante ── */
-  function pick3(): number[] {
-    const pool = [...INTERESTING];
-    for (let i = pool.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [pool[i], pool[j]] = [pool[j], pool[i]];
-    }
-    return pool.slice(0, 3);
-  }
-
   function startGame() {
-    const chans = pick3();
-    setRoundChans(chans);
-    setRoundXy(mixChannelsXy(chans));
     setRound(0); setTotalPts(0);
-    setCursor(null); setConfirmed(null);
+    newRound(pick3());
     setPhase('playing');
-    sendChannelsToAll(chans);
   }
 
-  function handleMouseMove(e: React.MouseEvent<SVGSVGElement>) {
-    if (phase !== 'playing') return;
-    const rect = svgRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    const { x, y } = svgToXy(
-      (e.clientX - rect.left) * DW / rect.width,
-      (e.clientY - rect.top)  * DH / rect.height,
-    );
-    const cx = Math.max(X_MIN, Math.min(X_MAX, x));
-    const cy = Math.max(Y_MIN, Math.min(Y_MAX, y));
-    setCursor({ x: cx, y: cy });
-    if (inHorseshoe(cx, cy)) sendCursorToTiles(cx, cy);
-  }
-
-  function handleClick(e: React.MouseEvent<SVGSVGElement>) {
-    if (phase !== 'playing' || !cursor) return;
-    e.preventDefault();
-    const d = Math.sqrt((cursor.x - roundXy.x) ** 2 + (cursor.y - roundXy.y) ** 2);
+  function confirm() {
+    if (phase !== 'playing' || roundChans.length !== 3) return;
+    const p = mixWeightedXy(roundChans, weights);
+    const d = Math.sqrt((p.x - target.x) ** 2 + (p.y - target.y) ** 2);
     const pts = Math.max(0, Math.round(1000 * (1 - d / 0.3)));
-    setConfirmed(cursor);
     setDist(parseFloat(d.toFixed(4)));
     setRoundPts(pts);
     setPhase('result');
-    /* révéler la couleur cible sur les dalles */
-    sendChannelsToAll(roundChans);
   }
 
-  /* ─── SVG helpers ─── */
-  const horsePath = HORSESHOE.map(([x, y], i) => {
-    const { px, py } = xyToSvg(x, y);
-    return `${i === 0 ? 'M' : 'L'}${px.toFixed(1)},${py.toFixed(1)}`;
-  }).join(' ') + ' Z';
-  const srgbPath = [[0.64,0.33],[0.30,0.60],[0.15,0.06]].map(([x,y],i) => {
-    const { px, py } = xyToSvg(x, y);
-    return `${i===0?'M':'L'}${px.toFixed(1)},${py.toFixed(1)}`;
-  }).join(' ') + ' Z';
-
-  const tgtSvg  = xyToSvg(roundXy.x, roundXy.y);
-  const curSvg  = cursor    ? xyToSvg(cursor.x,    cursor.y)    : null;
-  const confSvg = confirmed ? xyToSvg(confirmed.x, confirmed.y) : null;
-  const curColor = cursor ? xyToRgb255(cursor.x, cursor.y) : null;
-  const mixRgb = roundChans.length === 3 ? mixChannelsRgb255(roundChans) : null;
+  /* ─── Calculs de rendu (triangle + marqueurs) ─── */
+  const vertices = roundChans.length === 3 ? roundChans.map((i) => mixChannelsXy([i])) : [];
+  const playerXy = roundChans.length === 3 ? mixWeightedXy(roundChans, weights) : target;
+  const targetRgb = xyToRgb255(target.x, target.y);
+  const playerRgb = xyToRgb255(playerXy.x, playerXy.y);
+  const triangle: CiePolyline = { points: vertices, color: 'rgba(255,255,255,0.6)', width: 1.5, closed: true };
+  const diagMarkers: CieMarker[] = [
+    ...vertices.map((v, k) => {
+      const [r, g, b] = CHANNEL_PROFILES[roundChans[k]];
+      return { x: v.x, y: v.y, color: `rgb(${Math.round(r * 255)},${Math.round(g * 255)},${Math.round(b * 255)})`, radius: 5 } as CieMarker;
+    }),
+    { x: target.x, y: target.y, color: targetRgb ? `rgb(${targetRgb.r},${targetRgb.g},${targetRgb.b})` : '#a78bfa', ring: true, label: 'Cible' } as CieMarker,
+    phase === 'playing'
+      ? { x: playerXy.x, y: playerXy.y, color: playerRgb ? `rgb(${playerRgb.r},${playerRgb.g},${playerRgb.b})` : '#ffffff', crosshair: true, radius: 6 } as CieMarker
+      : { x: playerXy.x, y: playerXy.y, color: '#ffffff', ring: true, label: 'Vous' } as CieMarker,
+  ];
 
   /* ─── READY ─── */
   if (phase === 'ready') return (
     <div style={G.wrap}>
       <div style={{ display:'flex', alignItems:'flex-start', gap:20, padding:'18px 22px' }}>
         <div style={{ flex:1 }}>
-          <span style={G.tag}>🎲 Mix de Canaux</span>
+          <span style={G.tag}>Mix de Canaux</span>
           <p style={{ fontSize:13, color:'rgba(255,255,255,.62)', lineHeight:1.65, margin:'0 0 10px' }}>
-            3 canaux aléatoires s&apos;allument sur les dalles.<br />
-            Retrouvez la couleur obtenue sur le <em>diagramme CIE 1931</em>.<br />
-            <span style={{ color:'#a78bfa' }}>Déplacez le curseur et cliquez pour valider.</span>
+            3 canaux LED forment un <em>triangle</em> sur le diagramme CIE 1931.<br />
+            Dosez chaque canal avec les <strong>3 sliders</strong> pour que votre mélange<br />
+            <span style={{ color:'#a78bfa' }}>rejoigne la couleur cible dans le triangle.</span>
           </p>
           <p style={{ fontSize:12, color:'rgba(255,255,255,.4)', margin:0 }}>{TOTAL_ROUNDS} manches · max {TOTAL_ROUNDS * 1000} pts</p>
         </div>
@@ -403,82 +393,53 @@ export default function GameCanalMix({
           <button onClick={() => { onTurnOffAll(); onQuit(); }} style={G.stopBtn}><X size={12}/></button>
         </div>
 
-        {/* Canaux sélectionnés */}
-        <div style={{ ...G.glass, padding:'10px 14px', display:'flex', alignItems:'center', gap:12, flexWrap:'wrap' }}>
-          <div style={{ display:'flex', gap:6 }}>
-            {roundChans.map(i => {
-              const [r,g,b] = CHANNEL_PROFILES[i];
-              return (
-                <div key={i} style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:3 }}>
-                  <div style={{ width:28, height:28, borderRadius:6, background:`rgb(${Math.round(r*255)},${Math.round(g*255)},${Math.round(b*255)})`, border:'1.5px solid rgba(255,255,255,.25)' }} />
-                  <span style={{ fontSize:10, color:'rgba(255,255,255,.5)', fontWeight:600 }}>ch{i}</span>
-                </div>
-              );
-            })}
+        {/* Cible à reproduire + aperçu du mélange joueur */}
+        <div style={{ ...G.glass, padding:'10px 14px', display:'flex', alignItems:'center', gap:12 }}>
+          <div style={{ width:40, height:40, borderRadius:10, flexShrink:0, background: targetRgb ? `rgb(${targetRgb.r},${targetRgb.g},${targetRgb.b})` : '#000', border:'2px solid rgba(255,255,255,.3)' }} />
+          <div style={{ minWidth:0 }}>
+            <div style={{ fontSize:12, fontWeight:800, color:'#e8eaf0' }}>Couleur cible</div>
+            <div style={{ fontSize:11, color:'rgba(255,255,255,.5)' }}>
+              {phase==='result' ? `x=${target.x.toFixed(4)}, y=${target.y.toFixed(4)}` : 'Dosez les 3 canaux pour la reproduire'}
+            </div>
           </div>
-          {mixRgb && (
-            <div style={{ display:'flex', alignItems:'center', gap:6, marginLeft:4 }}>
-              <span style={{ fontSize:11, color:'rgba(255,255,255,.3)' }}>→</span>
-              <div style={{ width:34, height:34, borderRadius:8, background:`rgb(${mixRgb.r},${mixRgb.g},${mixRgb.b})`, border:'1.5px solid rgba(255,255,255,.25)' }} />
-              <div>
-                <div style={{ fontSize:11, fontWeight:700, color:'#e8eaf0' }}>{roundChans.map(i=>CHANNEL_NAMES[i]).join(' + ')}</div>
-                <div style={{ fontSize:10, color:'rgba(255,255,255,.45)' }}>
-                  {phase==='result' ? `cible : x=${roundXy.x.toFixed(4)}, y=${roundXy.y.toFixed(4)}` : (cursor ? `curseur : x=${cursor.x.toFixed(3)}, y=${cursor.y.toFixed(3)}` : 'Déplacez le curseur')}
-                </div>
-              </div>
-            </div>
-          )}
-          {curColor && phase==='playing' && (
-            <div style={{ marginLeft:'auto', display:'flex', alignItems:'center', gap:5 }}>
-              <div style={{ width:22, height:22, borderRadius:5, background:`rgb(${curColor.r},${curColor.g},${curColor.b})`, border:'1px solid rgba(255,255,255,.2)' }} />
-              <span style={{ fontSize:10, color:'rgba(255,255,255,.35)' }}>curseur</span>
-            </div>
-          )}
+          <div style={{ marginLeft:'auto', textAlign:'right' }}>
+            <div style={{ fontSize:10, color:'rgba(255,255,255,.4)', marginBottom:3 }}>votre mélange</div>
+            <div style={{ width:28, height:28, borderRadius:7, marginLeft:'auto', background: playerRgb ? `rgb(${playerRgb.r},${playerRgb.g},${playerRgb.b})` : '#000', border:'1.5px solid rgba(255,255,255,.25)' }} />
+          </div>
         </div>
 
-        {/* Diagramme CIE */}
-        <div style={{ position:'relative', borderRadius:12, overflow:'hidden', border:'1px solid rgba(255,255,255,.10)' }}>
-          <canvas ref={canvasRef} width={DW} height={DH} style={{ display:'block', width:'100%', height:'auto' }} />
-          <svg ref={svgRef} viewBox={`0 0 ${DW} ${DH}`} width="100%"
-            style={{ position:'absolute', top:0, left:0, cursor: phase==='playing' ? 'none' : 'default' }}
-            onMouseMove={handleMouseMove} onClick={handleClick}
-          >
-            <path d={horsePath} fill="none" stroke="rgba(255,255,255,.5)" strokeWidth="1.5" />
-            <path d={srgbPath}  fill="none" stroke="rgba(255,255,255,.3)" strokeWidth="1" strokeDasharray="5,4" />
-            {(() => { const {px,py}=xyToSvg(0.64,0.33); return <text x={px+4} y={py-4} fill="rgba(255,255,255,.35)" fontSize="8">R</text>; })()}
-            {(() => { const {px,py}=xyToSvg(0.30,0.60); return <text x={px-8} y={py-4} fill="rgba(255,255,255,.35)" fontSize="8">G</text>; })()}
-            {(() => { const {px,py}=xyToSvg(0.15,0.06); return <text x={px-8} y={py+10} fill="rgba(255,255,255,.35)" fontSize="8">B</text>; })()}
-            {[0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8].map(v => { const {px}=xyToSvg(v,0); return <text key={v} x={px} y={DH-5} fill="rgba(255,255,255,.25)" fontSize="8" textAnchor="middle">{v.toFixed(1)}</text>; })}
-            {[0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9].map(v => { const {py}=xyToSvg(0,v); return <text key={v} x={PAD_L-3} y={py+3} fill="rgba(255,255,255,.25)" fontSize="8" textAnchor="end">{v.toFixed(1)}</text>; })}
-            <text x={DW/2} y={DH-3} fill="rgba(255,255,255,.35)" fontSize="10" textAnchor="middle" fontStyle="italic">x</text>
-            <text x={8} y={DH/2} fill="rgba(255,255,255,.35)" fontSize="10" textAnchor="middle" fontStyle="italic" transform={`rotate(-90 8 ${DH/2})`}>y</text>
-            {/* D65 */}
-            {(() => { const {px,py}=xyToSvg(0.3127,0.3290); return <><circle cx={px} cy={py} r={4} fill="#fff" opacity={.6}/><text x={px+6} y={py+4} fill="rgba(255,255,255,.4)" fontSize="8">D65</text></>; })()}
-            {/* Curseur */}
-            {curSvg && phase==='playing' && (
-              <g>
-                <line x1={curSvg.px-14} y1={curSvg.py} x2={curSvg.px+14} y2={curSvg.py} stroke="#fff" strokeWidth={1.5}/>
-                <line x1={curSvg.px} y1={curSvg.py-14} x2={curSvg.px} y2={curSvg.py+14} stroke="#fff" strokeWidth={1.5}/>
-                <circle cx={curSvg.px} cy={curSvg.py} r={7} fill="none" stroke="#fff" strokeWidth={1.5}/>
-                {curColor && <circle cx={curSvg.px} cy={curSvg.py} r={3} fill={`rgb(${curColor.r},${curColor.g},${curColor.b})`}/>}
-              </g>
-            )}
-            {/* Réponse confirmée */}
-            {confSvg && phase==='result' && (
-              <g>
-                <circle cx={confSvg.px} cy={confSvg.py} r={9} fill="none" stroke="#fff" strokeWidth={2}/>
-                <circle cx={confSvg.px} cy={confSvg.py} r={3} fill="#fff"/>
-              </g>
-            )}
-            {/* Cible révélée */}
-            {phase==='result' && (
-              <g>
-                <circle cx={tgtSvg.px} cy={tgtSvg.py} r={11} fill="none" stroke="#a78bfa" strokeWidth={2.5}/>
-                <circle cx={tgtSvg.px} cy={tgtSvg.py} r={4} fill="#a78bfa"/>
-                {confSvg && <line x1={confSvg.px} y1={confSvg.py} x2={tgtSvg.px} y2={tgtSvg.py} stroke="rgba(255,255,255,.4)" strokeWidth={1.5} strokeDasharray="4,3"/>}
-              </g>
-            )}
-          </svg>
+        {/* Diagramme CIE coloré + triangle des 3 canaux */}
+        <div style={{ display:'flex', justifyContent:'center' }}>
+          <CieDiagramCanvas size={DW} markers={diagMarkers} polylines={[triangle]} />
+        </div>
+
+        {/* Sliders d'intensité (un par canal) — le point se déplace dans le triangle */}
+        <div style={{ ...G.glass, padding:'12px 14px', display:'flex', flexDirection:'column', gap:11 }}>
+          {roundChans.map((ci, k) => {
+            const [r,g,b] = CHANNEL_PROFILES[ci];
+            const col = `rgb(${Math.round(r*255)},${Math.round(g*255)},${Math.round(b*255)})`;
+            return (
+              <div key={ci} style={{ display:'flex', alignItems:'center', gap:10 }}>
+                <div style={{ width:22, height:22, borderRadius:6, flexShrink:0, background:col, border:'1.5px solid rgba(255,255,255,.25)' }} />
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', fontSize:11, marginBottom:3 }}>
+                    <span style={{ color:'rgba(255,255,255,.6)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{CHANNEL_NAMES[ci]}</span>
+                    <span style={{ fontWeight:800, color:'#e8eaf0', marginLeft:8 }}>{Math.round((weights[k] ?? 0)*100)}%</span>
+                  </div>
+                  <input
+                    type="range" min={0} max={1} step={0.01} value={weights[k] ?? 0} disabled={phase!=='playing'}
+                    onChange={e => setWeights(w => { const n = [...w] as [number, number, number]; n[k] = Number(e.target.value); return n; })}
+                    style={{ width:'100%', accentColor: col, cursor: phase==='playing' ? 'pointer' : 'default' }}
+                  />
+                </div>
+              </div>
+            );
+          })}
+          {phase==='playing' && (
+            <button onClick={confirm} style={{ ...G.playBtn, marginTop:2, display:'flex', alignItems:'center', justifyContent:'center', gap:7 }}>
+              <Check size={16} /> Valider le mélange
+            </button>
+          )}
         </div>
 
         {/* Résultat */}

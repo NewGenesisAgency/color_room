@@ -141,7 +141,7 @@ const S: Record<string, React.CSSProperties> = {
 // ── Component ──────────────────────────────────────────────────────────────────
 
 export default function GameMetamerisme({
-  onSendColor, onTurnOffAll, onQuit, tileCount = 42,
+  onSendColor, onTurnOffAll, onQuit, tileCount = 42, onComplete,
 }: GameTileProps) {
   const [phase,      setPhase]      = useState<'ready' | 'playing' | 'result' | 'finished'>('ready');
   const [rounds,     setRounds]     = useState<Round[]>([]);
@@ -152,6 +152,7 @@ export default function GameMetamerisme({
   const [roundScore, setRoundScore] = useState(0);
   const [totalScore, setTotalScore] = useState(0);
   const [validated,  setValidated]  = useState(false);
+  useEffect(() => { if (phase === 'finished') onComplete?.(totalScore); }, [phase]); // eslint-disable-line react-hooks/exhaustive-deps
   const [autoAdv,    setAutoAdv]    = useState(5);
 
   const numTiles = Math.min(tileCount, 42);

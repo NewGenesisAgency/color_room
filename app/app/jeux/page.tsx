@@ -15,13 +15,14 @@ const TetrisGame = dynamic(() => import('@/app/_components/TetrisGame'), { ssr: 
 const GameColorSpeed = dynamic(() => import('@/app/_components/GameColorSpeed'), { ssr: false });
 const GameMaitreDuBlanc = dynamic(() => import('@/app/_components/GameMaitreDuBlanc'), { ssr: false });
 const GamePuissance4 = dynamic(() => import('@/app/_components/GamePuissance4'), { ssr: false });
-const GameChasseurGamut = dynamic(() => import('@/app/_components/GameChasseurGamut'), { ssr: false });
 const GameMetamerisme = dynamic(() => import('@/app/_components/GameMetamerisme'), { ssr: false });
 const GameChromaticite = dynamic(() => import('@/app/_games/chromaticity-diagram/ChromaticityDiagram'), { ssr: false });
 const GameCanalMix = dynamic(() => import('@/app/_components/GameCanalMix'), { ssr: false });
 const Room3D = dynamic(() => import('@/app/_components/Room3D'), { ssr: false, loading: () => <div style={{ height: 420 }} /> });
 const CieMeasureWidget = dynamic(() => import('@/app/_components/CieMeasureWidget'), { ssr: false });
 const TouchControls = dynamic(() => import('@/app/_components/TouchControls'), { ssr: false });
+const SnakeGame = dynamic(() => import('@/app/_components/SnakeGame'), { ssr: false });
+const GameIntrus = dynamic(() => import('@/app/_components/GameIntrus'), { ssr: false });
 const SpectrePage = dynamic(() => import('@/app/spectre/page'), { ssr: false });
 const ChromaticitePage = dynamic(() => import('@/app/chromaticite/page'), { ssr: false });
 import {
@@ -757,10 +758,16 @@ function hudDpadKeys(preset: UIDpadPreset | undefined): TouchKey[] {
   }
 }
 
-function renderHudComp(
-  c: UILayoutComponent,
-  onSendColor: (idx: number, r: number, g: number, b: number, intensity: number) => void,
-): React.ReactNode {
+type HudPlateActions = {
+  onSendColor: (idx: number, r: number, g: number, b: number, intensity?: number) => void;
+  onTurnOff: (idx: number) => void;
+  onTurnOffAll: () => void;
+  onComplete?: (points: number) => void;
+  plateColors?: string[];   // couleurs live des 42 dalles (visualisation)
+};
+
+function renderHudComp(c: UILayoutComponent, plate: HudPlateActions): React.ReactNode {
+  const onSendColor = plate.onSendColor;
   const base: React.CSSProperties = {
     width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center',
     boxSizing: 'border-box', overflow: 'hidden', fontSize: c.fontSize ?? 14, color: c.textColor ?? '#1a1d2e',
@@ -785,15 +792,25 @@ function renderHudComp(
     case 'color_swatch':  return <div style={{ ...base, borderRadius: 12, background: c.bgColor ?? '#ff2aa6', boxShadow: '0 0 20px ' + (c.bgColor ?? '#ff2aa6') }} />;
     case 'progress_bar':  return <div style={{ ...base, background: 'rgba(0,0,0,0.07)', borderRadius: 999, overflow: 'hidden', padding: 0 }}><div style={{ width: '55%', height: '100%', background: 'linear-gradient(90deg,#059669,#06d6a0)', borderRadius: 999 }} /></div>;
     case 'dpad':          return <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><TouchControls forceShow compact keys={hudDpadKeys(c.dpadPreset)} /></div>;
+    case 'shape_rect':    return <div style={{ width: '100%', height: '100%', background: c.bgColor ?? '#334155', borderRadius: 12 }} />;
+    case 'shape_circle':  return <div style={{ width: '100%', height: '100%', background: c.bgColor ?? '#334155', borderRadius: '50%' }} />;
+    case 'divider':       return <div style={{ ...base, padding: 0 }}><div style={{ width: '100%', height: 2, borderRadius: 2, background: c.bgColor ?? 'rgba(255,255,255,0.4)' }} /></div>;
+    case 'image':         return c.src ? <img src={c.src} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 12 }} /> : <div style={{ ...base, borderRadius: 12, background: 'rgba(255,255,255,0.05)', border: '1px dashed rgba(255,255,255,0.2)', color: 'rgba(255,255,255,0.4)', fontSize: 11 }}>Image</div>;
+    case 'heart_life':    return <div style={{ ...base, gap: 4, color: '#ef4444' }}>{[0, 1, 2].map((i) => <svg key={i} width={Math.min(24, c.height - 10)} height={Math.min(24, c.height - 10)} viewBox="0 0 24 24" fill={i < 2 ? '#ef4444' : 'none'} stroke="#ef4444" strokeWidth="2"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.29 1.51 4.04 3 5.5l7 7Z" /></svg>)}</div>;
+    case 'plate_grid':    return <div style={{ width: '100%', height: '100%', padding: 6, background: '#0d1119', borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', boxSizing: 'border-box' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6,1fr)', gridTemplateRows: 'repeat(7,1fr)', gap: 3, width: '100%', height: '100%' }}>
+        {Array.from({ length: 42 }, (_, i) => <span key={i} style={{ borderRadius: 3, background: plate.plateColors?.[i] ?? '#1a1f2e', transition: 'background 0.1s' }} />)}
+      </div>
+    </div>;
     default:              return null;
   }
 }
 
 function HudUiOverlay({
-  components, onSendColor,
+  components, plate,
 }: {
   components: UILayoutComponent[];
-  onSendColor: (idx: number, r: number, g: number, b: number, intensity: number) => void;
+  plate: HudPlateActions;
 }) {
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const [scale, setScale] = useState(0.5);
@@ -813,7 +830,7 @@ function HudUiOverlay({
       <div style={{ position: 'absolute', top: 0, left: 0, width: HUD_CANVAS_W, height: usedH, transform: `scale(${scale})`, transformOrigin: 'top left' }}>
         {components.map((c) => (
           <div key={c.id} style={{ position: 'absolute', left: c.x, top: c.y, width: c.width, height: c.height }}>
-            {renderHudComp(c, onSendColor)}
+            {renderHudComp(c, plate)}
           </div>
         ))}
       </div>
@@ -845,6 +862,10 @@ export default function JeuxPage() {
   const [userClasses, setUserClasses] = useState<string[]>([]);
   const [gameSearch, setGameSearch] = useState('');
   const [gameVisibleCount, setGameVisibleCount] = useState(4);
+  // Pop-up "Commencer le jeu" : description + explication avant de lancer
+  const [pendingGame, setPendingGame] = useState<
+    { title: string; desc: string; accent: string; iconBg: string; iconColor: string; Icon: React.ComponentType<{ size?: number; color?: string }>; launch: () => void } | null
+  >(null);
   const [score, setScore] = useState<number>(0);
   const [gamesCompleted, setGamesCompleted] = useState<number>(0);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
@@ -922,7 +943,7 @@ export default function JeuxPage() {
   const [simonActive, setSimonActive] = useState<boolean>(false);
 
   // Nouveaux jeux natifs
-  const [activeBuiltinGame, setActiveBuiltinGame] = useState<'color-speed' | 'maitre-blanc' | 'puissance4' | 'chasseur-gamut' | 'metamere' | 'chromaticite-jeu' | 'canal-mix' | null>(null);
+  const [activeBuiltinGame, setActiveBuiltinGame] = useState<'color-speed' | 'maitre-blanc' | 'puissance4' | 'metamere' | 'chromaticite-jeu' | 'canal-mix' | 'intrus' | 'snake' | null>(null);
   const [activeView, setActiveView] = useState<null | 'spectre' | 'chromaticite'>(null);
   const [simonSequence, setSimonSequence] = useState<number[]>([]);
   const [simonPlayerInput, setSimonPlayerInput] = useState<number[]>([]);
@@ -988,6 +1009,7 @@ export default function JeuxPage() {
   const hwCurrentCtrlRef   = useRef<AbortController | null>(null); // pour annuler le POST en cours
   const hwFetchGenRef      = useRef(0);        // génération : invalide les callbacks orphelins
   const tetrisSnapRef = useRef<TetrisSnapshot | null>(null);
+  const tetrisAwardedRef = useRef(false); // évite de créditer plusieurs fois la même partie
   // State canonique des dalles pendant les jeux - équivalent tetrisSnapRef
   const gameColorStateRef = useRef<Array<{r:number;g:number;b:number;intensity:number}|null>>(new Array(42).fill(null));
   // Batch visuel (rAF) pour mettre à jour la 3D sans bloquer le fil principal
@@ -2682,7 +2704,7 @@ export default function JeuxPage() {
       }
       const finalScore = tetrixScore + (linesCleared * 100 * tetrixLevel);
       setMessage(`Game Over! Score: ${finalScore}`);
-      awardPoints(finalScore, `Tetrix terminé! Score: ${finalScore}`);
+      award(finalScore, `Tetrix terminé! Score: ${finalScore}`);
       showGameOverPopup('Tetrix Light', finalScore, `Niveau ${tetrixLevel} atteint`);
       return;
     }
@@ -3045,7 +3067,7 @@ export default function JeuxPage() {
       setSimonPhase('gameover');
       const finalScore = simonScore + (simonLevel * 10);
       setMessage(`Game Over! Score: ${finalScore}`);
-      awardPoints(finalScore, `Simon terminé! Niveau ${simonLevel} - +${finalScore} points.`);
+      award(finalScore, `Simon terminé! Niveau ${simonLevel} - +${finalScore} points.`);
       
       // Update high score
       if (finalScore > simonHighScore) {
@@ -3807,13 +3829,14 @@ export default function JeuxPage() {
                     'color-speed':      { title: 'Color Speed',        desc: "Cliquez la dalle qui s'allume - réflexes !",            Icon: Zap,       grad: 'linear-gradient(135deg,#4361ee,#7c3aed)', accent: '#7c3aed' },
                     'maitre-blanc':     { title: 'Le Maître du Blanc', desc: 'Recréez la teinte cible en dosant R, G, B',              Icon: Sun,       grad: 'linear-gradient(135deg,#f59e0b,#ef4444)', accent: '#f59e0b' },
                     'puissance4':       { title: 'Puissance 4',        desc: 'Alignez 4 couleurs sur la matrice 6×7',                  Icon: Grid,      grad: 'linear-gradient(135deg,#ff2828,#2850ff)', accent: '#ff2828' },
-                    'chasseur-gamut':   { title: 'Chasseur de Gamut',  desc: 'Localisez la couleur sur le diagramme CIE 1931',         Icon: Crosshair, grad: 'linear-gradient(135deg,#06d6a0,#4361ee)', accent: '#06d6a0' },
                     'metamere':         { title: 'Métamérie',          desc: "Trouvez l'éclairage qui cache ou révèle le texte",       Icon: Sparkles,  grad: 'linear-gradient(135deg,#7c3aed,#06d6a0)', accent: '#06d6a0' },
                     'chromaticite-jeu': { title: 'Chromaticité CIE',   desc: 'Mémorisez la couleur 5s puis retrouvez x, y, z sur le diagramme', Icon: Crosshair, grad: 'linear-gradient(135deg,#81e6d9,#4361ee)', accent: '#81e6d9' },
                     'canal-mix':        { title: 'Mix de Canaux',      desc: '3 canaux LED aléatoires - retrouvez la couleur sur le diagramme CIE', Icon: Palette,  grad: 'linear-gradient(135deg,#f97316,#7c3aed)', accent: '#f97316' },
+                    'intrus':           { title: "L'Intrus (Sniper)",  desc: 'Une dalle a une teinte presque invisible - trouvez-la au CS-160', Icon: Crosshair, grad: 'linear-gradient(135deg,#06d6a0,#ef4444)', accent: '#06d6a0' },
+                    'snake':            { title: 'Snake Lumière',       desc: 'Le serpent sur les 42 dalles - flèches ou D-pad tactile', Icon: Gamepad2,  grad: 'linear-gradient(135deg,#16a34a,#06d6a0)', accent: '#16a34a' },
                   };
 
-                  const builtinCards: GameCard[] = (['color-speed', 'maitre-blanc', 'puissance4', 'chasseur-gamut', 'metamere', 'chromaticite-jeu', 'canal-mix'] as const).map((gameId) => {
+                  const builtinCards: GameCard[] = (['color-speed', 'maitre-blanc', 'puissance4', 'metamere', 'chromaticite-jeu', 'canal-mix', 'intrus', 'snake'] as const).map((gameId) => {
                     const m = BUILTIN_META[gameId];
                     return {
                       key: `builtin:${gameId}`,
@@ -3859,7 +3882,10 @@ export default function JeuxPage() {
                     const iconName: string = typeof cfg?.icon === 'string' ? cfg.icon : 'Lightbulb';
                     const GIcon = ICONS_MAP[iconName] ?? Lightbulb;
                     const accentColor = typeof cfg?.accentColor === 'string' ? cfg.accentColor : (isEditor ? '#a0aeff' : '#c4b5fd');
-                    const iconBg = typeof cfg?.bgColor === 'string' ? cfg.bgColor : (isEditor ? 'linear-gradient(135deg,#1a2045,#2d1060)' : 'linear-gradient(135deg,#1a1040,#0d0830)');
+                    // Dégradé icône : couleur de fond -> couleur accent (configuré dans l'éditeur)
+                    const iconBg = typeof cfg?.bgColor === 'string'
+                      ? `linear-gradient(135deg, ${cfg.bgColor}, ${typeof cfg?.accentColor === 'string' ? cfg.accentColor : cfg.bgColor})`
+                      : (isEditor ? 'linear-gradient(135deg,#1a2045,#2d1060)' : 'linear-gradient(135deg,#1a1040,#0d0830)');
                     const description = typeof cfg?.description === 'string' && cfg.description ? cfg.description : `${nodeCount} nœud${nodeCount !== 1 ? 's' : ''} · ${tileCount} dalles`;
                     return {
                       key: `db:${g.id}`,
@@ -3898,7 +3924,7 @@ export default function JeuxPage() {
                         {visible.map((c) => (
                           <div key={c.key}
                             className={`game-card${c.selected ? ' selected' : ''}`}
-                            onClick={c.launch}
+                            onClick={() => setPendingGame(c)}
                             role="button" tabIndex={0}
                           >
                             <div className="game-icon" style={{ background: c.iconBg }}>
@@ -3913,7 +3939,7 @@ export default function JeuxPage() {
                             </div>
                             <button className="play-btn"
                               style={{ background: c.accent, color: '#fff', boxShadow: c.selected ? `0 0 0 2px ${c.accent}80, 0 4px 14px ${c.accent}66` : `0 3px 10px ${c.accent}55` }}
-                              onClick={(e) => { e.stopPropagation(); c.launch(); }}
+                              onClick={(e) => { e.stopPropagation(); setPendingGame(c); }}
                             ><Play size={15} /></button>
                           </div>
                         ))}
@@ -4105,7 +4131,15 @@ export default function JeuxPage() {
                     <TetrisGame
                       params={{ speed: 500 }}
                       isPlaying={gameActive}
-                      onSnapshot={(snap) => { tetrisSnapRef.current = snap; }}
+                      onSnapshot={(snap) => {
+                        tetrisSnapRef.current = snap;
+                        if (snap.gameOver && !tetrisAwardedRef.current) {
+                          tetrisAwardedRef.current = true;
+                          award(snap.score, `Tetris terminé ! Score : ${snap.score}`);
+                        } else if (!snap.gameOver && tetrisAwardedRef.current) {
+                          tetrisAwardedRef.current = false; // nouvelle partie
+                        }
+                      }}
                     />
                   </div>
                 )}
@@ -4268,16 +4302,24 @@ export default function JeuxPage() {
                     onQuit: () => { setActiveBuiltinGame(null); setGameActive(false); },
                     tileCount: 42,
                     onRegisterClickHandler: (fn: ((idx: number) => void) | null) => { gameClickHandlerRef.current = fn; },
+                    // Score universel + jeux réussis : appelé à la fin de chaque partie
+                    onComplete: (points: number) => {
+                      const pts = Math.max(0, Math.round(points));
+                      setScore((s) => s + pts);
+                      setGamesCompleted((v) => v + 1);
+                      if (pts > 0) { setScorePlusValue(pts); setScorePlusAnimKey((k) => k + 1); }
+                    },
                   };
                   return (
                     <div style={{ marginTop: 12, borderRadius: 18, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(10,10,18,0.95)' }}>
                       {activeBuiltinGame === 'color-speed'      && <GameColorSpeed      {...tileActions} />}
                       {activeBuiltinGame === 'maitre-blanc'    && <GameMaitreDuBlanc   {...tileActions} />}
                       {activeBuiltinGame === 'puissance4'      && <GamePuissance4      {...tileActions} />}
-                      {activeBuiltinGame === 'chasseur-gamut'  && <GameChasseurGamut   {...tileActions} />}
                       {activeBuiltinGame === 'metamere'        && <GameMetamerisme     {...tileActions} />}
                       {activeBuiltinGame === 'chromaticite-jeu'&& <GameChromaticite   {...tileActions} />}
                       {activeBuiltinGame === 'canal-mix'        && <GameCanalMix       {...tileActions} onSendRawChannels={tileActions.onSendRawChannels!} />}
+                      {activeBuiltinGame === 'intrus'           && <GameIntrus         {...tileActions} />}
+                      {activeBuiltinGame === 'snake'            && <SnakeGame          {...tileActions} />}
                     </div>
                   );
                 })()}
@@ -4299,16 +4341,71 @@ export default function JeuxPage() {
                   );
                 })()}
 
+                {/* Jeux natifs lancés depuis un nœud de l'éditeur (game_*) — exécutent
+                    le VRAI composant, donc identiques aux jeux de la liste. */}
+                {gameActive && !tetrisStandalone && hudRun && (() => {
+                  const nodes = Array.isArray(hudRun.cfg.nodes) ? (hudRun.cfg.nodes as EditorNode[]) : [];
+                  const NATIVE_MAP: Record<string, any> = {
+                    game_color_speed: GameColorSpeed,
+                    game_maitre_blanc: GameMaitreDuBlanc,
+                    game_puissance4: GamePuissance4,
+                    game_metamere: GameMetamerisme,
+                    game_chromaticite: GameChromaticite,
+                    game_canal_mix: GameCanalMix,
+                    game_intrus: GameIntrus,
+                    game_snake: SnakeGame,
+                  };
+                  const gNode = nodes.find((n) => NATIVE_MAP[n.kind] && n.enabled !== false);
+                  if (!gNode) return null;
+                  const Comp = NATIVE_MAP[gNode.kind];
+                  const extra = gNode.kind === 'game_snake' && typeof gNode.params?.speed === 'number' ? { speed: gNode.params.speed } : {};
+                  const ta = {
+                    onSendColor: (idx: number, r: number, g: number, b: number, intensity = 80) => {
+                      const p = PLATE_ID_BY_INDEX[idx]; if (!p) return;
+                      sendRgbToPlate({ r, g, b }, intensity, p); setPlateColor(idx, `rgb(${r},${g},${b})`, intensity > 0);
+                    },
+                    onTurnOff: (idx: number) => { const p = PLATE_ID_BY_INDEX[idx]; if (!p) return; sendRgbToPlate({ r: 0, g: 0, b: 0 }, 0, p); setPlateColor(idx, '#000000', false); },
+                    onTurnOffAll: () => { void blackoutHardware(); },
+                    onSendRawChannels: (idx: number, channels: number[]) => { const p = PLATE_ID_BY_INDEX[idx]; if (!p) return; for (let i = 0; i < 32; i++) scheduleSetCanal(p, i, clamp255(channels[i] ?? 0)); },
+                    onQuit: () => { void blackoutHardware(); setHudRun(null); setGameActive(false); },
+                    tileCount: 42,
+                    onRegisterClickHandler: (fn: ((idx: number) => void) | null) => { gameClickHandlerRef.current = fn; },
+                    onComplete: (points: number) => { const pts = Math.max(0, Math.round(points)); setScore((s) => s + pts); setGamesCompleted((v) => v + 1); if (pts > 0) { setScorePlusValue(pts); setScorePlusAnimKey((k) => k + 1); } },
+                  };
+                  return (
+                    <div style={{ marginTop: 12, borderRadius: 18, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(10,10,18,0.95)' }}>
+                      <Comp {...ta} {...extra} />
+                    </div>
+                  );
+                })()}
+
                 {/* Interface du jeu éditeur (composants UI dessinés dans /editeur, dont le diagramme CIE) */}
                 {gameActive && !tetrisStandalone && hudRun && Array.isArray(hudRun.cfg.uiLayout) && hudRun.cfg.uiLayout.length > 0 && (
                   <div className="section" style={{ marginTop: 12 }}>
                     <h3 style={{ marginTop: 0 }}><Gamepad2 size={16} /> Interface du jeu</h3>
                     <HudUiOverlay
                       components={hudRun.cfg.uiLayout}
-                      onSendColor={(idx, r, g, b, intensity) => {
-                        const plateId = PLATE_ID_BY_INDEX[idx];
-                        if (!plateId) return;
-                        sendRgbToPlate({ r, g, b }, intensity, plateId);
+                      plate={{
+                        onSendColor: (idx, r, g, b, intensity = 80) => {
+                          const plateId = PLATE_ID_BY_INDEX[idx];
+                          if (!plateId) return;
+                          sendRgbToPlate({ r, g, b }, intensity, plateId);
+                          setPlateColor(idx, `rgb(${r},${g},${b})`, intensity > 0);
+                        },
+                        onTurnOff: (idx) => {
+                          const plateId = PLATE_ID_BY_INDEX[idx];
+                          if (!plateId) return;
+                          sendRgbToPlate({ r: 0, g: 0, b: 0 }, 0, plateId);
+                          setPlateColor(idx, '#000000', false);
+                        },
+                        onTurnOffAll: () => { void blackoutHardware(); },
+                        onComplete: (points: number) => {
+                          const pts = Math.max(0, Math.round(points));
+                          setScore((s) => s + pts);
+                          setGamesCompleted((v) => v + 1);
+                          if (pts > 0) { setScorePlusValue(pts); setScorePlusAnimKey((k) => k + 1); }
+                        },
+                        plateColors,
                       }}
                     />
                   </div>
@@ -5105,6 +5202,44 @@ export default function JeuxPage() {
                 <span>
                   Astuce: lance <strong>"Défi Spectral"</strong> pour alimenter le graphe de spectre.
                 </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Pop-up "Commencer le jeu" : description + comment ça marche */}
+      {pendingGame && (
+        <div
+          onClick={() => setPendingGame(null)}
+          style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'grid', placeItems: 'center', padding: 20, background: 'rgba(8,10,20,0.62)', backdropFilter: 'blur(14px)' }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{ width: 'min(440px, 100%)', borderRadius: 24, overflow: 'hidden', background: 'linear-gradient(180deg,#161a26,#10131d)', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 30px 80px rgba(0,0,0,0.5)', animation: 'fadeIn 0.2s ease' }}
+          >
+            <div style={{ height: 96, background: pendingGame.iconBg, display: 'grid', placeItems: 'center', position: 'relative' }}>
+              <span style={{ width: 60, height: 60, borderRadius: 18, background: 'rgba(255,255,255,0.14)', display: 'grid', placeItems: 'center', backdropFilter: 'blur(8px)' }}>
+                <pendingGame.Icon size={32} color="#fff" />
+              </span>
+            </div>
+            <div style={{ padding: '20px 24px 24px' }}>
+              <div style={{ fontSize: 21, fontWeight: 900, color: '#fff', letterSpacing: '-0.02em', marginBottom: 6 }}>{pendingGame.title}</div>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 13.5, color: 'rgba(255,255,255,0.7)', lineHeight: 1.6, marginBottom: 18 }}>
+                <Lightbulb size={16} style={{ color: pendingGame.accent, flexShrink: 0, marginTop: 2 }} />
+                <span>{pendingGame.desc}</span>
+              </div>
+              <div style={{ display: 'flex', gap: 10 }}>
+                <button
+                  onClick={() => setPendingGame(null)}
+                  style={{ padding: '12px 18px', borderRadius: 14, border: '1px solid rgba(255,255,255,0.14)', background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.7)', fontWeight: 700, fontSize: 14, cursor: 'pointer', fontFamily: 'inherit' }}
+                >Annuler</button>
+                <button
+                  onClick={() => { const g = pendingGame; setPendingGame(null); g.launch(); }}
+                  style={{ flex: 1, padding: '12px 18px', borderRadius: 14, border: 'none', background: `linear-gradient(135deg, ${pendingGame.accent}, ${pendingGame.accent}cc)`, color: '#fff', fontWeight: 800, fontSize: 15, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, boxShadow: `0 6px 20px ${pendingGame.accent}55` }}
+                >
+                  <Play size={17} /> Commencer le jeu
+                </button>
               </div>
             </div>
           </div>

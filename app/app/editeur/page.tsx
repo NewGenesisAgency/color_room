@@ -6,15 +6,15 @@ import dynamic from 'next/dynamic';
 import type { TetrisSnapshot } from '@/app/_components/TetrisGame';
 import type { UILayoutComponent } from './UIDesigner';
 
-// Modules lourds (3D Three.js, éditeur Python/Pyodide, designer UI, panneau CS150)
+// Modules lourds (3D Three.js, éditeur Python/Pyodide, designer UI, panneau CS160)
 // chargés à la demande pour alléger le bundle initial de /editeur.
 const Room3D = dynamic(() => import('@/app/_components/Room3D'), { ssr: false });
 const TetrisGame = dynamic(() => import('@/app/_components/TetrisGame'), { ssr: false });
-const CS150Panel = dynamic(() => import('@/app/_components/CS150Panel'), { ssr: false });
+const CS160Panel = dynamic(() => import('@/app/_components/CS160Panel'), { ssr: false });
 const PythonEditor = dynamic(() => import('./PythonEditor'), { ssr: false });
 const UIDesigner = dynamic(() => import('./UIDesigner'), { ssr: false });
 
-import { Boxes, Gamepad2, Plus, Play, Pause, RotateCcw, Save, Trash2, FolderPlus, X, Lightbulb, Layers, Zap, Palette, Clock, MousePointer2, LayoutGrid, Maximize2, Minimize2, Eye, Star, Heart, Sun, Moon, Flame, Snowflake, Music, Target, Puzzle, Sparkles, Trophy, Rocket, Ghost, Dice1, Brain, Check, GitBranch, Hash, Settings2, Shuffle, Search, Users, Film, Thermometer, ScanLine, Wifi, WifiOff, type LucideIcon } from 'lucide-react';
+import { Boxes, Gamepad2, Plus, Play, Pause, RotateCcw, Save, Trash2, FolderPlus, X, Lightbulb, Layers, Zap, Palette, Clock, MousePointer2, LayoutGrid, Maximize2, Minimize2, Eye, Star, Heart, Sun, Moon, Flame, Snowflake, Music, Target, Puzzle, Sparkles, Trophy, Rocket, Ghost, Dice1, Brain, Check, GitBranch, Hash, Settings2, Shuffle, Search, Users, Film, Thermometer, ScanLine, Wifi, WifiOff, Crown, Gem, Bug, Bot, Atom, Bird, Cat, Dog, Fish, Leaf, Cloud, Droplet, Mountain, Anchor, Bell, Bomb, Camera, Egg, Feather, Gift, Hexagon, Key, Lock, Medal, Pizza, Plane, Rainbow, Skull, Smile, Wand2, Waves, Crosshair, Dice5, Joystick, FlaskConical, Swords, ChevronDown, type LucideIcon } from 'lucide-react';
 
 type IdFactory = () => string;
 
@@ -59,6 +59,11 @@ type EditorNodeKind =
   | 'game_maitre_blanc'
   | 'game_puissance4'
   | 'game_chasseur_gamut'
+  | 'game_metamere'
+  | 'game_canal_mix'
+  | 'game_intrus'
+  | 'game_chromaticite'
+  | 'game_snake'
   | 'on_timer'
   | 'on_click'
   | 'on_tick'
@@ -70,15 +75,15 @@ type EditorNodeKind =
   | 'get_score'
   | 'random_int'
   | 'game_tetris_block'
-  // CS150 Colorimeter nodes
-  | 'cs150_connect'
-  | 'cs150_measure'
-  | 'cs150_read_xyz'
-  | 'cs150_read_lvxy'
-  | 'cs150_set_backlight'
-  | 'cs150_set_calib_ch'
-  | 'cs150_rgb_calib'
-  | 'cs150_single_calib'
+  // CS160 Colorimeter nodes
+  | 'cs160_connect'
+  | 'cs160_measure'
+  | 'cs160_read_xyz'
+  | 'cs160_read_lvxy'
+  | 'cs160_set_backlight'
+  | 'cs160_set_calib_ch'
+  | 'cs160_rgb_calib'
+  | 'cs160_single_calib'
   // Multijoueur
   | 'mp_session'
   | 'mp_wait_players'
@@ -191,13 +196,56 @@ type EditorNode = {
 
 type GameDifficulty = 1 | 2 | 3 | 4 | 5;
 
-type GameIconName = 'Lightbulb' | 'Gamepad2' | 'Star' | 'Heart' | 'Sun' | 'Moon' | 'Flame' | 'Snowflake' | 'Music' | 'Target' | 'Puzzle' | 'Sparkles' | 'Trophy' | 'Rocket' | 'Ghost' | 'Palette' | 'Zap' | 'Dice1';
+type GameIconName =
+  | 'Lightbulb' | 'Gamepad2' | 'Star' | 'Heart' | 'Sun' | 'Moon' | 'Flame' | 'Snowflake' | 'Music' | 'Target' | 'Puzzle' | 'Sparkles' | 'Trophy' | 'Rocket' | 'Ghost' | 'Palette' | 'Zap' | 'Dice1'
+  | 'Crown' | 'Gem' | 'Bug' | 'Bot' | 'Atom' | 'Bird' | 'Cat' | 'Dog' | 'Fish' | 'Leaf' | 'Cloud' | 'Droplet' | 'Mountain' | 'Anchor' | 'Bell' | 'Bomb' | 'Camera' | 'Egg' | 'Feather' | 'Gift' | 'Hexagon' | 'Key' | 'Lock' | 'Medal' | 'Pizza' | 'Plane' | 'Rainbow' | 'Skull' | 'Smile' | 'Wand2' | 'Waves' | 'Crosshair' | 'Dice5' | 'Joystick' | 'FlaskConical' | 'Swords' | 'Brain' | 'Eye';
 
 const GAME_ICON_MAP: Record<GameIconName, LucideIcon> = {
   Lightbulb, Gamepad2, Star, Heart, Sun, Moon, Flame, Snowflake, Music, Target, Puzzle, Sparkles, Trophy, Rocket, Ghost, Palette, Zap, Dice1,
+  Crown, Gem, Bug, Bot, Atom, Bird, Cat, Dog, Fish, Leaf, Cloud, Droplet, Mountain, Anchor, Bell, Bomb, Camera, Egg, Feather, Gift, Hexagon, Key, Lock, Medal, Pizza, Plane, Rainbow, Skull, Smile, Wand2, Waves, Crosshair, Dice5, Joystick, FlaskConical, Swords, Brain, Eye,
 };
 
 const GAME_ICON_NAMES: GameIconName[] = Object.keys(GAME_ICON_MAP) as GameIconName[];
+
+// Template Python "low-code" par défaut d'un nouveau jeu : un placeholder commenté
+// qui sert de mini-tutoriel (API + structure de jeu) directement modifiable.
+const PYTHON_TEMPLATE = `import colorroom as cr
+import math
+
+# =============================================================
+#  MINI-TUTO - Jeu en Python (low-code) sur les 42 dalles LED
+#  API principale :
+#    cr.send_color(plate_id, r, g, b, intensity)  # dalle 1..42, intensity 0..1
+#    cr.set_variable('nom', valeur) / cr.get_variable('nom')
+#    cr.add_score(points) / cr.get_score()
+#    cr.get_key()        # derniere touche ('ArrowLeft', 'ArrowRight', ' ', ...)
+#    cr.emit_event('type')
+#    cr.log('message')   # affiche dans la console ci-dessous
+#    cr.tile_count       # nombre de dalles (42)
+#  Clique "Executer" pour lancer. Tout est modifiable !
+# =============================================================
+
+# 1) Degrade arc-en-ciel sur toutes les dalles
+for i in range(cr.tile_count):
+    h = i / cr.tile_count
+    r = int((0.5 + 0.5 * math.sin(h * 6.28)) * 255)
+    g = int((0.5 + 0.5 * math.sin(h * 6.28 + 2.09)) * 255)
+    b = int((0.5 + 0.5 * math.sin(h * 6.28 + 4.19)) * 255)
+    cr.send_color(i + 1, r, g, b, 0.85)
+
+# 2) Variables et score
+cr.set_variable('niveau', 1)
+cr.add_score(10)
+cr.log(f"Niveau {cr.get_variable('niveau')} - score {cr.get_score()}")
+
+# 3) Reagis a une touche du joueur
+touche = cr.get_key()
+if touche == ' ':
+    cr.emit_event('action')
+    cr.log("Espace presse -> evenement 'action' emis")
+
+# TODO : construis ta logique de jeu ici.
+`;
 
 type UICompKind = 'button' | 'slider' | 'label' | 'counter' | 'timer';
 
@@ -286,6 +334,11 @@ const NODE_CATALOG: NodeCatalogItem[] = [
   { kind: 'game_maitre_blanc', category: 'Jeux', title: 'Le Maître du Blanc', defaults: { rounds: 10, threshold: 0.025 } },
   { kind: 'game_puissance4', category: 'Jeux', title: 'Puissance 4 Chromatique', defaults: { mode: 'pvp' } },
   { kind: 'game_chasseur_gamut', category: 'Jeux', title: 'Chasseur de Gamut', defaults: { rounds: 8 } },
+  { kind: 'game_metamere', category: 'Jeux', title: 'Métamérie', defaults: {} },
+  { kind: 'game_canal_mix', category: 'Jeux', title: 'Mix de Canaux', defaults: {} },
+  { kind: 'game_intrus', category: 'Jeux', title: "L'Intrus (Sniper)", defaults: {} },
+  { kind: 'game_chromaticite', category: 'Jeux', title: 'Chromaticité CIE', defaults: {} },
+  { kind: 'game_snake', category: 'Jeux', title: 'Snake Lumière', defaults: { speed: 350 } },
   { kind: 'loop_count', category: 'Flux', title: 'Répéter N fois', defaults: { count: 3 } },
   { kind: 'on_timer', category: 'Évènements', title: 'Timer', defaults: { intervalMs: 1000 } },
   { kind: 'on_click', category: 'Évènements', title: 'On Click', defaults: { tileIndex: 0 } },
@@ -306,7 +359,7 @@ const NODE_CATALOG: NodeCatalogItem[] = [
   { kind: 'anim_strobe', category: 'Animation', title: 'Stroboscope', defaults: { color: '#ffffff', hz: 4, durationMs: 2000 } },
   { kind: 'anim_rainbow', category: 'Animation', title: 'Arc-en-ciel', defaults: { speed: 1.0, durationMs: 5000 } },
   { kind: 'anim_wave', category: 'Animation', title: 'Vague', defaults: { color: '#00d7ff', direction: 'left', speed: 1.0, durationMs: 3000 } },
-  // CS150 Colorimeter nodes
+  // CS160 Colorimeter nodes
   { kind: 'clear_tiles', category: 'Dalles', title: 'Effacer dalles', defaults: {} },
   { kind: 'variable_set', category: 'Variables', title: 'Set Variable', defaults: { name: 'x', value: 0, op: 'set' } },
   { kind: 'variable_get', category: 'Variables', title: 'Get Variable', defaults: { name: 'x' } },
@@ -353,24 +406,24 @@ const NODE_CATALOG: NodeCatalogItem[] = [
   { kind: 'ui_show', category: 'Interface', title: 'Afficher élément', defaults: { targetId: 'btn1' } },
   { kind: 'ui_hide', category: 'Interface', title: 'Masquer élément', defaults: { targetId: 'btn1' } },
   { kind: 'on_ui_click', category: 'Évènements', title: 'Clic sur bouton UI', defaults: { buttonId: 'btn1' } },
-  { kind: 'cs150_connect', category: 'Colorimètre', title: 'CS150 Connect', defaults: {} },
-  { kind: 'cs150_measure', category: 'Colorimètre', title: 'CS150 Mesurer', defaults: {} },
-  { kind: 'cs150_read_xyz', category: 'Colorimètre', title: 'CS150 Lire XYZ', defaults: {} },
-  { kind: 'cs150_read_lvxy', category: 'Colorimètre', title: 'CS150 Lire Lvxy', defaults: {} },
-  { kind: 'cs150_set_backlight', category: 'Colorimètre', title: 'CS150 Rétroéclairage', defaults: { mode: 'on' } },
-  { kind: 'cs150_set_calib_ch', category: 'Colorimètre', title: 'CS150 Canal Calib', defaults: { channel: 0 } },
-  { kind: 'cs150_rgb_calib', category: 'Colorimètre', title: 'CS150 Calib RGB', defaults: { 
+  { kind: 'cs160_connect', category: 'Colorimètre', title: 'CS160 Connect', defaults: {} },
+  { kind: 'cs160_measure', category: 'Colorimètre', title: 'CS160 Mesurer', defaults: {} },
+  { kind: 'cs160_read_xyz', category: 'Colorimètre', title: 'CS160 Lire XYZ', defaults: {} },
+  { kind: 'cs160_read_lvxy', category: 'Colorimètre', title: 'CS160 Lire Lvxy', defaults: {} },
+  { kind: 'cs160_set_backlight', category: 'Colorimètre', title: 'CS160 Rétroéclairage', defaults: { mode: 'on' } },
+  { kind: 'cs160_set_calib_ch', category: 'Colorimètre', title: 'CS160 Canal Calib', defaults: { channel: 0 } },
+  { kind: 'cs160_rgb_calib', category: 'Colorimètre', title: 'CS160 Calib RGB', defaults: { 
     trueRedX: 800, trueRedY: 400, trueRedZ: 300,
     trueGreenX: 600, trueGreenY: 1000, trueGreenZ: 400,
     trueBlueX: 500, trueBlueY: 600, trueBlueZ: 1000,
     calibId: 'rgb_calib_001', targetChannel: 1 
   }},
-  { kind: 'cs150_single_calib', category: 'Colorimètre', title: 'CS150 Calib 1 Point', defaults: {
+  { kind: 'cs160_single_calib', category: 'Colorimètre', title: 'CS160 Calib 1 Point', defaults: {
     trueLv: 11.0, trueX: 0.4, trueY: 0.4,
     calibId: 'single_calib_001', targetChannel: 1
   }},
   // ─── Mesure colorimétrique dans les jeux ────────────────────────────────────
-  { kind: 'measure_start', category: 'Mesure Jeu', title: 'Lancer mesure', defaults: { deviceId: 'cs150', timeoutSec: 5 } },
+  { kind: 'measure_start', category: 'Mesure Jeu', title: 'Lancer mesure', defaults: { deviceId: 'cs160', timeoutSec: 5 } },
   { kind: 'measure_on_result', category: 'Mesure Jeu', title: 'Résultat reçu', defaults: { varX: 'meas_x', varY: 'meas_y', varLv: 'meas_lv' } },
   { kind: 'measure_compare', category: 'Mesure Jeu', title: 'Comparer couleur', defaults: { targetX: 0.3127, targetY: 0.3290, toleranceDeltaE: 5 } },
   { kind: 'measure_show_cie', category: 'Mesure Jeu', title: 'Afficher CIE 1931', defaults: { showTarget: true, showResult: true } },
@@ -443,9 +496,11 @@ const NODE_CATALOG: NodeCatalogItem[] = [
 ];
 
 /** Kinds that are native built-in games - shown in catalog but NOT addable to canvas */
+// Seuls Simon / Mémoire / Spectre restent "lecture seule" (logique interne /
+// multijoueur non rendue par un composant). Les autres jeux natifs sont
+// ajoutables au canvas et s'exécutent réellement depuis l'éditeur.
 const NATIVE_GAME_KINDS: Set<EditorNodeKind> = new Set([
-  'game_tetris', 'game_simon', 'game_memory', 'game_spectrum',
-  'game_color_speed', 'game_maitre_blanc', 'game_puissance4', 'game_chasseur_gamut',
+  'game_simon', 'game_memory', 'game_spectrum',
 ]);
 
 function labelNodeKind(kind: EditorNodeKind): string {
@@ -1047,6 +1102,8 @@ export default function EditeurPage() {
   });
   const [graphDrag, setGraphDrag] = useState<{ nodeId: string; x: number; y: number } | null>(null);
   const [pendingLink, setPendingLink] = useState<{ fromNodeId: string } | null>(null);
+  const [iconPickerOpen, setIconPickerOpen] = useState(false);
+  const [onboardingStep, setOnboardingStep] = useState<number | null>(null); // mini-tuto skippable
 
   const [contextMenu, setContextMenu] = useState<{
     open: boolean;
@@ -2395,6 +2452,7 @@ export default function EditeurPage() {
       nodes: g.nodes,
       edges: g.edges,
       uiLayout: g.uiLayout ?? [],
+      pythonCode: g.pythonCode ?? '',
     };
   };
 
@@ -2408,6 +2466,7 @@ export default function EditeurPage() {
     nodes: EditorNode[];
     edges: GraphEdge[];
     uiLayout: UILayoutComponent[];
+    pythonCode?: string;
   } | null => {
     if (!config || typeof config !== 'object') return null;
     const o = config as any;
@@ -2421,7 +2480,8 @@ export default function EditeurPage() {
     const bgColor = typeof o.bgColor === 'string' ? o.bgColor : undefined;
     const accentColor = typeof o.accentColor === 'string' ? o.accentColor : undefined;
     const uiLayout = Array.isArray(o.uiLayout) ? (o.uiLayout as UILayoutComponent[]) : [];
-    return { tileCount, icon, difficulty, description, bgColor, accentColor, nodes, edges, uiLayout };
+    const pythonCode = typeof o.pythonCode === 'string' ? o.pythonCode : undefined;
+    return { tileCount, icon, difficulty, description, bgColor, accentColor, nodes, edges, uiLayout, pythonCode };
   };
 
   const createDbGame = async (name: string, initialGame: GameDoc): Promise<string | null> => {
@@ -2732,6 +2792,7 @@ export default function EditeurPage() {
       tileCount: 42,
       nodes: initialNodes,
       edges: initialEdges,
+      pythonCode: PYTHON_TEMPLATE,
     };
 
     const dbId = await createDbGame(gameName, provisionalGame);
@@ -2749,6 +2810,7 @@ export default function EditeurPage() {
     }));
     setDirty(false);
     setStatus(`Jeu créé: ${gameName}`);
+    setOnboardingStep(0); // lance le mini-tuto (skippable)
     setModal(null);
     setNewProjectName('');
   };
@@ -2784,6 +2846,7 @@ export default function EditeurPage() {
               nodes: cfg.nodes,
               edges: cfg.edges,
               uiLayout: cfg.uiLayout,
+              pythonCode: cfg.pythonCode,
             } satisfies GameDoc;
           })
           .filter(Boolean) as GameDoc[];
@@ -2892,6 +2955,8 @@ export default function EditeurPage() {
       return { ...cur, games: nextGames, selectedNodeId: nextId };
     });
     setStatus('Noeud ajouté');
+    // Écarte les voisins du nouveau bloc une fois rendu (physique anti-superposition)
+    requestAnimationFrame(() => resolveOverlaps(nextId));
     return nextId;
   };
 
@@ -2968,6 +3033,62 @@ export default function EditeurPage() {
       });
       return { ...cur, games: nextGames };
     });
+  };
+
+  // ── Physique anti-superposition : espace les blocs avec un padding minimal ──
+  // Résout les collisions AABB par séparation itérative. Le nœud "ancré" (qu'on
+  // vient de poser/déplacer) reste en place, ses voisins s'écartent pour faire place.
+  const NODE_GAP = 28;
+  const resolveOverlaps = (anchorId?: string) => {
+    const root = bpContentRef.current;
+    if (!root) return;
+    const cur = editorRef.current;
+    const game = cur.games.find((g) => g.id === cur.activeGameId);
+    if (!game || game.nodes.length < 2) return;
+
+    const sizes = new Map<string, { w: number; h: number }>();
+    root.querySelectorAll('.bp-node[data-nodeid]').forEach((node) => {
+      const el = node as HTMLElement;
+      const id = el.getAttribute('data-nodeid');
+      if (id) sizes.set(id, { w: el.offsetWidth || 300, h: el.offsetHeight || 130 });
+    });
+
+    const items = game.nodes.map((n) => ({ id: n.id, x: n.pos.x, y: n.pos.y, w: sizes.get(n.id)?.w ?? 300, h: sizes.get(n.id)?.h ?? 130 }));
+    let changed = false;
+    for (let iter = 0; iter < 20; iter++) {
+      let moved = false;
+      for (let i = 0; i < items.length; i++) {
+        for (let j = i + 1; j < items.length; j++) {
+          const a = items[i], b = items[j];
+          const dx = (a.x + a.w / 2) - (b.x + b.w / 2);
+          const dy = (a.y + a.h / 2) - (b.y + b.h / 2);
+          const penX = (a.w / 2 + b.w / 2 + NODE_GAP) - Math.abs(dx);
+          const penY = (a.h / 2 + b.h / 2 + NODE_GAP) - Math.abs(dy);
+          if (penX <= 0 || penY <= 0) continue; // pas de chevauchement
+          moved = true; changed = true;
+          if (penX < penY) {
+            const push = (dx >= 0 ? 1 : -1) * penX;
+            if (a.id === anchorId) b.x -= push;
+            else if (b.id === anchorId) a.x += push;
+            else { a.x += push / 2; b.x -= push / 2; }
+          } else {
+            const push = (dy >= 0 ? 1 : -1) * penY;
+            if (a.id === anchorId) b.y -= push;
+            else if (b.id === anchorId) a.y += push;
+            else { a.y += push / 2; b.y -= push / 2; }
+          }
+        }
+      }
+      if (!moved) break;
+    }
+    if (!changed) return;
+
+    const SNAP = 8;
+    const pos = new Map(items.map((it) => [it.id, { x: Math.max(0, Math.round(it.x / SNAP) * SNAP), y: Math.max(0, Math.round(it.y / SNAP) * SNAP) }]));
+    setEditor((c) => ({
+      ...c,
+      games: c.games.map((g) => g.id !== c.activeGameId ? g : { ...g, nodes: g.nodes.map((n) => pos.has(n.id) ? { ...n, pos: pos.get(n.id)! } : n) }),
+    }));
   };
 
   const assignSelectedTileToNode = (tileIndex: number) => {
@@ -3316,38 +3437,74 @@ export default function EditeurPage() {
 
                     <label style={{ display: 'grid', gap: 6 }}>
                       <span className="g-label">Description</span>
-                      <input
+                      <textarea
                         className="g-input"
                         value={activeGame.description ?? ''}
                         onChange={(e) => updateActiveGameMeta({ description: e.target.value })}
                         onBlur={() => void saveActiveGame()}
-                        placeholder="Description courte du jeu..."
-                        style={{ height: 36, fontSize: 13 }}
+                        placeholder="Décrivez le jeu, ses règles, son objectif…"
+                        rows={4}
+                        style={{ minHeight: 84, resize: 'vertical', fontSize: 13, lineHeight: 1.5, padding: '10px 12px', fontFamily: 'inherit' }}
                       />
                     </label>
 
                     <div>
-                      <span className="g-label" style={{ display: 'block', marginBottom: 6 }}>Icône du jeu</span>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                        {GAME_ICON_NAMES.map((iconName) => {
-                          const IconComp = GAME_ICON_MAP[iconName];
-                          const isActive = (activeGame.icon ?? 'Lightbulb') === iconName;
-                          return (
+                      <span className="g-label" style={{ display: 'block', marginBottom: 6 }}>Icône & couleurs</span>
+                      {(() => {
+                        const curIcon = activeGame.icon ?? 'Lightbulb';
+                        const CurIcon = GAME_ICON_MAP[curIcon] ?? Lightbulb;
+                        const bg = activeGame.bgColor ?? '#1a1040';
+                        const accent = activeGame.accentColor ?? '#a78bfa';
+                        const grad = `linear-gradient(135deg, ${bg}, ${accent})`;
+                        return (
+                          <div style={{ position: 'relative' }}>
+                            {/* Aperçu repliable : juste l'icône, clic pour personnaliser */}
                             <button
-                              key={iconName}
-                              onClick={() => { updateActiveGameMeta({ icon: iconName }); void saveActiveGame(); }}
-                              title={iconName}
-                              style={{
-                                width: 34, height: 34, borderRadius: 8, border: isActive ? '2px solid #4361ee' : '1px solid rgba(0,0,0,0.08)',
-                                background: isActive ? 'rgba(67,97,238,0.08)' : '#fff', display: 'grid', placeItems: 'center',
-                                cursor: 'pointer', transition: 'all 0.15s',
-                              }}
+                              onClick={() => setIconPickerOpen((o) => !o)}
+                              style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: 8, borderRadius: 12, border: '1px solid rgba(0,0,0,0.09)', background: '#fff', cursor: 'pointer', fontFamily: 'inherit' }}
                             >
-                              <IconComp size={16} color={isActive ? '#4361ee' : '#888'} />
+                              <span style={{ width: 44, height: 44, borderRadius: 11, background: grad, display: 'grid', placeItems: 'center', boxShadow: `0 3px 10px ${accent}44`, flexShrink: 0 }}>
+                                <CurIcon size={22} color="#fff" />
+                              </span>
+                              <span style={{ flex: 1, textAlign: 'left', fontSize: 12.5, fontWeight: 600, color: '#444' }}>Personnaliser l&apos;icône et le dégradé</span>
+                              <ChevronDown size={16} color="#999" style={{ transform: iconPickerOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
                             </button>
-                          );
-                        })}
-                      </div>
+
+                            {iconPickerOpen && (
+                              <div style={{ marginTop: 8, padding: 12, borderRadius: 12, border: '1px solid rgba(0,0,0,0.08)', background: 'rgba(250,250,252,0.95)', boxShadow: '0 8px 24px rgba(0,0,0,0.08)' }}>
+                                {/* Dégradé : 2 couleurs */}
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
+                                  <label style={{ display: 'grid', gap: 4 }}>
+                                    <span className="g-label" style={{ fontSize: 10 }}>Couleur 1 (fond)</span>
+                                    <input type="color" value={bg} onChange={(e) => updateActiveGameMeta({ bgColor: e.target.value })} onBlur={() => void saveActiveGame()} style={{ width: '100%', height: 30, border: '1px solid rgba(0,0,0,0.1)', borderRadius: 8, cursor: 'pointer', padding: 2 }} />
+                                  </label>
+                                  <label style={{ display: 'grid', gap: 4 }}>
+                                    <span className="g-label" style={{ fontSize: 10 }}>Couleur 2 (accent)</span>
+                                    <input type="color" value={accent} onChange={(e) => updateActiveGameMeta({ accentColor: e.target.value })} onBlur={() => void saveActiveGame()} style={{ width: '100%', height: 30, border: '1px solid rgba(0,0,0,0.1)', borderRadius: 8, cursor: 'pointer', padding: 2 }} />
+                                  </label>
+                                </div>
+                                {/* Grille d'icônes scrollable */}
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 5, maxHeight: 180, overflowY: 'auto', paddingRight: 2 }}>
+                                  {GAME_ICON_NAMES.map((iconName) => {
+                                    const IconComp = GAME_ICON_MAP[iconName];
+                                    const isActive = curIcon === iconName;
+                                    return (
+                                      <button
+                                        key={iconName}
+                                        onClick={() => { updateActiveGameMeta({ icon: iconName }); void saveActiveGame(); }}
+                                        title={iconName}
+                                        style={{ aspectRatio: '1', borderRadius: 8, border: isActive ? `2px solid ${accent}` : '1px solid rgba(0,0,0,0.07)', background: isActive ? grad : '#fff', display: 'grid', placeItems: 'center', cursor: 'pointer', transition: 'all 0.12s' }}
+                                      >
+                                        <IconComp size={16} color={isActive ? '#fff' : '#888'} />
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </div>
 
                     <div>
@@ -3415,35 +3572,6 @@ export default function EditeurPage() {
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#aaa', marginTop: 2 }}>
                         <span>1</span><span>21</span><span>42</span>
                       </div>
-                    </div>
-
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                      <label style={{ display: 'grid', gap: 4 }}>
-                        <span className="g-label" style={{ fontSize: 11 }}>Fond du jeu</span>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <input
-                            type="color"
-                            value={activeGame.bgColor ?? '#0a0a0f'}
-                            onChange={(e) => updateActiveGameMeta({ bgColor: e.target.value })}
-                            onBlur={() => void saveActiveGame()}
-                            style={{ width: 32, height: 32, border: '1px solid rgba(0,0,0,0.1)', borderRadius: 8, cursor: 'pointer', padding: 2 }}
-                          />
-                          <span style={{ fontSize: 11, color: '#888', fontFamily: 'monospace' }}>{activeGame.bgColor ?? '#0a0a0f'}</span>
-                        </div>
-                      </label>
-                      <label style={{ display: 'grid', gap: 4 }}>
-                        <span className="g-label" style={{ fontSize: 11 }}>Couleur accent</span>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <input
-                            type="color"
-                            value={activeGame.accentColor ?? '#4361ee'}
-                            onChange={(e) => updateActiveGameMeta({ accentColor: e.target.value })}
-                            onBlur={() => void saveActiveGame()}
-                            style={{ width: 32, height: 32, border: '1px solid rgba(0,0,0,0.1)', borderRadius: 8, cursor: 'pointer', padding: 2 }}
-                          />
-                          <span style={{ fontSize: 11, color: '#888', fontFamily: 'monospace' }}>{activeGame.accentColor ?? '#4361ee'}</span>
-                        </div>
-                      </label>
                     </div>
 
                     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 2, fontSize: 11 }}>
@@ -3579,11 +3707,11 @@ export default function EditeurPage() {
                   </button>
                   <button
                     className="g-btn g-btn--sm"
-                    onClick={() => setShowGameOverlay(true)}
-                    title="Ouvrir le visuel 2D du jeu"
+                    onClick={() => setEditorTab('ui')}
+                    title="Ouvrir l'interface du jeu"
                   >
-                    <Maximize2 size={14} />
-                    <span>2D</span>
+                    <LayoutGrid size={14} />
+                    <span>Interface</span>
                   </button>
                   <span style={{ fontSize: 12, fontWeight: 600, color: '#999' }}>{tileCount} dalles</span>
                   {hasRuntimeEvents && runtimeScore > 0 && (
@@ -3766,14 +3894,21 @@ export default function EditeurPage() {
                   )}
                 </div>
               </div>
-              {/* Tab switcher */}
-              <div style={{ display: 'flex', gap: 4, padding: '6px 12px', borderBottom: '1px solid rgba(0,0,0,0.07)', background: 'rgba(255,255,255,0.55)', flexShrink: 0 }}>
-                {(['canvas', 'python', 'ui'] as const).map(tab => (
-                  <button key={tab} type="button" onClick={() => setEditorTab(tab)}
-                    style={{ padding: '5px 13px', borderRadius: 8, border: '1px solid rgba(0,0,0,0.09)', background: editorTab === tab ? 'rgba(67,97,238,0.11)' : 'rgba(255,255,255,0.7)', color: editorTab === tab ? '#4361ee' : '#777', fontWeight: 700, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', transition: 'all 120ms' }}>
-                    {tab === 'canvas' ? 'Nœuds' : tab === 'python' ? 'Python' : 'Interface'}
-                  </button>
-                ))}
+              {/* Tab switcher (icônes Lucide) */}
+              <div style={{ display: 'flex', gap: 5, padding: '7px 12px', borderBottom: '1px solid rgba(0,0,0,0.07)', background: 'rgba(255,255,255,0.6)', flexShrink: 0 }}>
+                {([
+                  { tab: 'canvas' as const, label: 'Nœuds', Icon: GitBranch },
+                  { tab: 'python' as const, label: 'Python', Icon: Hash },
+                  { tab: 'ui' as const, label: 'Interface', Icon: LayoutGrid },
+                ]).map(({ tab, label, Icon }) => {
+                  const active = editorTab === tab;
+                  return (
+                    <button key={tab} type="button" onClick={() => setEditorTab(tab)} title={label}
+                      style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 13px', borderRadius: 10, border: active ? '1px solid rgba(67,97,238,0.5)' : '1px solid rgba(0,0,0,0.08)', background: active ? 'linear-gradient(135deg,rgba(67,97,238,0.14),rgba(124,58,237,0.1))' : 'rgba(255,255,255,0.7)', color: active ? '#4361ee' : '#7a808c', fontWeight: 700, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', transition: 'all 130ms', boxShadow: active ? '0 2px 8px rgba(67,97,238,0.15)' : 'none' }}>
+                      <Icon size={14} /> {label}
+                    </button>
+                  );
+                })}
               </div>
               <div className="panelbody" style={{ display: editorTab === 'canvas' ? undefined : 'none' }}>
                 <div
@@ -3841,8 +3976,10 @@ export default function EditeurPage() {
                   }}
                   onPointerUp={(e) => {
                     setGraphPanning({ active: false, x: 0, y: 0 });
+                    const droppedId = graphDrag?.nodeId;
                     setGraphDrag(null);
                     endDrag();
+                    if (droppedId) requestAnimationFrame(() => resolveOverlaps(droppedId));
 
                     if (linkDrag?.active && pendingLink?.fromNodeId) {
                       if (!activeGameId) {
@@ -3851,7 +3988,18 @@ export default function EditeurPage() {
                       }
 
                       const el = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null;
-                      if (el?.closest('.bp-pin--in')) {
+                      const inPin = el?.closest('.bp-pin--in');
+                      if (inPin) {
+                        // Le pointeur est capturé par `.bp`, donc le pointerup de l'entrée
+                        // ne se déclenche pas : on crée la liaison ici, depuis le DOM.
+                        const targetEl = inPin.closest('.bp-node') as HTMLElement | null;
+                        const targetId = targetEl?.getAttribute('data-nodeid');
+                        if (targetId && targetId !== pendingLink.fromNodeId) {
+                          addEdge(pendingLink.fromNodeId, targetId);
+                          setStatus('Connexion créée');
+                        }
+                        setPendingLink(null);
+                        setPendingAutoConnect(null);
                         setLinkDrag(null);
                         return;
                       }
@@ -3957,7 +4105,7 @@ export default function EditeurPage() {
                                           }}
                                         >
                                           <span className="bp-menu__title">{n.title}</span>
-                                          <span className="bp-menu__meta" style={{ color: catColor, opacity: 0.7, fontSize: 11 }}>{n.kind.startsWith('cs150') ? 'CS150' : ''}</span>
+                                          <span className="bp-menu__meta" style={{ color: catColor, opacity: 0.7, fontSize: 11 }}>{n.kind.startsWith('cs160') ? 'CS160' : ''}</span>
                                         </button>
                                       ))}
                                     </div>
@@ -5466,7 +5614,7 @@ export default function EditeurPage() {
                       </label>
                       <p style={{ fontSize: 11, opacity: 0.5, lineHeight: 1.4 }}>Se déclenche quand la dalle est cliquée/touchée.</p>
                     </>
-                  ) : selectedNode.kind.startsWith('cs150_') ? (
+                  ) : selectedNode.kind.startsWith('cs160_') ? (
                     <>
                       <div style={{ padding: 16, borderRadius: 12, background: '#fff', border: '1px solid rgba(0,0,0,0.06)', display: 'grid', gap: 14 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
@@ -5474,24 +5622,24 @@ export default function EditeurPage() {
                             <Target size={18} color="#fff" />
                           </div>
                           <div>
-                            <div style={{ fontWeight: 700, fontSize: 14 }}>Colorimètre CS150</div>
+                            <div style={{ fontWeight: 700, fontSize: 14 }}>Colorimètre CS160</div>
                             <div style={{ fontSize: 12, opacity: 0.6 }}>Konica Minolta</div>
                           </div>
                         </div>
                         
-                        {selectedNode.kind === 'cs150_connect' && (
+                        {selectedNode.kind === 'cs160_connect' && (
                           <p style={{ fontSize: 12, opacity: 0.7, lineHeight: 1.5 }}>
-                            Connecte le colorimètre CS150 via USB/RS232.
+                            Connecte le colorimètre CS160 via USB/RS232.
                           </p>
                         )}
                         
-                        {selectedNode.kind === 'cs150_measure' && (
+                        {selectedNode.kind === 'cs160_measure' && (
                           <p style={{ fontSize: 12, opacity: 0.7, lineHeight: 1.5 }}>
                             Lance une mesure one-shot (mesure + polling + lecture).
                           </p>
                         )}
                         
-                        {selectedNode.kind === 'cs150_read_xyz' && (
+                        {selectedNode.kind === 'cs160_read_xyz' && (
                           <>
                             <p style={{ fontSize: 12, opacity: 0.7, lineHeight: 1.5, marginBottom: 8 }}>
                               Lit les valeurs XYZ de la dernière mesure.
@@ -5513,7 +5661,7 @@ export default function EditeurPage() {
                           </>
                         )}
                         
-                        {selectedNode.kind === 'cs150_read_lvxy' && (
+                        {selectedNode.kind === 'cs160_read_lvxy' && (
                           <>
                             <p style={{ fontSize: 12, opacity: 0.7, lineHeight: 1.5, marginBottom: 8 }}>
                               Lit les valeurs Lv, x, y de la dernière mesure.
@@ -5535,7 +5683,7 @@ export default function EditeurPage() {
                           </>
                         )}
                         
-                        {selectedNode.kind === 'cs150_set_backlight' && (
+                        {selectedNode.kind === 'cs160_set_backlight' && (
                           <label style={{ display: 'grid', gap: 6 }}>
                             <span className="g-label">Mode rétroéclairage</span>
                             <select 
@@ -5550,7 +5698,7 @@ export default function EditeurPage() {
                           </label>
                         )}
                         
-                        {selectedNode.kind === 'cs150_set_calib_ch' && (
+                        {selectedNode.kind === 'cs160_set_calib_ch' && (
                           <label style={{ display: 'grid', gap: 6 }}>
                             <span className="g-label">Canal de calibration</span>
                             <select 
@@ -5566,7 +5714,7 @@ export default function EditeurPage() {
                           </label>
                         )}
                         
-                        {selectedNode.kind === 'cs150_rgb_calib' && (
+                        {selectedNode.kind === 'cs160_rgb_calib' && (
                           <>
                             <p style={{ fontSize: 12, opacity: 0.7, lineHeight: 1.5, marginBottom: 12 }}>
                               Calibration RGB: mesure Rouge, Vert, Bleu puis calcule la matrice.
@@ -5599,7 +5747,7 @@ export default function EditeurPage() {
                           </>
                         )}
                         
-                        {selectedNode.kind === 'cs150_single_calib' && (
+                        {selectedNode.kind === 'cs160_single_calib' && (
                           <>
                             <p style={{ fontSize: 12, opacity: 0.7, lineHeight: 1.5, marginBottom: 12 }}>
                               Calibration 1 point: mesure une source blanche de référence.
@@ -5658,7 +5806,7 @@ export default function EditeurPage() {
                         )}
                       </div>
                       <p style={{ fontSize: 11, opacity: 0.5, lineHeight: 1.4 }}>
-                        Utilisez le panneau CS150 dans la barre latérale pour le contrôle direct.
+                        Utilisez le panneau CS160 dans la barre latérale pour le contrôle direct.
                       </p>
                     </>
                   ) : selectedNode.kind === 'game_simon' ? (
@@ -5803,7 +5951,7 @@ export default function EditeurPage() {
                           <span style={{ fontSize: 11, fontWeight: 700, color: '#1a1a1a', textAlign: 'right' }}>±{getNum(selectedNode.params, 'threshold', 0.025).toFixed(3)}</span>
                         </div>
                       </div>
-                      <p style={{ fontSize: 11, opacity: 0.5, lineHeight: 1.4 }}>Trouve la combinaison RGB qui donne le blanc le plus pur. Mesuré par colorimètre CS150.</p>
+                      <p style={{ fontSize: 11, opacity: 0.5, lineHeight: 1.4 }}>Trouve la combinaison RGB qui donne le blanc le plus pur. Mesuré par colorimètre CS160.</p>
                     </div>
                   ) : selectedNode.kind === 'game_puissance4' ? (
                     <div style={{ display: 'grid', gap: 14 }}>
@@ -6186,7 +6334,7 @@ export default function EditeurPage() {
                   ) : selectedNode.kind === 'measure_start' ? (
                     <div style={{ display: 'grid', gap: 12 }}>
                       <div style={{ padding: 12, borderRadius: 10, background: 'rgba(14,165,233,0.08)', border: '1px solid rgba(14,165,233,0.2)' }}>
-                        <p style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.5 }}>Lance une mesure colorimétrique via le CS-150. Connectez la sortie à <strong>measure_on_result</strong>.</p>
+                        <p style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.5 }}>Lance une mesure colorimétrique via le CS-160. Connectez la sortie à <strong>measure_on_result</strong>.</p>
                       </div>
                       <label style={{ display: 'grid', gap: 4 }}>
                         <span className="g-label">Timeout (sec)</span>
@@ -6198,7 +6346,7 @@ export default function EditeurPage() {
                   ) : selectedNode.kind === 'measure_on_result' ? (
                     <div style={{ display: 'grid', gap: 12 }}>
                       <div style={{ padding: 12, borderRadius: 10, background: 'rgba(14,165,233,0.08)', border: '1px solid rgba(14,165,233,0.2)' }}>
-                        <p style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.5 }}>Déclenché quand la mesure CS-150 est reçue. Les coordonnées CIE xy et la luminance Lv sont stockées dans des variables.</p>
+                        <p style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.5 }}>Déclenché quand la mesure CS-160 est reçue. Les coordonnées CIE xy et la luminance Lv sont stockées dans des variables.</p>
                       </div>
                       <label style={{ display: 'grid', gap: 4 }}>
                         <span className="g-label">Variable x</span>
@@ -7216,9 +7364,9 @@ export default function EditeurPage() {
               )}
             </div>
 
-            {/* CS150 Colorimeter Panel */}
+            {/* CS160 Colorimeter Panel */}
             <div style={{ marginTop: 16, padding: '0 20px 20px' }}>
-              <CS150Panel />
+              <CS160Panel />
             </div>
         </aside>
       </div>
@@ -7358,6 +7506,41 @@ export default function EditeurPage() {
           </div>
         </div>
       )}
+
+      {/* Mini-tuto skippable à chaque création de jeu */}
+      {onboardingStep !== null && (() => {
+        const STEPS = [
+          { icon: Boxes, title: 'Bienvenue dans l’éditeur', text: 'Crée ton jeu en assemblant des blocs (nœuds) ou en code Python. Ce mini-tuto se passe quand tu veux.' },
+          { icon: GitBranch, title: 'Les blocs (Nœuds)', text: 'Clic droit (ou glisse depuis une sortie) sur le canvas pour ajouter un nœud. Relie la sortie d’un bloc à l’entrée d’un autre. Les blocs ne se chevauchent plus (physique anti-superposition).' },
+          { icon: LayoutGrid, title: 'L’interface (UI)', text: 'Onglet Interface : dépose des composants (score, minuteur, diagramme CIE, D-pad…), déplace-les, et personnalise-les dans le panneau de droite.' },
+          { icon: Gamepad2, title: 'Jeux natifs', text: 'Ajoute un bloc-jeu (Puissance 4, Snake, L’Intrus, Chromaticité…) : le vrai jeu s’exécute, avec ton interface par-dessus.' },
+          { icon: Zap, title: 'Python low-code', text: 'Onglet Python : un script d’exemple commenté est déjà prêt (API cr.send_color, get_key, add_score…). Modifie-le et clique Exécuter.' },
+        ];
+        const step = STEPS[Math.min(onboardingStep, STEPS.length - 1)];
+        const Icon = step.icon;
+        const last = onboardingStep >= STEPS.length - 1;
+        return (
+          <div style={{ position: 'fixed', inset: 0, background: 'linear-gradient(180deg, rgba(255,255,255,0.26), rgba(245,247,255,0.42))', backdropFilter: 'blur(18px) saturate(140%)', display: 'grid', placeItems: 'center', zIndex: 10001 }}>
+            <div className="glass" style={{ width: 'min(440px, calc(100vw - 40px))', padding: 26, borderRadius: 22, background: 'linear-gradient(135deg, rgba(255,255,255,0.92), rgba(245,247,255,0.86))', border: '1px solid rgba(255,255,255,0.75)', boxShadow: '0 24px 64px rgba(120,140,200,0.22)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+                <div style={{ width: 44, height: 44, borderRadius: 12, background: 'linear-gradient(135deg,#4361ee,#7c3aed)', display: 'grid', placeItems: 'center', flexShrink: 0 }}><Icon size={22} color="#fff" /></div>
+                <div style={{ fontWeight: 800, fontSize: 17, color: '#1a1d2e' }}>{step.title}</div>
+              </div>
+              <p style={{ fontSize: 13.5, color: '#4a4f5e', lineHeight: 1.6, margin: '0 0 18px' }}>{step.text}</p>
+              <div style={{ display: 'flex', gap: 5, marginBottom: 16 }}>
+                {STEPS.map((_, i) => <span key={i} style={{ height: 5, flex: 1, borderRadius: 3, background: i <= onboardingStep ? '#4361ee' : 'rgba(0,0,0,0.1)', transition: 'background 0.2s' }} />)}
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <button className="g-btn" onClick={() => setOnboardingStep(null)} style={{ height: 40, padding: '0 16px', fontSize: 13 }}>Passer</button>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  {onboardingStep > 0 && <button className="g-btn" onClick={() => setOnboardingStep((s) => Math.max(0, (s ?? 0) - 1))} style={{ height: 40, padding: '0 16px' }}>Précédent</button>}
+                  <button className="g-btn g-btn--accent" onClick={() => last ? setOnboardingStep(null) : setOnboardingStep((s) => (s ?? 0) + 1)} style={{ height: 40, padding: '0 20px' }}>{last ? 'Commencer' : 'Suivant'}</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Modal de confirmation de suppression */}
       {modal?.type === 'confirm-delete' && (

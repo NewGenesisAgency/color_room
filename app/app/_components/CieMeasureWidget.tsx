@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from 'react';
 import { Crosshair, RefreshCcw, Ruler } from 'lucide-react';
-import cs150Service from '@/app/_services/cs150';
+import cs160Service from '@/app/_services/cs160';
+import CieDiagramCanvas, { type CieMarker } from './CieDiagramCanvas';
 
 // ── CIE 1931 spectral locus (horseshoe) ──────────────────────────────────────
 const HORSESHOE: [number, number][] = [
@@ -144,7 +145,7 @@ export default function CieMeasureWidget({
     setMeasuring(true);
     setError(null);
     try {
-      const { lvxy } = await cs150Service.oneShotMeasurement();
+      const { lvxy } = await cs160Service.oneShotMeasurement();
       if (lvxy && Number.isFinite(lvxy.x) && Number.isFinite(lvxy.y)) {
         const m = { x: lvxy.x, y: lvxy.y };
         setMeasured(m);
@@ -152,10 +153,10 @@ export default function CieMeasureWidget({
         const pts = Math.round(points * Math.max(0, 1 - dE / 100));
         setBest((b) => (b === null ? pts : Math.max(b, pts)));
       } else {
-        setError('Mesure indisponible — appareil CS-150 non connecté ?');
+        setError('Mesure indisponible — appareil CS-160 non connecté ?');
       }
     } catch {
-      setError('Erreur de communication avec le CS-150');
+      setError('Erreur de communication avec le CS-160');
     } finally {
       setMeasuring(false);
     }
@@ -165,10 +166,11 @@ export default function CieMeasureWidget({
   const success = dE !== null && dE <= tolerance;
   const score = dE !== null ? Math.round(points * Math.max(0, 1 - dE / 100)) : null;
 
-  const tPos = xyToSvg(target.x, target.y);
-  const mPos = measured ? xyToSvg(measured.x, measured.y) : null;
   const tColor = `rgb(${target.rgb.r},${target.rgb.g},${target.rgb.b})`;
-  const svgH = height ?? Math.round((width * DH) / DW);
+  const markers: CieMarker[] = [
+    { x: target.x, y: target.y, color: tColor, ring: true, label: 'Cible' },
+    ...(measured ? [{ x: measured.x, y: measured.y, crosshair: true, ring: true, radius: 6 } as CieMarker] : []),
+  ];
 
   const cell: React.CSSProperties = {
     flex: 1, padding: '7px 9px', borderRadius: 10, background: 'rgba(255,255,255,0.7)',
@@ -184,42 +186,9 @@ export default function CieMeasureWidget({
         <Crosshair size={13} /> Diagramme CIE 1931
       </div>
 
-      <svg viewBox={`0 0 ${DW} ${DH}`} width="100%" height={svgH} style={{ borderRadius: 12, background: '#fbfbfd', border: '1px solid rgba(0,0,0,0.08)', display: 'block' }}>
-        <defs>
-          <radialGradient id="cieFill" cx="38%" cy="42%" r="62%">
-            <stop offset="0%" stopColor="rgba(255,255,255,0.95)" />
-            <stop offset="55%" stopColor="rgba(225,230,245,0.6)" />
-            <stop offset="100%" stopColor="rgba(200,206,225,0.25)" />
-          </radialGradient>
-        </defs>
-        {/* Grille légère */}
-        {[0.2, 0.4, 0.6, 0.8].map((gx) => {
-          const a = xyToSvg(gx, Y_MIN), b = xyToSvg(gx, Y_MAX);
-          return <line key={`vx${gx}`} x1={a.px} y1={a.py} x2={b.px} y2={b.py} stroke="rgba(0,0,0,0.05)" strokeWidth={1} />;
-        })}
-        {[0.2, 0.4, 0.6, 0.8].map((gy) => {
-          const a = xyToSvg(X_MIN, gy), b = xyToSvg(X_MAX, gy);
-          return <line key={`hy${gy}`} x1={a.px} y1={a.py} x2={b.px} y2={b.py} stroke="rgba(0,0,0,0.05)" strokeWidth={1} />;
-        })}
-        {/* Locus spectral */}
-        <path d={horseshoePath} fill="url(#cieFill)" stroke="rgba(40,46,70,0.55)" strokeWidth={1.5} strokeLinejoin="round" />
-
-        {/* Ligne cible ↔ mesure */}
-        {mPos && (
-          <line x1={tPos.px} y1={tPos.py} x2={mPos.px} y2={mPos.py} stroke={success ? '#059669' : '#ef4444'} strokeWidth={1.5} strokeDasharray="4 3" />
-        )}
-        {/* Cible */}
-        <circle cx={tPos.px} cy={tPos.py} r={9} fill="none" stroke="#1a1d2e" strokeWidth={2} />
-        <circle cx={tPos.px} cy={tPos.py} r={6} fill={tColor} stroke="#fff" strokeWidth={1.5} />
-        {/* Point mesuré */}
-        {mPos && (
-          <g>
-            <circle cx={mPos.px} cy={mPos.py} r={5.5} fill="#fff" stroke={success ? '#059669' : '#ef4444'} strokeWidth={2.5} />
-            <line x1={mPos.px - 9} y1={mPos.py} x2={mPos.px + 9} y2={mPos.py} stroke={success ? '#059669' : '#ef4444'} strokeWidth={1.5} />
-            <line x1={mPos.px} y1={mPos.py - 9} x2={mPos.px} y2={mPos.py + 9} stroke={success ? '#059669' : '#ef4444'} strokeWidth={1.5} />
-          </g>
-        )}
-      </svg>
+      <div style={{ display: 'flex', justifyContent: 'center' }}>
+        <CieDiagramCanvas size={Math.max(300, Math.round(width))} markers={markers} />
+      </div>
 
       {/* Lecture */}
       <div style={{ display: 'flex', gap: 6 }}>
@@ -259,7 +228,7 @@ export default function CieMeasureWidget({
           boxShadow: measuring ? 'none' : '0 4px 14px rgba(67,97,238,0.3)',
           display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, transition: 'all 150ms',
         }}>
-          <Ruler size={15} /> {measuring ? 'Mesure en cours…' : 'Mesurer (CS-150)'}
+          <Ruler size={15} /> {measuring ? 'Mesure en cours…' : 'Mesurer (CS-160)'}
         </button>
         {rnd && (
           <button onClick={newTarget} disabled={measuring} style={{

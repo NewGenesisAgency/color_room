@@ -1,7 +1,7 @@
 /**
- * CS150 Colorimeter Service
+ * CS160 Colorimeter Service
  * 
- * This service provides a TypeScript interface to the Konica Minolta CS150
+ * This service provides a TypeScript interface to the Konica Minolta CS160
  * via the .NET SDK bridge or direct API calls.
  */
 
@@ -30,7 +30,7 @@ export interface CalibData {
   trueValues: MeasurementData[];
 }
 
-export interface CS150Status {
+export interface CS160Status {
   connected: boolean;
   deviceInfo?: string;
   calibChannel: number;
@@ -42,16 +42,16 @@ export type MeasStatus = 'idle' | 'measuring' | 'completed' | 'error';
 export type BackLightMode = 'on' | 'off';
 export type CalibType = 'RGB' | 'OnePoint' | 'MultiPoint';
 
-class CS150Service {
-  private baseUrl = '/api/cs150';
-  private _status: CS150Status = { connected: false, calibChannel: 0 };
+class CS160Service {
+  private baseUrl = '/api/cs160';
+  private _status: CS160Status = { connected: false, calibChannel: 0 };
 
-  get status(): CS150Status {
+  get status(): CS160Status {
     return { ...this._status };
   }
 
   /**
-   * Connect to CS150 device
+   * Connect to CS160 device
    */
   async connect(): Promise<boolean> {
     try {
@@ -68,13 +68,13 @@ class CS150Service {
       }
       return data.success;
     } catch (error) {
-      console.error('CS150 connect error:', error);
+      console.error('CS160 connect error:', error);
       return false;
     }
   }
 
   /**
-   * Disconnect from CS150 device
+   * Disconnect from CS160 device
    */
   async disconnect(): Promise<boolean> {
     try {
@@ -90,7 +90,7 @@ class CS150Service {
       }
       return data.success;
     } catch (error) {
-      console.error('CS150 disconnect error:', error);
+      console.error('CS160 disconnect error:', error);
       return false;
     }
   }
@@ -98,7 +98,7 @@ class CS150Service {
   /**
    * Get current status
    */
-  async getStatus(): Promise<CS150Status> {
+  async getStatus(): Promise<CS160Status> {
     try {
       const res = await fetch(`${this.baseUrl}?action=status`);
       const data = await res.json();
@@ -108,7 +108,7 @@ class CS150Service {
       }
       return this._status;
     } catch (error) {
-      console.error('CS150 status error:', error);
+      console.error('CS160 status error:', error);
       return this._status;
     }
   }
@@ -126,7 +126,7 @@ class CS150Service {
       const data = await res.json();
       return data.success;
     } catch (error) {
-      console.error('CS150 measure error:', error);
+      console.error('CS160 measure error:', error);
       return false;
     }
   }
@@ -175,7 +175,7 @@ class CS150Service {
       }
       return null;
     } catch (error) {
-      console.error('CS150 readXYZ error:', error);
+      console.error('CS160 readXYZ error:', error);
       return null;
     }
   }
@@ -197,7 +197,7 @@ class CS150Service {
       }
       return null;
     } catch (error) {
-      console.error('CS150 readLvxy error:', error);
+      console.error('CS160 readLvxy error:', error);
       return null;
     }
   }
@@ -240,7 +240,7 @@ class CS150Service {
       }
       return data.success;
     } catch (error) {
-      console.error('CS150 setBacklight error:', error);
+      console.error('CS160 setBacklight error:', error);
       return false;
     }
   }
@@ -262,7 +262,7 @@ class CS150Service {
       }
       return data.success;
     } catch (error) {
-      console.error('CS150 setCalibrationCh error:', error);
+      console.error('CS160 setCalibrationCh error:', error);
       return false;
     }
   }
@@ -289,7 +289,7 @@ class CS150Service {
       const data = await res.json();
       return data.success;
     } catch (error) {
-      console.error('CS150 setMatrixCalib error:', error);
+      console.error('CS160 setMatrixCalib error:', error);
       return false;
     }
   }
@@ -313,7 +313,7 @@ class CS150Service {
       }
       return null;
     } catch (error) {
-      console.error('CS150 getCalibData error:', error);
+      console.error('CS160 getCalibData error:', error);
       return null;
     }
   }
@@ -395,5 +395,5 @@ class CS150Service {
 }
 
 // Export singleton instance
-export const cs150Service = new CS150Service();
-export default cs150Service;
+export const cs160Service = new CS160Service();
+export default cs160Service;

@@ -99,7 +99,7 @@ const P: Record<string, React.CSSProperties> = {
   },
 };
 
-export default function GameMaitreDuBlanc({ onSendColor, onTurnOff, onTurnOffAll, onQuit, tileCount = 42 }: GameTileProps) {
+export default function GameMaitreDuBlanc({ onSendColor, onTurnOff, onTurnOffAll, onQuit, tileCount = 42, onComplete }: GameTileProps) {
   const [phase, setPhase] = useState<'ready' | 'playing' | 'result' | 'finished'>('ready');
   const [roundIdx, setRoundIdx] = useState(0);
   const [order, setOrder] = useState<number[]>([]);
@@ -110,6 +110,7 @@ export default function GameMaitreDuBlanc({ onSendColor, onTurnOff, onTurnOffAll
   const [roundScore, setRoundScore] = useState(0);
   const [totalScore, setTotalScore] = useState(0);
   const [dist, setDist] = useState(0);
+  useEffect(() => { if (phase === 'finished') onComplete?.(totalScore); }, [phase]); // eslint-disable-line react-hooks/exhaustive-deps
   const [attempts, setAttempts] = useState(0);
   const lastSendRef = useRef<number>(0);
   const numTiles = Math.min(tileCount, 42);

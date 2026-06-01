@@ -156,82 +156,82 @@ async function runNode(node: Node, msg: RuntimeMsg, logger: Logger): Promise<Run
     return { ...msg, _clickTarget: target };
   }
 
-  // CS150 Colorimeter nodes
-  if (k === 'cs150_connect') {
+  // CS160 Colorimeter nodes
+  if (k === 'cs160_connect') {
     try {
-      const res = await fetch('/api/cs150', {
+      const res = await fetch('/api/cs160', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ action: 'connect' }),
       });
       const payload = await res.json();
-      logger.info('cs150_connect', { payload });
+      logger.info('cs160_connect', { payload });
       return { ...msg, payload };
     } catch {
-      logger.warn('cs150_connect: failed');
+      logger.warn('cs160_connect: failed');
       return msg;
     }
   }
 
-  if (k === 'cs150_disconnect') {
+  if (k === 'cs160_disconnect') {
     try {
-      const res = await fetch('/api/cs150', {
+      const res = await fetch('/api/cs160', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ action: 'disconnect' }),
       });
       const payload = await res.json();
-      logger.info('cs150_disconnect', { payload });
+      logger.info('cs160_disconnect', { payload });
       return { ...msg, payload };
     } catch {
-      logger.warn('cs150_disconnect: failed');
+      logger.warn('cs160_disconnect: failed');
       return msg;
     }
   }
 
-  if (k === 'cs150_measure') {
+  if (k === 'cs160_measure') {
     try {
-      const res = await fetch('/api/cs150', {
+      const res = await fetch('/api/cs160', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ action: 'measure' }),
       });
       const payload = await res.json();
-      logger.info('cs150_measure', { payload });
+      logger.info('cs160_measure', { payload });
       return { ...msg, payload };
     } catch {
-      logger.warn('cs150_measure: failed');
+      logger.warn('cs160_measure: failed');
       return msg;
     }
   }
 
-  if (k === 'cs150_samples') {
+  if (k === 'cs160_samples') {
     try {
-      const res = await fetch('/api/cs150', {
+      const res = await fetch('/api/cs160', {
         method: 'GET',
         cache: 'no-store',
       });
       const payload = await res.json();
-      logger.info('cs150_samples', { payload });
+      logger.info('cs160_samples', { payload });
       return { ...msg, payload };
     } catch {
-      logger.warn('cs150_samples: failed');
+      logger.warn('cs160_samples: failed');
       return msg;
     }
   }
 
-  if (k === 'cs150_status') {
+  if (k === 'cs160_status') {
     try {
-      const res = await fetch('/api/cs150', {
+      const res = await fetch('/api/cs160', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ action: 'status' }),
       });
       const payload = await res.json();
-      logger.info('cs150_status', { payload });
+      logger.info('cs160_status', { payload });
       return { ...msg, payload };
     } catch {
-      logger.warn('cs150_status: failed');
+      logger.warn('cs160_status: failed');
       return msg;
     }
   }

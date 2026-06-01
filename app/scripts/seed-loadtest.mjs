@@ -4,7 +4,7 @@
  *
  * Design du blueprint :
  *
- *  [Début] ──► [CS150 Connect] ──► [Lancer mesure]
+ *  [Début] ──► [CS160 Connect] ──► [Lancer mesure]
  *
  *  [Résultat reçu] ──► [Aperçu couleur 5s] ──► [Éteindre] ──► [Afficher CIE 1931]
  *                                                                      │
@@ -14,7 +14,7 @@
  *
  *  Note : [Résultat reçu] est un EVENT node asynchrone (comme on_tick).
  *         Il ne reçoit PAS d'edge depuis [Lancer mesure] — il se déclenche
- *         automatiquement quand le CS-150 renvoie ses données.
+ *         automatiquement quand le CS-160 renvoie ses données.
  */
 import Database from 'better-sqlite3';
 import path from 'node:path';
@@ -50,8 +50,8 @@ const nodes = [
   },
   {
     id: 'lt_connect',
-    kind: 'cs150_connect',
-    name: 'Connecter CS-150',
+    kind: 'cs160_connect',
+    name: 'Connecter CS-160',
     enabled: true,
     params: {},
     pos: { x: 380, y: 320 },
@@ -62,7 +62,7 @@ const nodes = [
     name: 'Instruction',
     enabled: true,
     params: {
-      text: '🔬 Pointez le CS-150 vers une source lumineuse et appuyez sur Mesurer',
+      text: '🔬 Pointez le CS-160 vers une source lumineuse et appuyez sur Mesurer',
       size: 14,
       color: '#a0c4ff',
     },
@@ -71,14 +71,14 @@ const nodes = [
   {
     id: 'lt_measure',
     kind: 'measure_start',
-    name: 'Lancer mesure CS-150',
+    name: 'Lancer mesure CS-160',
     enabled: true,
-    params: { deviceId: 'cs150', timeoutSec: 30 },
+    params: { deviceId: 'cs160', timeoutSec: 30 },
     pos: { x: 680, y: 320 },
   },
 
   // ── LIGNE 2 : Handler résultat (EVENT asynchrone, y = 560) ─────────────
-  // measure_on_result est déclenché par le runtime quand le CS-150 renvoie
+  // measure_on_result est déclenché par le runtime quand le CS-160 renvoie
   // ses valeurs — il n'est pas connecté EN ENTRÉE depuis measure_start.
   {
     id: 'lt_on_result',
@@ -186,7 +186,7 @@ const nodes = [
     kind: 'measure_start',
     name: 'Relancer mesure',
     enabled: true,
-    params: { deviceId: 'cs150', timeoutSec: 30 },
+    params: { deviceId: 'cs160', timeoutSec: 30 },
     pos: { x: 2380, y: 720 },
   },
 ];
@@ -219,7 +219,7 @@ const config = {
   tileCount: 42,
   icon: 'Palette',
   difficulty: 3,
-  description: 'Mesure avec le CS-150\nRetrouve la couleur\nsur le diagramme CIE',
+  description: 'Mesure avec le CS-160\nRetrouve la couleur\nsur le diagramme CIE',
   bgColor: '#0d1117',
   accentColor: '#7c3aed',
   nodes,

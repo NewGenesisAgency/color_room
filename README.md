@@ -195,8 +195,43 @@ POST   /api/scores                — Enregistrer un score
 | `/gestion` | Tableau de bord (users, classes, scores) | Enseignants / admin |
 | `/spectre` | Spectre lumineux temps réel | Tous |
 | `/chromaticite` | Diagramme CIE 1931 | Tous |
-| `/mesure` | Mesures CS-150 | Tous |
+| `/mesure` | Mesures CS-160 | Tous |
 | `/aide` | Guide d'utilisation | Tous |
+
+---
+
+## Jeux disponibles (`/jeux`)
+
+La liste se charge **4 par 4** (bouton « Charger plus ») et est **recherchable**. Chaque partie met à jour le **score universel** et le compteur de **jeux réussis**.
+
+| Jeu | Type | Détails |
+|---|---|---|
+| Tetris Lumière | Réflexe | Tetris sur les 42 dalles, clavier + **D-pad tactile** |
+| Snake Lumière | Réflexe | Serpent 6×7, flèches + D-pad tactile |
+| Color Speed | Réflexe | Cliquer la dalle qui s'allume |
+| Simon Lumière | Mémoire | Reproduire les séquences |
+| Le Maître du Blanc | Colorimétrie | Recréer une teinte en dosant R/G/B |
+| Puissance 4 Chromatique | Réflexion | IA minimax renforcée (anti-piège), thème sombre minimaliste |
+| Métamérie | Colorimétrie | Trouver l'éclairage qui révèle/cache un texte |
+| Mix de Canaux | Colorimétrie | **Triangle** des 3 canaux LED + **3 sliders** d'intensité (point = barycentre, pas de placement) |
+| Chromaticité CIE | Colorimétrie | Diagramme CIE 1931 **coloré** (repris de `/mesure`) + sliders x/y |
+| L'Intrus (Sniper) | **Mesure CS-160** | Dalles identiques sauf une (écart infime) ; le joueur **mesure au CS-160** pour la débusquer. Écran identique partout (pas de triche), différence réelle uniquement sur les dalles |
+| Spectre Chromatique | **Multijoueur** | Jusqu'à 8 joueurs, une teinte par joueur |
+
+Les diagrammes de chromaticité partagent le composant `CieDiagramCanvas` (gamut peint pixel par pixel). Les jeux de mesure utilisent `cs160Service` → `/api/cs160`.
+
+---
+
+## Éditeur de jeux (`/editeur`)
+
+Éditeur visuel type **blueprint** (façon Unreal Engine) + **UI Designer** + **Python low-code**.
+
+- **Nœuds (blocs)** : ajout via clic droit / glissé depuis une sortie ; liaisons en **pointillés animés qui défilent** ; **physique anti-superposition** (les blocs s'espacent automatiquement avec un padding) ; design glass minimaliste.
+- **Jeux natifs comme blocs** : poser un bloc-jeu (Puissance 4, Snake, L'Intrus, Chromaticité, Color Speed, Maître du Blanc, Métamérie, Mix de Canaux, Tetris) → le **vrai jeu s'exécute** dans `/jeux`, avec l'interface dessinée par-dessus.
+- **UI Designer** (onglet Interface) : composants déplaçables (Bouton, Texte, Slider, Score, Minuteur, Manche, Couleur, Progression, **Diagramme CIE**, **D-pad tactile**), personnalisables ; icônes Lucide.
+- **Python low-code** : chaque nouveau jeu reçoit un **script d'exemple commenté** (API `cr.send_color`, `cr.get_key`, `cr.add_score`, `cr.emit_event`…). Exécution via Pyodide.
+- **Mini-tutoriel** skippable à chaque création de jeu.
+- Métadonnées : description (textarea), **icône + couleur + dégradé** (popup, ~55 icônes), difficulté, mode (solo/coop/versus), dalles cibles.
 
 ---
 

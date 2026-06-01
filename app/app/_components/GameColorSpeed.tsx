@@ -11,6 +11,9 @@ export interface GameTileProps {
   onQuit:      () => void;
   tileCount?:  number;
   onRegisterClickHandler?: (fn: ((idx: number) => void) | null) => void;
+  /** Appelé une fois à la fin d'une partie : met à jour le score universel
+   *  (points ajoutés) et incrémente le compteur de jeux réussis. */
+  onComplete?: (points: number) => void;
 }
 
 /* ── Constants ──────────────────────────────────────────────────────── */
@@ -90,7 +93,7 @@ const ANIM = `
 ══════════════════════════════════════════════════════════════════════ */
 export default function GameColorSpeed({
   onSendColor, onTurnOff, onTurnOffAll, onQuit,
-  tileCount = 42, onRegisterClickHandler,
+  tileCount = 42, onRegisterClickHandler, onComplete,
 }: GameTileProps) {
 
   type Phase = 'ready' | 'countdown' | 'playing' | 'finished';
@@ -98,6 +101,7 @@ export default function GameColorSpeed({
   const [phase,      setPhase]      = useState<Phase>('ready');
   const [timeLeft,   setTimeLeft]   = useState(GAME_DURATION);
   const [score,      setScore]      = useState(0);
+  useEffect(() => { if (phase === 'finished') onComplete?.(score); }, [phase]); // eslint-disable-line react-hooks/exhaustive-deps
   const [missed,     setMissed]     = useState(0);
   const [combo,      setCombo]      = useState(0);
   const [lightnings, setLightnings] = useState(0);

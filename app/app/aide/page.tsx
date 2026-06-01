@@ -211,7 +211,7 @@ export default function AidePage() {
           <ul className="aide-list">
             <li>
               Page <strong>Mesure</strong> : visualisez le spectre lumineux en temps réel depuis
-              la CS-150
+              la CS-160
             </li>
             <li>
               Page <strong>Spectre Chromatique</strong> : visualisez la composition spectrale des

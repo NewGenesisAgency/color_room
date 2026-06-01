@@ -1,7 +1,8 @@
 'use client';
 import { useCallback, useRef, useState } from 'react';
+import { MousePointerClick, Type, SlidersHorizontal, Trophy, Timer, Flag, Palette, Gauge, Crosshair, Gamepad2, LayoutGrid, Plus, ZoomIn, ZoomOut, Maximize, Trash2, Layers, Square, Circle, Image as ImageIcon, Minus, Heart, type LucideIcon } from 'lucide-react';
 
-export type UICompKind = 'button' | 'label' | 'slider' | 'score_display' | 'timer_display' | 'round_badge' | 'color_swatch' | 'progress_bar' | 'cie_diagram' | 'dpad';
+export type UICompKind = 'button' | 'label' | 'slider' | 'score_display' | 'timer_display' | 'round_badge' | 'color_swatch' | 'progress_bar' | 'cie_diagram' | 'dpad' | 'shape_rect' | 'shape_circle' | 'image' | 'divider' | 'plate_grid' | 'heart_life';
 
 /** Préréglages de touches pour le D-pad tactile (converties en KeyboardEvent). */
 export type UIDpadPreset = 'arrows_space' | 'lr_space' | 'arrows' | 'lr';
@@ -27,6 +28,10 @@ export type UILayoutComponent = {
   points?: number;
   // Contrôles tactiles (dpad)
   dpadPreset?: UIDpadPreset;
+  // Jeu Snake (snake_game)
+  snakeSpeed?: number;
+  // Image
+  src?: string;
 };
 
 type Props = {
@@ -41,17 +46,23 @@ const SNAP = 8;
 const snap = (v: number) => Math.round(v / SNAP) * SNAP;
 const uid  = () => Math.random().toString(36).slice(2, 10);
 
-const PALETTE = [
-  { kind: 'button'       as UICompKind, label: 'Bouton',      icon: '', w: 160, h: 48 },
-  { kind: 'label'        as UICompKind, label: 'Texte',        icon: '',  w: 200, h: 36 },
-  { kind: 'slider'       as UICompKind, label: 'Slider',       icon: '',  w: 240, h: 52 },
-  { kind: 'score_display'as UICompKind, label: 'Score',        icon: '', w: 140, h: 64 },
-  { kind: 'timer_display'as UICompKind, label: 'Minuteur',     icon: '',  w: 140, h: 64 },
-  { kind: 'round_badge'  as UICompKind, label: 'Manche',       icon: '', w: 160, h: 48 },
-  { kind: 'color_swatch' as UICompKind, label: 'Couleur',      icon: '', w: 80,  h: 80 },
-  { kind: 'progress_bar' as UICompKind, label: 'Progression',  icon: '', w: 280, h: 32 },
-  { kind: 'cie_diagram'  as UICompKind, label: 'Diagramme CIE', icon: '', w: 320, h: 300 },
-  { kind: 'dpad'         as UICompKind, label: 'Contrôles tactiles', icon: '', w: 300, h: 150 },
+const PALETTE: { kind: UICompKind; label: string; Icon: LucideIcon; color: string; w: number; h: number }[] = [
+  { kind: 'button',        label: 'Bouton',       Icon: MousePointerClick, color: '#4361ee', w: 160, h: 48 },
+  { kind: 'label',         label: 'Texte',        Icon: Type,              color: '#64748b', w: 200, h: 36 },
+  { kind: 'slider',        label: 'Slider',       Icon: SlidersHorizontal, color: '#0ea5e9', w: 240, h: 52 },
+  { kind: 'score_display', label: 'Score',        Icon: Trophy,            color: '#f59e0b', w: 140, h: 64 },
+  { kind: 'timer_display', label: 'Minuteur',     Icon: Timer,             color: '#ef4444', w: 140, h: 64 },
+  { kind: 'round_badge',   label: 'Manche',       Icon: Flag,              color: '#8b5cf6', w: 160, h: 48 },
+  { kind: 'color_swatch',  label: 'Couleur',      Icon: Palette,           color: '#ec4899', w: 80,  h: 80 },
+  { kind: 'progress_bar',  label: 'Progression',  Icon: Gauge,             color: '#10b981', w: 280, h: 32 },
+  { kind: 'cie_diagram',   label: 'Diagramme CIE', Icon: Crosshair,        color: '#06b6d4', w: 320, h: 300 },
+  { kind: 'dpad',          label: 'Contrôles tactiles', Icon: Gamepad2,    color: '#6366f1', w: 300, h: 150 },
+  { kind: 'plate_grid',    label: 'Plaques (42)', Icon: LayoutGrid,       color: '#06b6d4', w: 260, h: 300 },
+  { kind: 'shape_rect',    label: 'Rectangle',    Icon: Square,           color: '#94a3b8', w: 160, h: 90 },
+  { kind: 'shape_circle',  label: 'Cercle',       Icon: Circle,           color: '#94a3b8', w: 90,  h: 90 },
+  { kind: 'image',         label: 'Image',        Icon: ImageIcon,        color: '#f59e0b', w: 160, h: 120 },
+  { kind: 'divider',       label: 'Séparateur',   Icon: Minus,            color: '#cbd5e1', w: 240, h: 12 },
+  { kind: 'heart_life',    label: 'Vies (cœurs)', Icon: Heart,            color: '#ef4444', w: 140, h: 40 },
 ];
 
 function defaultText(k: UICompKind) {
@@ -59,7 +70,9 @@ function defaultText(k: UICompKind) {
 }
 
 function Preview({ c }: { c: UILayoutComponent }) {
-  const base: React.CSSProperties = { position:'absolute', left:c.x, top:c.y, width:c.width, height:c.height, display:'flex', alignItems:'center', justifyContent:'center', boxSizing:'border-box', overflow:'hidden', pointerEvents:'none', userSelect:'none', fontSize: c.fontSize ?? 14, color: c.textColor ?? '#1a1d2e' };
+  // Le wrapper positionne et dimensionne déjà l'élément ; l'aperçu doit le REMPLIR
+  // (inset:0), pas se repositionner à (x,y) — sinon il se décale de son contour.
+  const base: React.CSSProperties = { position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center', boxSizing:'border-box', overflow:'hidden', pointerEvents:'none', userSelect:'none', fontSize: c.fontSize ?? 14, color: c.textColor ?? '#1a1d2e' };
   switch (c.kind) {
     case 'button':        return <div style={{ ...base, background: c.bgColor ?? '#4361ee', color: c.textColor ?? '#fff', borderRadius: 12, fontWeight: 700, boxShadow: '0 4px 14px rgba(67,97,238,0.28)' }}>{c.text || 'Bouton'}</div>;
     case 'label':         return <div style={{ ...base, justifyContent: 'flex-start', paddingLeft: 4, fontWeight: 600 }}>{c.text || 'Texte'}</div>;
@@ -69,6 +82,16 @@ function Preview({ c }: { c: UILayoutComponent }) {
     case 'round_badge':   return <div style={{ ...base, background:'rgba(67,97,238,0.09)', borderRadius:12, fontWeight:800, color:'#4361ee', fontSize:14 }}>Manche 1/5</div>;
     case 'color_swatch':  return <div style={{ ...base, borderRadius:12, background: c.bgColor ?? '#ff2aa6', boxShadow: '0 0 20px ' + (c.bgColor ?? '#ff2aa6') }} />;
     case 'progress_bar':  return <div style={{ ...base, background:'rgba(0,0,0,0.07)', borderRadius:999, overflow:'hidden', padding:0 }}><div style={{ width:'55%', height:'100%', background:'linear-gradient(90deg,#059669,#06d6a0)', borderRadius:999 }} /></div>;
+    case 'shape_rect':    return <div style={{ ...base, background: c.bgColor ?? '#334155', borderRadius: 12 }} />;
+    case 'shape_circle':  return <div style={{ ...base, background: c.bgColor ?? '#334155', borderRadius: '50%' }} />;
+    case 'divider':       return <div style={{ ...base, padding:0 }}><div style={{ width:'100%', height:2, borderRadius:2, background: c.bgColor ?? 'rgba(255,255,255,0.4)' }} /></div>;
+    case 'image':         return <div style={{ ...base, borderRadius:12, overflow:'hidden', background:'#11151f', border:'1px dashed rgba(255,255,255,0.18)' }}>{c.src ? <img src={c.src} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }} /> : <span style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:4, color:'rgba(255,255,255,0.35)', fontSize:10 }}><ImageIcon size={20} />Image</span>}</div>;
+    case 'heart_life':    return <div style={{ ...base, gap:4, color:'#ef4444' }}>{[0,1,2].map(i => <Heart key={i} size={Math.min(22, c.height-12)} fill={i<2?'#ef4444':'none'} />)}</div>;
+    case 'plate_grid':    return <div style={{ ...base, padding:6, background:'#0d1119', borderRadius:12, border:'1px solid rgba(255,255,255,0.08)' }}>
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(6,1fr)', gridTemplateRows:'repeat(7,1fr)', gap:3, width:'100%', height:'100%' }}>
+        {Array.from({length:42},(_,i)=><span key={i} style={{ borderRadius:3, background:`hsl(${(i*8.5)%360} 70% 55%)`, opacity:0.85 }} />)}
+      </div>
+    </div>;
     case 'cie_diagram':   return <div style={{ ...base, flexDirection:'column', gap:5, background:'#fbfbfd', borderRadius:12, border:'1px solid rgba(0,0,0,0.1)', color:'#5a6072' }}>
       <svg viewBox="0 0 60 52" width={Math.max(28, Math.min(c.width-16, c.height-30))} height={Math.max(24, Math.min(c.width-16, c.height-30))} style={{ maxWidth:'78%' }}>
         <path d="M9,47 C2,30 13,7 30,5 C47,8 57,30 51,47 Z" fill="rgba(120,140,220,0.14)" stroke="rgba(40,46,70,0.5)" strokeWidth="1.5" strokeLinejoin="round" />
@@ -127,28 +150,44 @@ export default function UIDesigner({ components, onChange, gameVariables = [] }:
   return (
     <div style={{ display:'flex', height:'100%', minHeight:0, fontFamily:'inherit' }}>
       {/* Palette */}
-      <div style={{ width:128, background:'rgba(255,255,255,0.6)', borderRight:'1px solid rgba(0,0,0,0.08)', padding:'10px 7px', display:'flex', flexDirection:'column', gap:5, overflowY:'auto', flexShrink:0 }}>
-        <div style={{ fontSize:10, fontWeight:800, color:'#aaa', textTransform:'uppercase', letterSpacing:'0.07em', paddingBottom:6, borderBottom:'1px solid rgba(0,0,0,0.06)', marginBottom:2 }}>Composants</div>
-        {PALETTE.map(p => <button key={p.kind} onClick={() => add(p)} style={{ padding:'7px 9px', borderRadius:9, border:'1px solid rgba(0,0,0,0.08)', background:'rgba(255,255,255,0.75)', cursor:'pointer', textAlign:'left', fontSize:12, fontWeight:600, fontFamily:'inherit', display:'flex', alignItems:'center', gap:5, transition:'all 120ms' }}>{p.icon} {p.label}</button>)}
+      <div style={{ width:158, background:'linear-gradient(180deg,#fbfbfe,#f4f5fa)', borderRight:'1px solid rgba(0,0,0,0.07)', padding:'12px 9px', display:'flex', flexDirection:'column', gap:6, overflowY:'auto', flexShrink:0 }}>
+        <div style={{ display:'flex', alignItems:'center', gap:6, fontSize:10, fontWeight:800, color:'#9aa0ad', textTransform:'uppercase', letterSpacing:'0.08em', paddingBottom:8, borderBottom:'1px solid rgba(0,0,0,0.06)', marginBottom:2 }}>
+          <Layers size={12} /> Composants
+        </div>
+        {PALETTE.map(p => (
+          <button key={p.kind} onClick={() => add(p)}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = `${p.color}66`; e.currentTarget.style.background = `${p.color}0d`; e.currentTarget.style.transform = 'translateX(2px)'; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(0,0,0,0.08)'; e.currentTarget.style.background = 'rgba(255,255,255,0.85)'; e.currentTarget.style.transform = 'none'; }}
+            style={{ padding:'7px 8px', borderRadius:11, border:'1px solid rgba(0,0,0,0.08)', background:'rgba(255,255,255,0.85)', cursor:'pointer', textAlign:'left', fontSize:12, fontWeight:600, fontFamily:'inherit', color:'#3a3f4b', display:'flex', alignItems:'center', gap:8, transition:'all 130ms' }}>
+            <span style={{ width:26, height:26, borderRadius:8, flexShrink:0, display:'grid', placeItems:'center', background:`${p.color}1a`, color:p.color }}><p.Icon size={15} /></span>
+            {p.label}
+          </button>
+        ))}
       </div>
 
       {/* Canvas */}
       <div style={{ flex:1, background:'repeating-linear-gradient(0deg,transparent,transparent 31px,rgba(67,97,238,0.05) 32px),repeating-linear-gradient(90deg,transparent,transparent 31px,rgba(67,97,238,0.05) 32px)', overflow:'hidden', position:'relative', display:'flex', alignItems:'center', justifyContent:'center' }} onClick={() => setSel(null)}>
         <div style={{ width:CW, height:CH, background:'rgba(255,255,255,0.94)', borderRadius:16, border:'1px solid rgba(0,0,0,0.09)', boxShadow:'0 8px 40px rgba(0,0,0,0.09)', position:'relative', transform:`scale(${zoom})`, transformOrigin:'center', flexShrink:0 }}>
           {components.map(c => (
-            <div key={c.id} style={{ position:'absolute', left:c.x, top:c.y, width:c.width, height:c.height, cursor:'move', outline: sel===c.id ? '2.5px solid #4361ee' : 'none', outlineOffset:2, borderRadius:4, zIndex: sel===c.id ? 10 : 1 }} onMouseDown={e => onDown(e, c.id)}>
+            <div key={c.id} style={{ position:'absolute', left:c.x, top:c.y, width:c.width, height:c.height, cursor:'move', outline: sel===c.id ? '2.5px solid #4361ee' : 'none', outlineOffset:2, borderRadius:4, zIndex: sel===c.id ? 10 : 1 }} onMouseDown={e => onDown(e, c.id)} onClick={e => { e.stopPropagation(); setSel(c.id); }}>
               <Preview c={c} />
-              {sel===c.id && <button onClick={e => { e.stopPropagation(); del(c.id); }} style={{ position:'absolute', top:-20, right:0, padding:'1px 6px', borderRadius:5, border:'none', background:'#dc2626', color:'#fff', cursor:'pointer', fontSize:11, fontWeight:700 }}>✕</button>}
+              {sel===c.id && <button onClick={e => { e.stopPropagation(); del(c.id); }} title="Supprimer" style={{ position:'absolute', top:-26, right:0, width:22, height:22, borderRadius:7, border:'none', background:'#dc2626', color:'#fff', cursor:'pointer', display:'grid', placeItems:'center', boxShadow:'0 2px 8px rgba(220,38,38,0.4)' }}><Trash2 size={12} /></button>}
             </div>
           ))}
-          {components.length === 0 && <div style={{ position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center', flexDirection:'column', gap:8, color:'rgba(0,0,0,0.2)', pointerEvents:'none' }}><span style={{ fontSize:40 }}></span><span style={{ fontSize:13, fontWeight:600 }}>Ajoutez des composants depuis la palette</span></div>}
+          {components.length === 0 && <div style={{ position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center', flexDirection:'column', gap:10, color:'rgba(0,0,0,0.22)', pointerEvents:'none' }}><Plus size={42} strokeWidth={1.5} /><span style={{ fontSize:13, fontWeight:600 }}>Ajoutez des composants depuis la palette</span></div>}
         </div>
         {/* Zoom */}
-        <div style={{ position:'absolute', bottom:12, right:12, display:'flex', gap:5, background:'rgba(255,255,255,0.9)', borderRadius:9, padding:'3px 7px', boxShadow:'0 2px 8px rgba(0,0,0,0.09)' }}>
-          <button style={{ padding:'4px 9px', borderRadius:7, border:'1px solid rgba(0,0,0,0.09)', background:'rgba(255,255,255,0.8)', cursor:'pointer', fontSize:11, fontWeight:700 }} onClick={() => setZoom(z => Math.max(0.4, z-0.1))}>−</button>
-          <span style={{ fontSize:11, fontWeight:700, display:'flex', alignItems:'center', minWidth:38, justifyContent:'center' }}>{Math.round(zoom*100)}%</span>
-          <button style={{ padding:'4px 9px', borderRadius:7, border:'1px solid rgba(0,0,0,0.09)', background:'rgba(255,255,255,0.8)', cursor:'pointer', fontSize:11, fontWeight:700 }} onClick={() => setZoom(z => Math.min(1.5, z+0.1))}>+</button>
-          <button style={{ padding:'4px 9px', borderRadius:7, border:'1px solid rgba(0,0,0,0.09)', background:'rgba(255,255,255,0.8)', cursor:'pointer', fontSize:11, fontWeight:700 }} onClick={() => setZoom(1)}>1:1</button>
+        <div style={{ position:'absolute', bottom:14, right:14, display:'flex', alignItems:'center', gap:3, background:'rgba(255,255,255,0.92)', backdropFilter:'blur(10px)', borderRadius:11, padding:'4px 5px', boxShadow:'0 4px 16px rgba(0,0,0,0.12)', border:'1px solid rgba(0,0,0,0.05)' }}>
+          {[
+            { Icon: ZoomOut, fn: () => setZoom(z => Math.max(0.4, +(z-0.1).toFixed(2))), title: 'Dézoomer' },
+            null,
+            { Icon: ZoomIn, fn: () => setZoom(z => Math.min(1.5, +(z+0.1).toFixed(2))), title: 'Zoomer' },
+            { Icon: Maximize, fn: () => setZoom(1), title: '100%' },
+          ].map((b, i) => b === null
+            ? <span key={i} style={{ fontSize:11, fontWeight:800, color:'#555', minWidth:38, textAlign:'center' }}>{Math.round(zoom*100)}%</span>
+            : <button key={i} title={b.title} onClick={b.fn} style={{ width:28, height:28, borderRadius:8, border:'none', background:'transparent', cursor:'pointer', display:'grid', placeItems:'center', color:'#475569' }}
+                onMouseEnter={e => e.currentTarget.style.background='rgba(0,0,0,0.06)'} onMouseLeave={e => e.currentTarget.style.background='transparent'}><b.Icon size={15} /></button>
+          )}
         </div>
       </div>
 
@@ -185,6 +224,7 @@ export default function UIDesigner({ components, onChange, gameVariables = [] }:
               <option value="lr">Gauche / Droite</option>
             </select>
           </label>}
+          {selComp.kind==='image' && <label><span style={lbl}>Source (URL)</span><input style={inp} value={selComp.src??''} onChange={e=>upd(selComp.id,{src:e.target.value})} placeholder="https://..." /></label>}
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:7 }}>
             <label><span style={lbl}>L</span><input type="number" style={inp} value={selComp.x} onChange={e=>upd(selComp.id,{x:snap(Number(e.target.value))})} /></label>
             <label><span style={lbl}>T</span><input type="number" style={inp} value={selComp.y} onChange={e=>upd(selComp.id,{y:snap(Number(e.target.value))})} /></label>

@@ -473,7 +473,7 @@ export default function MesurePage() {
 
   const checkStatus = useCallback(async () => {
     try {
-      const res  = await fetch('/api/cs150?action=status', { cache: 'no-store' });
+      const res  = await fetch('/api/cs160?action=status', { cache: 'no-store' });
       const data = await res.json();
       setConnected(!!data.connected);
       if (data.port) setDevicePort(data.port);
@@ -492,7 +492,7 @@ export default function MesurePage() {
   const connect = async () => {
     setLoading(true); setError('');
     try {
-      const res  = await fetch('/api/cs150', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'connect' }) });
+      const res  = await fetch('/api/cs160', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'connect' }) });
       const data = await res.json();
       if (data.success) { setConnected(true); await checkStatus(); }
       else setError(data.error || 'Échec de connexion');
@@ -503,7 +503,7 @@ export default function MesurePage() {
   const disconnect = async () => {
     setLoading(true); setError('');
     try {
-      await fetch('/api/cs150', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'disconnect' }) });
+      await fetch('/api/cs160', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'disconnect' }) });
       setConnected(false); setStatusLabel('CS-160 déconnecté'); setMeasurement(null);
     } catch (e: any) { setError(e.message); }
     setLoading(false);
@@ -512,7 +512,7 @@ export default function MesurePage() {
   const measure = async () => {
     setLoading(true); setError(''); setMeasurement(null);
     try {
-      const res  = await fetch('/api/cs150', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'measure' }) });
+      const res  = await fetch('/api/cs160', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'measure' }) });
       const data = await res.json();
       if (data.success && data.data) {
         const result: MeasureResult = {
@@ -532,7 +532,7 @@ export default function MesurePage() {
   const loadSamples = async () => {
     setLoading(true); setError('');
     try {
-      const res  = await fetch('/api/cs150?action=samples', { cache: 'no-store' });
+      const res  = await fetch('/api/cs160?action=samples', { cache: 'no-store' });
       const data = await res.json();
       if (data.success) setSamples(data.data);
       else setError(data.error || 'Impossible de récupérer les samples');

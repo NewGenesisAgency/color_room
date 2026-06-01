@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { GameTileProps } from '../../_components/GameColorSpeed';
+import CieDiagramCanvas, { type CieMarker } from '../../_components/CieDiagramCanvas';
 
 // ── CIE 1931 spectral locus (horseshoe) ──────────────────────────────────────
 const HORSESHOE: [number, number][] = [
@@ -173,7 +174,7 @@ const S: Record<string, React.CSSProperties> = {
 };
 
 // ── Composant principal ────────────────────────────────────────────────────────
-export default function ChromaticityDiagram({ onSendColor, onTurnOffAll, onQuit, tileCount = 42 }: GameTileProps) {
+export default function ChromaticityDiagram({ onSendColor, onTurnOffAll, onQuit, tileCount = 42, onComplete }: GameTileProps) {
   type Phase = 'ready' | 'show' | 'guess' | 'result' | 'finished';
 
   const [phase,      setPhase]      = useState<Phase>('ready');
@@ -186,6 +187,7 @@ export default function ChromaticityDiagram({ onSendColor, onTurnOffAll, onQuit,
   const [roundScore, setRoundScore] = useState(0);
   const [totalScore, setTotalScore] = useState(0);
   const [dist,       setDist]       = useState(0);
+  useEffect(() => { if (phase === 'finished') onComplete?.(totalScore); }, [phase]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const numTiles    = Math.min(tileCount, 42);
   const canvasRef   = useRef<HTMLCanvasElement | null>(null);
@@ -410,107 +412,22 @@ export default function ChromaticityDiagram({ onSendColor, onTurnOffAll, onQuit,
       {/* Body */}
       <div style={S.body}>
         {/* ── Diagramme ── */}
-        <div style={S.diagramPane}>
-          <div style={{ position: 'relative', width: DW, height: DH }}>
-            {/* Canvas background */}
-            <canvas
-              ref={canvasRef}
-              width={DW}
-              height={DH}
-              style={{ position: 'absolute', inset: 0, borderRadius: 8 }}
-            />
-            {/* SVG overlay interactif */}
-            <svg
-              ref={svgRef}
-              width={DW}
-              height={DH}
-              style={{ position: 'absolute', inset: 0, cursor: phase === 'guess' ? 'crosshair' : 'default' }}
-              onClick={handleSvgClick}
-              onMouseMove={handleSvgMove}
-            >
-              {/* Contour spectral locus */}
-              <path d={horsePath} fill="none" stroke="rgba(255,255,255,.35)" strokeWidth="1.5" />
-
-              {/* Triangle sRGB */}
-              <path d={srgbPath} fill="none" stroke="rgba(255,255,255,.18)" strokeWidth="1" strokeDasharray="4 3" />
-
-              {/* Labels axes */}
-              {[0, 0.2, 0.4, 0.6, 0.8].map(v => {
-                const { px } = xyToSvg(v, 0); const { py } = xyToSvg(0, v);
-                return (
-                  <g key={v}>
-                    <text x={px} y={DH - 6} textAnchor="middle" fontSize={9} fill="rgba(255,255,255,.3)">{v.toFixed(1)}</text>
-                    <text x={8}  y={py + 4} textAnchor="middle" fontSize={9} fill="rgba(255,255,255,.3)">{v.toFixed(1)}</text>
-                  </g>
-                );
-              })}
-              <text x={DW / 2} y={DH - 2}  textAnchor="middle" fontSize={10} fill="rgba(255,255,255,.35)">x</text>
-              <text x={10}     y={DH / 2}   textAnchor="middle" fontSize={10} fill="rgba(255,255,255,.35)" transform={`rotate(-90,10,${DH/2})`}>y</text>
-
-              {/* Point D65 (blanc) */}
-              {(() => { const { px, py } = xyToSvg(0.3127, 0.3290); return (
-                <circle cx={px} cy={py} r={4} fill="none" stroke="rgba(255,255,255,.4)" strokeWidth="1.5" />
-              ); })()}
-
-              {/* Curseur devinette (toujours visible en guess/result) */}
-              {(phase === 'guess' || phase === 'result') && (() => {
-                const { px, py } = guessSvg;
-                const c = guessRgb ?? { r: 200, g: 200, b: 200 };
-                const hex = `rgb(${c.r},${c.g},${c.b})`;
-                return (
-                  <g>
-                    <line x1={px - 10} y1={py} x2={px + 10} y2={py} stroke={hex} strokeWidth="2" opacity={0.85} />
-                    <line x1={px} y1={py - 10} x2={px} y2={py + 10} stroke={hex} strokeWidth="2" opacity={0.85} />
-                    <circle cx={px} cy={py} r={9}  fill="none" stroke={hex} strokeWidth="2" />
-                    <circle cx={px} cy={py} r={3}  fill={hex} />
-                  </g>
-                );
-              })()}
-
-              {/* Point confirmé (phase result) */}
-              {phase === 'result' && confSvg && (() => {
-                const { px, py } = confSvg;
-                return (
-                  <g>
-                    <circle cx={px} cy={py} r={11} fill="none" stroke="#fbbf24" strokeWidth="2.5" strokeDasharray="4 2" />
-                    <circle cx={px} cy={py} r={4} fill="#fbbf24" />
-                  </g>
-                );
-              })()}
-
-              {/* Point cible (révélé en phase result seulement) */}
-              {phase === 'result' && target && tgtSvg && (() => {
-                const { px, py } = tgtSvg;
-                const tc = target.rgb;
-                return (
-                  <g>
-                    <circle cx={px} cy={py} r={13} fill={`rgba(${tc.r},${tc.g},${tc.b},0.25)`} stroke={`rgb(${tc.r},${tc.g},${tc.b})`} strokeWidth="2.5" />
-                    <circle cx={px} cy={py} r={5}  fill={`rgb(${tc.r},${tc.g},${tc.b})`} />
-                    {confSvg && (
-                      <line
-                        x1={confSvg.px} y1={confSvg.py} x2={px} y2={py}
-                        stroke="rgba(255,255,255,.35)" strokeWidth="1.5" strokeDasharray="4 3"
-                      />
-                    )}
-                  </g>
-                );
-              })()}
-
-              {/* Légende phase result */}
-              {phase === 'result' && (
-                <g>
-                  <circle cx={DW - 80} cy={14} r={5} fill="#fbbf24" />
-                  <text x={DW - 72} y={18} fontSize={9} fill="rgba(255,255,255,.5)">Votre réponse</text>
-                  {target && (
-                    <>
-                      <circle cx={DW - 80} cy={28} r={5} fill={`rgb(${target.rgb.r},${target.rgb.g},${target.rgb.b})`} />
-                      <text x={DW - 72} y={32} fontSize={9} fill="rgba(255,255,255,.5)">Cible</text>
-                    </>
-                  )}
-                </g>
-              )}
-            </svg>
-          </div>
+        <div style={{ ...S.diagramPane, width: DW + 28 }}>
+          <CieDiagramCanvas
+            size={DW}
+            onPick={phase === 'guess' ? (x, y) => updateGuess(x, y) : undefined}
+            markers={[
+              ...(phase === 'guess'
+                ? [{ x: guessX, y: guessY, color: guessRgb ? `rgb(${guessRgb.r},${guessRgb.g},${guessRgb.b})` : '#cccccc', ring: true, crosshair: true, radius: 6 } as CieMarker]
+                : []),
+              ...(phase === 'result' && confirmed
+                ? [{ x: confirmed.x, y: confirmed.y, color: '#fbbf24', ring: true, label: 'Vous' } as CieMarker]
+                : []),
+              ...(phase === 'result' && target
+                ? [{ x: target.x, y: target.y, color: `rgb(${target.rgb.r},${target.rgb.g},${target.rgb.b})`, ring: true, label: 'Cible' } as CieMarker]
+                : []),
+            ]}
+          />
         </div>
 
         {/* ── Panneau de contrôle ── */}
