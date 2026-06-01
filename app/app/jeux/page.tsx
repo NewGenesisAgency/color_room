@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import type { TetrisSnapshot } from '@/app/_components/TetrisGame';
 import type { UILayoutComponent, UIDpadPreset } from '@/app/editeur/UIDesigner';
+import { SPRITE_ICONS } from '@/app/editeur/UIDesigner';
 import type { TouchKey } from '@/app/_components/TouchControls';
 import NavigationMenu from '@/app/_components/NavigationMenu';
 import LoginScreen from '@/app/_components/LoginScreen';
@@ -768,6 +769,7 @@ type HudPlateActions = {
   onTurnOffAll: () => void;
   onComplete?: (points: number) => void;
   plateColors?: string[];   // couleurs live des 42 dalles (visualisation)
+  onEvent?: (eventId: string) => void;  // clic d'un composant -> lance le graphe depuis le noeud event
 };
 
 function renderHudComp(c: UILayoutComponent, plate: HudPlateActions): React.ReactNode {
@@ -787,7 +789,7 @@ function renderHudComp(c: UILayoutComponent, plate: HudPlateActions): React.Reac
           />
         </div>
       );
-    case 'button':        return <div style={{ ...base, background: c.bgColor ?? '#4361ee', color: c.textColor ?? '#fff', borderRadius: 12, fontWeight: 700 }}>{c.text || 'Bouton'}</div>;
+    case 'button':        return <button onClick={() => c.eventId && plate.onEvent?.(c.eventId)} style={{ ...base, background: c.bgColor ?? '#4361ee', color: c.textColor ?? '#fff', borderRadius: 12, fontWeight: 700, border: 'none', cursor: c.eventId ? 'pointer' : 'default', fontFamily: 'inherit', fontSize: c.fontSize ?? 14 }}>{c.text || 'Bouton'}</button>;
     case 'label':         return <div style={{ ...base, justifyContent: 'flex-start', paddingLeft: 4, fontWeight: 600 }}>{c.text || 'Texte'}</div>;
     case 'slider':        return <div style={{ ...base, flexDirection: 'column', gap: 4, padding: '0 10px' }}><span style={{ fontSize: 11, fontWeight: 700, alignSelf: 'flex-start' }}>{c.text || 'Slider'}</span><input type="range" style={{ width: '100%' }} readOnly /></div>;
     case 'score_display': return <div style={{ ...base, flexDirection: 'column', background: 'rgba(255,255,255,0.9)', borderRadius: 14, border: '1px solid rgba(67,97,238,0.2)' }}><span style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{c.text || 'Score'}</span><span style={{ fontSize: 26, fontWeight: 900, color: '#4361ee', lineHeight: 1 }}>0</span></div>;
@@ -806,6 +808,15 @@ function renderHudComp(c: UILayoutComponent, plate: HudPlateActions): React.Reac
         {Array.from({ length: 42 }, (_, i) => <span key={i} style={{ borderRadius: 3, background: plate.plateColors?.[i] ?? '#1a1f2e', transition: 'background 0.1s' }} />)}
       </div>
     </div>;
+    case 'gauge_ring': { const v = Math.max(0, Math.min(100, c.value ?? 70)); const acc = c.bgColor ?? '#22d3ee'; const d = Math.max(28, Math.min(c.width, c.height) - 6); return <div style={{ ...base }}><div style={{ width: d, height: d, borderRadius: '50%', background: `conic-gradient(${acc} ${v * 3.6}deg, rgba(255,255,255,0.08) 0)`, display: 'grid', placeItems: 'center' }}><div style={{ width: '66%', height: '66%', borderRadius: '50%', background: '#0d1119', display: 'grid', placeItems: 'center', fontSize: 15, fontWeight: 800, color: acc }}>{v}%</div></div></div>; }
+    case 'turn_indicator': return <div style={{ ...base, justifyContent: 'flex-start', gap: 8, padding: '0 12px', background: '#141a26', borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', color: '#e8eaf0' }}><span style={{ width: 10, height: 10, borderRadius: '50%', background: c.bgColor ?? '#06d6a0', boxShadow: `0 0 8px ${c.bgColor ?? '#06d6a0'}` }} /><span style={{ fontSize: 13, fontWeight: 700 }}>{c.text || 'À ton tour'}</span></div>;
+    case 'players_list': return <div style={{ ...base, flexDirection: 'column', alignItems: 'stretch', justifyContent: 'flex-start', gap: 6, padding: 9, background: '#141a26', borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', overflowY: 'auto' }}>{['Joueur 1', 'Joueur 2', 'Joueur 3'].map((p, i) => <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#cdd3e0' }}><span style={{ width: 8, height: 8, borderRadius: '50%', background: `hsl(${i * 100} 70% 55%)` }} />{p}</div>)}</div>;
+    case 'leaderboard': return <div style={{ ...base, flexDirection: 'column', alignItems: 'stretch', justifyContent: 'flex-start', gap: 5, padding: 9, background: '#141a26', borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', overflowY: 'auto' }}>{[['1', 'Lea', '120'], ['2', 'Tom', '95'], ['3', 'Sam', '80']].map((r, i) => <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: i === 0 ? '#f59e0b' : '#cdd3e0', fontWeight: i === 0 ? 800 : 600 }}><span>{r[0]}. {r[1]}</span><span>{r[2]}</span></div>)}</div>;
+    case 'button_grid': { const n = Math.max(2, Math.min(6, c.gridCols ?? 4)); const cols = ['#ef4444', '#22c55e', '#3b82f6', '#eab308', '#a855f7', '#06d6a0']; return <div style={{ width: '100%', height: '100%', padding: 6, background: '#0d1119', borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', boxSizing: 'border-box' }}><div style={{ display: 'grid', gridTemplateColumns: `repeat(${n},1fr)`, gridTemplateRows: `repeat(${n},1fr)`, gap: 5, width: '100%', height: '100%' }}>{Array.from({ length: n * n }, (_, i) => <button key={i} onClick={() => c.eventId && plate.onEvent?.(`${c.eventId}:${i}`)} style={{ borderRadius: 8, border: 'none', cursor: 'pointer', background: cols[i % cols.length], opacity: 0.9 }} />)}</div></div>; }
+    case 'rgb_sliders': return <div style={{ ...base, flexDirection: 'column', justifyContent: 'center', gap: 9, padding: '8px 12px', background: '#141a26', borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)' }}>{(['#ef4444', '#22c55e', '#3b82f6'] as const).map((col, i) => <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ width: 14, height: 14, borderRadius: 4, background: col, flexShrink: 0 }} /><input type="range" min={0} max={255} defaultValue={128} style={{ flex: 1, accentColor: col }} /></div>)}</div>;
+    case 'sprite': { const Ico = SPRITE_ICONS[c.icon ?? 'Smile'] ?? SPRITE_ICONS.Smile; const el = <Ico size={Math.max(16, Math.min(c.width, c.height) - 12)} color={c.bgColor ?? '#f97316'} />; return c.eventId ? <button onClick={() => plate.onEvent?.(c.eventId!)} style={{ ...base, border: 'none', background: 'transparent', cursor: 'pointer' }}>{el}</button> : <div style={{ ...base }}>{el}</div>; }
+    case 'message_box': return <div style={{ ...base, flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'center', gap: 4, padding: '10px 13px', background: '#141a26', borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', color: '#cdd3e0' }}><span style={{ fontSize: 11, fontWeight: 800, color: c.bgColor ?? '#38bdf8' }}>Message</span><span style={{ fontSize: 12.5, lineHeight: 1.4 }}>{c.text || 'Bravo !'}</span></div>;
+    case 'title_banner': return <div style={{ ...base, background: 'linear-gradient(135deg,#1a2030,#0d1119)', borderRadius: 14, border: '1px solid rgba(255,255,255,0.08)', color: '#fff', fontWeight: 900, fontSize: Math.min(22, c.height / 2.6), letterSpacing: '-0.02em' }}>{c.text || 'TITRE'}</div>;
     default:              return null;
   }
 }
@@ -4412,6 +4423,14 @@ export default function JeuxPage() {
                           if (pts > 0) { setScorePlusValue(pts); setScorePlusAnimKey((k) => k + 1); }
                         },
                         plateColors,
+                        // Clic d'un composant UI -> lance le graphe depuis le nœud d'événement correspondant
+                        onEvent: (eventId: string) => {
+                          const base = eventId.split(':')[0];
+                          const nodes = Array.isArray(hudRun?.cfg.nodes) ? (hudRun!.cfg.nodes as EditorNode[]) : [];
+                          const ev = nodes.find((n) => (n.kind === 'on_ui_click' || n.kind === 'ui_event_click') && n.enabled !== false &&
+                            (String(n.params?.buttonId ?? '') === base || String(n.params?.eventType ?? '') === base || String(n.params?.buttonId ?? '') === eventId));
+                          if (ev) runHudGraphFrom(String(ev.id));
+                        },
                       }}
                     />
                   </div>

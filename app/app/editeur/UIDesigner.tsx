@@ -1,8 +1,9 @@
 'use client';
 import { useCallback, useRef, useState } from 'react';
-import { MousePointerClick, Type, SlidersHorizontal, Trophy, Timer, Flag, Palette, Gauge, Crosshair, Gamepad2, LayoutGrid, Plus, ZoomIn, ZoomOut, Maximize, Trash2, Layers, Square, Circle, Image as ImageIcon, Minus, Heart, type LucideIcon } from 'lucide-react';
+import { MousePointerClick, Type, SlidersHorizontal, Trophy, Timer, Flag, Palette, Gauge, Crosshair, Gamepad2, LayoutGrid, Plus, ZoomIn, ZoomOut, Maximize, Trash2, Layers, Square, Circle, Image as ImageIcon, Minus, Heart, Users, CircleDot, Award, MessageSquare, Smile, Activity, type LucideIcon } from 'lucide-react';
 
-export type UICompKind = 'button' | 'label' | 'slider' | 'score_display' | 'timer_display' | 'round_badge' | 'color_swatch' | 'progress_bar' | 'cie_diagram' | 'dpad' | 'shape_rect' | 'shape_circle' | 'image' | 'divider' | 'plate_grid' | 'heart_life';
+export type UICompKind = 'button' | 'label' | 'slider' | 'score_display' | 'timer_display' | 'round_badge' | 'color_swatch' | 'progress_bar' | 'cie_diagram' | 'dpad' | 'shape_rect' | 'shape_circle' | 'image' | 'divider' | 'plate_grid' | 'heart_life'
+  | 'gauge_ring' | 'players_list' | 'turn_indicator' | 'leaderboard' | 'button_grid' | 'rgb_sliders' | 'sprite' | 'message_box' | 'title_banner';
 
 /** Préréglages de touches pour le D-pad tactile (converties en KeyboardEvent). */
 export type UIDpadPreset = 'arrows_space' | 'lr_space' | 'arrows' | 'lr';
@@ -32,6 +33,11 @@ export type UILayoutComponent = {
   snakeSpeed?: number;
   // Image
   src?: string;
+  // Sprite : nom d'icône Lucide
+  icon?: string;
+  // button_grid : nb de colonnes ; gauge/leaderboard : valeur indicative
+  gridCols?: number;
+  value?: number;
 };
 
 type Props = {
@@ -63,7 +69,20 @@ const PALETTE: { kind: UICompKind; label: string; Icon: LucideIcon; color: strin
   { kind: 'image',         label: 'Image',        Icon: ImageIcon,        color: '#f59e0b', w: 160, h: 120 },
   { kind: 'divider',       label: 'Séparateur',   Icon: Minus,            color: '#cbd5e1', w: 240, h: 12 },
   { kind: 'heart_life',    label: 'Vies (cœurs)', Icon: Heart,            color: '#ef4444', w: 140, h: 40 },
+  { kind: 'gauge_ring',    label: 'Jauge ronde',  Icon: Activity,         color: '#22d3ee', w: 120, h: 120 },
+  { kind: 'players_list',  label: 'Joueurs',      Icon: Users,            color: '#818cf8', w: 200, h: 180 },
+  { kind: 'turn_indicator',label: 'Tour de jeu',  Icon: CircleDot,        color: '#06d6a0', w: 220, h: 56 },
+  { kind: 'leaderboard',   label: 'Classement',   Icon: Award,            color: '#f59e0b', w: 220, h: 200 },
+  { kind: 'button_grid',   label: 'Grille boutons', Icon: LayoutGrid,     color: '#a855f7', w: 200, h: 200 },
+  { kind: 'rgb_sliders',   label: 'Sliders RGB',  Icon: SlidersHorizontal, color: '#ec4899', w: 240, h: 130 },
+  { kind: 'sprite',        label: 'Sprite (icône)', Icon: Smile,          color: '#f97316', w: 80,  h: 80 },
+  { kind: 'message_box',   label: 'Message',      Icon: MessageSquare,    color: '#38bdf8', w: 280, h: 90 },
+  { kind: 'title_banner',  label: 'Bandeau titre', Icon: Type,            color: '#94a3b8', w: 320, h: 60 },
 ];
+
+export const SPRITE_ICONS: Record<string, LucideIcon> = {
+  Smile, Heart, Trophy, Award, Flag, Crosshair, Gamepad2, Users, CircleDot, Activity, Palette, Timer, Gauge,
+};
 
 function defaultText(k: UICompKind) {
   return k === 'button' ? 'Soumettre' : k === 'label' ? 'Texte' : k === 'score_display' ? 'Score' : k === 'timer_display' ? 'Temps' : k === 'round_badge' ? 'Manche' : '';
@@ -87,6 +106,15 @@ function Preview({ c }: { c: UILayoutComponent }) {
     case 'divider':       return <div style={{ ...base, padding:0 }}><div style={{ width:'100%', height:2, borderRadius:2, background: c.bgColor ?? 'rgba(255,255,255,0.4)' }} /></div>;
     case 'image':         return <div style={{ ...base, borderRadius:12, overflow:'hidden', background:'#11151f', border:'1px dashed rgba(255,255,255,0.18)' }}>{c.src ? <img src={c.src} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }} /> : <span style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:4, color:'rgba(255,255,255,0.35)', fontSize:10 }}><ImageIcon size={20} />Image</span>}</div>;
     case 'heart_life':    return <div style={{ ...base, gap:4, color:'#ef4444' }}>{[0,1,2].map(i => <Heart key={i} size={Math.min(22, c.height-12)} fill={i<2?'#ef4444':'none'} />)}</div>;
+    case 'gauge_ring': { const v = Math.max(0, Math.min(100, c.value ?? 70)); const acc = c.bgColor ?? '#22d3ee'; const d = Math.max(28, Math.min(c.width, c.height) - 8); return <div style={{ ...base }}><div style={{ width:d, height:d, borderRadius:'50%', background:`conic-gradient(${acc} ${v*3.6}deg, rgba(255,255,255,0.08) 0)`, display:'grid', placeItems:'center' }}><div style={{ width:'66%', height:'66%', borderRadius:'50%', background:'#0d1119', display:'grid', placeItems:'center', fontSize:14, fontWeight:800, color:acc }}>{v}%</div></div></div>; }
+    case 'turn_indicator': return <div style={{ ...base, justifyContent:'flex-start', gap:8, padding:'0 12px', background:'#141a26', borderRadius:12, border:'1px solid rgba(255,255,255,0.08)', color:'#e8eaf0' }}><span style={{ width:10, height:10, borderRadius:'50%', background: c.bgColor ?? '#06d6a0', boxShadow:`0 0 8px ${c.bgColor ?? '#06d6a0'}` }} /><span style={{ fontSize:13, fontWeight:700 }}>{c.text || 'À ton tour'}</span></div>;
+    case 'players_list': return <div style={{ ...base, flexDirection:'column', alignItems:'stretch', justifyContent:'flex-start', gap:6, padding:9, background:'#141a26', borderRadius:12, border:'1px solid rgba(255,255,255,0.08)' }}>{['Joueur 1','Joueur 2','Joueur 3'].map((p,i)=><div key={i} style={{ display:'flex', alignItems:'center', gap:8, fontSize:12, color:'#cdd3e0' }}><span style={{ width:8, height:8, borderRadius:'50%', background:`hsl(${i*100} 70% 55%)` }} />{p}</div>)}</div>;
+    case 'leaderboard': return <div style={{ ...base, flexDirection:'column', alignItems:'stretch', justifyContent:'flex-start', gap:5, padding:9, background:'#141a26', borderRadius:12, border:'1px solid rgba(255,255,255,0.08)' }}>{[['1','Lea','120'],['2','Tom','95'],['3','Sam','80']].map((r,i)=><div key={i} style={{ display:'flex', justifyContent:'space-between', fontSize:12, color: i===0?'#f59e0b':'#cdd3e0', fontWeight: i===0?800:600 }}><span>{r[0]}. {r[1]}</span><span>{r[2]}</span></div>)}</div>;
+    case 'button_grid': return <div style={{ ...base, padding:6, background:'#0d1119', borderRadius:12, border:'1px solid rgba(255,255,255,0.08)' }}><div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gridTemplateRows:'repeat(4,1fr)', gap:5, width:'100%', height:'100%' }}>{Array.from({length:16},(_,i)=><span key={i} style={{ borderRadius:7, background:['#ef4444','#22c55e','#3b82f6','#eab308'][i%4], opacity:0.9 }} />)}</div></div>;
+    case 'rgb_sliders': return <div style={{ ...base, flexDirection:'column', justifyContent:'center', gap:8, padding:'8px 12px', background:'#141a26', borderRadius:12, border:'1px solid rgba(255,255,255,0.08)' }}>{['#ef4444','#22c55e','#3b82f6'].map((col,i)=><div key={i} style={{ display:'flex', alignItems:'center', gap:8 }}><span style={{ width:14, height:14, borderRadius:4, background:col, flexShrink:0 }} /><div style={{ flex:1, height:5, borderRadius:3, background:'rgba(255,255,255,0.1)' }}><div style={{ width:`${[70,40,90][i]}%`, height:'100%', borderRadius:3, background:col }} /></div></div>)}</div>;
+    case 'sprite': { const Ico = SPRITE_ICONS[c.icon ?? 'Smile'] ?? Smile; return <div style={{ ...base }}><Ico size={Math.max(16, Math.min(c.width, c.height) - 14)} color={c.bgColor ?? '#f97316'} /></div>; }
+    case 'message_box': return <div style={{ ...base, flexDirection:'column', alignItems:'flex-start', justifyContent:'center', gap:4, padding:'10px 13px', background:'#141a26', borderRadius:12, border:'1px solid rgba(255,255,255,0.08)', color:'#cdd3e0' }}><span style={{ fontSize:11, fontWeight:800, color: c.bgColor ?? '#38bdf8' }}>Message</span><span style={{ fontSize:12.5, lineHeight:1.4 }}>{c.text || 'Bravo, niveau réussi !'}</span></div>;
+    case 'title_banner': return <div style={{ ...base, background:'linear-gradient(135deg,#1a2030,#0d1119)', borderRadius:14, border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontWeight:900, fontSize:Math.min(20, c.height/3), letterSpacing:'-0.02em' }}>{c.text || 'TITRE DU JEU'}</div>;
     case 'plate_grid':    return <div style={{ ...base, padding:6, background:'#0d1119', borderRadius:12, border:'1px solid rgba(255,255,255,0.08)' }}>
       <div style={{ display:'grid', gridTemplateColumns:'repeat(6,1fr)', gridTemplateRows:'repeat(7,1fr)', gap:3, width:'100%', height:'100%' }}>
         {Array.from({length:42},(_,i)=><span key={i} style={{ borderRadius:3, background:`hsl(${(i*8.5)%360} 70% 55%)`, opacity:0.85 }} />)}
@@ -195,13 +223,20 @@ export default function UIDesigner({ components, onChange, gameVariables = [] }:
       <div style={{ width:210, background:'rgba(255,255,255,0.7)', borderLeft:'1px solid rgba(0,0,0,0.08)', padding:'12px 11px', display:'flex', flexDirection:'column', gap:11, overflowY:'auto', flexShrink:0 }}>
         {!selComp ? <div style={{ color:'#ccc', fontSize:13, paddingTop:24, textAlign:'center' }}>Sélectionnez<br/>un composant</div> : <>
           <div style={{ fontWeight:800, fontSize:13, color:'#1a1d2e' }}>Propriétés</div>
-          {['button','label','score_display','timer_display','round_badge'].includes(selComp.kind) && <label><span style={lbl}>Texte</span><input style={inp} value={selComp.text??''} onChange={e=>upd(selComp.id,{text:e.target.value})} /></label>}
+          {['button','label','score_display','timer_display','round_badge','title_banner','message_box','turn_indicator'].includes(selComp.kind) && <label><span style={lbl}>Texte</span><input style={inp} value={selComp.text??''} onChange={e=>upd(selComp.id,{text:e.target.value})} /></label>}
+          {selComp.kind==='sprite' && <label><span style={lbl}>Icône</span>
+            <select style={inp} value={selComp.icon ?? 'Smile'} onChange={e=>upd(selComp.id,{icon:e.target.value})}>
+              {Object.keys(SPRITE_ICONS).map(k => <option key={k} value={k}>{k}</option>)}
+            </select>
+          </label>}
+          {(selComp.kind==='gauge_ring' || selComp.kind==='leaderboard') && <label><span style={lbl}>Valeur (aperçu)</span><input type="number" style={inp} value={selComp.value ?? 70} onChange={e=>upd(selComp.id,{value:Number(e.target.value)})} /></label>}
+          {selComp.kind==='button_grid' && <label><span style={lbl}>Colonnes</span><input type="number" min="2" max="6" style={inp} value={selComp.gridCols ?? 4} onChange={e=>upd(selComp.id,{gridCols:Math.max(2,Math.min(6,Number(e.target.value)))})} /></label>}
           <label><span style={lbl}>Variable liée</span>
             <input style={inp} list="vl" value={selComp.varBind??''} onChange={e=>upd(selComp.id,{varBind:e.target.value})} placeholder="ex: score" />
             <datalist id="vl">{gameVariables.map(v=><option key={v} value={v}/>)}</datalist>
           </label>
           {selComp.kind==='color_swatch' && <label><span style={lbl}>Variable couleur</span><input style={inp} value={selComp.colorBind??''} onChange={e=>upd(selComp.id,{colorBind:e.target.value})} placeholder="ex: target" /></label>}
-          {selComp.kind==='button' && <label><span style={lbl}>Événement (onClick)</span><input style={inp} value={selComp.eventId??''} onChange={e=>upd(selComp.id,{eventId:e.target.value})} placeholder="ex: submit" /></label>}
+          {['button','button_grid','sprite','color_swatch'].includes(selComp.kind) && <label><span style={lbl}>Événement (au clic)</span><input style={inp} value={selComp.eventId??''} onChange={e=>upd(selComp.id,{eventId:e.target.value})} placeholder="ex: submit" /></label>}
           {selComp.kind==='cie_diagram' && <>
             <label style={{ display:'flex', alignItems:'center', gap:7, cursor:'pointer' }}>
               <input type="checkbox" checked={!!selComp.cieRandom} onChange={e=>upd(selComp.id,{cieRandom:e.target.checked})} />
