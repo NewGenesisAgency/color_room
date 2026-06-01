@@ -2499,33 +2499,34 @@ input[type='range'].slider-intensity::-moz-range-progress {
   clip-path: polygon(40% 15%, 100% 15%, 100% 85%, 40% 85%, 0% 50%);
 }
 
-/* ── Wires - courbes de Bézier solides style UE5 ─────────────────────────── */
+/* ── Wires - pointillés ANIMÉS qui défilent (Unreal Engine) ──────────────── */
 .bp-wire {
-  stroke: rgba(190,200,220,0.65);
-  stroke-width: 2.5;
-  opacity: 1;
-  stroke-dasharray: none;
-  animation: none;
-  filter: none;
+  fill: none;
+  stroke: rgba(120,150,240,0.88);
+  stroke-width: 2.4;
+  opacity: 0.92;
   stroke-linecap: round;
+  stroke-dasharray: 5 11;
+  animation: bp-wire-flow 0.65s linear infinite;
+  filter: drop-shadow(0 0 5px rgba(120,150,240,0.5));
 }
 
 .bp-wire--preview {
-  stroke: rgba(79,158,232,0.85);
-  stroke-width: 2;
-  opacity: 0.90;
-  stroke-dasharray: 7 5;
+  stroke: rgba(150,180,255,0.96);
+  stroke-width: 2.6;
+  opacity: 1;
+  stroke-dasharray: 5 9;
   animation: bp-wire-flow 0.5s linear infinite;
-  filter: none;
+  filter: drop-shadow(0 0 8px rgba(120,150,240,0.65));
 }
 
 .bp-wire--active {
-  stroke: rgba(255,255,255,0.92);
-  stroke-width: 3;
+  stroke: rgba(185,205,255,0.98);
+  stroke-width: 2.8;
   opacity: 1;
-  stroke-dasharray: none;
-  animation: none;
-  filter: drop-shadow(0 0 5px rgba(255,255,255,0.40));
+  stroke-dasharray: 5 11;
+  animation: bp-wire-flow 0.45s linear infinite;
+  filter: drop-shadow(0 0 10px rgba(120,150,240,0.72));
 }
 
 /* ── Context menu (clic droit) ───────────────────────────────────────────── */
