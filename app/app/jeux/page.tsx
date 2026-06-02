@@ -171,7 +171,37 @@ type TargetColor = { r: number; g: number; b: number };
 
 type TargetTemp = { name: string; temp: number };
 
-const PLATE_ID_BY_INDEX: number[] = Array.from({ length: 42 }, (_, i) => i + 1);
+// Mapping index visuel (grille 6 colonnes, row-major — identique à Room3D/buildMeta)
+//   → numéro de plaque PHYSIQUE envoyé à la supervision.
+//
+// Numérotation physique réelle relevée sur site (par salle), du BAS vers le HAUT :
+//   • Mur du fond (3×3), gauche→droite :   1- 2- 3 (bas) / 4- 5- 6 (milieu) / 7- 8- 9 (haut)
+//   • Plafond (3×4), du fond (près du mur) vers l'avant (côté entrée), gauche→droite :
+//       10-11-12 (près du mur) / 13-14-15 / 16-17-18 / 19-20-21 (côté entrée)
+//   • Salle de droite (colonnes 3-5) : même schéma décalé de +21 → plaques 22-42.
+//
+// Rappel Room3D.buildMeta : row = floor(i/6), col = i%6.
+//   rangées 0-3 = plafond (row 0 = côté entrée, row 3 = près du mur),
+//   rangées 4-6 = mur     (row 4 = haut, row 6 = bas),
+//   colonnes 0-2 = salle gauche, 3-5 = salle droite.
+function plateIdForIndex(i: number): number {
+  const row  = Math.floor(i / 6);
+  const col  = i % 6;
+  const room = col < 3 ? 0 : 1;   // 0 = salle gauche, 1 = salle droite
+  const lc   = col % 3;           // colonne dans la salle (0 = gauche)
+  let base: number;
+  if (row >= 4) {
+    // Mur : row 6 = bas → 1-3, row 5 = milieu → 4-6, row 4 = haut → 7-9
+    const rowFromBottom = 6 - row;
+    base = 1 + rowFromBottom * 3 + lc;
+  } else {
+    // Plafond : row 3 (près du mur) → 10-12 … row 0 (entrée) → 19-21
+    const rowFromWall = 3 - row;
+    base = 10 + rowFromWall * 3 + lc;
+  }
+  return base + room * 21;
+}
+const PLATE_ID_BY_INDEX: number[] = Array.from({ length: 42 }, (_, i) => plateIdForIndex(i));
 const INSTRUMENT_PLATE_ID = 1;
 const SPECTRUM_GRAPH_MAX = 100;
 
