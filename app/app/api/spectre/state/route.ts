@@ -50,6 +50,7 @@ export async function GET(req: Request) {
     return NextResponse.json({
       ok: true,
       sessionId: latest.session.id,
+      roomCode: latest.session.room_code ?? latest.session.id,
       status: latest.session.status,
       updatedAt: latest.session.updated_at,
       players,

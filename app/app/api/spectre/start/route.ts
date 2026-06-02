@@ -20,7 +20,7 @@ export async function POST(req: Request) {
       }
     }
 
-    let { sessionId, state } = startSpectreSession({ reset, maxRounds });
+    let { sessionId, roomCode, state } = startSpectreSession({ reset, maxRounds });
 
     const reqToken = typeof body.token === 'string' ? body.token : '';
     if (!reqToken) {
@@ -30,17 +30,17 @@ export async function POST(req: Request) {
       // restée « active »), on repart d'une salle neuve pour ne jamais bloquer
       // le créateur sur l'écran « Connexion… ».
       if (!joined) {
-        ({ sessionId, state } = startSpectreSession({ reset: true, maxRounds }));
+        ({ sessionId, roomCode, state } = startSpectreSession({ reset: true, maxRounds }));
         joined = joinSpectreSession(sessionId, name);
       }
       if (joined) {
-        return NextResponse.json({ ok: true, sessionId, state, token: joined.token, seat: joined.seat as SpSeat });
+        return NextResponse.json({ ok: true, sessionId, roomCode, state, token: joined.token, seat: joined.seat as SpSeat });
       }
       // Échec inattendu : on le signale explicitement au client.
       return NextResponse.json({ ok: false, error: 'create_failed' }, { status: 500 });
     }
 
-    return NextResponse.json({ ok: true, sessionId, state });
+    return NextResponse.json({ ok: true, sessionId, roomCode, state });
   } catch (e) {
     return NextResponse.json({ ok: false, error: e instanceof Error ? e.message : 'start_failed' }, { status: 500 });
   }

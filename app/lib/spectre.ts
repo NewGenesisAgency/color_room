@@ -36,6 +36,7 @@ export type SpSessionRow = {
   status: 'active' | 'finished';
   game_id: string;
   state_json: string;
+  room_code: string | null;
 };
 
 export type SpPlayerRow = {
@@ -51,6 +52,24 @@ export type SpPlayerRow = {
 
 function randomId(): string {
   return `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
+}
+
+const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // sans I O U 1 L 0 (ambigus)
+
+function generateSpectreCode(): string {
+  let code = '';
+  for (let i = 0; i < 6; i++) code += CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)];
+  return code;
+}
+
+function uniqueSpectreCode(db: import('better-sqlite3').Database): string {
+  let code = generateSpectreCode();
+  for (let tries = 0; tries < 20; tries++) {
+    const clash = db.prepare("SELECT 1 FROM crg_mp_sessions WHERE room_code = ? AND status = 'active';").get(code);
+    if (!clash) return code;
+    code = generateSpectreCode();
+  }
+  return code; // en dernier recours (collision très improbable sur 6 chars base32)
 }
 
 function randomVividColor(): { r: number; g: number; b: number } {
@@ -106,7 +125,7 @@ export function getActiveSpectreSession(): { session: SpSessionRow; state: SpSta
   try {
     const db = getDb();
     const row = db.prepare(
-      "SELECT id, created_at, updated_at, status, game_id, state_json FROM crg_mp_sessions WHERE status = 'active' AND game_id = 'spectre' ORDER BY updated_at DESC LIMIT 1;"
+      "SELECT id, created_at, updated_at, status, game_id, state_json, room_code FROM crg_mp_sessions WHERE status = 'active' AND game_id = 'spectre' ORDER BY updated_at DESC LIMIT 1;"
     ).get() as SpSessionRow | undefined;
     if (!row) return null;
     return { session: row, state: JSON.parse(row.state_json) as SpState };
@@ -117,7 +136,7 @@ export function getSpectreSessionById(sessionId: string): { session: SpSessionRo
   try {
     const db = getDb();
     const row = db.prepare(
-      "SELECT id, created_at, updated_at, status, game_id, state_json FROM crg_mp_sessions WHERE id = ? AND game_id = 'spectre';"
+      "SELECT id, created_at, updated_at, status, game_id, state_json, room_code FROM crg_mp_sessions WHERE id = ? AND game_id = 'spectre';"
     ).get(sessionId) as SpSessionRow | undefined;
     if (!row) return null;
     return { session: row, state: JSON.parse(row.state_json) as SpState };
@@ -128,14 +147,14 @@ export function getLatestSpectreSession(): { session: SpSessionRow; state: SpSta
   try {
     const db = getDb();
     const row = db.prepare(
-      "SELECT id, created_at, updated_at, status, game_id, state_json FROM crg_mp_sessions WHERE game_id = 'spectre' ORDER BY updated_at DESC LIMIT 1;"
+      "SELECT id, created_at, updated_at, status, game_id, state_json, room_code FROM crg_mp_sessions WHERE game_id = 'spectre' ORDER BY updated_at DESC LIMIT 1;"
     ).get() as SpSessionRow | undefined;
     if (!row) return null;
     return { session: row, state: JSON.parse(row.state_json) as SpState };
   } catch { return null; }
 }
 
-export function startSpectreSession(opts?: { reset?: boolean; maxRounds?: number }): { sessionId: string; state: SpState } {
+export function startSpectreSession(opts?: { reset?: boolean; maxRounds?: number }): { sessionId: string; roomCode: string; state: SpState } {
   const db = getDb();
   const reset = Boolean(opts?.reset);
   const maxRounds = (opts?.maxRounds && opts.maxRounds > 0) ? opts.maxRounds : 5;
@@ -145,9 +164,13 @@ export function startSpectreSession(opts?: { reset?: boolean; maxRounds?: number
   }
 
   const existing = getActiveSpectreSession();
-  if (existing && !reset) return { sessionId: existing.session.id, state: existing.state };
+  if (existing && !reset) {
+    const roomCode = existing.session.room_code ?? existing.session.id;
+    return { sessionId: existing.session.id, roomCode, state: existing.state };
+  }
 
   const sessionId = randomId();
+  const roomCode = uniqueSpectreCode(db);
   const color = randomVividColor();
   const state: SpState = {
     gameId: 'spectre',
@@ -163,10 +186,10 @@ export function startSpectreSession(opts?: { reset?: boolean; maxRounds?: number
   };
 
   db.prepare(
-    "INSERT INTO crg_mp_sessions(id, status, game_id, state_json, updated_at) VALUES(?, 'active', ?, ?, datetime('now'));"
-  ).run(sessionId, 'spectre', JSON.stringify(state));
+    "INSERT INTO crg_mp_sessions(id, status, game_id, state_json, updated_at, room_code) VALUES(?, 'active', ?, ?, datetime('now'), ?);"
+  ).run(sessionId, 'spectre', JSON.stringify(state), roomCode);
 
-  return { sessionId, state };
+  return { sessionId, roomCode, state };
 }
 
 export function listSpectrePlayers(sessionId: string): SpPlayerRow[] {
@@ -178,13 +201,20 @@ export function listSpectrePlayers(sessionId: string): SpPlayerRow[] {
   } catch { return []; }
 }
 
-export function joinSpectreSession(sessionId: string, name?: string): { token: string; seat: SpSeat } | null {
+export function joinSpectreSession(codeOrId: string, name?: string): { token: string; seat: SpSeat; sessionId: string } | null {
   try {
     const db = getDb();
-    const session = db.prepare(
-      "SELECT id, status, state_json FROM crg_mp_sessions WHERE id = ? AND game_id = 'spectre';"
-    ).get(sessionId) as { id: string; status: string; state_json: string } | undefined;
+    // Accepte un room_code court (6 chars) OU l'ID interne (long)
+    const byCode = db.prepare(
+      "SELECT id, status, state_json FROM crg_mp_sessions WHERE room_code = ? AND game_id = 'spectre';"
+    ).get(codeOrId.toUpperCase()) as { id: string; status: string; state_json: string } | undefined;
+    const session = byCode ?? (
+      db.prepare(
+        "SELECT id, status, state_json FROM crg_mp_sessions WHERE id = ? AND game_id = 'spectre';"
+      ).get(codeOrId) as { id: string; status: string; state_json: string } | undefined
+    );
     if (!session || session.status !== 'active') return null;
+    const sessionId = session.id;
 
     const state = JSON.parse(session.state_json) as SpState;
     if (state.phase !== 'lobby') return null;
@@ -212,7 +242,7 @@ export function joinSpectreSession(sessionId: string, name?: string): { token: s
     };
     db.prepare("UPDATE crg_mp_sessions SET state_json = ?, updated_at = datetime('now') WHERE id = ?;").run(JSON.stringify(state), sessionId);
 
-    return { token, seat };
+    return { token, seat, sessionId };
   } catch { return null; }
 }
 
@@ -232,7 +262,7 @@ export function submitSpectreGuess(token: string, r: number, g: number, b: numbe
     if (!player) return null;
     const db = getDb();
     const sessionRow = db.prepare(
-      "SELECT id, created_at, updated_at, status, game_id, state_json FROM crg_mp_sessions WHERE id = ? AND game_id = 'spectre';"
+      "SELECT id, created_at, updated_at, status, game_id, state_json, room_code FROM crg_mp_sessions WHERE id = ? AND game_id = 'spectre';"
     ).get(player.session_id) as SpSessionRow | undefined;
     if (!sessionRow || sessionRow.status !== 'active') return null;
 
@@ -261,7 +291,7 @@ export function advanceSpectrePhase(sessionId: string): { state: SpState } | nul
   try {
     const db = getDb();
     const sessionRow = db.prepare(
-      "SELECT id, created_at, updated_at, status, game_id, state_json FROM crg_mp_sessions WHERE id = ? AND game_id = 'spectre';"
+      "SELECT id, created_at, updated_at, status, game_id, state_json, room_code FROM crg_mp_sessions WHERE id = ? AND game_id = 'spectre';"
     ).get(sessionId) as SpSessionRow | undefined;
     if (!sessionRow || sessionRow.status !== 'active') return null;
 

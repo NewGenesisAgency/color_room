@@ -1,6 +1,6 @@
 'use client';
-import { useCallback, useRef, useState } from 'react';
-import { MousePointerClick, Type, SlidersHorizontal, Trophy, Timer, Flag, Palette, Gauge, Crosshair, Gamepad2, LayoutGrid, Plus, ZoomIn, ZoomOut, Maximize, Trash2, Layers, Square, Circle, Image as ImageIcon, Minus, Heart, Users, CircleDot, Award, MessageSquare, Smile, Activity, type LucideIcon } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { MousePointerClick, Type, SlidersHorizontal, Trophy, Timer, Flag, Palette, Gauge, Crosshair, Gamepad2, LayoutGrid, Plus, ZoomIn, ZoomOut, Maximize, Trash2, Layers, Square, Circle, Image as ImageIcon, Minus, Heart, Users, CircleDot, Award, MessageSquare, Smile, Activity, Copy, type LucideIcon } from 'lucide-react';
 
 export type UICompKind = 'button' | 'label' | 'slider' | 'score_display' | 'timer_display' | 'round_badge' | 'color_swatch' | 'progress_bar' | 'cie_diagram' | 'dpad' | 'shape_rect' | 'shape_circle' | 'image' | 'divider' | 'plate_grid' | 'heart_life'
   | 'gauge_ring' | 'players_list' | 'turn_indicator' | 'leaderboard' | 'button_grid' | 'rgb_sliders' | 'sprite' | 'message_box' | 'title_banner';
@@ -176,6 +176,7 @@ export default function UIDesigner({ components, onChange, gameVariables = [] }:
   const [zoom, setZoom] = useState(1);
   const dragRef = useRef<{ id:string; ox:number; oy:number; cx:number; cy:number } | null>(null);
   const componentsRef = useRef(components); componentsRef.current = components;
+  const selRef = useRef(sel); selRef.current = sel;
   const selComp = components.find(c => c.id === sel) ?? null;
 
   const add = useCallback((p: typeof PALETTE[0]) => {
@@ -187,6 +188,27 @@ export default function UIDesigner({ components, onChange, gameVariables = [] }:
 
   const upd = useCallback((id: string, patch: Partial<UILayoutComponent>) => onChange(components.map(c => c.id === id ? { ...c, ...patch } : c)), [components, onChange]);
   const del = useCallback((id: string) => { onChange(components.filter(c => c.id !== id)); if (sel === id) setSel(null); }, [components, onChange, sel]);
+  const dup = useCallback((id: string) => {
+    const src = componentsRef.current.find(c => c.id === id);
+    if (!src) return;
+    const clone: UILayoutComponent = { ...src, id: uid(), x: snap(Math.min(CW - src.width, src.x + 16)), y: snap(Math.min(CH - src.height, src.y + 16)) };
+    onChange(resolveUiOverlaps([...componentsRef.current, clone], clone.id));
+    setSel(clone.id);
+  }, [onChange]);
+
+  // Raccourcis clavier : Suppr = supprimer, Ctrl+D = dupliquer
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+      const id = selRef.current;
+      if (!id) return;
+      if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); del(id); }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'd') { e.preventDefault(); dup(id); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [del, dup]);
 
   function onDown(e: React.MouseEvent, id: string) {
     e.stopPropagation();
@@ -230,7 +252,10 @@ export default function UIDesigner({ components, onChange, gameVariables = [] }:
           {components.map(c => (
             <div key={c.id} style={{ position:'absolute', left:c.x, top:c.y, width:c.width, height:c.height, cursor:'move', outline: sel===c.id ? '2.5px solid #4361ee' : 'none', outlineOffset:2, borderRadius:4, zIndex: sel===c.id ? 10 : 1 }} onMouseDown={e => onDown(e, c.id)} onClick={e => { e.stopPropagation(); setSel(c.id); }}>
               <Preview c={c} />
-              {sel===c.id && <button onClick={e => { e.stopPropagation(); del(c.id); }} title="Supprimer" style={{ position:'absolute', top:-26, right:0, width:22, height:22, borderRadius:7, border:'none', background:'#dc2626', color:'#fff', cursor:'pointer', display:'grid', placeItems:'center', boxShadow:'0 2px 8px rgba(220,38,38,0.4)' }}><Trash2 size={12} /></button>}
+              {sel===c.id && <>
+                <button onClick={e => { e.stopPropagation(); dup(c.id); }} title="Dupliquer" style={{ position:'absolute', top:-26, right:26, width:22, height:22, borderRadius:7, border:'none', background:'#4361ee', color:'#fff', cursor:'pointer', display:'grid', placeItems:'center', boxShadow:'0 2px 8px rgba(67,97,238,0.4)' }}><Copy size={11} /></button>
+                <button onClick={e => { e.stopPropagation(); del(c.id); }} title="Supprimer" style={{ position:'absolute', top:-26, right:0, width:22, height:22, borderRadius:7, border:'none', background:'#dc2626', color:'#fff', cursor:'pointer', display:'grid', placeItems:'center', boxShadow:'0 2px 8px rgba(220,38,38,0.4)' }}><Trash2 size={12} /></button>
+              </>}
             </div>
           ))}
           {components.length === 0 && <div style={{ position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center', flexDirection:'column', gap:10, color:'rgba(0,0,0,0.22)', pointerEvents:'none' }}><Plus size={42} strokeWidth={1.5} /><span style={{ fontSize:13, fontWeight:600 }}>Ajoutez des composants depuis la palette</span></div>}
@@ -299,7 +324,10 @@ export default function UIDesigner({ components, onChange, gameVariables = [] }:
           </div>
           <label><span style={lbl}>Fond</span><input type="color" style={{ ...inp, padding:2, height:34, cursor:'pointer' }} value={selComp.bgColor??'#4361ee'} onChange={e=>upd(selComp.id,{bgColor:e.target.value})} /></label>
           <label><span style={lbl}>Texte</span><input type="color" style={{ ...inp, padding:2, height:34, cursor:'pointer' }} value={selComp.textColor??'#1a1d2e'} onChange={e=>upd(selComp.id,{textColor:e.target.value})} /></label>
-          <button style={{ marginTop:4, padding:'7px 10px', borderRadius:9, border:'1px solid rgba(220,38,38,0.22)', background:'rgba(220,38,38,0.06)', color:'#dc2626', cursor:'pointer', fontSize:12, fontWeight:700, fontFamily:'inherit' }} onClick={()=>del(selComp.id)}>Supprimer</button>
+          <div style={{ display:'flex', gap:6, marginTop:4 }}>
+            <button style={{ flex:1, padding:'7px 8px', borderRadius:9, border:'1px solid rgba(67,97,238,0.22)', background:'rgba(67,97,238,0.06)', color:'#4361ee', cursor:'pointer', fontSize:12, fontWeight:700, fontFamily:'inherit', display:'flex', alignItems:'center', justifyContent:'center', gap:5 }} onClick={()=>dup(selComp.id)}><Copy size={12}/> Dupliquer</button>
+            <button style={{ flex:1, padding:'7px 8px', borderRadius:9, border:'1px solid rgba(220,38,38,0.22)', background:'rgba(220,38,38,0.06)', color:'#dc2626', cursor:'pointer', fontSize:12, fontWeight:700, fontFamily:'inherit', display:'flex', alignItems:'center', justifyContent:'center', gap:5 }} onClick={()=>del(selComp.id)}><Trash2 size={12}/> Supprimer</button>
+          </div>
         </>}
       </div>
     </div>

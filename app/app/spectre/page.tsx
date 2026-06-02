@@ -176,6 +176,7 @@ export function SpectreGame({ embedded = false, initialJoinCode, onExit }: Spect
   const [token, setToken] = useState('');
   const [seat, setSeat] = useState<number | null>(null);
   const [sessionId, setSessionId] = useState('');
+  const [roomCode, setRoomCode] = useState(''); // code court 6 chars affiché / copié / QR
   const [gameState, setGameState] = useState<SpState | null>(null);
   const [sessionStatus, setSessionStatus] = useState<'active' | 'finished'>('active');
   const [players, setPlayers] = useState<Array<{ seat: number; name: string }>>([]);
@@ -197,7 +198,7 @@ export function SpectreGame({ embedded = false, initialJoinCode, onExit }: Spect
     try {
       const saved = window.localStorage.getItem('sp_session');
       if (!saved) return;
-      const parsed = JSON.parse(saved) as { token: string; seat: number; sessionId: string; savedAt: number };
+      const parsed = JSON.parse(saved) as { token: string; seat: number; sessionId: string; roomCode?: string; savedAt: number };
       if (!parsed.token || !parsed.sessionId) return;
       // Expire après 2h
       if (Date.now() - parsed.savedAt > 2 * 60 * 60 * 1000) {
@@ -207,6 +208,7 @@ export function SpectreGame({ embedded = false, initialJoinCode, onExit }: Spect
       setToken(parsed.token);
       setSeat(parsed.seat);
       setSessionId(parsed.sessionId);
+      setRoomCode(parsed.roomCode ?? parsed.sessionId);
       setView('game');
     } catch { /* ignore */ }
   }, []);
@@ -244,7 +246,7 @@ export function SpectreGame({ embedded = false, initialJoinCode, onExit }: Spect
         // session locale et on revient à l'accueil au lieu de rester bloqué.
         if (res.status === 404 || data.error === 'no_session') {
           window.localStorage.removeItem('sp_session');
-          setToken(''); setGameState(null); setSeat(null); setSessionId(''); setView('login');
+          setToken(''); setGameState(null); setSeat(null); setSessionId(''); setRoomCode(''); setView('login');
         }
         return;
       }
@@ -252,6 +254,7 @@ export function SpectreGame({ embedded = false, initialJoinCode, onExit }: Spect
       setGameState(st);
       setSessionStatus(data.status);
       setPlayers(data.players ?? []);
+      if (data.roomCode) setRoomCode(data.roomCode);
       if (seat && st.players?.[seat as SpSeat]) {
         setSubmitted(st.players[seat as SpSeat]!.submitted);
       }
@@ -362,7 +365,8 @@ export function SpectreGame({ embedded = false, initialJoinCode, onExit }: Spect
       setToken(data.token);
       setSeat(data.seat);
       setSessionId(data.sessionId);
-      window.localStorage.setItem('sp_session', JSON.stringify({ token: data.token, seat: data.seat, sessionId: data.sessionId, savedAt: Date.now() }));
+      setRoomCode(data.roomCode ?? data.sessionId);
+      window.localStorage.setItem('sp_session', JSON.stringify({ token: data.token, seat: data.seat, sessionId: data.sessionId, roomCode: data.roomCode ?? data.sessionId, savedAt: Date.now() }));
       setView('game');
     } catch { setError('Erreur réseau'); } finally { setLoading(false); }
   }
@@ -381,8 +385,9 @@ export function SpectreGame({ embedded = false, initialJoinCode, onExit }: Spect
       if (!data.ok) { setError(data.error === 'join_failed' ? 'Salle introuvable ou jeu déjà commencé' : data.error ?? 'Erreur'); return; }
       setToken(data.token);
       setSeat(data.seat);
-      setSessionId(joinCodeInput.trim());
-      window.localStorage.setItem('sp_session', JSON.stringify({ token: data.token, seat: data.seat, sessionId: joinCodeInput.trim(), savedAt: Date.now() }));
+      setSessionId(data.sessionId ?? joinCodeInput.trim());
+      setRoomCode(data.roomCode ?? joinCodeInput.trim().toUpperCase());
+      window.localStorage.setItem('sp_session', JSON.stringify({ token: data.token, seat: data.seat, sessionId: data.sessionId ?? joinCodeInput.trim(), roomCode: data.roomCode ?? joinCodeInput.trim().toUpperCase(), savedAt: Date.now() }));
       setView('game');
     } catch { setError('Erreur réseau'); } finally { setLoading(false); }
   }
@@ -426,6 +431,7 @@ export function SpectreGame({ embedded = false, initialJoinCode, onExit }: Spect
     const data = await res.json();
     if (data.ok) {
       setSessionId(data.sessionId);
+      if (data.roomCode) setRoomCode(data.roomCode);
       setSubmitted(false);
       setMyX(0.3127); setMyY(0.3290);
     }
@@ -516,13 +522,15 @@ export function SpectreGame({ embedded = false, initialJoinCode, onExit }: Spect
           <div style={{ background: 'rgba(255,255,255,0.9)', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 20, padding: 24, marginBottom: 20 }}>
             <p style={{ color: 'rgba(0,0,0,0.5)', fontSize: 12, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', margin: '0 0 8px' }}>Code de la salle</p>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <code style={{ flex: 1, color: '#a78bfa', fontSize: 12, background: 'rgba(167,139,250,0.1)', padding: '10px 14px', borderRadius: 10, wordBreak: 'break-all' }}>{sessionId}</code>
-              <button onClick={() => navigator.clipboard.writeText(sessionId)} style={{ padding: '10px 14px', borderRadius: 10, border: '1px solid rgba(0,0,0,0.12)', background: 'rgba(0,0,0,0.04)', color: 'rgba(0,0,0,0.6)', cursor: 'pointer', fontSize: 13 }}>Copier</button>
+              <code style={{ flex: 1, color: '#a78bfa', fontSize: 28, fontWeight: 900, background: 'rgba(167,139,250,0.1)', padding: '10px 18px', borderRadius: 12, letterSpacing: '0.18em', textAlign: 'center' }}>
+                {roomCode || sessionId}
+              </code>
+              <button onClick={() => navigator.clipboard.writeText(roomCode || sessionId)} style={{ padding: '10px 14px', borderRadius: 10, border: '1px solid rgba(0,0,0,0.12)', background: 'rgba(0,0,0,0.04)', color: 'rgba(0,0,0,0.6)', cursor: 'pointer', fontSize: 13 }}>Copier</button>
             </div>
             {/* QR code : scanner avec un téléphone du même réseau pour rejoindre */}
             {(() => {
               const origin = typeof window !== 'undefined' ? window.location.origin : '';
-              const joinUrl = `${origin}/spectre?code=${encodeURIComponent(sessionId)}`;
+              const joinUrl = `${origin}/spectre?code=${encodeURIComponent(roomCode || sessionId)}`;
               return (
                 <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
                   <QrCode value={joinUrl} size={148} caption="Scanner pour rejoindre" fgColor="#5b3fb8" />
@@ -795,7 +803,7 @@ export function SpectreGame({ embedded = false, initialJoinCode, onExit }: Spect
             <div style={{ textAlign: 'center', color: 'rgba(0,0,0,0.35)', fontSize: 14 }}>En attente de l&apos;hôte pour rejouer…</div>
           )}
 
-          <button onClick={() => { window.localStorage.removeItem('sp_session'); setView('login'); setToken(''); setGameState(null); setSeat(null); setSessionId(''); onExit?.(); }}
+          <button onClick={() => { window.localStorage.removeItem('sp_session'); setView('login'); setToken(''); setGameState(null); setSeat(null); setSessionId(''); setRoomCode(''); onExit?.(); }}
             style={{ marginTop: 12, width: '100%', padding: '14px', borderRadius: 14, border: '1px solid rgba(0,0,0,0.1)', background: 'rgba(255,255,255,0.7)', color: 'rgba(0,0,0,0.5)', cursor: 'pointer', fontWeight: 600, fontSize: 15 }}>
             Quitter
           </button>
