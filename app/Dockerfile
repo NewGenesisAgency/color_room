@@ -13,7 +13,8 @@ FROM node:20-slim AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-# Ensure node_modules binaries are executable (can be stripped by Docker COPY on some systems)
+# Ensure node_modules binaries are executable and on PATH (needed on ARM/Raspberry Pi)
+ENV PATH="/app/node_modules/.bin:${PATH}"
 RUN chmod -R +x node_modules/.bin || true
 RUN npm run build
 
