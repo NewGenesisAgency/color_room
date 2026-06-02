@@ -56,6 +56,11 @@ function migrate(db: Database.Database) {
   );
   db.exec('CREATE INDEX IF NOT EXISTS idx_crg_games_updated ON crg_games(updated_at);');
 
+  // Réglages applicatifs clé/valeur (URLs des APIs modifiables à chaud depuis le site)
+  db.exec(
+    "CREATE TABLE IF NOT EXISTS crg_app_config (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at TEXT NOT NULL DEFAULT (datetime('now')));",
+  );
+
   // ─── Room system additions ────────────────────────────────────────────────
   try { db.exec("ALTER TABLE crg_mp_sessions ADD COLUMN room_code TEXT;"); } catch { /* already exists */ }
   try { db.exec("ALTER TABLE crg_mp_sessions ADD COLUMN room_name TEXT DEFAULT 'Partie';"); } catch { /* already exists */ }

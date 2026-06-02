@@ -113,6 +113,17 @@ export function getActiveSpectreSession(): { session: SpSessionRow; state: SpSta
   } catch { return null; }
 }
 
+export function getSpectreSessionById(sessionId: string): { session: SpSessionRow; state: SpState } | null {
+  try {
+    const db = getDb();
+    const row = db.prepare(
+      "SELECT id, created_at, updated_at, status, game_id, state_json FROM crg_mp_sessions WHERE id = ? AND game_id = 'spectre';"
+    ).get(sessionId) as SpSessionRow | undefined;
+    if (!row) return null;
+    return { session: row, state: JSON.parse(row.state_json) as SpState };
+  } catch { return null; }
+}
+
 export function getLatestSpectreSession(): { session: SpSessionRow; state: SpState } | null {
   try {
     const db = getDb();

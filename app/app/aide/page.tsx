@@ -1,9 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import Link from 'next/link';
 import {
-  ArrowLeft,
   LogIn,
   Gamepad2,
   BookOpen,
@@ -104,10 +102,6 @@ export default function AidePage() {
             <p>Guide d&apos;utilisation</p>
           </div>
         </div>
-        <Link href="/" className="aide-back-link">
-          <ArrowLeft size={15} />
-          Accueil
-        </Link>
       </header>
 
       {/* Content */}

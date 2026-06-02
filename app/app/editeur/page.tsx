@@ -5,6 +5,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import type { TetrisSnapshot } from '@/app/_components/TetrisGame';
 import type { UILayoutComponent } from './UIDesigner';
+import Coachmarks, { type CoachStep } from '@/app/_components/Coachmarks';
 
 // Modules lourds (3D Three.js, éditeur Python/Pyodide, designer UI, panneau CS160)
 // chargés à la demande pour alléger le bundle initial de /editeur.
@@ -14,7 +15,7 @@ const CS160Panel = dynamic(() => import('@/app/_components/CS160Panel'), { ssr: 
 const PythonEditor = dynamic(() => import('./PythonEditor'), { ssr: false });
 const UIDesigner = dynamic(() => import('./UIDesigner'), { ssr: false });
 
-import { Boxes, Gamepad2, Plus, Play, Pause, RotateCcw, Save, Trash2, FolderPlus, X, Lightbulb, Layers, Zap, Palette, Clock, MousePointer2, LayoutGrid, Maximize2, Minimize2, Eye, Star, Heart, Sun, Moon, Flame, Snowflake, Music, Target, Puzzle, Sparkles, Trophy, Rocket, Ghost, Dice1, Brain, Check, GitBranch, Hash, Settings2, Shuffle, Search, Users, Film, Thermometer, ScanLine, Wifi, WifiOff, Crown, Gem, Bug, Bot, Atom, Bird, Cat, Dog, Fish, Leaf, Cloud, Droplet, Mountain, Anchor, Bell, Bomb, Camera, Egg, Feather, Gift, Hexagon, Key, Lock, Medal, Pizza, Plane, Rainbow, Skull, Smile, Wand2, Waves, Crosshair, Dice5, Joystick, FlaskConical, Swords, ChevronDown, type LucideIcon } from 'lucide-react';
+import { Boxes, Gamepad2, Plus, Play, Pause, RotateCcw, Save, Trash2, FolderPlus, X, Lightbulb, Layers, Zap, Palette, Clock, MousePointer2, LayoutGrid, Maximize2, Minimize2, Eye, Star, Heart, Sun, Moon, Flame, Snowflake, Music, Target, Puzzle, Sparkles, Trophy, Rocket, Ghost, Dice1, Brain, Check, GitBranch, Hash, Settings2, Shuffle, Search, Users, Film, Thermometer, ScanLine, Wifi, WifiOff, Crown, Gem, Bug, Bot, Atom, Bird, Cat, Dog, Fish, Leaf, Cloud, Droplet, Mountain, Anchor, Bell, Bomb, Camera, Egg, Feather, Gift, Hexagon, Key, Lock, Medal, Pizza, Plane, Rainbow, Skull, Smile, Wand2, Waves, Crosshair, Dice5, Joystick, FlaskConical, Swords, ChevronDown, GraduationCap, type LucideIcon } from 'lucide-react';
 
 type IdFactory = () => string;
 
@@ -1112,6 +1113,7 @@ export default function EditeurPage() {
   const [pendingLink, setPendingLink] = useState<{ fromNodeId: string } | null>(null);
   const [iconPickerOpen, setIconPickerOpen] = useState(false);
   const [onboardingStep, setOnboardingStep] = useState<number | null>(null); // mini-tuto skippable
+  const [tourOpen, setTourOpen] = useState(false); // tuto en coachmarks ancrés (blocs + designer)
 
   const [contextMenu, setContextMenu] = useState<{
     open: boolean;
@@ -2818,7 +2820,14 @@ export default function EditeurPage() {
     }));
     setDirty(false);
     setStatus(`Jeu créé: ${gameName}`);
-    setOnboardingStep(0); // lance le mini-tuto (skippable)
+    // Lance le tuto ancré (coachmarks) automatiquement la 1re fois seulement ;
+    // ensuite il reste relançable via le bouton 🎓 de la barre d'outils.
+    try {
+      if (!window.localStorage.getItem('crg_editor_tour_seen')) {
+        setTourOpen(true);
+        window.localStorage.setItem('crg_editor_tour_seen', '1');
+      }
+    } catch { setTourOpen(true); }
     setModal(null);
     setNewProjectName('');
   };
@@ -3348,8 +3357,50 @@ export default function EditeurPage() {
     );
   }
 
+  // Étapes du tutoriel ancré (coachmarks) : explique la création d'un jeu via les
+  // blocs (Nœuds) ET le designer d'interface. Chaque `before` révèle la cible.
+  const tourSteps: CoachStep[] = [
+    {
+      title: 'Bienvenue dans l\'éditeur de jeux 🎮',
+      text: 'Ce petit tutoriel montre comment créer un jeu de A à Z. Cliquez sur « Suivant » pour voir chaque étape, ou « Passer le tuto » à tout moment.',
+    },
+    {
+      selector: '[data-tour="editor-new"]',
+      title: '1. Créer un jeu',
+      text: 'Tout commence ici : « Nouveau jeu » crée un projet. Vous pouvez partir d\'un modèle ou d\'une page blanche.',
+    },
+    {
+      selector: '[data-tour="editor-tabs"]',
+      title: '2. Trois modes de création',
+      text: 'Nœuds = logique en blocs reliés · Python = code low-code · Interface = designer visuel. On peut combiner les trois.',
+    },
+    {
+      selector: '[data-tour="editor-blocs"]',
+      title: '3. Les blocs (Nœuds)',
+      text: 'Double-cliquez (ou clic droit) sur le canevas pour ajouter un bloc, puis reliez les points pour créer la logique : démarrer → remplir une dalle → attendre → boucler…',
+      before: () => setEditorTab('canvas'),
+    },
+    {
+      selector: '[data-tour="editor-ui"]',
+      title: '4. Le designer d\'interface',
+      text: 'Glissez des composants (boutons, sliders, score, minuteur, diagramme CIE…), placez-les sur l\'écran et liez-les à des variables. C\'est ce que verra le joueur.',
+      before: () => setEditorTab('ui'),
+    },
+    {
+      selector: '[data-tour="editor-play"]',
+      title: '5. Tester sur les dalles',
+      text: 'Activez l\'aperçu pour envoyer votre jeu sur les 42 dalles LED en temps réel et vérifier le rendu.',
+      before: () => setEditorTab('canvas'),
+    },
+    {
+      title: 'Prêt à jouer ! ✨',
+      text: 'Enregistrez votre jeu : il apparaîtra dans la page « Jeux » comme un jeu natif, jouable par tous. Relancez ce tuto à tout moment via le bouton 🎓.',
+    },
+  ];
+
   return (
     <main className="editeur stage">
+      <Coachmarks open={tourOpen} steps={tourSteps} onClose={() => setTourOpen(false)} finishLabel="Commencer" />
       <div className="ue">
         <aside className="ue__left" style={{ borderRadius: 16, overflow: 'hidden', background: '#fff', border: '1px solid rgba(0,0,0,0.07)', display: 'flex', flexDirection: 'column' }}>
             <div className="panelhead" style={{ background: '#fff', borderBottom: '1px solid rgba(0,0,0,0.07)', padding: '10px 14px', flexShrink: 0 }}>
@@ -3363,6 +3414,7 @@ export default function EditeurPage() {
             <div style={{ padding: '8px 10px', borderBottom: '1px solid rgba(0,0,0,0.06)', display: 'flex', gap: 4, flexWrap: 'wrap', flexShrink: 0 }}>
               <button
                 className="g-btn g-btn--sm g-btn--accent"
+                data-tour="editor-new"
                 disabled={dbLoading}
                 onClick={() => setModal({ type: 'create-project' })}
                 style={{ flex: 1 }}
@@ -3387,6 +3439,14 @@ export default function EditeurPage() {
                 style={{ width: 32, padding: 0 }}
               >
                 <Trash2 size={13} />
+              </button>
+              <button
+                className="g-btn g-btn--sm"
+                onClick={() => setTourOpen(true)}
+                title="Lancer le tutoriel : comment créer un jeu"
+                style={{ width: 32, padding: 0 }}
+              >
+                <GraduationCap size={13} color="#7c3aed" />
               </button>
             </div>
 
@@ -3706,6 +3766,7 @@ export default function EditeurPage() {
                   </div>
                   <button
                     className="g-btn g-btn--sm"
+                    data-tour="editor-play"
                     onClick={() => setIsPlaying((p) => !p)}
                     title={isPlaying ? 'Pause envoi hardware' : 'Play envoi hardware'}
                     style={isPlaying ? { background: '#1a1a1a', color: '#fff', borderColor: '#1a1a1a' } : {}}
@@ -3903,7 +3964,7 @@ export default function EditeurPage() {
                 </div>
               </div>
               {/* Tab switcher (icônes Lucide) */}
-              <div style={{ display: 'flex', gap: 5, padding: '7px 12px', borderBottom: '1px solid rgba(0,0,0,0.07)', background: 'rgba(255,255,255,0.6)', flexShrink: 0 }}>
+              <div data-tour="editor-tabs" style={{ display: 'flex', gap: 5, padding: '7px 12px', borderBottom: '1px solid rgba(0,0,0,0.07)', background: 'rgba(255,255,255,0.6)', flexShrink: 0 }}>
                 {([
                   { tab: 'canvas' as const, label: 'Nœuds', Icon: GitBranch },
                   { tab: 'python' as const, label: 'Python', Icon: Hash },
@@ -3918,7 +3979,7 @@ export default function EditeurPage() {
                   );
                 })}
               </div>
-              <div className="panelbody" style={{ display: editorTab === 'canvas' ? undefined : 'none' }}>
+              <div className="panelbody" data-tour="editor-blocs" style={{ display: editorTab === 'canvas' ? undefined : 'none' }}>
                 <div
                   className="bp"
                   onDoubleClick={(e) => {
@@ -5314,7 +5375,7 @@ export default function EditeurPage() {
                 </div>
               )}
               {editorTab === 'ui' && activeGame && (
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+                <div data-tour="editor-ui" style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
                   <UIDesigner
                     components={activeGame.uiLayout ?? []}
                     onChange={comps => commit(cur => ({ ...cur, games: cur.games.map(g => g.id === cur.activeGameId ? { ...g, uiLayout: comps } : g) }))}

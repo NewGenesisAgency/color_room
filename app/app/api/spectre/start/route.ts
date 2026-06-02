@@ -20,14 +20,24 @@ export async function POST(req: Request) {
       }
     }
 
-    const { sessionId, state } = startSpectreSession({ reset, maxRounds });
+    let { sessionId, state } = startSpectreSession({ reset, maxRounds });
 
     const reqToken = typeof body.token === 'string' ? body.token : '';
     if (!reqToken) {
-      const joined = joinSpectreSession(sessionId, name);
+      // Nouveau créateur : il DOIT obtenir un siège.
+      let joined = joinSpectreSession(sessionId, name);
+      // Si la session active réutilisée n'est plus en lobby (partie abandonnée
+      // restée « active »), on repart d'une salle neuve pour ne jamais bloquer
+      // le créateur sur l'écran « Connexion… ».
+      if (!joined) {
+        ({ sessionId, state } = startSpectreSession({ reset: true, maxRounds }));
+        joined = joinSpectreSession(sessionId, name);
+      }
       if (joined) {
         return NextResponse.json({ ok: true, sessionId, state, token: joined.token, seat: joined.seat as SpSeat });
       }
+      // Échec inattendu : on le signale explicitement au client.
+      return NextResponse.json({ ok: false, error: 'create_failed' }, { status: 500 });
     }
 
     return NextResponse.json({ ok: true, sessionId, state });

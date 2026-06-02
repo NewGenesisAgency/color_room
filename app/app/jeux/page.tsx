@@ -24,7 +24,7 @@ const CieMeasureWidget = dynamic(() => import('@/app/_components/CieMeasureWidge
 const TouchControls = dynamic(() => import('@/app/_components/TouchControls'), { ssr: false });
 const SnakeGame = dynamic(() => import('@/app/_components/SnakeGame'), { ssr: false });
 const GameIntrus = dynamic(() => import('@/app/_components/GameIntrus'), { ssr: false });
-const SpectrePage = dynamic(() => import('@/app/spectre/page'), { ssr: false });
+const SpectrePage = dynamic(() => import('@/app/spectre/page').then((m) => m.SpectreGame), { ssr: false });
 const ChromaticitePage = dynamic(() => import('@/app/chromaticite/page'), { ssr: false });
 import {
   Activity,
@@ -909,6 +909,8 @@ export default function JeuxPage() {
   const [sessionChecked, setSessionChecked] = useState(false);
 
   const [currentUser, setCurrentUser] = useState<string | null>(null);
+  // Code de classe issu d'un QR code / deep-link (/jeux?classe=CODE) à rejoindre
+  const [pendingClassCode, setPendingClassCode] = useState('');
   const [userAvatarColor, setUserAvatarColor] = useState('#4361ee');
   const [userAvatarIcon, setUserAvatarIcon] = useState('U');
   const [userClasses, setUserClasses] = useState<string[]>([]);
@@ -998,6 +1000,9 @@ export default function JeuxPage() {
   // Nouveaux jeux natifs
   const [activeBuiltinGame, setActiveBuiltinGame] = useState<'color-speed' | 'maitre-blanc' | 'puissance4' | 'metamere' | 'chromaticite-jeu' | 'canal-mix' | 'intrus' | 'snake' | null>(null);
   const [activeView, setActiveView] = useState<null | 'spectre' | 'chromaticite'>(null);
+  // Spectre Chromatique : jeu multijoueur rendu inline (sous les dalles), comme les autres jeux
+  const [spectreActive, setSpectreActive] = useState<boolean>(false);
+  const [spectreJoinCode, setSpectreJoinCode] = useState<string>('');
   const [simonSequence, setSimonSequence] = useState<number[]>([]);
   const [simonPlayerInput, setSimonPlayerInput] = useState<number[]>([]);
   const [simonLevel, setSimonLevel] = useState<number>(1);
@@ -1589,7 +1594,47 @@ export default function JeuxPage() {
       .then((r) => r.json())
       .then((data) => setHasTeacher(data.hasTeacher ?? true))
       .catch(() => {});
+
+    // Deep-links via QR code : ?classe=CODE (rejoindre une classe), ?spectre=CODE (rejoindre une partie)
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const classe = params.get('classe');
+      if (classe && classe.trim()) setPendingClassCode(classe.trim().toUpperCase());
+      const sp = params.get('spectre');
+      if (sp && sp.trim()) {
+        setSpectreJoinCode(sp.trim());
+        setSpectreActive(true);
+        setGameActive(true);
+      }
+    } catch { /* ignore */ }
   }, []);
+
+  // Auto-jointure d'une classe dès que l'utilisateur est connecté (deep-link QR code)
+  useEffect(() => {
+    if (!currentUser || !pendingClassCode) return;
+    void (async () => {
+      try {
+        const res = await fetch('/api/classes/join', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ code: pendingClassCode }),
+        });
+        const data = await res.json();
+        if (res.ok && data.ok) {
+          setMessage(data.alreadyMember
+            ? `Vous êtes déjà inscrit dans la classe « ${data.className} ».`
+            : `Classe « ${data.className} » rejointe !`);
+          void fetch('/api/auth/me/classes', { cache: 'no-store' })
+            .then(r => r.json()).then(d => { if (d.classes) setUserClasses(d.classes.map((c: { name: string }) => c.name)); })
+            .catch(() => {});
+        } else {
+          setMessage(data.error ?? 'Code de classe invalide');
+        }
+      } catch { setMessage('Erreur réseau lors de la jointure de la classe'); }
+      setPendingClassCode('');
+      try { window.history.replaceState(null, '', '/jeux'); } catch { /* ignore */ }
+    })();
+  }, [currentUser, pendingClassCode]);
 
   useEffect(() => {
     if (view !== 'main') return;
@@ -3876,6 +3921,7 @@ export default function JeuxPage() {
       {view === 'login' ? (
         <LoginScreen
           sessionChecked={sessionChecked}
+          initialClassCode={pendingClassCode || undefined}
           onSuccess={(user) => {
             setCurrentUser(user.username);
             setUserType((user.role === 'enseignant' || user.role === 'formateur') ? 'enseignant' : 'apprenant');
@@ -4065,8 +4111,18 @@ export default function JeuxPage() {
                     iconColor: '#fff',
                     badgeLabel: 'multi',
                     accent: '#8b5cf6',
-                    selected: false,
-                    launch: () => setActiveView('spectre'),
+                    selected: spectreActive,
+                    launch: () => {
+                      setTetrisStandalone(false);
+                      setCustomRun(null);
+                      setHudRun(null);
+                      setCurrentGame(null);
+                      setSimonActive(false);
+                      setActiveBuiltinGame(null);
+                      setSpectreActive(true);
+                      setGameActive(true);
+                      setMessage('Spectre Chromatique - créez ou rejoignez une salle !');
+                    },
                   };
 
                   const dbCards: GameCard[] = dbGames.map((g) => {
@@ -4089,7 +4145,7 @@ export default function JeuxPage() {
                       Icon: GIcon,
                       iconBg,
                       iconColor: accentColor,
-                      badgeLabel: isEditor ? 'éditeur' : 'custom',
+                      badgeLabel: 'natif',
                       accent: accentColor,
                       selected: false,
                       launch: () => isEditor ? startHudFromDb({ id: g.id, name: g.name, config: g.config }) : startCustomFromDb({ id: g.id, name: g.name, config: g.config }),
@@ -4206,8 +4262,7 @@ export default function JeuxPage() {
                 {gameActive && customRun ? (
                   <div className="glass" style={{ padding: 14, borderRadius: 18, marginBottom: 12 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                      <strong>Jeu custom</strong>
-                      <span style={{ fontSize: 12, opacity: 0.8 }}>{customRun.name}</span>
+                      <strong>{customRun.name}</strong>
                     </div>
                     <div
                       style={{
@@ -4518,6 +4573,28 @@ export default function JeuxPage() {
                     </div>
                   );
                 })()}
+
+                {/* Spectre Chromatique - jeu multijoueur rendu inline (sous les dalles) */}
+                {gameActive && spectreActive && (
+                  <div style={{ marginTop: 12, borderRadius: 18, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.08)', background: '#f8f9ff' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: 'linear-gradient(135deg,#8b5cf6,#06d6a0)' }}>
+                      <strong style={{ color: '#fff', fontSize: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <Palette size={16} color="#fff" /> Spectre Chromatique
+                      </strong>
+                      <button
+                        onClick={() => { setSpectreActive(false); setSpectreJoinCode(''); setGameActive(false); }}
+                        style={{ padding: '6px 12px', borderRadius: 9, border: '1px solid rgba(255,255,255,0.4)', background: 'rgba(255,255,255,0.15)', color: '#fff', cursor: 'pointer', fontWeight: 700, fontSize: 12 }}
+                      >
+                        ✕ Quitter
+                      </button>
+                    </div>
+                    <SpectrePage
+                      embedded
+                      initialJoinCode={spectreJoinCode || undefined}
+                      onExit={() => { setSpectreActive(false); setSpectreJoinCode(''); setGameActive(false); }}
+                    />
+                  </div>
+                )}
 
                 {/* Tetris Lumière - si le jeu éditeur contient un noeud game_tetris */}
                 {gameActive && !tetrisStandalone && hudRun && (() => {

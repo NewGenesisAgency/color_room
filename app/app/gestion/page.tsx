@@ -4,10 +4,11 @@ import { useEffect, useState } from 'react';
 import {
   Users, BookOpen, Trophy, Settings, Plus, Trash2, RefreshCw,
   Download, Eye, EyeOff, ArrowLeft, ChevronDown, ChevronUp,
-  Shield, GraduationCap, UserCheck, Copy, Check,
+  Shield, GraduationCap, UserCheck, Copy, Check, QrCode as QrCodeIcon,
 } from 'lucide-react';
 import Link from 'next/link';
 import { AvatarIcon } from '@/app/_components/avatarIcons';
+import QrCode from '@/app/_components/QrCode';
 import './gestion.css';
 
 type Role = 'admin' | 'enseignant' | 'apprenant';
@@ -127,6 +128,7 @@ export default function GestionPage() {
   const [expandedClass, setExpandedClass] = useState<string | null>(null);
   const [classMembers, setClassMembers] = useState<Record<string, Member[]>>({});
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
+  const [qrClass, setQrClass] = useState<string | null>(null); // id de la classe dont on affiche le QR code
 
   // Scores
   const [scores, setScores] = useState<ScoreRow[]>([]);
@@ -633,6 +635,13 @@ export default function GestionPage() {
                         >
                           {copiedCode === cls.code ? <Check size={14} /> : <Copy size={14} />}
                         </button>
+                        <button
+                          className="gest-icon-btn"
+                          onClick={() => setQrClass(qrClass === cls.id ? null : cls.id)}
+                          title="Afficher le QR code pour rejoindre la classe"
+                        >
+                          <QrCodeIcon size={14} />
+                        </button>
                       </div>
                       <div className="gest-class-card-actions">
                         <button
@@ -662,6 +671,19 @@ export default function GestionPage() {
                         </button>
                       </div>
                     </div>
+
+                    {qrClass === cls.id && (() => {
+                      const origin = typeof window !== 'undefined' ? window.location.origin : '';
+                      const joinUrl = `${origin}/jeux?classe=${encodeURIComponent(cls.code)}`;
+                      return (
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, padding: '18px 12px', borderTop: '1px solid rgba(0,0,0,0.06)' }}>
+                          <QrCode value={joinUrl} size={170} caption={`Classe ${cls.name} · ${cls.code}`} />
+                          <p style={{ margin: 0, fontSize: 12, opacity: 0.6, textAlign: 'center', maxWidth: 320 }}>
+                            Les élèves scannent ce QR code avec leur téléphone (même réseau Wi-Fi) pour rejoindre la classe automatiquement.
+                          </p>
+                        </div>
+                      );
+                    })()}
 
                     {expandedClass === cls.id && (
                       <div className="gest-class-members">

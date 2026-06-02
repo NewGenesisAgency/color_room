@@ -16,6 +16,8 @@ type AuthUser = {
 interface Props {
   sessionChecked: boolean;
   onSuccess: (user: AuthUser) => void;
+  /** Code de classe pré-rempli (deep-link / QR code) : bascule sur l'inscription. */
+  initialClassCode?: string;
 }
 
 const AVATAR_COLORS = [
@@ -24,7 +26,7 @@ const AVATAR_COLORS = [
   '#264653', '#8ecae6',
 ];
 
-export default function LoginScreen({ sessionChecked, onSuccess }: Props) {
+export default function LoginScreen({ sessionChecked, onSuccess, initialClassCode }: Props) {
   const [view, setView] = useState<'login' | 'register'>('login');
   const [mounted, setMounted] = useState(false);
 
@@ -48,6 +50,14 @@ export default function LoginScreen({ sessionChecked, onSuccess }: Props) {
   const [regSuccess, setRegSuccess] = useState('');
 
   useEffect(() => { setMounted(true); }, []);
+
+  // Deep-link / QR code de classe : pré-remplir le code et ouvrir l'inscription.
+  useEffect(() => {
+    if (initialClassCode && initialClassCode.trim()) {
+      setRegCode(initialClassCode.trim().toUpperCase());
+      setView('register');
+    }
+  }, [initialClassCode]);
 
   async function handleLogin() {
     if (!loginUser.trim()) { setLoginError('Entrez votre nom d\'utilisateur'); return; }

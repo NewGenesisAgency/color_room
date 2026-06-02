@@ -1,7 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState, useMemo } from 'react';
-import { Palette, CheckCircle2, Crown, Trophy, RotateCcw } from 'lucide-react';
+import { Palette, CheckCircle2, Crown, Trophy, RotateCcw, LogOut } from 'lucide-react';
+import QrCode from '@/app/_components/QrCode';
 
 // ── Types (miroir de lib/spectre.ts) ────────────────────────────────────────
 type SpSeat = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
@@ -154,7 +155,16 @@ const PHASE_LABELS: Record<SpPhase, string> = {
 };
 
 // ── Composant principal ───────────────────────────────────────────────────────
-export default function SpectrePage() {
+interface SpectrePageProps {
+  /** Rendu intégré dans la page Jeux (sous les dalles) plutôt qu'en plein écran. */
+  embedded?: boolean;
+  /** Code de salle pré-rempli (deep-link / QR code), bascule en mode « Rejoindre ». */
+  initialJoinCode?: string;
+  /** Quitter le jeu (utilisé en mode intégré pour revenir à la liste des jeux). */
+  onExit?: () => void;
+}
+
+export function SpectreGame({ embedded = false, initialJoinCode, onExit }: SpectrePageProps = {}) {
   const [view, setView] = useState<'login' | 'game'>('login');
   const [nameInput, setNameInput] = useState('');
   const [joinCodeInput, setJoinCodeInput] = useState('');
@@ -201,7 +211,27 @@ export default function SpectrePage() {
     } catch { /* ignore */ }
   }, []);
 
+  // ── Deep-link / QR code : code de salle pré-rempli → mode « Rejoindre » ─────
+  useEffect(() => {
+    let code = initialJoinCode?.trim();
+    // En page autonome (/spectre, ouverte par un QR code sur un téléphone),
+    // on lit le code directement dans l'URL : /spectre?code=...
+    if (!code && !embedded && typeof window !== 'undefined') {
+      code = new URLSearchParams(window.location.search).get('code')?.trim() || undefined;
+    }
+    if (code) {
+      setLoginMode('join');
+      setJoinCodeInput(code);
+    }
+  }, [initialJoinCode, embedded]);
+
   const myRgb = useMemo(() => cXyToRgb(myX, myY) ?? { r: 200, g: 200, b: 200 }, [myX, myY]);
+
+  // En mode intégré, on contraint chaque écran dans une carte sous les dalles
+  // (au lieu d'occuper tout l'écran comme une pop-up plein écran).
+  const embWrap: React.CSSProperties = embedded
+    ? { minHeight: 480, maxHeight: '80vh', overflowY: 'auto', borderRadius: 18, border: '1px solid rgba(0,0,0,0.08)' }
+    : { minHeight: '100vh' };
 
   // ── Polling state ─────────────────────────────────────────────────────────
   const pollState = useCallback(async () => {
@@ -209,7 +239,15 @@ export default function SpectrePage() {
     try {
       const res = await fetch(`/api/spectre/state?token=${encodeURIComponent(token)}&_=${Date.now()}`);
       const data = await res.json();
-      if (!data.ok) return;
+      if (!data.ok) {
+        // Session disparue (serveur redémarré, partie purgée…) : on nettoie la
+        // session locale et on revient à l'accueil au lieu de rester bloqué.
+        if (res.status === 404 || data.error === 'no_session') {
+          window.localStorage.removeItem('sp_session');
+          setToken(''); setGameState(null); setSeat(null); setSessionId(''); setView('login');
+        }
+        return;
+      }
       const st: SpState = data.state;
       setGameState(st);
       setSessionStatus(data.status);
@@ -320,7 +358,7 @@ export default function SpectrePage() {
         body: JSON.stringify({ name: nameInput.trim(), maxRounds: maxRoundsInput }),
       });
       const data = await res.json();
-      if (!data.ok) { setError(data.error ?? 'Erreur création'); return; }
+      if (!data.ok || !data.token) { setError(data.error ?? 'Création impossible — réessayez'); return; }
       setToken(data.token);
       setSeat(data.seat);
       setSessionId(data.sessionId);
@@ -402,7 +440,7 @@ export default function SpectrePage() {
   // ────────────────────────────────────────────────────────────────────────────
   if (view === 'login') {
     return (
-      <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg,#f0f2ff 0%,#f8f0ff 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'system-ui,sans-serif' }}>
+      <div style={{ ...embWrap,background: 'linear-gradient(135deg,#f0f2ff 0%,#f8f0ff 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'system-ui,sans-serif' }}>
         <div style={{ width: 420, padding: 40, borderRadius: 24, background: 'rgba(255,255,255,0.9)', border: '1px solid rgba(0,0,0,0.08)', backdropFilter: 'blur(20px)' }}>
           <div style={{ textAlign: 'center', marginBottom: 32 }}>
             <div style={{ marginBottom: 8 }}><Palette size={48} color="#a78bfa" /></div>
@@ -451,7 +489,7 @@ export default function SpectrePage() {
 
   if (!gameState) {
     return (
-      <div style={{ minHeight: '100vh', background: '#f8f9ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ ...embWrap,background: '#f8f9ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <div style={{ color: 'rgba(0,0,0,0.5)', fontSize: 18 }}>Connexion…</div>
       </div>
     );
@@ -467,7 +505,7 @@ export default function SpectrePage() {
   // ────────────────────────────────────────────────────────────────────────────
   if (gameState.phase === 'lobby') {
     return (
-      <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg,#f0f2ff,#f8f0ff)', fontFamily: 'system-ui,sans-serif', padding: 40, boxSizing: 'border-box' }}>
+      <div style={{ ...embWrap,background: 'linear-gradient(135deg,#f0f2ff,#f8f0ff)', fontFamily: 'system-ui,sans-serif', padding: 40, boxSizing: 'border-box' }}>
         <div style={{ maxWidth: 560, margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: 40 }}>
             <div style={{ marginBottom: 8 }}><Palette size={48} color="#a78bfa" /></div>
@@ -481,6 +519,17 @@ export default function SpectrePage() {
               <code style={{ flex: 1, color: '#a78bfa', fontSize: 12, background: 'rgba(167,139,250,0.1)', padding: '10px 14px', borderRadius: 10, wordBreak: 'break-all' }}>{sessionId}</code>
               <button onClick={() => navigator.clipboard.writeText(sessionId)} style={{ padding: '10px 14px', borderRadius: 10, border: '1px solid rgba(0,0,0,0.12)', background: 'rgba(0,0,0,0.04)', color: 'rgba(0,0,0,0.6)', cursor: 'pointer', fontSize: 13 }}>Copier</button>
             </div>
+            {/* QR code : scanner avec un téléphone du même réseau pour rejoindre */}
+            {(() => {
+              const origin = typeof window !== 'undefined' ? window.location.origin : '';
+              const joinUrl = `${origin}/spectre?code=${encodeURIComponent(sessionId)}`;
+              return (
+                <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+                  <QrCode value={joinUrl} size={148} caption="Scanner pour rejoindre" fgColor="#5b3fb8" />
+                  <p style={{ color: 'rgba(0,0,0,0.4)', fontSize: 11, margin: 0, textAlign: 'center' }}>Les joueurs scannent ce QR code avec leur téléphone (même Wi-Fi)</p>
+                </div>
+              );
+            })()}
           </div>
 
           <div style={{ background: 'rgba(255,255,255,0.9)', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 20, padding: 24, marginBottom: 24 }}>
@@ -519,7 +568,7 @@ export default function SpectrePage() {
   // ────────────────────────────────────────────────────────────────────────────
   if (gameState.phase === 'reveal') {
     return (
-      <div style={{ minHeight: '100vh', background: targetCss, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontFamily: 'system-ui,sans-serif', transition: 'background 0.5s', position: 'relative' }}>
+      <div style={{ ...embWrap,background: targetCss, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontFamily: 'system-ui,sans-serif', transition: 'background 0.5s', position: 'relative' }}>
         <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.15)' }} />
         <div style={{ position: 'relative', textAlign: 'center', zIndex: 1 }}>
           <div style={{ background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(20px)', borderRadius: 24, padding: '32px 48px', border: '1px solid rgba(255,255,255,0.15)' }}>
@@ -561,7 +610,7 @@ export default function SpectrePage() {
     }
 
     return (
-      <div style={{ minHeight: '100vh', background: '#f8f9ff', fontFamily: 'system-ui,sans-serif', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '16px', boxSizing: 'border-box' }}>
+      <div style={{ ...embWrap,background: '#f8f9ff', fontFamily: 'system-ui,sans-serif', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '16px', boxSizing: 'border-box' }}>
         {/* Header */}
         <div style={{ width: '100%', maxWidth: 540, marginBottom: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span style={{ color: 'rgba(0,0,0,0.5)', fontSize: 12, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase' }}>Manche {gameState.round}/{gameState.maxRounds} · Reproduction</span>
@@ -647,7 +696,7 @@ export default function SpectrePage() {
   // ────────────────────────────────────────────────────────────────────────────
   if (gameState.phase === 'result') {
     return (
-      <div style={{ minHeight: '100vh', background: '#f8f9ff', fontFamily: 'system-ui,sans-serif', padding: '32px 16px', boxSizing: 'border-box' }}>
+      <div style={{ ...embWrap,background: '#f8f9ff', fontFamily: 'system-ui,sans-serif', padding: '32px 16px', boxSizing: 'border-box' }}>
         <div style={{ maxWidth: 560, margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: 28 }}>
             <p style={{ color: 'rgba(0,0,0,0.5)', fontSize: 12, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', margin: '0 0 8px' }}>Manche {gameState.round} / {gameState.maxRounds} · Résultats</p>
@@ -713,7 +762,7 @@ export default function SpectrePage() {
   if (gameState.phase === 'finished' || sessionStatus === 'finished') {
     const winner = sortedPlayers[0];
     return (
-      <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg,#f0f2ff,#f8f0ff)', fontFamily: 'system-ui,sans-serif', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 16px', boxSizing: 'border-box' }}>
+      <div style={{ ...embWrap,background: 'linear-gradient(135deg,#f0f2ff,#f8f0ff)', fontFamily: 'system-ui,sans-serif', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 16px', boxSizing: 'border-box' }}>
         <div style={{ width: '100%', maxWidth: 520 }}>
           <div style={{ textAlign: 'center', marginBottom: 32 }}>
             <div style={{ marginBottom: 12 }}><Trophy size={64} color="#ffd700" /></div>
@@ -746,7 +795,7 @@ export default function SpectrePage() {
             <div style={{ textAlign: 'center', color: 'rgba(0,0,0,0.35)', fontSize: 14 }}>En attente de l&apos;hôte pour rejouer…</div>
           )}
 
-          <button onClick={() => { window.localStorage.removeItem('sp_session'); setView('login'); setToken(''); setGameState(null); setSeat(null); setSessionId(''); }}
+          <button onClick={() => { window.localStorage.removeItem('sp_session'); setView('login'); setToken(''); setGameState(null); setSeat(null); setSessionId(''); onExit?.(); }}
             style={{ marginTop: 12, width: '100%', padding: '14px', borderRadius: 14, border: '1px solid rgba(0,0,0,0.1)', background: 'rgba(255,255,255,0.7)', color: 'rgba(0,0,0,0.5)', cursor: 'pointer', fontWeight: 600, fontSize: 15 }}>
             Quitter
           </button>
@@ -756,4 +805,11 @@ export default function SpectrePage() {
   }
 
   return null;
+}
+
+// Export par défaut = route /spectre (page autonome, ouverte par QR code sur
+// téléphone). Aucune prop personnalisée ici pour respecter le typage des pages
+// Next.js ; SpectreGame lit lui-même ?code= dans l'URL en mode non intégré.
+export default function SpectrePage() {
+  return <SpectreGame />;
 }

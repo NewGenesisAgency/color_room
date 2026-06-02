@@ -9,10 +9,7 @@
  *   GET  /api/samples   — données stockées
  */
 
-function getBaseUrl(): string {
-  const v = process.env.CS160_API_URL?.trim();
-  return v && v.length > 0 ? v.replace(/\/$/, '') : 'http://172.17.50.39:3000';
-}
+import { getCs160BaseUrl as getBaseUrl } from '@/lib/settings';
 
 interface BridgeResponse {
   success: boolean;

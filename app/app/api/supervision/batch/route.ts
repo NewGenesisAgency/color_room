@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
-
-const DEFAULT_BASE_URL = 'http://172.17.50.136:18080';
+import { getSupervisionBaseUrl as getBaseUrl } from '@/lib/settings';
 
 // Timeout par défaut pour les appels normaux (ex: éditeur sans fast)
 const DEFAULT_TIMEOUT_MS = 1200;
@@ -68,11 +67,6 @@ function forceReset() {
   const stale = hwWaiters.splice(0);
   for (const w of stale) w.resolve(false);
   // hwInFlight reste correct : il ne compte que les fetches réellement en cours
-}
-
-function getBaseUrl(): string {
-  const v = process.env.SUPERVISION_API_URL?.trim();
-  return v && v.length > 0 ? v.replace(/\/$/, '') : DEFAULT_BASE_URL;
 }
 
 export async function POST(req: Request) {

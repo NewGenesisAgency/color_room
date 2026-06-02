@@ -1,12 +1,7 @@
 import { NextResponse } from 'next/server';
+import { getSupervisionBaseUrl as getBaseUrl } from '@/lib/settings';
 
-const DEFAULT_BASE_URL = 'http://172.17.50.136:18080';
 const DEFAULT_TIMEOUT_MS = 3000;
-
-function getBaseUrl(): string {
-  const v = process.env.SUPERVISION_API_URL?.trim();
-  return v && v.length > 0 ? v.replace(/\/$/, '') : DEFAULT_BASE_URL;
-}
 
 async function forward(req: Request) {
   const baseUrl = getBaseUrl();
