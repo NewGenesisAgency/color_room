@@ -9,10 +9,6 @@ services:
       - COLOR_ROOM_PORT=3000
       - COLOR_ROOM_DB_PATH=/data/ColorRoomDB.db
     volumes:
-      # On monte le DOSSIER contenant la base (et ses fichiers -wal / -shm du mode WAL),
-      # pas un fichier unique : un bind-mount de fichier absent crée un dossier vide et
-      # casse l'ouverture SQLite. Le dossier ./app/data contient la base réelle.
-      # Pour partager la base avec SupervisionAPI (.NET), remplacer par : ../SupervisionAPI/data:/data
       - ./app/data:/data
     restart: unless-stopped
     healthcheck:
@@ -23,18 +19,18 @@ services:
       start_period: 10s
 
   portainer:
-    image: portainer/portainer-ce:latest
+    image: portainer/portainer-ce:2.21.4
     container_name: portainer
     restart: always
     security_opt:
       - no-new-privileges:true
     volumes:
       - /etc/localtime:/etc/localtime:ro
-      - /var/run/docker.sock:/var/run/docker.sock  # Permet Ã  Portainer de piloter Docker
-      - portainer_data:/data                       # Persistance des rÃ©glages Portainer
+      - /var/run/docker.sock:/var/run/docker.sock
+      - portainer_data:/data
     ports:
-      - "9000:9000"  # Interface HTTP (optionnel)
-      - "9443:9443"  # Interface HTTPS (recommandÃ©)
+      - "9000:9000"
+      - "9443:9443"
 
 volumes:
   portainer_data:

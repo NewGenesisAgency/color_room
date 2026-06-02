@@ -1,4 +1,4 @@
-FROM node:20-slim AS deps
+FROM --platform=linux/arm64 node:20-slim AS deps
 WORKDIR /app
 
 RUN apt-get update \
@@ -9,7 +9,7 @@ RUN apt-get update \
 COPY package.json package-lock.json* ./
 RUN npm install --legacy-peer-deps
 
-FROM node:20-slim AS builder
+FROM --platform=linux/arm64 node:20-slim AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
@@ -18,7 +18,7 @@ ENV PATH="/app/node_modules/.bin:${PATH}"
 RUN chmod -R +x node_modules/.bin || true
 RUN npm run build
 
-FROM node:20-slim AS runner
+FROM --platform=linux/arm64 node:20-slim AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 
