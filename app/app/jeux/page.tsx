@@ -817,11 +817,14 @@ function renderHudComp(c: UILayoutComponent, plate: HudPlateActions, vars: Recor
   switch (c.kind) {
     case 'cie_diagram':
       return (
-        <div style={{ width: '100%', height: '100%', overflow: 'auto', background: '#fff', borderRadius: 14, border: '1px solid rgba(0,0,0,0.08)', padding: 10, boxSizing: 'border-box' }}>
+        <div style={{ width: '100%', height: '100%', overflow: 'hidden', background: '#fff', borderRadius: 14, border: '1px solid rgba(0,0,0,0.08)', padding: 10, boxSizing: 'border-box' }}>
           <CieMeasureWidget
             targetX={c.cieTargetX} targetY={c.cieTargetY} tolerance={c.cieTolerance}
-            randomTarget={c.cieRandom} points={c.points} width={c.width - 20} height={undefined}
+            randomTarget={c.cieRandom} points={c.points}
+            width={Math.max(120, c.width - 20)}
+            height={Math.max(100, c.height - 20)}
             onSendColor={onSendColor}
+            onTurnOffAll={plate.onTurnOff ? () => { for (let i = 0; i < 42; i++) plate.onTurnOff!(i); } : undefined}
           />
         </div>
       );
@@ -2420,6 +2423,82 @@ export default function JeuxPage() {
         startMatchPairGame();
         const onEndId = g.out.get(node.id)?.[0];
         if (onEndId) hudGraphContinuationRef.current = () => { if (!hudGraphRunRef.current.stop) walk(onEndId); };
+        return;
+      }
+
+      // ── Mesure colorimétrique CS-160 ──────────────────────────────────────
+      // measure_start : lance une mesure via le CS-160 et stocke x, y, Lv dans
+      // les variables définies dans les paramètres, puis continue l'exécution.
+      if (node.kind === 'measure_start' || node.kind === 'cs160_measure') {
+        const varX  = String(params.varX  ?? 'meas_x');
+        const varY  = String(params.varY  ?? 'meas_y');
+        const varLv = String(params.varLv ?? 'meas_lv');
+        const timeoutSec = Math.max(1, Math.min(30, Number(params.timeoutSec ?? params.timeout ?? 10)));
+        (async () => {
+          try {
+            const res = await fetch('/api/cs160', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({ action: 'measure' }),
+              signal: AbortSignal.timeout(timeoutSec * 1000),
+              cache: 'no-store',
+            });
+            const data = await res.json();
+            if (data.success && data.data) {
+              const d = data.data.data ?? data.data;
+              const lvxy = d.lvxy ?? d;
+              hudVarsRef.current[varX]  = Number(lvxy.x  ?? 0);
+              hudVarsRef.current[varY]  = Number(lvxy.y  ?? 0);
+              hudVarsRef.current[varLv] = Number(lvxy.Lv ?? lvxy.lv ?? 0);
+              hudVarsRef.current.meas_ok = 1;
+            } else {
+              hudVarsRef.current.meas_ok = 0;
+            }
+          } catch { hudVarsRef.current.meas_ok = 0; }
+          bumpHudVars();
+          const nextId = g.out.get(node.id)?.[0];
+          if (nextId && !hudGraphRunRef.current.stop) walk(nextId);
+        })();
+        return;
+      }
+
+      // measure_on_result : alias de measure_start (lit le résultat) ou nœud
+      // de « branchement après mesure » — continue immédiatement (le résultat
+      // a déjà été stocké par measure_start dans hudVarsRef).
+      if (node.kind === 'measure_on_result') {
+        const varX  = String(params.varX  ?? 'meas_x');
+        const varY  = String(params.varY  ?? 'meas_y');
+        const varLv = String(params.varLv ?? 'meas_lv');
+        // Remappe si des noms différents sont demandés
+        if (hudVarsRef.current.meas_x  !== undefined) hudVarsRef.current[varX]  = hudVarsRef.current.meas_x;
+        if (hudVarsRef.current.meas_y  !== undefined) hudVarsRef.current[varY]  = hudVarsRef.current.meas_y;
+        if (hudVarsRef.current.meas_lv !== undefined) hudVarsRef.current[varLv] = hudVarsRef.current.meas_lv;
+        bumpHudVars();
+        const nextId = g.out.get(node.id)?.[0];
+        if (nextId) walk(nextId);
+        return;
+      }
+
+      // measure_compare : calcule ΔE (distance CIE xy) entre la mesure et la
+      // cible et ajoute un score proportionnel à la précision.
+      if (node.kind === 'measure_compare') {
+        const tx = Number(params.targetX ?? 0.3127);
+        const ty = Number(params.targetY ?? 0.3290);
+        const tol = Math.max(0.001, Number(params.toleranceDeltaE ?? 5));
+        const mx = Number(hudVarsRef.current.meas_x ?? 0);
+        const my = Number(hudVarsRef.current.meas_y ?? 0);
+        const dxy = Math.sqrt((mx - tx) ** 2 + (my - ty) ** 2);
+        const accuracy = Math.max(0, 1 - dxy / (tol * 0.01)); // 0..1
+        hudVarsRef.current.meas_accuracy = Math.round(accuracy * 100);
+        hudVarsRef.current.meas_delta    = Math.round(dxy * 1000) / 1000;
+        const pts = Math.round(accuracy * Number(params.maxPoints ?? 100));
+        if (pts > 0) {
+          hudVarsRef.current.score = Number(hudVarsRef.current.score ?? 0) + pts;
+          if (pts > 0) { setScorePlusValue(pts); setScorePlusAnimKey((k) => k + 1); }
+        }
+        bumpHudVars();
+        const nextId = g.out.get(node.id)?.[0];
+        if (nextId) walk(nextId);
         return;
       }
 

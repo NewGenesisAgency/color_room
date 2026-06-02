@@ -71,6 +71,45 @@ function migrate(db: Database.Database) {
   try { db.exec("ALTER TABLE crg_mp_players ADD COLUMN is_ready INTEGER DEFAULT 0;"); } catch { /* already exists */ }
   try { db.exec("ALTER TABLE crg_mp_players ADD COLUMN seat_score INTEGER DEFAULT 0;"); } catch { /* already exists */ }
   db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_crg_mp_sessions_room_code ON crg_mp_sessions(room_code) WHERE room_code IS NOT NULL;");
+
+  // ─── Jeu seed : ChromaDetect – Load Test CS-160 ──────────────────────────
+  // Créé ou remis à jour à chaque démarrage (le jeu est identifié par son nom).
+  // Utilise uniquement le CS-160 (jamais CS-150).
+  seedChromatectGame(db);
+}
+
+function seedChromatectGame(db: Database.Database) {
+  const GAME_NAME = 'ChromaDetect – Load Test CS-160';
+  const config = {
+    version: 1,
+    tileCount: 42,
+    bgColor: '#0a0f1a',
+    accentColor: '#06d6a0',
+    icon: 'Crosshair',
+    description: 'Mesurez la couleur spectrale affichée sur les dalles avec le CS-160 et comparez au spectre cible. Plus vous êtes précis, plus vous marquez.',
+    nodes: [
+      { id: 'n_start', kind: 'event_begin', name: 'Démarrer', enabled: true, params: {}, pos: { x: 80, y: 120 } },
+    ],
+    edges: [],
+    uiLayout: [
+      // Bandeau titre
+      { id: 'u_title', kind: 'title_banner', x: 10, y: 10, width: 700, height: 50,
+        text: 'ChromaDetect – CS-160', bgColor: '#0a0f1a', textColor: '#06d6a0', fontSize: 20 },
+      // Diagramme CIE 1931 — cœur du jeu : cible aléatoire, mesure CS-160, ΔE, score
+      { id: 'u_cie', kind: 'cie_diagram', x: 10, y: 70, width: 700, height: 480,
+        cieTargetX: 0.3127, cieTargetY: 0.3290, cieTolerance: 5, cieRandom: true, points: 1000 },
+    ],
+  };
+
+  const existing = db.prepare("SELECT id FROM crg_games WHERE name = ?;").get(GAME_NAME) as { id: string } | undefined;
+  if (existing) {
+    db.prepare("UPDATE crg_games SET config_json = ?, kind = 'editor', updated_at = datetime('now') WHERE id = ?;")
+      .run(JSON.stringify(config), existing.id);
+  } else {
+    const id = `chromadetect_${Date.now().toString(36)}`;
+    db.prepare("INSERT INTO crg_games(id, name, kind, config_json, updated_at) VALUES(?, ?, 'editor', ?, datetime('now'));")
+      .run(id, GAME_NAME, JSON.stringify(config));
+  }
 }
 
 export function getDb(): Database.Database {

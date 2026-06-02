@@ -4122,91 +4122,6 @@ export default function EditeurPage() {
                       </div>
                     ) : null}
 
-                    {contextMenu.open ? (
-                      <div className="bp-menu" style={{ left: contextMenu.x, top: contextMenu.y }}>
-                        <div className="bp-menu__search">
-                          <input
-                            className="bp-menu__input"
-                            placeholder="Rechercher un noeud…"
-                            value={contextMenu.q}
-                            autoFocus
-                            onChange={(e) => setContextMenu((p) => ({ ...p, q: e.target.value }))}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Escape') setContextMenu((p) => ({ ...p, open: false }));
-                            }}
-                          />
-                        </div>
-
-                        <div className="bp-menu__list">
-                          {(() => {
-                            const q = contextMenu.q.trim().toLowerCase();
-                            const allFiltered = NODE_CATALOG.filter((n) => {
-                              if (!q) return true;
-                              return `${n.category} ${n.title} ${n.kind}`.toLowerCase().includes(q);
-                            });
-                            const addable = allFiltered.filter((n) => !NATIVE_GAME_KINDS.has(n.kind));
-                            const natives = allFiltered.filter((n) => NATIVE_GAME_KINDS.has(n.kind));
-                            const categories = [...new Set(addable.map((n) => n.category))];
-                            return (
-                              <>
-                                {categories.map((cat) => {
-                                  const CatIcon = NODE_CATEGORY_ICONS[cat] ?? Boxes;
-                                  const catColor = NODE_CATEGORY_COLORS[cat] ?? '#999';
-                                  return (
-                                    <div key={cat}>
-                                      <div className="bp-menu__cathead" style={{ borderLeft: `3px solid ${catColor}` }}>
-                                        <CatIcon size={11} style={{ color: catColor, flexShrink: 0 }} />
-                                        <span>{cat}</span>
-                                      </div>
-                                      {addable.filter((n) => n.category === cat).map((n) => (
-                                        <button
-                                          key={n.kind}
-                                          className="bp-menu__item"
-                                          onClick={() => {
-                                            const createdId = addNode(n.kind, { x: contextMenu.gx, y: contextMenu.gy });
-                                            if (createdId && pendingAutoConnect?.fromNodeId) {
-                                              addEdge(pendingAutoConnect.fromNodeId, createdId);
-                                              setPendingLink(null);
-                                              setPendingAutoConnect(null);
-                                            }
-                                            setContextMenu((p) => ({ ...p, open: false }));
-                                            setStatus('Noeud ajouté');
-                                          }}
-                                        >
-                                          <span className="bp-menu__title">{n.title}</span>
-                                          <span className="bp-menu__meta" style={{ color: catColor, opacity: 0.7, fontSize: 11 }}>{n.kind.startsWith('cs160') ? 'CS160' : ''}</span>
-                                        </button>
-                                      ))}
-                                    </div>
-                                  );
-                                })}
-                                {natives.length > 0 && (
-                                  <div>
-                                    <div className="bp-menu__cathead" style={{ borderLeft: '3px solid #a855f7', marginTop: 8 }}>
-                                      <Gamepad2 size={11} style={{ color: '#a855f7', flexShrink: 0 }} />
-                                      <span>Jeux Natifs</span>
-                                      <span style={{ marginLeft: 4, fontSize: 9, opacity: 0.6, fontWeight: 600 }}>(lecture seule)</span>
-                                    </div>
-                                    {natives.map((n) => (
-                                      <div
-                                        key={n.kind}
-                                        className="bp-menu__item"
-                                        style={{ opacity: 0.45, cursor: 'not-allowed', userSelect: 'none' }}
-                                        title="Jeu natif - non recréable via l'éditeur"
-                                      >
-                                        <span className="bp-menu__title">{n.title}</span>
-                                        <span className="bp-menu__meta" style={{ color: '#a855f7', opacity: 0.7, fontSize: 10 }}>natif</span>
-                                      </div>
-                                    ))}
-                                  </div>
-                                )}
-                              </>
-                            );
-                          })()}
-                        </div>
-                      </div>
-                    ) : null}
-
                     <svg className="bp__wires" width="2000" height="2000" viewBox="0 0 2000 2000" preserveAspectRatio="none">
                       <defs>
                         <marker
@@ -5362,6 +5277,91 @@ export default function EditeurPage() {
                       );
                     })}
                   </div>
+                  {/* Menu clic-droit : enfant DIRECT de .bp (hors du .bp__content transformé)
+                      → non affecté par translate/scale → placé exactement sous le curseur */}
+                  {contextMenu.open ? (
+                    <div className="bp-menu" style={{ left: contextMenu.x, top: contextMenu.y }}>
+                      <div className="bp-menu__search">
+                        <input
+                          className="bp-menu__input"
+                          placeholder="Rechercher un noeud…"
+                          value={contextMenu.q}
+                          autoFocus
+                          onChange={(e) => setContextMenu((p) => ({ ...p, q: e.target.value }))}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Escape') setContextMenu((p) => ({ ...p, open: false }));
+                          }}
+                        />
+                      </div>
+                      <div className="bp-menu__list">
+                        {(() => {
+                          const q = contextMenu.q.trim().toLowerCase();
+                          const allFiltered = NODE_CATALOG.filter((n) => {
+                            if (!q) return true;
+                            return `${n.category} ${n.title} ${n.kind}`.toLowerCase().includes(q);
+                          });
+                          const addable = allFiltered.filter((n) => !NATIVE_GAME_KINDS.has(n.kind));
+                          const natives = allFiltered.filter((n) => NATIVE_GAME_KINDS.has(n.kind));
+                          const categories = [...new Set(addable.map((n) => n.category))];
+                          return (
+                            <>
+                              {categories.map((cat) => {
+                                const CatIcon = NODE_CATEGORY_ICONS[cat] ?? Boxes;
+                                const catColor = NODE_CATEGORY_COLORS[cat] ?? '#999';
+                                return (
+                                  <div key={cat}>
+                                    <div className="bp-menu__cathead" style={{ borderLeft: `3px solid ${catColor}` }}>
+                                      <CatIcon size={11} style={{ color: catColor, flexShrink: 0 }} />
+                                      <span>{cat}</span>
+                                    </div>
+                                    {addable.filter((n) => n.category === cat).map((n) => (
+                                      <button
+                                        key={n.kind}
+                                        className="bp-menu__item"
+                                        onClick={() => {
+                                          const createdId = addNode(n.kind, { x: contextMenu.gx, y: contextMenu.gy });
+                                          if (createdId && pendingAutoConnect?.fromNodeId) {
+                                            addEdge(pendingAutoConnect.fromNodeId, createdId);
+                                            setPendingLink(null);
+                                            setPendingAutoConnect(null);
+                                          }
+                                          setContextMenu((p) => ({ ...p, open: false }));
+                                          setStatus('Noeud ajouté');
+                                        }}
+                                      >
+                                        <span className="bp-menu__title">{n.title}</span>
+                                        <span className="bp-menu__meta" style={{ color: catColor, opacity: 0.7, fontSize: 11 }}>{n.kind.startsWith('cs160') ? 'CS160' : ''}</span>
+                                      </button>
+                                    ))}
+                                  </div>
+                                );
+                              })}
+                              {natives.length > 0 && (
+                                <div>
+                                  <div className="bp-menu__cathead" style={{ borderLeft: '3px solid #a855f7', marginTop: 8 }}>
+                                    <Gamepad2 size={11} style={{ color: '#a855f7', flexShrink: 0 }} />
+                                    <span>Jeux Natifs</span>
+                                    <span style={{ marginLeft: 4, fontSize: 9, opacity: 0.6, fontWeight: 600 }}>(lecture seule)</span>
+                                  </div>
+                                  {natives.map((n) => (
+                                    <div
+                                      key={n.kind}
+                                      className="bp-menu__item"
+                                      style={{ opacity: 0.45, cursor: 'not-allowed', userSelect: 'none' }}
+                                      title="Jeu natif - non recréable via l'éditeur"
+                                    >
+                                      <span className="bp-menu__title">{n.title}</span>
+                                      <span className="bp-menu__meta" style={{ color: '#a855f7', opacity: 0.7, fontSize: 10 }}>natif</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </>
+                          );
+                        })()}
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
               </div>
               {editorTab === 'python' && activeGame && (
