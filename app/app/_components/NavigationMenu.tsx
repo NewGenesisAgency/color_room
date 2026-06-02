@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   Menu, X, Home, Gamepad2, Sparkles, Palette, Ruler,
-  LogIn, LogOut, Settings, HelpCircle, PenSquare, SlidersHorizontal,
+  LogIn, LogOut, Settings, HelpCircle, PenSquare, SlidersHorizontal, Activity,
 } from 'lucide-react';
 import { AvatarIcon } from './avatarIcons';
 
@@ -83,6 +83,7 @@ export default function NavigationMenu() {
     { href: '/editeur',      label: 'Éditeur',         icon: PenSquare },
     { href: '/aide',         label: 'Aide',            icon: HelpCircle },
     { href: '/configuration', label: 'Configuration',  icon: SlidersHorizontal },
+    { href: '/health',       label: 'Santé & Diagnostic', icon: Activity },
     ...(isAdmin || isEnseignant
       ? [{ href: '/gestion', label: 'Tableau de bord', icon: Settings }]
       : []),
