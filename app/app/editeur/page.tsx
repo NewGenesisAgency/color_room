@@ -15,7 +15,7 @@ const CS160Panel = dynamic(() => import('@/app/_components/CS160Panel'), { ssr: 
 const PythonEditor = dynamic(() => import('./PythonEditor'), { ssr: false });
 const UIDesigner = dynamic(() => import('./UIDesigner'), { ssr: false });
 
-import { Boxes, Gamepad2, Plus, Play, Pause, RotateCcw, Save, Trash2, FolderPlus, X, Lightbulb, Layers, Zap, Palette, Clock, MousePointer2, LayoutGrid, Maximize2, Minimize2, Eye, Star, Heart, Sun, Moon, Flame, Snowflake, Music, Target, Puzzle, Sparkles, Trophy, Rocket, Ghost, Dice1, Brain, Check, GitBranch, Hash, Settings2, Shuffle, Search, Users, Film, Thermometer, ScanLine, Wifi, WifiOff, Crown, Gem, Bug, Bot, Atom, Bird, Cat, Dog, Fish, Leaf, Cloud, Droplet, Mountain, Anchor, Bell, Bomb, Camera, Egg, Feather, Gift, Hexagon, Key, Lock, Medal, Pizza, Plane, Rainbow, Skull, Smile, Wand2, Waves, Crosshair, Dice5, Joystick, FlaskConical, Swords, ChevronDown, GraduationCap, type LucideIcon } from 'lucide-react';
+import { Boxes, Gamepad2, Plus, Play, Pause, RotateCcw, Save, Trash2, FolderPlus, X, Lightbulb, Layers, Zap, Palette, Clock, MousePointer2, LayoutGrid, Maximize2, Minimize2, Eye, Star, Heart, Sun, Moon, Flame, Snowflake, Music, Target, Puzzle, Sparkles, Trophy, Rocket, Ghost, Dice1, Brain, Check, GitBranch, Hash, Settings2, Shuffle, Search, Users, Film, Thermometer, ScanLine, Wifi, WifiOff, Crown, Gem, Bug, Bot, Atom, Bird, Cat, Dog, Fish, Leaf, Cloud, Droplet, Mountain, Anchor, Bell, Bomb, Camera, Egg, Feather, Gift, Hexagon, Key, Lock, Medal, Pizza, Plane, Rainbow, Skull, Smile, Wand2, Waves, Crosshair, Dice5, Joystick, FlaskConical, Swords, ChevronDown, GraduationCap, SlidersHorizontal, type LucideIcon } from 'lucide-react';
 
 type IdFactory = () => string;
 
@@ -1054,7 +1054,7 @@ export default function EditeurPage() {
   const [showGrid, setShowGrid] = useState<boolean>(true);
   const [zoomLevel, setZoomLevel] = useState<number>(100);
   const [newProjectName, setNewProjectName] = useState<string>('');
-  const [newProjectTemplate, setNewProjectTemplate] = useState<'blank' | 'tutorial' | 'animation' | 'interactive' | 'fluorescence' | 'color-demo' | 'pulse-advanced' | 'rainbow' | 'tetris' | 'memory' | 'tetris-blueprint'>('blank');
+  const [newProjectTemplate, setNewProjectTemplate] = useState<'blank' | 'tutorial' | 'animation' | 'interactive' | 'fluorescence' | 'color-demo' | 'pulse-advanced' | 'rainbow' | 'tetris' | 'memory' | 'tetris-blueprint' | 'snake' | 'puissance4' | 'color_speed' | 'maitre_blanc' | 'intrus' | 'canal_mix' | 'metamere' | 'chromaticite' | 'spectre'>('blank');
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -2535,7 +2535,7 @@ export default function EditeurPage() {
     }
   };
 
-  const createGame = async (forcedName?: string, template: 'blank' | 'tutorial' | 'animation' | 'interactive' | 'fluorescence' | 'color-demo' | 'pulse-advanced' | 'rainbow' | 'tetris' | 'memory' | 'tetris-blueprint' = 'blank') => {
+  const createGame = async (forcedName?: string, template: 'blank' | 'tutorial' | 'animation' | 'interactive' | 'fluorescence' | 'color-demo' | 'pulse-advanced' | 'rainbow' | 'tetris' | 'memory' | 'tetris-blueprint' | 'snake' | 'puissance4' | 'color_speed' | 'maitre_blanc' | 'intrus' | 'canal_mix' | 'metamere' | 'chromaticite' | 'spectre' = 'blank') => {
     const makeId: IdFactory = () => `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
     const provisionalId = makeId();
     const nextIndex = (editorRef.current.games.length || 0) + 1;
@@ -2796,6 +2796,142 @@ export default function EditeurPage() {
       ];
     }
 
+    let templateUiLayout: UILayoutComponent[] | undefined = undefined;
+
+    if (template === 'snake') {
+      const gameId = makeId();
+      initialNodes = [
+        { id: eventId, kind: 'event_begin', name: 'Démarrer', enabled: true, params: {}, pos: { x: 80, y: 120 } },
+        { id: gameId,  kind: 'game_snake',  name: 'Snake Chromatique', enabled: true, params: { speed: 700 }, pos: { x: 380, y: 120 } },
+      ];
+      initialEdges = [{ id: makeId(), from: eventId, to: gameId }];
+      templateUiLayout = [
+        { id: makeId(), kind: 'title_banner',  x: 40,  y: 16,  width: 400, height: 52, text: 'Snake Chromatique' },
+        { id: makeId(), kind: 'score_display', x: 40,  y: 84,  width: 140, height: 64, text: 'Score' },
+        { id: makeId(), kind: 'round_badge',   x: 200, y: 84,  width: 130, height: 64, text: 'Niveau' },
+        { id: makeId(), kind: 'dpad',          x: 40,  y: 168, width: 340, height: 160, dpadPreset: 'arrows_space' },
+        { id: makeId(), kind: 'message_box',   x: 40,  y: 348, width: 340, height: 72,  text: '← → ↑ ↓ pour diriger · Entrée = rejouer · Mange les dalles colorées !', bgColor: '#06d6a0' },
+      ] as UILayoutComponent[];
+    } else if (template === 'puissance4') {
+      const gameId = makeId();
+      initialNodes = [
+        { id: eventId, kind: 'event_begin',    name: 'Démarrer', enabled: true, params: {}, pos: { x: 80, y: 120 } },
+        { id: gameId,  kind: 'game_puissance4', name: 'Puissance 4', enabled: true, params: { mode: 'pvp' }, pos: { x: 380, y: 120 } },
+      ];
+      initialEdges = [{ id: makeId(), from: eventId, to: gameId }];
+      templateUiLayout = [
+        { id: makeId(), kind: 'title_banner',   x: 40,  y: 16,  width: 400, height: 52, text: 'Puissance 4 Chromatique' },
+        { id: makeId(), kind: 'turn_indicator', x: 40,  y: 84,  width: 280, height: 52, text: 'Tour du Joueur', bgColor: '#ff3b6e' },
+        { id: makeId(), kind: 'score_display',  x: 40,  y: 152, width: 130, height: 64, text: 'J1' },
+        { id: makeId(), kind: 'score_display',  x: 186, y: 152, width: 130, height: 64, text: 'J2', bgColor: '#3b82f6' },
+        { id: makeId(), kind: 'message_box',    x: 40,  y: 236, width: 340, height: 72,  text: 'Clique une colonne ou utilise ← → Espace pour poser un jeton', bgColor: '#4361ee' },
+      ] as UILayoutComponent[];
+    } else if (template === 'color_speed') {
+      const gameId = makeId();
+      initialNodes = [
+        { id: eventId, kind: 'event_begin',    name: 'Démarrer', enabled: true, params: {}, pos: { x: 80, y: 120 } },
+        { id: gameId,  kind: 'game_color_speed', name: 'Color Speed', enabled: true, params: { gameDuration: 60, tileCount: 42 }, pos: { x: 380, y: 120 } },
+      ];
+      initialEdges = [{ id: makeId(), from: eventId, to: gameId }];
+      templateUiLayout = [
+        { id: makeId(), kind: 'title_banner',   x: 40,  y: 16,  width: 400, height: 52, text: 'Color Speed' },
+        { id: makeId(), kind: 'timer_display',  x: 40,  y: 84,  width: 140, height: 64, text: 'Temps' },
+        { id: makeId(), kind: 'score_display',  x: 196, y: 84,  width: 140, height: 64, text: 'Score' },
+        { id: makeId(), kind: 'progress_bar',   x: 40,  y: 164, width: 340, height: 28, text: 'Progression' },
+        { id: makeId(), kind: 'message_box',    x: 40,  y: 212, width: 340, height: 72,  text: "Clique vite sur la dalle qui s'allume ! Combo = bonus.", bgColor: '#f59e0b' },
+      ] as UILayoutComponent[];
+    } else if (template === 'maitre_blanc') {
+      const gameId = makeId();
+      initialNodes = [
+        { id: eventId, kind: 'event_begin',     name: 'Démarrer', enabled: true, params: {}, pos: { x: 80, y: 120 } },
+        { id: gameId,  kind: 'game_maitre_blanc', name: 'Maître du Blanc', enabled: true, params: { rounds: 10, threshold: 0.025 }, pos: { x: 380, y: 120 } },
+      ];
+      initialEdges = [{ id: makeId(), from: eventId, to: gameId }];
+      templateUiLayout = [
+        { id: makeId(), kind: 'title_banner',  x: 40,  y: 16,  width: 420, height: 52, text: 'Le Maître du Blanc' },
+        { id: makeId(), kind: 'round_badge',   x: 40,  y: 84,  width: 160, height: 52, text: 'Manche' },
+        { id: makeId(), kind: 'score_display', x: 216, y: 84,  width: 140, height: 52, text: 'Score' },
+        { id: makeId(), kind: 'color_swatch',  x: 40,  y: 152, width: 100, height: 100, bgColor: '#fff8dc' },
+        { id: makeId(), kind: 'rgb_sliders',   x: 156, y: 152, width: 240, height: 130 },
+        { id: makeId(), kind: 'button',        x: 40,  y: 268, width: 340, height: 48, text: 'Valider ma couleur', bgColor: '#f59e0b' },
+        { id: makeId(), kind: 'message_box',   x: 40,  y: 332, width: 340, height: 72,  text: 'Reproduis la température de couleur affichée sur la salle droite. Salle gauche = ta tentative.', bgColor: '#f59e0b' },
+      ] as UILayoutComponent[];
+    } else if (template === 'intrus') {
+      const gameId = makeId();
+      initialNodes = [
+        { id: eventId, kind: 'event_begin', name: 'Démarrer', enabled: true, params: {}, pos: { x: 80, y: 120 } },
+        { id: gameId,  kind: 'game_intrus', name: "L'Intrus (Sniper)", enabled: true, params: {}, pos: { x: 380, y: 120 } },
+      ];
+      initialEdges = [{ id: makeId(), from: eventId, to: gameId }];
+      templateUiLayout = [
+        { id: makeId(), kind: 'title_banner',   x: 40,  y: 16,  width: 420, height: 52, text: "L'Intrus — Mode Sniper" },
+        { id: makeId(), kind: 'timer_display',  x: 40,  y: 84,  width: 130, height: 64, text: 'Temps' },
+        { id: makeId(), kind: 'score_display',  x: 186, y: 84,  width: 130, height: 64, text: 'Score' },
+        { id: makeId(), kind: 'round_badge',    x: 332, y: 84,  width: 120, height: 64, text: 'Niveau' },
+        { id: makeId(), kind: 'button',         x: 40,  y: 164, width: 195, height: 48, text: 'Analyser avec CS-160', bgColor: '#06d6a0' },
+        { id: makeId(), kind: 'button',         x: 251, y: 164, width: 195, height: 48, text: "C'est l'intrus !", bgColor: '#ef4444' },
+        { id: makeId(), kind: 'message_box',    x: 40,  y: 228, width: 420, height: 72,  text: "Vise chaque dalle avec le CS-160. La dalle hors-norme = l'intrus. Clique sa case pour accuser.", bgColor: '#06d6a0' },
+      ] as UILayoutComponent[];
+    } else if (template === 'canal_mix') {
+      const gameId = makeId();
+      initialNodes = [
+        { id: eventId, kind: 'event_begin',  name: 'Démarrer', enabled: true, params: {}, pos: { x: 80, y: 120 } },
+        { id: gameId,  kind: 'game_canal_mix', name: 'Mix de Canaux', enabled: true, params: {}, pos: { x: 380, y: 120 } },
+      ];
+      initialEdges = [{ id: makeId(), from: eventId, to: gameId }];
+      templateUiLayout = [
+        { id: makeId(), kind: 'title_banner',  x: 40,  y: 16,  width: 420, height: 52, text: 'Mix de Canaux Spectraux' },
+        { id: makeId(), kind: 'round_badge',   x: 40,  y: 84,  width: 160, height: 52, text: 'Manche' },
+        { id: makeId(), kind: 'score_display', x: 216, y: 84,  width: 140, height: 52, text: 'Score' },
+        { id: makeId(), kind: 'cie_diagram',   x: 40,  y: 148, width: 340, height: 280, cieRandom: true },
+        { id: makeId(), kind: 'message_box',   x: 40,  y: 444, width: 340, height: 72,  text: 'Sélectionne des canaux spectraux pour reproduire la couleur cible sur la salle gauche. Cible affichée salle droite.', bgColor: '#06b6d4' },
+      ] as UILayoutComponent[];
+    } else if (template === 'metamere') {
+      const gameId = makeId();
+      initialNodes = [
+        { id: eventId, kind: 'event_begin',  name: 'Démarrer', enabled: true, params: {}, pos: { x: 80, y: 120 } },
+        { id: gameId,  kind: 'game_metamere', name: 'Métamérie', enabled: true, params: {}, pos: { x: 380, y: 120 } },
+      ];
+      initialEdges = [{ id: makeId(), from: eventId, to: gameId }];
+      templateUiLayout = [
+        { id: makeId(), kind: 'title_banner',  x: 40,  y: 16,  width: 420, height: 52, text: 'Métamérie' },
+        { id: makeId(), kind: 'round_badge',   x: 40,  y: 84,  width: 160, height: 52, text: 'Manche' },
+        { id: makeId(), kind: 'score_display', x: 216, y: 84,  width: 140, height: 52, text: 'Score' },
+        { id: makeId(), kind: 'color_swatch',  x: 40,  y: 152, width: 100, height: 100, bgColor: '#4361ee' },
+        { id: makeId(), kind: 'label',         x: 156, y: 152, width: 240, height: 100, text: 'Couleur de référence (salle droite)' },
+        { id: makeId(), kind: 'button',        x: 40,  y: 268, width: 340, height: 48,  text: 'Valider mon illuminant', bgColor: '#8b5cf6' },
+        { id: makeId(), kind: 'message_box',   x: 40,  y: 332, width: 340, height: 88,  text: "Un mot s'affiche en couleur sur la salle droite. Reproduis sa couleur sur la salle gauche en choisissant l'illuminant correct.", bgColor: '#8b5cf6' },
+      ] as UILayoutComponent[];
+    } else if (template === 'chromaticite') {
+      const gameId = makeId();
+      initialNodes = [
+        { id: eventId, kind: 'event_begin',       name: 'Démarrer', enabled: true, params: {}, pos: { x: 80, y: 120 } },
+        { id: gameId,  kind: 'game_chromaticite', name: 'Chromaticité CIE', enabled: true, params: {}, pos: { x: 380, y: 120 } },
+      ];
+      initialEdges = [{ id: makeId(), from: eventId, to: gameId }];
+      templateUiLayout = [
+        { id: makeId(), kind: 'title_banner',  x: 40,  y: 16,  width: 420, height: 52, text: 'Chromaticité CIE 1931' },
+        { id: makeId(), kind: 'round_badge',   x: 40,  y: 84,  width: 140, height: 52, text: 'Manche' },
+        { id: makeId(), kind: 'score_display', x: 196, y: 84,  width: 140, height: 52, text: 'Score' },
+        { id: makeId(), kind: 'cie_diagram',   x: 40,  y: 148, width: 380, height: 300, cieRandom: true },
+        { id: makeId(), kind: 'message_box',   x: 40,  y: 464, width: 380, height: 72,  text: 'La couleur cible s\'affiche 5 secondes sur la salle droite. Identifie-la sur le diagramme CIE 1931.', bgColor: '#06b6d4' },
+      ] as UILayoutComponent[];
+    } else if (template === 'spectre') {
+      const gameId = makeId();
+      initialNodes = [
+        { id: eventId, kind: 'event_begin',   name: 'Démarrer', enabled: true, params: {}, pos: { x: 80, y: 120 } },
+        { id: gameId,  kind: 'game_spectrum', name: 'Spectre Chromatique', enabled: true, params: { maxRounds: 5, revealMs: 5000, guessMs: 30000 }, pos: { x: 380, y: 120 } },
+      ];
+      initialEdges = [{ id: makeId(), from: eventId, to: gameId }];
+      templateUiLayout = [
+        { id: makeId(), kind: 'title_banner',  x: 40,  y: 16,  width: 420, height: 52, text: 'Spectre Chromatique' },
+        { id: makeId(), kind: 'players_list',  x: 40,  y: 84,  width: 200, height: 160 },
+        { id: makeId(), kind: 'leaderboard',   x: 256, y: 84,  width: 200, height: 160 },
+        { id: makeId(), kind: 'color_swatch',  x: 40,  y: 260, width: 120, height: 120, bgColor: '#ff3b6e' },
+        { id: makeId(), kind: 'message_box',   x: 176, y: 260, width: 280, height: 120, text: 'Mémorize la couleur puis retrouve-la sur le diagramme CIE. Multijoueur 1-8 joueurs.', bgColor: '#7209b7' },
+      ] as UILayoutComponent[];
+    }
+
     const provisionalGame: GameDoc = {
       id: provisionalId,
       name: gameName,
@@ -2803,6 +2939,7 @@ export default function EditeurPage() {
       nodes: initialNodes,
       edges: initialEdges,
       pythonCode: PYTHON_TEMPLATE,
+      ...(templateUiLayout ? { uiLayout: templateUiLayout } : {}),
     };
 
     const dbId = await createDbGame(gameName, provisionalGame);
@@ -7517,40 +7654,79 @@ export default function EditeurPage() {
                 <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 12, opacity: 0.9 }}>
                   Template de départ
                 </label>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10, maxHeight: 380, overflowY: 'auto' }}>
-                  {[
-                    { id: 'blank', icon: Layers, label: 'Vide', desc: 'Projet vide avec événement initial' },
-                    { id: 'tutorial', icon: Zap, label: 'Tutoriel', desc: 'Remplissage simple démonstratif' },
-                    { id: 'animation', icon: Play, label: 'Animation', desc: 'Pulsation automatique' },
-                    { id: 'interactive', icon: MousePointer2, label: 'Interactif', desc: 'Contrôle d\'une dalle' },
-                    { id: 'fluorescence', icon: Palette, label: 'Fluorescence UV', desc: 'Activation UV → Fluorescence verte' },
-                    { id: 'color-demo', icon: Palette, label: 'Démo RGB', desc: '3 dalles RGB primaires' },
-                    { id: 'pulse-advanced', icon: Clock, label: 'Pulsations', desc: 'Alternance chaud/froid' },
-                    { id: 'rainbow', icon: Palette, label: 'Arc-en-ciel', desc: 'Séquence colorée complète' },
-                    { id: 'tetris', icon: Gamepad2, label: 'Tetris Lumière', desc: 'Jeu Tetris interactif sur les dalles' },
-                    { id: 'memory', icon: Brain, label: 'Jeu de Mémoire', desc: 'Mémorisation de séquences lumineuses type Simon' },
-                    { id: 'tetris-blueprint', icon: Gamepad2, label: 'Tetris Blueprint (UE5)', desc: 'Tetris jouable via nœuds on_tick + game_tetris_block' },
-                  ].map((t) => (
-                    <button
-                      key={t.id}
-                      onClick={() => setNewProjectTemplate(t.id as typeof newProjectTemplate)}
-                      className="g-card"
-                      style={{
-                        padding: 14,
-                        borderRadius: 14,
-                        border: newProjectTemplate === t.id ? '2px solid #4361ee' : '1px solid rgba(255,255,255,0.6)',
-                        background: newProjectTemplate === t.id ? 'rgba(67, 97, 238, 0.06)' : 'linear-gradient(135deg, rgba(255,255,255,0.78), rgba(255,255,255,0.55))',
-                        cursor: 'pointer',
-                        textAlign: 'left',
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
-                        <t.icon size={18} color={newProjectTemplate === t.id ? '#4361ee' : '#666'} />
-                        <span style={{ fontWeight: 700, fontSize: 14 }}>{t.label}</span>
-                      </div>
-                      <p style={{ margin: 0, fontSize: 12, opacity: 0.7, lineHeight: 1.4 }}>{t.desc}</p>
-                    </button>
-                  ))}
+                <div style={{ maxHeight: 420, overflowY: 'auto' }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', opacity: 0.5, marginBottom: 8 }}>Modèles généraux</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10, marginBottom: 16 }}>
+                    {[
+                      { id: 'blank', icon: Layers, label: 'Vide', desc: 'Projet vide avec événement initial' },
+                      { id: 'tutorial', icon: Zap, label: 'Tutoriel', desc: 'Remplissage simple démonstratif' },
+                      { id: 'animation', icon: Play, label: 'Animation', desc: 'Pulsation automatique' },
+                      { id: 'interactive', icon: MousePointer2, label: 'Interactif', desc: 'Contrôle d\'une dalle' },
+                      { id: 'fluorescence', icon: Palette, label: 'Fluorescence UV', desc: 'Activation UV → Fluorescence verte' },
+                      { id: 'color-demo', icon: Palette, label: 'Démo RGB', desc: '3 dalles RGB primaires' },
+                      { id: 'pulse-advanced', icon: Clock, label: 'Pulsations', desc: 'Alternance chaud/froid' },
+                      { id: 'rainbow', icon: Palette, label: 'Arc-en-ciel', desc: 'Séquence colorée complète' },
+                      { id: 'tetris', icon: Gamepad2, label: 'Tetris Lumière', desc: 'Jeu Tetris interactif sur les dalles' },
+                      { id: 'memory', icon: Brain, label: 'Jeu de Mémoire', desc: 'Mémorisation de séquences lumineuses type Simon' },
+                      { id: 'tetris-blueprint', icon: Gamepad2, label: 'Tetris Blueprint (UE5)', desc: 'Tetris jouable via nœuds on_tick + game_tetris_block' },
+                    ].map((t) => (
+                      <button
+                        key={t.id}
+                        onClick={() => setNewProjectTemplate(t.id as typeof newProjectTemplate)}
+                        className="g-card"
+                        style={{
+                          padding: 14,
+                          borderRadius: 14,
+                          border: newProjectTemplate === t.id ? '2px solid #4361ee' : '1px solid rgba(255,255,255,0.6)',
+                          background: newProjectTemplate === t.id ? 'rgba(67, 97, 238, 0.06)' : 'linear-gradient(135deg, rgba(255,255,255,0.78), rgba(255,255,255,0.55))',
+                          cursor: 'pointer',
+                          textAlign: 'left',
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+                          <t.icon size={18} color={newProjectTemplate === t.id ? '#4361ee' : '#666'} />
+                          <span style={{ fontWeight: 700, fontSize: 14 }}>{t.label}</span>
+                        </div>
+                        <p style={{ margin: 0, fontSize: 12, opacity: 0.7, lineHeight: 1.4 }}>{t.desc}</p>
+                      </button>
+                    ))}
+                  </div>
+                  <div style={{ borderTop: '1px solid rgba(0,0,0,0.08)', paddingTop: 12, marginBottom: 8 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', opacity: 0.5, marginBottom: 8 }}>Jeux natifs</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
+                      {[
+                        { id: 'snake',        icon: Gamepad2,          label: 'Snake',           desc: 'Snake chromatique spectral' },
+                        { id: 'puissance4',   icon: Gamepad2,          label: 'Puissance 4',     desc: 'Jeu de stratégie Puissance 4' },
+                        { id: 'color_speed',  icon: Zap,               label: 'Color Speed',     desc: 'Réflexes — clique la bonne dalle' },
+                        { id: 'maitre_blanc', icon: Palette,           label: 'Maître du Blanc', desc: 'Reproduis la température de blanc' },
+                        { id: 'intrus',       icon: Crosshair,         label: "L'Intrus",        desc: 'Trouve la dalle différente au CS-160' },
+                        { id: 'canal_mix',    icon: SlidersHorizontal, label: 'Mix Canaux',      desc: 'Mélange spectral CIE' },
+                        { id: 'metamere',     icon: Palette,           label: 'Métamérie',       desc: 'Illuminants et métamérie' },
+                        { id: 'chromaticite', icon: Crosshair,         label: 'Chromaticité',    desc: 'Diagramme CIE 1931' },
+                        { id: 'spectre',      icon: Gamepad2,          label: 'Spectre',         desc: 'Spectre chromatique multijoueur' },
+                      ].map((t) => (
+                        <button
+                          key={t.id}
+                          onClick={() => setNewProjectTemplate(t.id as typeof newProjectTemplate)}
+                          className="g-card"
+                          style={{
+                            padding: 14,
+                            borderRadius: 14,
+                            border: newProjectTemplate === t.id ? '2px solid #7c3aed' : '1px solid rgba(255,255,255,0.6)',
+                            background: newProjectTemplate === t.id ? 'rgba(124, 58, 237, 0.06)' : 'linear-gradient(135deg, rgba(255,255,255,0.78), rgba(255,255,255,0.55))',
+                            cursor: 'pointer',
+                            textAlign: 'left',
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+                            <t.icon size={18} color={newProjectTemplate === t.id ? '#7c3aed' : '#666'} />
+                            <span style={{ fontWeight: 700, fontSize: 14 }}>{t.label}</span>
+                          </div>
+                          <p style={{ margin: 0, fontSize: 12, opacity: 0.7, lineHeight: 1.4 }}>{t.desc}</p>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
