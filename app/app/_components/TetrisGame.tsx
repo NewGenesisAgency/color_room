@@ -38,21 +38,21 @@ export type TetrisSnapshot = { grid: Grid; piece: Piece | null; score: number; g
 export type TetrisParams = { speed?: number };
 
 // ─── 7-bag randomizer ────────────────────────────────────────────────────────
+// Closure : évite les class private fields qui posent problème avec SWC/Babel.
 // Garantit qu'on voit chaque pièce exactement une fois par cycle de 7.
-// Plus jamais 5 S d'affilée.
-class Bag {
-  private bag: number[] = [];
-  private refill() {
-    this.bag = [0, 1, 2, 3, 4, 5, 6];
-    for (let i = this.bag.length - 1; i > 0; i--) {
+function makeBag(): () => number {
+  let pool: number[] = [];
+  function refill() {
+    pool = [0, 1, 2, 3, 4, 5, 6];
+    for (let i = pool.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
-      [this.bag[i], this.bag[j]] = [this.bag[j], this.bag[i]];
+      const tmp = pool[i]; pool[i] = pool[j]; pool[j] = tmp;
     }
   }
-  next(): number {
-    if (this.bag.length === 0) this.refill();
-    return this.bag.pop()!;
-  }
+  return function nextIdx(): number {
+    if (pool.length === 0) refill();
+    return pool.pop()!;
+  };
 }
 
 // ─── Pure helpers ─────────────────────────────────────────────────────────────
@@ -140,24 +140,24 @@ type GS = {
   grid: Grid;
   piece: Piece | null;
   hold: Piece | null;
-  holdUsed: boolean;        // ne peut utiliser hold qu'une fois par pièce
-  queue: number[];          // 3 pièces suivantes visibles
-  bag: Bag;
+  holdUsed: boolean;
+  queue: number[];          // 3 pièces suivantes (indices PIECES)
+  nextIdx: () => number;    // 7-bag closure
   score: number;
   lines: number;
-  combo: number;            // lignes consécutives
+  combo: number;
   over: boolean;
 };
 
 function initGS(): GS {
-  const bag = new Bag();
+  const nextIdx = makeBag();
   return {
     grid: emptyGrid(),
     piece: null,
     hold: null,
     holdUsed: false,
-    queue: [bag.next(), bag.next(), bag.next()],
-    bag,
+    queue: [nextIdx(), nextIdx(), nextIdx()],
+    nextIdx,
     score: 0,
     lines: 0,
     combo: 0,
@@ -167,7 +167,7 @@ function initGS(): GS {
 
 function spawnNext(s: GS): boolean {
   const idx = s.queue.shift()!;
-  s.queue.push(s.bag.next());
+  s.queue.push(s.nextIdx());
   const spawned = pieceFromIdx(idx);
   if (collides(s.grid, spawned)) {
     s.piece = null;
