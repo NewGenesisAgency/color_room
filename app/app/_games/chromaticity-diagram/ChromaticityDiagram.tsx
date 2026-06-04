@@ -107,6 +107,9 @@ const SHOW_DURATION = 5;   // secondes d'affichage de la couleur cible
 const TOTAL_ROUNDS  = 5;
 const INTENSITY     = 85;
 
+const LEFT_IDX  = [0,1,2,6,7,8,12,13,14,18,19,20,24,25,26,30,31,32,36,37,38];
+const RIGHT_IDX = [3,4,5,9,10,11,15,16,17,21,22,23,27,28,29,33,34,35,39,40,41];
+
 // ── Styles ────────────────────────────────────────────────────────────────────
 const S: Record<string, React.CSSProperties> = {
   wrap: {
@@ -189,7 +192,6 @@ export default function ChromaticityDiagram({ onSendColor, onTurnOffAll, onQuit,
   const [dist,       setDist]       = useState(0);
   useEffect(() => { if (phase === 'finished') onComplete?.(totalScore); }, [phase]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const numTiles    = Math.min(tileCount, 42);
   const canvasRef   = useRef<HTMLCanvasElement | null>(null);
   const svgRef      = useRef<SVGSVGElement | null>(null);
   const hwTimerRef  = useRef<number>(0);
@@ -243,7 +245,7 @@ export default function ChromaticityDiagram({ onSendColor, onTurnOffAll, onQuit,
     setGuessY(0.3290);
     setCountdown(SHOW_DURATION);
     setPhase('show');
-    for (let i = 0; i < numTiles; i++) onSendColor(i, tgt.rgb.r, tgt.rgb.g, tgt.rgb.b, INTENSITY);
+    for (const i of RIGHT_IDX) onSendColor(i, tgt.rgb.r, tgt.rgb.g, tgt.rgb.b, INTENSITY);
   }
 
   // ── Compte à rebours phase "show" ─────────────────────────────────────────
@@ -269,9 +271,9 @@ export default function ChromaticityDiagram({ onSendColor, onTurnOffAll, onQuit,
       if (phaseRef.current !== 'guess') return;
       const c = xyToRgb255(x, y);
       if (!c) return;
-      for (let i = 0; i < numTiles; i++) onSendColor(i, c.r, c.g, c.b, INTENSITY);
+      for (const i of LEFT_IDX) onSendColor(i, c.r, c.g, c.b, INTENSITY);
     }, 30);
-  }, [numTiles, onSendColor]);
+  }, [onSendColor]);
 
   // ── Mettre à jour la devinette (sliders ou clic diagramme) ───────────────
   function updateGuess(x: number, y: number) {
@@ -309,8 +311,10 @@ export default function ChromaticityDiagram({ onSendColor, onTurnOffAll, onQuit,
     setDist(parseFloat(d.toFixed(5)));
     setRoundScore(pts);
     setPhase('result');
-    // Révéler la couleur cible sur les dalles
-    for (let i = 0; i < numTiles; i++) onSendColor(i, target.rgb.r, target.rgb.g, target.rgb.b, INTENSITY);
+    // Révéler la couleur cible (droite) + réponse joueur (gauche)
+    for (const i of RIGHT_IDX) onSendColor(i, target.rgb.r, target.rgb.g, target.rgb.b, INTENSITY);
+    const gc = xyToRgb255(guessX, guessY);
+    if (gc) for (const i of LEFT_IDX) onSendColor(i, gc.r, gc.g, gc.b, INTENSITY);
   }
 
   // ── Passer à la manche suivante / terminer ────────────────────────────────

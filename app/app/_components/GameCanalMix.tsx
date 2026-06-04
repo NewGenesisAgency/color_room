@@ -103,6 +103,10 @@ function xyToRgb255(x: number, y: number) {
   };
 }
 
+/* ─── Room tile groups ───────────────────────────────────────────────── */
+const LEFT_IDX  = [0,1,2,6,7,8,12,13,14,18,19,20,24,25,26,30,31,32,36,37,38];
+const RIGHT_IDX = [3,4,5,9,10,11,15,16,17,21,22,23,27,28,29,33,34,35,39,40,41];
+
 /* ─── Game constants ─────────────────────────────────────────────────── */
 const TOTAL_ROUNDS = 5;
 const AUTO_S = 4;
@@ -205,14 +209,15 @@ export default function GameCanalMix({
 
   useEffect(() => () => { onTurnOffAll(); window.clearTimeout(hwTimer.current); }, []); // eslint-disable-line
 
-  /* ── Aperçu live : envoie les 3 canaux DOSÉS par les sliders aux dalles ── */
+  /* ── Aperçu live : envoie les 3 canaux DOSÉS par les sliders aux dalles de GAUCHE ── */
   useEffect(() => {
     if (phase !== 'playing' || roundChans.length !== 3) return;
     window.clearTimeout(hwTimer.current);
     hwTimer.current = window.setTimeout(() => {
       const chs = new Array(32).fill(0);
       roundChans.forEach((i, k) => { chs[i] = Math.round((weights[k] ?? 0) * HW_INTENSITY); });
-      for (let t = 0; t < numTiles; t++) onSendRawChannels(t, chs);
+      // LEFT_IDX (21 dalles gauche) = mélange courant du joueur
+      for (const t of LEFT_IDX) onSendRawChannels(t, chs);
     }, 40);
   }, [weights, roundChans, phase, numTiles, onSendRawChannels]);
 
@@ -229,9 +234,16 @@ export default function GameCanalMix({
   /* ── Nouvelle manche : la cible est un mélange aléatoire des 3 canaux ── */
   function newRound(chans: number[]) {
     const tw = [0.25 + Math.random() * 0.75, 0.25 + Math.random() * 0.75, 0.25 + Math.random() * 0.75];
+    const targetXy = mixWeightedXy(chans, tw, profiles);
     setRoundChans(chans);
-    setTarget(mixWeightedXy(chans, tw, profiles));
+    setTarget(targetXy);
     setWeights([0.5, 0.5, 0.5]);
+
+    // RIGHT_IDX (21 dalles droite) = couleur cible à reproduire
+    const trgRgb = xyToRgb255(targetXy.x, targetXy.y);
+    if (trgRgb) {
+      for (const t of RIGHT_IDX) onSendColor(t, trgRgb.r, trgRgb.g, trgRgb.b, HW_INTENSITY);
+    }
   }
 
   /* ── Auto-avance après résultat ── */

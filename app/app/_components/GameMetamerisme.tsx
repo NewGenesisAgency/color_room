@@ -82,6 +82,9 @@ const PHYSICS_WORDS: { word: string; fg: RGB }[] = [
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
+const LEFT_IDX  = [0,1,2,6,7,8,12,13,14,18,19,20,24,25,26,30,31,32,36,37,38];
+const RIGHT_IDX = [3,4,5,9,10,11,15,16,17,21,22,23,27,28,29,33,34,35,39,40,41];
+
 const TOTAL_ROUNDS    = 8;
 const ROUND_TIME      = 90;
 const HIDE_WIN_DIST   = 0.08;
@@ -155,7 +158,6 @@ export default function GameMetamerisme({
   useEffect(() => { if (phase === 'finished') onComplete?.(totalScore); }, [phase]); // eslint-disable-line react-hooks/exhaustive-deps
   const [autoAdv,    setAutoAdv]    = useState(5);
 
-  const numTiles = Math.min(tileCount, 42);
   const timerRef = useRef<number>(0);
   const hwRef    = useRef<number>(0);
 
@@ -163,9 +165,9 @@ export default function GameMetamerisme({
   const sendIllumToTiles = useCallback((il: RGB) => {
     window.clearTimeout(hwRef.current);
     hwRef.current = window.setTimeout(() => {
-      for (let i = 0; i < numTiles; i++) onSendColor(i, il.r, il.g, il.b, 80);
+      for (const i of LEFT_IDX) onSendColor(i, il.r, il.g, il.b, 80);
     }, 40);
-  }, [numTiles, onSendColor]);
+  }, [onSendColor]);
 
   useEffect(() => () => {
     window.clearTimeout(hwRef.current);
@@ -193,6 +195,8 @@ export default function GameMetamerisme({
     setHintShown(false);
     setIllum(r[0].startIllum);
     sendIllumToTiles(r[0].startIllum);
+    const firstEntry = PHYSICS_WORDS[r[0].wordIdx];
+    for (const i of RIGHT_IDX) onSendColor(i, firstEntry.fg.r, firstEntry.fg.g, firstEntry.fg.b, 80);
     launchTimer();
   }
 
@@ -232,10 +236,11 @@ export default function GameMetamerisme({
     const pts = forcePts !== undefined ? forcePts : computeScore();
     setRoundScore(pts);
     setPhase('result');
-    // Flash the winning target colour on tiles
+    // Show reference (word colour) on RIGHT, player illuminant on LEFT
     if (round && entry) {
-      const target = round.mode === 'cacher' ? entry.fg : { r: 255, g: 255, b: 255 };
-      for (let i = 0; i < numTiles; i++) onSendColor(i, target.r, target.g, target.b, 80);
+      const refColor = entry.fg;
+      for (const i of RIGHT_IDX) onSendColor(i, refColor.r, refColor.g, refColor.b, 80);
+      // LEFT keeps the current player illuminant (already sent via sendIllumToTiles)
     }
     let n = 5;
     setAutoAdv(n);
@@ -262,6 +267,8 @@ export default function GameMetamerisme({
     const startIl = rounds[next].startIllum;
     setIllum(startIl);
     sendIllumToTiles(startIl);
+    const nextEntry = PHYSICS_WORDS[rounds[next].wordIdx];
+    for (const i of RIGHT_IDX) onSendColor(i, nextEntry.fg.r, nextEntry.fg.g, nextEntry.fg.b, 80);
     setPhase('playing');
     launchTimer();
   }

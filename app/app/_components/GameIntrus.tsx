@@ -10,6 +10,9 @@ import type { GameTileProps } from './GameColorSpeed';
 // chaque dalle avec le CS-160, lit la mesure, et désigne l'intrus. Course contre
 // la montre : à chaque niveau la différence devient plus subtile.
 
+const LEFT_IDX  = [0,1,2,6,7,8,12,13,14,18,19,20,24,25,26,30,31,32,36,37,38];
+const RIGHT_IDX = [3,4,5,9,10,11,15,16,17,21,22,23,27,28,29,33,34,35,39,40,41];
+
 const COLS = 6;
 const ROWS = 7;
 const CELLS = COLS * ROWS;
@@ -107,7 +110,8 @@ export default function GameIntrus({ onSendColor, onTurnOff, onTurnOffAll, onQui
     setReadings({});
     setReveal(false);
     setMsg('Visez une dalle avec le CS-160 puis analysez-la.');
-    for (let i = 0; i < numTiles; i++) onSendColor(i, next[i].r, next[i].g, next[i].b, 80);
+    // Toutes les 42 dalles sont utilisées (concept de l'intrus = 1 dalle sur N) — intensité 95 pour meilleure visibilité
+    for (let i = 0; i < numTiles; i++) onSendColor(i, next[i].r, next[i].g, next[i].b, 95);
   }, [numTiles, onSendColor]);
 
   function startGame() {

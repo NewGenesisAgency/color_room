@@ -42,6 +42,9 @@ const TARGETS = [
 const TOTAL_ROUNDS = 10;
 const WIN_THRESHOLD = 0.025; // XYZ distance < this = victory
 
+const LEFT_IDX  = [0,1,2,6,7,8,12,13,14,18,19,20,24,25,26,30,31,32,36,37,38];
+const RIGHT_IDX = [3,4,5,9,10,11,15,16,17,21,22,23,27,28,29,33,34,35,39,40,41];
+
 /* ── Styles ──────────────────────────────────────────────────────────── */
 const P: Record<string, React.CSSProperties> = {
   wrap: {
@@ -113,8 +116,6 @@ export default function GameMaitreDuBlanc({ onSendColor, onTurnOff, onTurnOffAll
   useEffect(() => { if (phase === 'finished') onComplete?.(totalScore); }, [phase]); // eslint-disable-line react-hooks/exhaustive-deps
   const [attempts, setAttempts] = useState(0);
   const lastSendRef = useRef<number>(0);
-  const numTiles = Math.min(tileCount, 42);
-
   function shuffleOrder(): number[] {
     const arr = Array.from({ length: TOTAL_ROUNDS }, (_, i) => i);
     for (let i = arr.length - 1; i > 0; i--) {
@@ -137,10 +138,9 @@ export default function GameMaitreDuBlanc({ onSendColor, onTurnOff, onTurnOffAll
     lightTiles(target.r, target.g, target.b, 200, 200, 200, ord[0]);
   }
 
-  function lightTiles(tr: number, tg: number, tb: number, playerR: number, playerG: number, playerB: number, tIdx: number) {
-    const halfA = Math.floor(numTiles / 2);
-    for (let i = 0; i < halfA; i++) onSendColor(i, tr, tg, tb, 80);
-    for (let i = halfA; i < numTiles; i++) onSendColor(i, playerR, playerG, playerB, 80);
+  function lightTiles(tr: number, tg: number, tb: number, playerR: number, playerG: number, playerB: number, _tIdx: number) {
+    for (const i of RIGHT_IDX) onSendColor(i, tr, tg, tb, 90);
+    for (const i of LEFT_IDX)  onSendColor(i, playerR, playerG, playerB, 80);
   }
 
   function handleSliderChange(which: 'r' | 'g' | 'b', val: number) {
@@ -156,8 +156,7 @@ export default function GameMaitreDuBlanc({ onSendColor, onTurnOff, onTurnOffAll
     lastSendRef.current = now;
     if (order.length === 0) return;
     const target = TARGETS[order[roundIdx]];
-    const halfA = Math.floor(numTiles / 2);
-    for (let i = halfA; i < numTiles; i++) onSendColor(i, nr, ng, nb, 80);
+    for (const i of LEFT_IDX) onSendColor(i, nr, ng, nb, 80);
     const xyz = rgbToXYZ(nr, ng, nb);
     const tgt = rgbToXYZ(target.r, target.g, target.b);
     setDist(parseFloat(xyzDistance(xyz, tgt).toFixed(4)));
