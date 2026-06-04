@@ -30,7 +30,7 @@ export const CHANNELS_ROUGE: ChannelProfile[] = [
   { nm: 443, label: 'Bleu',               rgb: [0.10, 0.04, 0.98] },
   { nm: 479, label: 'Cyan-bleu',          rgb: [0.00, 0.45, 1.00] },
   { nm: 513, label: 'Vert',               rgb: [0.00, 0.95, 0.38] },
-  { nm: 525, label: 'Vert foncé',         rgb: [0.00, 0.72, 0.18] },
+  { nm: 513, label: 'Vert (2)',           rgb: [0.00, 0.72, 0.18] },
   { nm: 541, label: 'Jaune-vert',         rgb: [0.50, 1.00, 0.00] },
   { nm: 593, label: 'Orange',             rgb: [1.00, 0.72, 0.00] },
   { nm: 605, label: 'Orange-rouge',       rgb: [1.00, 0.38, 0.00] },
