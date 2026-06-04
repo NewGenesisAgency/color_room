@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Crosshair, Ruler, Target, Timer, Trophy, X } from 'lucide-react';
 import type { GameTileProps } from './GameColorSpeed';
-import cs160Service from '@/app/_services/cs160';
 
 // ── L'Intrus — mode "Sniper" de précision ─────────────────────────────────────
 // Toutes les dalles s'allument dans une couleur identique sauf UNE, légèrement
@@ -134,9 +133,17 @@ export default function GameIntrus({ onSendColor, onTurnOff, onTurnOffAll, onQui
     setMeasuring(true);
     let reading: Reading | null = null;
     try {
-      const { lvxy } = await cs160Service.oneShotMeasurement();
-      if (lvxy && Number.isFinite(lvxy.x) && Number.isFinite(lvxy.y)) {
-        reading = { x: lvxy.x, y: lvxy.y, Lv: lvxy.Lv };
+      const res = await fetch('/api/cs160', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'measure' }),
+      });
+      const data = await res.json();
+      if (data.success && data.data?.lvxy) {
+        const { Lv, x, y } = data.data.lvxy;
+        if (Number.isFinite(x) && Number.isFinite(y) && Number.isFinite(Lv)) {
+          reading = { x, y, Lv };
+        }
       }
     } catch { /* appareil indisponible → simulation */ }
     if (!reading) {
