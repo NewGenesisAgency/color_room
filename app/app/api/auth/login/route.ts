@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
       ok: true,
       user: { id: user.id, username: user.name, role: user.user_type, niveau: user.niveau, avatarColor: user.avatar_color, avatarIcon: user.avatar_icon },
     });
-    res.cookies.set('crg_session', token, { httpOnly: true, maxAge: 7 * 24 * 3600, path: '/', sameSite: 'lax' });
+    res.cookies.set('crg_session', token, { httpOnly: true, maxAge: 30 * 24 * 3600, path: '/', sameSite: 'lax' });
     return res;
   } catch (err) {
     return NextResponse.json({ error: 'Erreur serveur', detail: String(err) }, { status: 500 });

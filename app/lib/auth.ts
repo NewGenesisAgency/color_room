@@ -41,3 +41,10 @@ export function getSessionUser(token: string): SessionUser | null {
   `).get(token) as SessionUser | undefined;
   return row ?? null;
 }
+
+// Renouvelle la date d'expiration d'une session valide (sliding window 30 jours).
+export function renewSession(token: string): void {
+  const db = getDb();
+  const newExpiry = new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString();
+  db.prepare('UPDATE crg_sessions SET expires_at = ? WHERE token = ?').run(newExpiry, token);
+}

@@ -1609,25 +1609,53 @@ export default function JeuxPage() {
     const snoozed = window.localStorage.getItem('crg_mp_snooze_session') ?? '';
     if (snoozed) setMpSnoozedSessionId(snoozed);
 
-    // Restore session from server cookie
+    // ── Restauration de session ─────────────────────────────────────────────
+    // 1. Lecture du cache localStorage IMMÉDIATE → évite le flash de LoginScreen
+    const cachedRaw = window.localStorage.getItem('crg_user');
+    let hasCachedUser = false;
+    if (cachedRaw) {
+      try {
+        const cached = JSON.parse(cachedRaw) as { username: string; role: string; niveau?: string; avatarColor?: string; avatarIcon?: string };
+        if (cached.username) {
+          setCurrentUser(cached.username);
+          setUserType((cached.role ?? 'apprenant') as UserType);
+          if (cached.niveau) setNiveau(cached.niveau as Niveau);
+          if (cached.avatarColor) setUserAvatarColor(cached.avatarColor);
+          if (cached.avatarIcon) setUserAvatarIcon(cached.avatarIcon.slice(0, 1).toUpperCase() || 'U');
+          setView('main');
+          setSessionChecked(true); // skip loader
+          hasCachedUser = true;
+        }
+      } catch { window.localStorage.removeItem('crg_user'); }
+    }
+
+    // 2. Vérification serveur en arrière-plan (sliding-window renewal inclus dans /api/auth/me)
     void fetch('/api/auth/me', { cache: 'no-store' })
       .then((r) => r.json())
       .then((data) => {
         if (data.user) {
+          // Mettre à jour cache + state avec les données fraîches
+          window.localStorage.setItem('crg_user', JSON.stringify(data.user));
           setCurrentUser(data.user.username);
           setUserType(data.user.role as UserType);
           if (data.user.niveau) setNiveau(data.user.niveau as Niveau);
           if (data.user.avatarColor) setUserAvatarColor(data.user.avatarColor);
           if (data.user.avatarIcon) setUserAvatarIcon((data.user.avatarIcon as string).slice(0, 1).toUpperCase() || 'U');
-          // Fetch classes membership
           void fetch('/api/auth/me/classes', { cache: 'no-store' })
             .then(r => r.json()).then(d => { if (d.classes) setUserClasses(d.classes.map((c: {name:string}) => c.name)); })
             .catch(() => {});
           setView('main');
+        } else {
+          // Session expirée ou invalide → vider le cache et afficher le login
+          window.localStorage.removeItem('crg_user');
+          if (hasCachedUser) {
+            setCurrentUser(null);
+            setView('login');
+          }
         }
-        setSessionChecked(true);
+        if (!hasCachedUser) setSessionChecked(true);
       })
-      .catch(() => setSessionChecked(true));
+      .catch(() => { if (!hasCachedUser) setSessionChecked(true); });
 
     // Check if teacher account exists (for setup)
     void fetch('/api/auth/setup', { cache: 'no-store' })
@@ -2636,6 +2664,7 @@ export default function JeuxPage() {
 
   function logout() {
     void fetch('/api/auth/logout', { method: 'POST' }).catch(() => {});
+    window.localStorage.removeItem('crg_user');
     setCurrentUser(null);
     setView('login');
     setLoginStep('role');
@@ -4041,6 +4070,8 @@ export default function JeuxPage() {
           sessionChecked={sessionChecked}
           initialClassCode={pendingClassCode || undefined}
           onSuccess={(user) => {
+            // Persister en localStorage pour éviter le flash au prochain chargement
+            window.localStorage.setItem('crg_user', JSON.stringify(user));
             setCurrentUser(user.username);
             setUserType((user.role === 'enseignant' || user.role === 'formateur') ? 'enseignant' : 'apprenant');
             if (user.niveau) setNiveau(user.niveau as Niveau);
