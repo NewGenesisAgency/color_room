@@ -215,7 +215,7 @@ export default function GameCanalMix({
   const [totalPts, setTotalPts]         = useState(0);
   const [countdown, setCountdown]       = useState(AUTO_S);
   const [msg, setMsg]                   = useState('');
-  useEffect(() => { if (phase === 'finished') onComplete?.(totalPts); }, [phase]); // eslint-disable-line
+  useEffect(() => { if (phase === 'finished') onComplete?.(Math.round(totalPts / 5)); }, [phase]); // eslint-disable-line
 
   const hwTimer  = useRef<number>(0);
   const numTiles = Math.min(tileCount, 42);

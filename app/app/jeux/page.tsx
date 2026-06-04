@@ -1006,6 +1006,7 @@ export default function JeuxPage() {
 
   const [scorePlusAnimKey, setScorePlusAnimKey] = useState<number>(0);
   const [scorePlusValue, setScorePlusValue] = useState<number>(0);
+  const [scoreFlashKey, setScoreFlashKey] = useState(0);
 
   // Simon game states
   const [simonActive, setSimonActive] = useState<boolean>(false);
@@ -2897,6 +2898,9 @@ export default function JeuxPage() {
     }
   }
 
+  // Flash animation on score change
+  useEffect(() => { setScoreFlashKey(k => k + 1); }, [score]); // eslint-disable-line react-hooks/exhaustive-deps
+
   function award(points: number, text: string) {
     awardPoints(points, text);
     setGamesCompleted((v) => v + 1);
@@ -4167,9 +4171,10 @@ export default function JeuxPage() {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                   <div style={{ padding: '12px 14px', borderRadius: 14, background: 'rgba(255,255,255,0.65)', border: '1px solid rgba(255,255,255,0.85)', backdropFilter: 'blur(16px)', boxShadow: 'inset 0 1px 0 #fff' }}>
                     <div style={{ fontSize: 10, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.07em', color: 'var(--text-3)', marginBottom: 5 }}>Score</div>
-                    <div style={{ fontSize: 24, fontWeight: 900, color: 'var(--accent)', letterSpacing: '-0.02em', position: 'relative' }}>
+                    <div key={scoreFlashKey} style={{ fontSize: 24, fontWeight: 900, color: 'var(--accent)', letterSpacing: '-0.02em', position: 'relative', animation: scoreFlashKey > 0 ? 'scoreFlash .35s ease' : 'none' }}>
                       {score}
                       {scorePlusValue > 0 ? <span key={scorePlusAnimKey} className="mp-plusone">+{scorePlusValue}</span> : null}
+                      {scorePlusValue < 0 ? <span key={scorePlusAnimKey} className="mp-minusone">{scorePlusValue}</span> : null}
                     </div>
                   </div>
                   <div style={{ padding: '12px 14px', borderRadius: 14, background: 'rgba(255,255,255,0.65)', border: '1px solid rgba(255,255,255,0.85)', backdropFilter: 'blur(16px)', boxShadow: 'inset 0 1px 0 #fff' }}>
@@ -4759,6 +4764,16 @@ export default function JeuxPage() {
                       setGamesCompleted((v) => v + 1);
                       if (pts > 0) { setScorePlusValue(pts); setScorePlusAnimKey((k) => k + 1); }
                     },
+                    onScoreDelta: (delta: number, reason: string) => {
+                      if (delta > 0) {
+                        awardPoints(delta, reason);
+                      } else {
+                        setScore(s => Math.max(0, s + delta));
+                        setMessage(reason);
+                        setScorePlusValue(delta);
+                        setScorePlusAnimKey(k => k + 1);
+                      }
+                    },
                   };
                   return (
                     <div style={{ marginTop: 12, borderRadius: 18, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(10,10,18,0.95)' }}>
@@ -4843,6 +4858,16 @@ export default function JeuxPage() {
                     tileCount: 42,
                     onRegisterClickHandler: (fn: ((idx: number) => void) | null) => { gameClickHandlerRef.current = fn; },
                     onComplete: (points: number) => { const pts = Math.max(0, Math.round(points)); setScore((s) => s + pts); setGamesCompleted((v) => v + 1); if (pts > 0) { setScorePlusValue(pts); setScorePlusAnimKey((k) => k + 1); } },
+                    onScoreDelta: (delta: number, reason: string) => {
+                      if (delta > 0) {
+                        awardPoints(delta, reason);
+                      } else {
+                        setScore(s => Math.max(0, s + delta));
+                        setMessage(reason);
+                        setScorePlusValue(delta);
+                        setScorePlusAnimKey(k => k + 1);
+                      }
+                    },
                   };
                   return (
                     <div style={{ marginTop: 12, borderRadius: 18, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.08)', background: hudRun?.cfg.bgColor ?? '#0d1119' }}>

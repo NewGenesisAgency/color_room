@@ -247,7 +247,7 @@ export default function GamePuissance4({ onSendColor, onTurnOff, onTurnOffAll, o
   const [winner, setWinner]         = useState<Cell | null>(null);
   const [isDraw, setIsDraw]         = useState(false);
   // Ne compte comme "réussi" qu'une victoire du joueur (P1) ou un nul — pas une défaite.
-  useEffect(() => { if (phase === 'finished' && (winner === P1 || isDraw)) onComplete?.(winner === P1 ? 100 : 40); }, [phase]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (phase === 'finished' && (winner === P1 || isDraw)) onComplete?.(winner === P1 ? 300 : 100); }, [phase]); // eslint-disable-line react-hooks/exhaustive-deps
   const [thinking, setThinking]     = useState(false);
   const [moveCount, setMoveCount]   = useState(0);
   const [scores, setScores]         = useState({ p1: 0, p2: 0 });

@@ -14,6 +14,8 @@ export interface GameTileProps {
   /** Appelé une fois à la fin d'une partie : met à jour le score universel
    *  (points ajoutés) et incrémente le compteur de jeux réussis. */
   onComplete?: (points: number) => void;
+  /** Appelé à chaque delta de score en cours de jeu (positif ou négatif). */
+  onScoreDelta?: (delta: number, reason: string) => void;
 }
 
 /* ── Constants ──────────────────────────────────────────────────────── */
@@ -30,9 +32,9 @@ const COLORS: { r: number; g: number; b: number }[] = [
 
 type SpeedTier = { label: string; bonus: number; color: string; glow: string };
 function speedTier(ms: number): SpeedTier {
-  if (ms <  350) return { label: '⚡ ÉCLAIR',  bonus: 15, color: '#fff176', glow: 'rgba(255,241,118,0.55)' };
-  if (ms <  650) return { label: '🔥 RAPIDE',  bonus: 10, color: '#ffa040', glow: 'rgba(255,160,64,0.50)'  };
-  if (ms < 1100) return { label: '✓ BIEN',     bonus:  5, color: '#4ade80', glow: 'rgba(74,222,128,0.45)' };
+  if (ms <  350) return { label: '⚡ ÉCLAIR',  bonus: 30, color: '#fff176', glow: 'rgba(255,241,118,0.55)' };
+  if (ms <  650) return { label: '🔥 RAPIDE',  bonus: 20, color: '#ffa040', glow: 'rgba(255,160,64,0.50)'  };
+  if (ms < 1100) return { label: '✓ BIEN',     bonus: 10, color: '#4ade80', glow: 'rgba(74,222,128,0.45)' };
   return               { label: '🐢 LENT',     bonus:  0, color: '#94a3b8', glow: 'rgba(148,163,184,0.35)' };
 }
 
@@ -93,7 +95,7 @@ const ANIM = `
 ══════════════════════════════════════════════════════════════════════ */
 export default function GameColorSpeed({
   onSendColor, onTurnOff, onTurnOffAll, onQuit,
-  tileCount = 42, onRegisterClickHandler, onComplete,
+  tileCount = 42, onRegisterClickHandler, onComplete, onScoreDelta,
 }: GameTileProps) {
 
   type Phase = 'ready' | 'countdown' | 'playing' | 'finished';
@@ -101,7 +103,7 @@ export default function GameColorSpeed({
   const [phase,      setPhase]      = useState<Phase>('ready');
   const [timeLeft,   setTimeLeft]   = useState(GAME_DURATION);
   const [score,      setScore]      = useState(0);
-  useEffect(() => { if (phase === 'finished') onComplete?.(score); }, [phase]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (phase === 'finished') onComplete?.(0); }, [phase]); // eslint-disable-line react-hooks/exhaustive-deps
   const [missed,     setMissed]     = useState(0);
   const [combo,      setCombo]      = useState(0);
   const [lightnings, setLightnings] = useState(0);
@@ -160,6 +162,7 @@ export default function GameColorSpeed({
       comboRef.current = 0;
       setCombo(0);
       setMissed(m => m + 1);
+      onScoreDelta?.(-10, 'Raté −10');
       const missIdx = activeTileRef.current!;
       onTurnOff(missIdx);
       activeTileRef.current = null;
@@ -229,6 +232,7 @@ export default function GameColorSpeed({
       if (tier.bonus === 15) { lightRef.current++; setLightnings(lightRef.current); }
 
       setScore(s => s + delta);
+      onScoreDelta?.(delta, `${tier.label} +${delta}`);
       setPopKey(k => k + 1);
       bubble(`+${delta}`, tier);
       showSpeed(tier);
@@ -244,8 +248,9 @@ export default function GameColorSpeed({
       comboRef.current = 0;
       setCombo(0);
       setMissed(m => m + 1);
-      bubble('−2', { color: '#ef4444', glow: 'rgba(239,68,68,0.5)' });
-      setScore(s => Math.max(0, s - 2));
+      bubble('−15', { color: '#ef4444', glow: 'rgba(239,68,68,0.5)' });
+      setScore(s => Math.max(0, s - 15));
+      onScoreDelta?.(-15, 'Mauvaise dalle −15');
     }
   }
 
@@ -283,9 +288,9 @@ export default function GameColorSpeed({
           </p>
           <div style={P.tiers}>
             {([
-              ['⚡ Éclair',  '< 350 ms', '+15', '#fff176'],
-              ['🔥 Rapide',  '< 650 ms', '+10', '#ffa040'],
-              ['✓ Bien',     '< 1.1 s',  '+5',  '#4ade80'],
+              ['⚡ Éclair',  '< 350 ms', '+30', '#fff176'],
+              ['🔥 Rapide',  '< 650 ms', '+20', '#ffa040'],
+              ['✓ Bien',     '< 1.1 s',  '+10', '#4ade80'],
               ['🐢 Lent',    '≥ 1.1 s',  '+0',  '#94a3b8'],
             ] as [string, string, string, string][]).map(([lbl, time, pts, c]) => (
               <div key={lbl} style={{ ...P.tierChip, borderColor: c + '44', color: c }}>

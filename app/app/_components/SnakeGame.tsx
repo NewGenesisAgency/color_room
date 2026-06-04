@@ -101,10 +101,12 @@ const TOUCH_KEYS: TouchKey[] = [
   { key: 'ArrowDown',  slot: 'down',  label: <ChevronDown size={22} />, repeat: true },
 ];
 
-export default function SnakeGame({ onSendColor, onTurnOff, onTurnOffAll, onQuit, onComplete }: GameTileProps) {
+export default function SnakeGame({ onSendColor, onTurnOff, onTurnOffAll, onQuit, onComplete, onScoreDelta }: GameTileProps) {
   const gs = useRef<GS>(fresh());
   const onCompleteRef = useRef(onComplete);
   onCompleteRef.current = onComplete;
+  const onScoreDeltaRef = useRef(onScoreDelta);
+  onScoreDeltaRef.current = onScoreDelta;
   const [, setTick] = useState(0);
   const rerender = useCallback(() => setTick(t => (t + 1) % 1_000_000), []);
 
@@ -147,18 +149,19 @@ export default function SnakeGame({ onSendColor, onTurnOff, onTurnOffAll, onQuit
       const h = s.snake[0];
       const nx: Pt = { x: h.x + DELTA[s.dir].x, y: h.y + DELTA[s.dir].y };
       if (nx.x < 0 || nx.x >= COLS || nx.y < 0 || nx.y >= ROWS) {
-        s.over = true; draw(s); rerender(); onCompleteRef.current?.(s.score); return;
+        s.over = true; draw(s); rerender(); onScoreDeltaRef.current?.(-20, 'Game over −20'); onCompleteRef.current?.(0); return;
       }
       const fi = s.foods.findIndex(f => f.pos.x === nx.x && f.pos.y === nx.y);
       const eating = fi >= 0;
       const checkBody = eating ? s.snake : s.snake.slice(0, -1);
       if (checkBody.some(p => p.x === nx.x && p.y === nx.y)) {
-        s.over = true; draw(s); rerender(); onCompleteRef.current?.(s.score); return;
+        s.over = true; draw(s); rerender(); onScoreDeltaRef.current?.(-20, 'Game over −20'); onCompleteRef.current?.(0); return;
       }
       s.snake = [nx, ...(eating ? s.snake : s.snake.slice(0, -1))];
       if (eating) {
         const ate = s.foods[fi];
         s.score += ate.type.pts;
+        onScoreDeltaRef.current?.(ate.type.pts, `${ate.type.nm}nm +${ate.type.pts}`);
         s.eaten++;
         s.level = Math.floor(s.eaten / 5) + 1;
         s.flash = FOODS.indexOf(ate.type);

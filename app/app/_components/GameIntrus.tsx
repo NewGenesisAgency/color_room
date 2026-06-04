@@ -75,7 +75,7 @@ const S: Record<string, React.CSSProperties> = {
   statLbl: { fontSize: 10, color: 'rgba(255,255,255,.4)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 3 },
 };
 
-export default function GameIntrus({ onSendColor, onTurnOff, onTurnOffAll, onQuit, onComplete, tileCount = 42 }: GameTileProps) {
+export default function GameIntrus({ onSendColor, onTurnOff, onTurnOffAll, onQuit, onComplete, onScoreDelta, tileCount = 42 }: GameTileProps) {
   const numTiles = Math.min(tileCount, CELLS);
   const [phase, setPhase] = useState<'ready' | 'playing' | 'finished'>('ready');
   const [level, setLevel] = useState(1);
@@ -93,7 +93,7 @@ export default function GameIntrus({ onSendColor, onTurnOff, onTurnOffAll, onQui
   const phaseRef = useRef(phase); phaseRef.current = phase;
   const scoreRef = useRef(0); scoreRef.current = score;
 
-  useEffect(() => { if (phase === 'finished') onComplete?.(scoreRef.current); }, [phase]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (phase === 'finished') onComplete?.(0); }, [phase]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => () => onTurnOffAll(), []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Génère un niveau : base identique + 1 intrus
@@ -164,8 +164,9 @@ export default function GameIntrus({ onSendColor, onTurnOff, onTurnOffAll, onQui
   function accuse() {
     if (selected === null || phase !== 'playing') return;
     if (selected === intruderIdx) {
-      const bonus = Math.round(timeLeft * 5 + level * 50);
+      const bonus = Math.round(timeLeft * 3 + level * 30);
       setScore((s) => s + bonus);
+      onScoreDelta?.(bonus, `Intrus trouvé ! +${bonus}`);
       setMsg(`Intrus démasqué ! +${bonus} pts`);
       const nextLvl = level + 1;
       setLevel(nextLvl);
@@ -173,6 +174,7 @@ export default function GameIntrus({ onSendColor, onTurnOff, onTurnOffAll, onQui
       buildLevel(nextLvl);
     } else {
       setTimeLeft((t) => Math.max(1, t - WRONG_PENALTY));
+      onScoreDelta?.(-40, 'Mauvaise accusation −40');
       setMsg(`Ce n'est pas l'intrus. -${WRONG_PENALTY}s`);
     }
   }

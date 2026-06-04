@@ -155,7 +155,7 @@ export default function GameMetamerisme({
   const [roundScore, setRoundScore] = useState(0);
   const [totalScore, setTotalScore] = useState(0);
   const [validated,  setValidated]  = useState(false);
-  useEffect(() => { if (phase === 'finished') onComplete?.(totalScore); }, [phase]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (phase === 'finished') onComplete?.(Math.round(totalScore / 5)); }, [phase]); // eslint-disable-line react-hooks/exhaustive-deps
   const [autoAdv,    setAutoAdv]    = useState(5);
 
   const timerRef = useRef<number>(0);

@@ -113,7 +113,7 @@ export default function GameMaitreDuBlanc({ onSendColor, onTurnOff, onTurnOffAll
   const [roundScore, setRoundScore] = useState(0);
   const [totalScore, setTotalScore] = useState(0);
   const [dist, setDist] = useState(0);
-  useEffect(() => { if (phase === 'finished') onComplete?.(totalScore); }, [phase]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (phase === 'finished') onComplete?.(Math.round(totalScore / 5)); }, [phase]); // eslint-disable-line react-hooks/exhaustive-deps
   const [attempts, setAttempts] = useState(0);
   const lastSendRef = useRef<number>(0);
   function shuffleOrder(): number[] {

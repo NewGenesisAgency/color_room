@@ -124,7 +124,7 @@ function tryRotate(grid: Grid, p: Piece, cw: boolean): Piece | null {
 }
 
 // ─── Scoring (système Tetris guideline) ───────────────────────────────────────
-const LINE_PTS = [0, 100, 300, 500, 800]; // 0, 1, 2, 3, 4 lignes
+const LINE_PTS = [0, 50, 150, 350, 700]; // 0, 1, 2, 3, 4 lignes
 const COMBO_BONUS = 50;                    // bonus par combo consécutif
 const HARD_DROP_PTS = 2;                   // 2 pts par cellule en hard drop
 const SOFT_DROP_PTS = 1;                   // 1 pt par cellule en soft drop
