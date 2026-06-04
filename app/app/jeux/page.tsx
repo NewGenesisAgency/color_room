@@ -8,7 +8,7 @@ import { SPRITE_ICONS } from '@/app/editeur/UIDesigner';
 import type { TouchKey } from '@/app/_components/TouchControls';
 import NavigationMenu from '@/app/_components/NavigationMenu';
 import LoginScreen from '@/app/_components/LoginScreen';
-import { PLATE_TYPE, CHANNELS_ROUGE, CHANNELS_BLEU } from '@/lib/tileChannels';
+import { PLATE_TYPE, CHANNELS_ROUGE, CHANNELS_BLEU, getPlateType, MAP_ROUGE_TO_BLEU, remapChannels32 } from '@/lib/tileChannels';
 
 // Modules lourds (3D Three.js, jeux, pages spectre/chromaticité) chargés à la
 // demande : ils n'alourdissent plus le bundle initial de /jeux, ce qui accélère
@@ -1206,6 +1206,16 @@ export default function JeuxPage() {
         flushHardwareBatch();
       });
     }
+  }
+
+  // Comme scheduleSetCanal mais l'index est toujours en référence "rouge".
+  // Si la plaque est de type "bleu", le canal est remappé au nm le plus proche.
+  // Ex : refIdx=10 (629nm rouge) → canal 18 (620nm bleu) sur une plaque bleu.
+  function scheduleSetCanalRef(plaqueId: number, refIdx: number, intensity: number) {
+    const mapped = getPlateType(plaqueId) === 'rouge'
+      ? refIdx
+      : (MAP_ROUGE_TO_BLEU[refIdx] ?? refIdx);
+    scheduleSetCanal(plaqueId, mapped, intensity);
   }
 
   function sendRgbToPlate(rgb: TargetColor, intensity100: number, plateId: number) {
@@ -3579,7 +3589,7 @@ export default function JeuxPage() {
     setLedValues((prev) => ({ ...prev, [index]: value }));
 
     const targets = getTargetPlateIds();
-    for (const plaqueId of targets) scheduleSetCanal(plaqueId, index, value);
+    for (const plaqueId of targets) scheduleSetCanalRef(plaqueId, index, value);
 
     const next = { ...ledValues, [index]: value };
 
@@ -3600,7 +3610,7 @@ export default function JeuxPage() {
       const scale = masterIntensity / 255;
       const effective = clamp255(raw * scale);
       const targets = getTargetPlateIds();
-      for (const plaqueId of targets) scheduleSetCanal(plaqueId, index, effective);
+      for (const plaqueId of targets) scheduleSetCanalRef(plaqueId, index, effective);
 
       const channels32: number[] = [];
       for (let i = 0; i < 32; i++) channels32.push(clamp255((next[i] ?? 0) * scale));
@@ -3671,24 +3681,26 @@ export default function JeuxPage() {
 
   // API version that sends to hardware (debounced)
   function applyBeginnerRgb(rgb: TargetColor, intensity: number) {
-    const channels32 = rgbToChannels32(rgb, intensity);
+    const channels32Rouge = rgbToChannels32(rgb, intensity);
+    const channels32Bleu = remapChannels32(channels32Rouge, 'rouge', 'bleu');
     const targets = getTargetPlateIds();
     for (const plaqueId of targets) {
-      for (let i = 0; i < 32; i++) scheduleSetCanal(plaqueId, i, channels32[i]);
+      const ch = getPlateType(plaqueId) === 'rouge' ? channels32Rouge : channels32Bleu;
+      for (let i = 0; i < 32; i++) scheduleSetCanal(plaqueId, i, ch[i]);
     }
 
     setLedValues(() => {
       const next: Record<number, number> = {};
-      for (let i = 0; i < 32; i++) next[i] = channels32[i];
+      for (let i = 0; i < 32; i++) next[i] = channels32Rouge[i];
       return next;
     });
 
-    const preview = channels32ToPreviewRgb255(channels32, 100);
+    const preview = channels32ToPreviewRgb255(channels32Rouge, 100);
     const css = rgbToCss(preview);
     setHardwarePreviewCss(css);
     setSelectedPlatesColor(css, true);
 
-    const totalPower = channels32.reduce((sum, val) => sum + val, 0);
+    const totalPower = channels32Rouge.reduce((sum, val) => sum + val, 0);
     setInstrument((p) => ({ ...p, power: `${Math.floor(totalPower * 3)}W` }));
   }
 
@@ -4618,9 +4630,10 @@ export default function JeuxPage() {
                     onSendRawChannels: (idx: number, channels: number[]) => {
                       const plateId = PLATE_ID_BY_INDEX[idx];
                       if (!plateId) return;
-                      // Envoyer chaque canal directement (0-100 déjà) sans conversion RGB
-                      for (let ch = 0; ch < Math.min(channels.length, 32); ch++) {
-                        scheduleSetCanal(plateId, ch, Math.max(0, Math.min(100, Math.round(channels[ch] ?? 0))));
+                      // Remappe les canaux si la plaque est de type bleu (channels est en référence rouge)
+                      const mapped = remapChannels32(channels, 'rouge', getPlateType(plateId));
+                      for (let ch = 0; ch < 32; ch++) {
+                        scheduleSetCanal(plateId, ch, Math.max(0, Math.min(100, Math.round(mapped[ch] ?? 0))));
                       }
                       // Mise à jour visuelle : reconstituer une couleur approximative depuis les 3 premiers canaux
                       const r = clamp255(Math.round((channels[0] ?? 0) * 2.55));
@@ -4720,7 +4733,7 @@ export default function JeuxPage() {
                     },
                     onTurnOff: (idx: number) => { const p = PLATE_ID_BY_INDEX[idx]; if (!p) return; sendRgbToPlate({ r: 0, g: 0, b: 0 }, 0, p); setPlateColor(idx, '#000000', false); },
                     onTurnOffAll: () => { void blackoutHardware(); },
-                    onSendRawChannels: (idx: number, channels: number[]) => { const p = PLATE_ID_BY_INDEX[idx]; if (!p) return; for (let i = 0; i < 32; i++) scheduleSetCanal(p, i, clamp255(channels[i] ?? 0)); },
+                    onSendRawChannels: (idx: number, channels: number[]) => { const p = PLATE_ID_BY_INDEX[idx]; if (!p) return; const mapped = remapChannels32(channels, 'rouge', getPlateType(p)); for (let i = 0; i < 32; i++) scheduleSetCanal(p, i, clamp255(mapped[i] ?? 0)); },
                     onQuit: () => { void blackoutHardware(); setHudRun(null); setGameActive(false); },
                     tileCount: 42,
                     onRegisterClickHandler: (fn: ((idx: number) => void) | null) => { gameClickHandlerRef.current = fn; },

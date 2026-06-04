@@ -100,3 +100,70 @@ export function getPlateType(plateId: number): TileType {
 export function getChannels(plateId: number): ChannelProfile[] {
   return getPlateType(plateId) === 'bleu' ? CHANNELS_BLEU : CHANNELS_ROUGE;
 }
+
+/**
+ * Retourne l'index du canal de `dstType` dont le nm est le plus proche
+ * du canal `srcIdx` de `srcType`.
+ *
+ * Règles :
+ *  - Canal spectral (nm ≠ null) → cherche le nm le plus proche dans dst.
+ *  - Canal phosphore (nm = null) → conserve la position relative
+ *    dans le bloc phosphore (avec clamping si dst a moins de canaux phosphores).
+ */
+export function mapChannelToType(
+  srcIdx: number,
+  srcType: TileType,
+  dstType: TileType,
+): number {
+  if (srcType === dstType) return srcIdx;
+  const src = srcType === 'rouge' ? CHANNELS_ROUGE : CHANNELS_BLEU;
+  const dst = dstType === 'rouge' ? CHANNELS_ROUGE : CHANNELS_BLEU;
+  const srcNm = src[srcIdx]?.nm ?? null;
+
+  if (srcNm === null) {
+    // Bloc phosphore : position relative depuis la fin des LEDs spectrales
+    const srcSpec = src.filter(c => c.nm !== null).length;
+    const dstSpec = dst.filter(c => c.nm !== null).length;
+    const relPos = srcIdx - srcSpec;
+    return Math.min(dst.length - 1, dstSpec + Math.max(0, relPos));
+  }
+
+  // Canal spectral : nm le plus proche
+  let bestIdx = 0;
+  let bestDelta = Infinity;
+  for (let i = 0; i < dst.length; i++) {
+    const dstNm = dst[i].nm;
+    if (dstNm === null) continue;
+    const delta = Math.abs(dstNm - srcNm);
+    if (delta < bestDelta) { bestDelta = delta; bestIdx = i; }
+  }
+  return bestIdx;
+}
+
+// Tableaux pré-calculés (évite les calculs répétitifs dans les boucles hot-path)
+export const MAP_ROUGE_TO_BLEU: number[] = Array.from({ length: 32 }, (_, i) =>
+  mapChannelToType(i, 'rouge', 'bleu'),
+);
+export const MAP_BLEU_TO_ROUGE: number[] = Array.from({ length: 32 }, (_, i) =>
+  mapChannelToType(i, 'bleu', 'rouge'),
+);
+
+/**
+ * Reméppe un tableau de 32 valeurs de canaux d'un type vers l'autre.
+ * Deux canaux source qui tombent sur le même canal destination sont fusionnés
+ * par le max (on garde la valeur la plus forte).
+ */
+export function remapChannels32(
+  channels: number[],
+  srcType: TileType,
+  dstType: TileType,
+): number[] {
+  if (srcType === dstType) return channels;
+  const map = srcType === 'rouge' ? MAP_ROUGE_TO_BLEU : MAP_BLEU_TO_ROUGE;
+  const result = new Array(32).fill(0) as number[];
+  for (let i = 0; i < 32; i++) {
+    const dstIdx = map[i] ?? i;
+    result[dstIdx] = Math.max(result[dstIdx], channels[i] ?? 0);
+  }
+  return result;
+}
