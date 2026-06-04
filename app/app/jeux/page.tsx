@@ -8,6 +8,7 @@ import { SPRITE_ICONS } from '@/app/editeur/UIDesigner';
 import type { TouchKey } from '@/app/_components/TouchControls';
 import NavigationMenu from '@/app/_components/NavigationMenu';
 import LoginScreen from '@/app/_components/LoginScreen';
+import { PLATE_TYPE, CHANNELS_ROUGE, CHANNELS_BLEU } from '@/lib/tileChannels';
 
 // Modules lourds (3D Three.js, jeux, pages spectre/chromaticité) chargés à la
 // demande : ils n'alourdissent plus le bundle initial de /jeux, ce qui accélère
@@ -534,7 +535,8 @@ function seatTintLabel(channel1to32?: number): string {
   return name ? `Canal ${n}: ${name}` : `Canal ${n}`;
 }
 
-function channels32ToPreviewRgb255(channels32: number[], maxValue: number): TargetColor {
+function channels32ToPreviewRgb255(channels32: number[], maxValue: number, plateId = 1): TargetColor {
+  const CHANNEL_PROFILES = getChannelProfiles(plateId);
   const denom = Math.max(1, maxValue);
   let rAcc = 0;
   let gAcc = 0;
@@ -542,7 +544,7 @@ function channels32ToPreviewRgb255(channels32: number[], maxValue: number): Targ
   let wSum = 0;
 
   for (let i = 0; i < 32; i++) {
-    const p = CHANNEL_PROFILES[i] ?? { rgb: [1, 1, 1], strength: 0 };
+    const p = CHANNEL_PROFILES[i] ?? { rgb: [1, 1, 1] as [number,number,number], strength: 0 };
     if (p.strength <= 0) continue;
 
     const v = Number.isFinite(channels32[i]) ? Number(channels32[i]) : 0;
@@ -567,40 +569,10 @@ type ChannelProfile = {
   strength: number;
 };
 
-const CHANNEL_PROFILES: ChannelProfile[] = [
-  { rgb: [0.30, 0.00, 0.50], strength: 1.0 },
-  { rgb: [0.55, 0.10, 0.85], strength: 1.0 },
-  { rgb: [0.25, 0.05, 0.95], strength: 1.0 },
-  { rgb: [0.05, 0.05, 0.40], strength: 1.0 },
-  { rgb: [0.00, 0.65, 1.00], strength: 1.0 },
-  { rgb: [0.25, 1.00, 0.35], strength: 1.0 },
-  { rgb: [0.00, 0.55, 0.12], strength: 1.0 },
-  { rgb: [1.00, 1.00, 0.40], strength: 1.0 },
-  { rgb: [1.00, 0.55, 0.00], strength: 1.0 },
-  { rgb: [0.75, 0.25, 0.00], strength: 1.0 },
-  { rgb: [0.55, 0.00, 0.00], strength: 1.0 },
-  { rgb: [1.00, 0.05, 0.05], strength: 1.0 },
-  { rgb: [0.95, 0.00, 0.20], strength: 1.0 },
-  { rgb: [0.90, 0.00, 0.22], strength: 1.0 },
-  { rgb: [0.35, 0.00, 0.00], strength: 1.0 },
-  { rgb: [0.20, 0.00, 0.00], strength: 0.25 },
-  { rgb: [0.10, 0.00, 0.00], strength: 0.15 },
-  { rgb: [0.10, 0.00, 0.00], strength: 0.15 },
-  { rgb: [1.00, 0.58, 0.00], strength: 1.0 },
-  { rgb: [1.00, 0.70, 0.10], strength: 1.0 },
-  { rgb: [1.00, 0.78, 0.15], strength: 0.55 },
-  { rgb: [1.00, 0.80, 0.20], strength: 0.45 },
-  { rgb: [1.00, 0.82, 0.22], strength: 0.35 },
-  { rgb: [1.00, 0.92, 0.78], strength: 1.0 },
-  { rgb: [1.00, 0.97, 0.90], strength: 1.0 },
-  { rgb: [1.00, 1.00, 1.00], strength: 1.0 },
-  { rgb: [0.90, 0.90, 0.90], strength: 0.75 },
-  { rgb: [0.80, 0.80, 0.80], strength: 0.60 },
-  { rgb: [0.55, 0.55, 0.55], strength: 0.45 },
-  { rgb: [0.40, 0.40, 0.40], strength: 0.40 },
-  { rgb: [0.78, 0.78, 0.78], strength: 0.55 },
-  { rgb: [0.92, 0.92, 0.92], strength: 0.70 },
-];
+function getChannelProfiles(plateId: number): ChannelProfile[] {
+  const src = (PLATE_TYPE[plateId] ?? 'rouge') === 'bleu' ? CHANNELS_BLEU : CHANNELS_ROUGE;
+  return src.map(ch => ({ rgb: ch.rgb, strength: 1.0 }));
+}
 
 /**
  * Convertit une couleur RGB (0-255) en tableau de 32 valeurs de canaux LED (0-100).
@@ -617,7 +589,8 @@ const CHANNEL_PROFILES: ChannelProfile[] = [
  * Chaque composante est envoyée vers les groupes de canaux physiques correspondants.
  * Aucun boost blanc automatique : le blanc n'apparaît que si la couleur source en contient.
  */
-function rgbToChannels32(rgb: TargetColor, masterIntensity: number): number[] {
+function rgbToChannels32(rgb: TargetColor, masterIntensity: number, plateId = 1): number[] {
+  const CHANNEL_PROFILES = getChannelProfiles(plateId);
   const R = Math.max(0, Math.min(255, Math.round(rgb.r)));
   const G = Math.max(0, Math.min(255, Math.round(rgb.g)));
   const B = Math.max(0, Math.min(255, Math.round(rgb.b)));
@@ -1236,7 +1209,7 @@ export default function JeuxPage() {
   }
 
   function sendRgbToPlate(rgb: TargetColor, intensity100: number, plateId: number) {
-    const channels32 = rgbToChannels32(rgb, intensity100);
+    const channels32 = rgbToChannels32(rgb, intensity100, plateId);
     for (let i = 0; i < 32; i++) {
       scheduleSetCanal(plateId, i, clamp255(channels32[i] ?? 0));
     }

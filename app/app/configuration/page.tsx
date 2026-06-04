@@ -3,44 +3,18 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { SlidersHorizontal, Save, RotateCcw, Activity, CheckCircle2, XCircle, Loader2, Terminal, Copy, Check, Sliders, Zap, Moon } from 'lucide-react';
 import NavigationMenu from '@/app/_components/NavigationMenu';
+import { CHANNELS_ROUGE, CHANNELS_BLEU, getPlateType, type TileType } from '@/lib/tileChannels';
 
-// ─── Métadonnées des 32 canaux LED ────────────────────────────────────────────
-const CHANNEL_META: { label: string; color: string; group: string }[] = [
-  { label: 'Violet 404nm',   color: '#8b5cf6', group: 'Violet/Bleu' },
-  { label: 'Bleu 420nm',     color: '#7c3aed', group: 'Violet/Bleu' },
-  { label: 'Bleu 450nm',     color: '#4361ee', group: 'Violet/Bleu' },
-  { label: 'Cyan-bleu 470nm',color: '#2563eb', group: 'Violet/Bleu' },
-  { label: 'Cyan 490nm',     color: '#0891b2', group: 'Violet/Bleu' },
-  { label: 'Vert 520nm',     color: '#059669', group: 'Vert' },
-  { label: 'Vert 550nm',     color: '#16a34a', group: 'Vert' },
-  { label: 'Jaune-vert 570nm',color:'#ca8a04', group: 'Jaune' },
-  { label: 'Jaune 585nm',    color: '#d97706', group: 'Jaune' },
-  { label: 'Ambre 600nm',    color: '#ea580c', group: 'Jaune' },
-  { label: 'Orange 620nm',   color: '#dc2626', group: 'Rouge' },
-  { label: 'Rouge 640nm',    color: '#b91c1c', group: 'Rouge' },
-  { label: 'Rouge 660nm',    color: '#991b1b', group: 'Rouge' },
-  { label: 'Rouge 680nm',    color: '#7f1d1d', group: 'Rouge' },
-  { label: 'Rouge profond 700nm', color: '#6b1919', group: 'Rouge' },
-  { label: 'IR 720nm',       color: '#4a1515', group: 'Réservé' },
-  { label: 'IR 740nm',       color: '#3a1010', group: 'Réservé' },
-  { label: 'IR 760nm',       color: '#2a0a0a', group: 'Réservé' },
-  { label: 'Jaune-blanc',    color: '#fbbf24', group: 'Blanc' },
-  { label: 'Blanc chaud',    color: '#f59e0b', group: 'Blanc' },
-  { label: 'Réservé 20',     color: '#94a3b8', group: 'Réservé' },
-  { label: 'Réservé 21',     color: '#94a3b8', group: 'Réservé' },
-  { label: 'Réservé 22',     color: '#94a3b8', group: 'Réservé' },
-  { label: 'Réservé 23',     color: '#94a3b8', group: 'Réservé' },
-  { label: 'Blanc jaunâtre', color: '#fef08a', group: 'Blanc' },
-  { label: 'Blanc pur',      color: '#ffffff', group: 'Blanc' },
-  { label: 'Blanc neutre',   color: '#f1f5f9', group: 'Blanc' },
-  { label: 'Blanc froid',    color: '#e0f2fe', group: 'Blanc' },
-  { label: 'Réservé 28',     color: '#94a3b8', group: 'Réservé' },
-  { label: 'Réservé 29',     color: '#94a3b8', group: 'Réservé' },
-  { label: 'Réservé 30',     color: '#94a3b8', group: 'Réservé' },
-  { label: 'Gris clair',     color: '#cbd5e1', group: 'Blanc' },
-];
+function rgbToHex(r: number, g: number, b: number): string {
+  return '#' + [r, g, b].map(v => Math.round(v * 255).toString(16).padStart(2, '0')).join('');
+}
 
-const CH_GROUPS = ['Violet/Bleu', 'Vert', 'Jaune', 'Rouge', 'Blanc', 'Réservé'] as const;
+function buildChannelMeta(channels: typeof CHANNELS_ROUGE) {
+  return channels.map(ch => ({
+    label: ch.nm != null ? `${ch.label} ${ch.nm}nm` : ch.label,
+    color: rgbToHex(ch.rgb[0], ch.rgb[1], ch.rgb[2]),
+  }));
+}
 
 type ApiSnapshot = { value: string; source: string; default: string };
 type ConfigSnapshot = { supervision: ApiSnapshot; cs160: ApiSnapshot };
@@ -63,6 +37,7 @@ export default function ConfigurationPage() {
   // 32 canaux LED — état des sliders
   const [channels, setChannels] = useState<number[]>(Array(32).fill(0));
   const [targetPlate, setTargetPlate] = useState<number>(0); // 0 = toutes les plaques
+  const [previewType, setPreviewType] = useState<TileType>('rouge');
   const [sendingChannels, setSendingChannels] = useState(false);
   const [channelMsg, setChannelMsg] = useState('');
   const sendTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -237,7 +212,7 @@ export default function ConfigurationPage() {
                 </div>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                   <label style={{ fontSize: 12, fontWeight: 700, color: 'rgba(0,0,0,0.6)' }}>Dalle :</label>
-                  <select value={targetPlate} onChange={e => setTargetPlate(Number(e.target.value))}
+                  <select value={targetPlate} onChange={e => { const p = Number(e.target.value); setTargetPlate(p); if (p > 0) setPreviewType(getPlateType(p)); }}
                     style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid rgba(0,0,0,0.15)', background: '#fff', fontSize: 13, fontFamily: 'inherit' }}>
                     <option value={0}>Toutes (1-42)</option>
                     {Array.from({ length: 42 }, (_, i) => <option key={i + 1} value={i + 1}>Dalle {i + 1}</option>)}
@@ -257,38 +232,45 @@ export default function ConfigurationPage() {
                 </div>
               </div>
               {channelMsg && <p style={{ margin: '0 0 12px', fontSize: 13, fontWeight: 700, color: channelMsg.startsWith('✓') ? '#059669' : '#ef4444' }}>{channelMsg}</p>}
-              <p style={{ margin: '0 0 16px', fontSize: 12, color: 'rgba(0,0,0,0.45)', lineHeight: 1.5 }}>
+              <p style={{ margin: '0 0 12px', fontSize: 12, color: 'rgba(0,0,0,0.45)', lineHeight: 1.5 }}>
                 Contrôlez chaque canal spectral (0-255). Les sliders envoient automatiquement (200 ms de debounce) sur la dalle sélectionnée.
               </p>
 
-              {/* Sliders groupés par couleur */}
-              {CH_GROUPS.map(group => {
-                const items = CHANNEL_META.map((m, i) => ({ ...m, idx: i })).filter(m => m.group === group);
-                if (items.length === 0) return null;
-                return (
-                  <div key={group} style={{ marginBottom: 16 }}>
-                    <div style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'rgba(0,0,0,0.45)', marginBottom: 8 }}>{group}</div>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '8px 12px' }}>
-                      {items.map(({ idx, label, color }) => (
-                        <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                              <span style={{ width: 10, height: 10, borderRadius: '50%', background: color, border: '1px solid rgba(0,0,0,0.1)', flexShrink: 0, display: 'inline-block' }} />
-                              <span style={{ fontSize: 11, fontWeight: 600, color: 'rgba(0,0,0,0.65)' }}>Ch.{idx} {label}</span>
-                            </div>
-                            <input type="number" min={0} max={255} value={channels[idx] ?? 0}
-                              onChange={e => setChannel(idx, Math.max(0, Math.min(255, Number(e.target.value))))}
-                              style={{ width: 44, padding: '1px 4px', borderRadius: 5, border: '1px solid rgba(0,0,0,0.12)', background: '#fff', fontSize: 11, textAlign: 'right', fontFamily: 'monospace' }} />
-                          </div>
-                          <input type="range" min={0} max={255} value={channels[idx] ?? 0}
-                            onChange={e => setChannel(idx, Number(e.target.value))}
-                            style={{ width: '100%', accentColor: color, height: 4, cursor: 'pointer' }} />
-                        </div>
-                      ))}
+              {/* Sélecteur de type de dalle */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: 'rgba(0,0,0,0.6)' }}>Type de dalle :</span>
+                {(['rouge', 'bleu'] as TileType[]).map(t => (
+                  <button key={t} onClick={() => setPreviewType(t)}
+                    style={{ padding: '5px 14px', borderRadius: 8, border: `2px solid ${previewType === t ? (t === 'rouge' ? '#ef4444' : '#3b82f6') : 'rgba(0,0,0,0.12)'}`, background: previewType === t ? (t === 'rouge' ? 'rgba(239,68,68,0.08)' : 'rgba(59,130,246,0.08)') : '#fff', fontWeight: 800, fontSize: 13, cursor: 'pointer', color: previewType === t ? (t === 'rouge' ? '#ef4444' : '#3b82f6') : 'rgba(0,0,0,0.5)', transition: 'all .15s' }}>
+                    {t === 'rouge' ? 'Rouge' : 'Bleu'}
+                  </button>
+                ))}
+                {targetPlate > 0 && (
+                  <span style={{ fontSize: 11, color: 'rgba(0,0,0,0.4)', fontStyle: 'italic' }}>
+                    (dalle {targetPlate} = type {previewType} détecté automatiquement)
+                  </span>
+                )}
+              </div>
+
+              {/* Sliders groupés */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '8px 12px' }}>
+                {buildChannelMeta(previewType === 'rouge' ? CHANNELS_ROUGE : CHANNELS_BLEU).map(({ label, color }, idx) => (
+                  <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                        <span style={{ width: 10, height: 10, borderRadius: '50%', background: color, border: '1px solid rgba(0,0,0,0.1)', flexShrink: 0, display: 'inline-block' }} />
+                        <span style={{ fontSize: 11, fontWeight: 600, color: 'rgba(0,0,0,0.65)' }}>Ch.{idx} {label}</span>
+                      </div>
+                      <input type="number" min={0} max={255} value={channels[idx] ?? 0}
+                        onChange={e => setChannel(idx, Math.max(0, Math.min(255, Number(e.target.value))))}
+                        style={{ width: 44, padding: '1px 4px', borderRadius: 5, border: '1px solid rgba(0,0,0,0.12)', background: '#fff', fontSize: 11, textAlign: 'right', fontFamily: 'monospace' }} />
                     </div>
+                    <input type="range" min={0} max={255} value={channels[idx] ?? 0}
+                      onChange={e => setChannel(idx, Number(e.target.value))}
+                      style={{ width: '100%', accentColor: color, height: 4, cursor: 'pointer' }} />
                   </div>
-                );
-              })}
+                ))}
+              </div>
             </div>
 
             {/* Notes : ouvrir le port et faire marcher la redirection (Windows) */}

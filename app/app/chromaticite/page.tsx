@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { CHANNELS_ROUGE, CHANNELS_BLEU, type TileType } from '@/lib/tileChannels';
 
 // ── CIE 1931 spectral locus (horseshoe boundary) ────────────────────────────
 const HORSESHOE: [number, number][] = [
@@ -97,46 +98,16 @@ function xyToRgb255(x: number, y: number): { r: number; g: number; b: number } |
 const SRGB_PRIMARIES = [[0.64, 0.33], [0.30, 0.60], [0.15, 0.06]];
 
 // ── Hardware API ─────────────────────────────────────────────────────────────
-// Profils LED à 32 canaux — valeurs normalisées (0–1), identiques à editeur/page.tsx
-const CHANNEL_PROFILES: { rgb: [number, number, number]; strength: number }[] = [
-  { rgb: [0.35, 0.00, 0.60], strength: 1.0  }, // 1  404nm — Violet foncé
-  { rgb: [0.55, 0.00, 0.85], strength: 1.0  }, // 2  421nm — Violet clair
-  { rgb: [0.28, 0.00, 0.95], strength: 1.0  }, // 3  435nm — Bleu-violet
-  { rgb: [0.10, 0.04, 0.98], strength: 1.0  }, // 4  448nm — Bleu marine
-  { rgb: [0.00, 0.45, 1.00], strength: 1.0  }, // 5  479nm — Bleu turquoise
-  { rgb: [0.00, 0.95, 0.38], strength: 1.0  }, // 6  513nm — Vert clair
-  { rgb: [0.00, 0.72, 0.18], strength: 1.0  }, // 7  ~525nm — Vert foncé
-  { rgb: [0.50, 1.00, 0.00], strength: 1.0  }, // 8  541nm — Jaune-vert (lime)
-  { rgb: [1.00, 0.72, 0.00], strength: 1.0  }, // 9  593nm — Orange/ambre
-  { rgb: [1.00, 0.38, 0.00], strength: 1.0  }, // 10 605nm — Orange-rouge
-  { rgb: [0.92, 0.06, 0.00], strength: 1.0  }, // 11 629nm — Rouge (un peu foncé)
-  { rgb: [1.00, 0.03, 0.00], strength: 1.0  }, // 12 642nm — Rouge pétant
-  { rgb: [0.96, 0.00, 0.05], strength: 1.0  }, // 13 658nm — Rouge cerise
-  { rgb: [0.92, 0.00, 0.06], strength: 1.0  }, // 14 658nm — Rouge cerise+
-  { rgb: [0.55, 0.00, 0.00], strength: 1.0  }, // 15 698nm — Rouge foncé
-  { rgb: [0.26, 0.00, 0.00], strength: 0.18 }, // 16 731nm — Rouge très foncé (near-IR)
-  { rgb: [0.12, 0.00, 0.00], strength: 0.10 }, // 17 758nm — Rouge invisible (IR)
-  { rgb: [0.06, 0.00, 0.00], strength: 0.07 }, // 18 780nm — Rouge invisible (IR)
-  { rgb: [1.00, 0.52, 0.00], strength: 1.0  }, // 19 — Jaune orange
-  { rgb: [1.00, 0.65, 0.06], strength: 1.0  }, // 20 — Jaune orange clair
-  { rgb: [1.00, 0.68, 0.10], strength: 0.50 }, // 21 — Jaune orange clair (dim)
-  { rgb: [1.00, 0.72, 0.12], strength: 0.38 }, // 22 — Jaune orange clair (dim2)
-  { rgb: [1.00, 0.75, 0.14], strength: 0.28 }, // 23 — Jaune orange clair (dim3)
-  { rgb: [1.00, 0.90, 0.62], strength: 0.90 }, // 24 — Blanc chaud orangé
-  { rgb: [1.00, 0.96, 0.85], strength: 1.0  }, // 25 — Blanc légèrement jaunis
-  { rgb: [1.00, 1.00, 1.00], strength: 1.0  }, // 26 — Blanc pur
-  { rgb: [1.00, 1.00, 0.98], strength: 0.75 }, // 27 — Blanc (dim)
-  { rgb: [0.98, 0.98, 0.96], strength: 0.60 }, // 28 — Blanc (dim2)
-  { rgb: [0.62, 0.62, 0.62], strength: 0.48 }, // 29 — Gris
-  { rgb: [0.50, 0.50, 0.50], strength: 0.42 }, // 30 — Gris foncé
-  { rgb: [0.82, 0.82, 0.80], strength: 0.58 }, // 31 — Blanc/Gris
-  { rgb: [0.92, 0.92, 0.90], strength: 0.68 }, // 32 — Blanc dim
-];
+function getChannelProfiles(tileType: TileType): { rgb: [number, number, number]; strength: number }[] {
+  const src = tileType === 'bleu' ? CHANNELS_BLEU : CHANNELS_ROUGE;
+  return src.map(ch => ({ rgb: ch.rgb, strength: 1.0 }));
+}
 
 function clamp(v: number, lo: number, hi: number) { return Math.max(lo, Math.min(hi, v)); }
 
 // Produit des valeurs 0–100 (cohérent avec jeux/page.tsx et editeur/page.tsx)
-function rgbToChannels32(r: number, g: number, b: number, intensity: number): number[] {
+function rgbToChannels32(r: number, g: number, b: number, intensity: number, tileType: TileType = 'rouge'): number[] {
+  const CHANNEL_PROFILES = getChannelProfiles(tileType);
   const rn = clamp(r, 0, 255) / 255;
   const gn = clamp(g, 0, 255) / 255;
   const bn = clamp(b, 0, 255) / 255;
@@ -148,7 +119,7 @@ function rgbToChannels32(r: number, g: number, b: number, intensity: number): nu
   const norm = Math.max(1e-6, Math.sqrt(rn * rn + gn * gn + bn * bn));
   const tr = rn / norm, tg = gn / norm, tb = bn / norm;
 
-  let bestIdx = 25; // blanc par défaut
+  let bestIdx = 25;
   let bestScore = -1;
   for (let i = 0; i < 32; i++) {
     const p = CHANNEL_PROFILES[i];
@@ -170,8 +141,8 @@ function rgbToChannels32(r: number, g: number, b: number, intensity: number): nu
   return channels.map(v => clamp(Math.round(v), 0, 100));
 }
 
-async function sendColorToAllPlates(r: number, g: number, b: number, intensity = 85) {
-  const channelArray = rgbToChannels32(r, g, b, intensity).map((v, i) => ({ index: i, value: v }));
+async function sendColorToAllPlates(r: number, g: number, b: number, intensity = 85, tileType: TileType = 'rouge') {
+  const channelArray = rgbToChannels32(r, g, b, intensity, tileType).map((v, i) => ({ index: i, value: v }));
   const sends: Promise<void>[] = [];
   for (let plateId = 1; plateId <= 42; plateId++) {
     sends.push(
@@ -209,6 +180,7 @@ export default function ChromaticitePage() {
   const [sentOk, setSentOk] = useState(false);
   const [intensity, setIntensity] = useState(85);
   const [liveOnPlates, setLiveOnPlates] = useState(false);
+  const [tileType, setTileType] = useState<TileType>('rouge');
 
   const cursorRgb = cursor ? xyToRgb255(cursor.x, cursor.y) : null;
   const selectedRgb = selected ? xyToRgb255(selected.x, selected.y) : null;
@@ -248,9 +220,9 @@ export default function ChromaticitePage() {
     hwTimerRef.current = window.setTimeout(() => {
       const c = xyToRgb255(x, y);
       if (!c) return;
-      sendColorToAllPlates(c.r, c.g, c.b, intensity).catch(() => {});
+      sendColorToAllPlates(c.r, c.g, c.b, intensity, tileType).catch(() => {});
     }, 40);
-  }, [liveOnPlates, intensity]);
+  }, [liveOnPlates, intensity, tileType]);
 
   function handleMouseMove(e: React.MouseEvent<SVGSVGElement>) {
     const rect = svgRef.current?.getBoundingClientRect();
@@ -280,7 +252,7 @@ export default function ChromaticitePage() {
     const c = xyToRgb255(selected.x, selected.y);
     if (!c) return;
     setSending(true);
-    await sendColorToAllPlates(c.r, c.g, c.b, intensity);
+    await sendColorToAllPlates(c.r, c.g, c.b, intensity, tileType);
     setSending(false);
     setSentOk(true);
     window.setTimeout(() => setSentOk(false), 1500);
@@ -520,6 +492,19 @@ export default function ChromaticitePage() {
               ) : (
                 <div style={{ fontSize: 12, color: 'rgba(0,0,0,0.35)' }}>Cliquez sur le diagramme pour sélectionner une couleur</div>
               )}
+            </div>
+
+            {/* Type de dalle */}
+            <div style={{ background: '#fff', borderRadius: 12, padding: '14px 16px', border: '1px solid rgba(0,0,0,0.08)' }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(0,0,0,0.4)', marginBottom: 10, letterSpacing: '0.06em' }}>TYPE DE DALLE</div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                {(['rouge', 'bleu'] as TileType[]).map(t => (
+                  <button key={t} onClick={() => setTileType(t)}
+                    style={{ flex: 1, padding: '7px 0', borderRadius: 8, border: `2px solid ${tileType === t ? (t === 'rouge' ? '#ef4444' : '#3b82f6') : 'rgba(0,0,0,0.1)'}`, background: tileType === t ? (t === 'rouge' ? 'rgba(239,68,68,0.08)' : 'rgba(59,130,246,0.08)') : '#fff', fontWeight: 800, fontSize: 13, cursor: 'pointer', color: tileType === t ? (t === 'rouge' ? '#ef4444' : '#3b82f6') : 'rgba(0,0,0,0.45)' }}>
+                    {t === 'rouge' ? 'Rouge' : 'Bleu'}
+                  </button>
+                ))}
+              </div>
             </div>
 
             {/* Intensity slider */}

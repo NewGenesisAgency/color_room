@@ -4,59 +4,12 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Check, X } from 'lucide-react';
 import type { GameTileProps } from './GameColorSpeed';
 import CieDiagramCanvas, { type CieMarker, type CiePolyline } from './CieDiagramCanvas';
+import { CHANNELS_ROUGE, CHANNELS_BLEU, type TileType } from '@/lib/tileChannels';
 
-/* ─────────────────────────────────────────────────────────────────────────
-   Profils RGB (0-1) des 32 canaux physiques — identiques à chromaticite/page.tsx
-   Les valeurs sont encodées gamma (sRGB). On les délinéarise pour calculer
-   le xy CIE exact par mélange additif.
-───────────────────────────────────────────────────────────────────────── */
-const CHANNEL_PROFILES: [number, number, number][] = [
-  [0.35, 0.00, 0.60], // 0  404nm — Violet foncé
-  [0.55, 0.00, 0.85], // 1  421nm — Violet clair
-  [0.28, 0.00, 0.95], // 2  435nm — Bleu-violet
-  [0.10, 0.04, 0.98], // 3  448nm — Bleu marine
-  [0.00, 0.45, 1.00], // 4  479nm — Bleu turquoise
-  [0.00, 0.95, 0.38], // 5  513nm — Vert clair
-  [0.00, 0.72, 0.18], // 6  ~525nm — Vert foncé
-  [0.50, 1.00, 0.00], // 7  541nm — Jaune-vert (lime)
-  [1.00, 0.72, 0.00], // 8  593nm — Orange/ambre
-  [1.00, 0.38, 0.00], // 9  605nm — Orange-rouge (rouge/orangé marron)
-  [0.92, 0.06, 0.00], // 10 629nm — Rouge (un peu foncé)
-  [1.00, 0.03, 0.00], // 11 642nm — Rouge pétant
-  [0.96, 0.00, 0.05], // 12 658nm — Rouge cerise
-  [0.92, 0.00, 0.06], // 13 658nm — Rouge cerise+
-  [0.55, 0.00, 0.00], // 14 698nm — Rouge foncé
-  [0.26, 0.00, 0.00], // 15 731nm — Rouge très foncé (near-IR)
-  [0.12, 0.00, 0.00], // 16 758nm — Rouge invisible (IR)
-  [0.06, 0.00, 0.00], // 17 780nm — Rouge invisible (IR)
-  [1.00, 0.52, 0.00], // 18 — Jaune orange (phosphore chaud)
-  [1.00, 0.65, 0.06], // 19 — Jaune orange clair
-  [1.00, 0.68, 0.10], // 20 — Jaune orange clair (dim)
-  [1.00, 0.72, 0.12], // 21 — Jaune orange clair (dim2)
-  [1.00, 0.75, 0.14], // 22 — Jaune orange clair (dim3)
-  [1.00, 0.90, 0.62], // 23 — Blanc chaud orangé
-  [1.00, 0.96, 0.85], // 24 — Blanc légèrement jaunis
-  [1.00, 1.00, 1.00], // 25 — Blanc pur
-  [1.00, 1.00, 0.98], // 26 — Blanc (dim)
-  [0.98, 0.98, 0.96], // 27 — Blanc (dim2)
-  [0.62, 0.62, 0.62], // 28 — Gris
-  [0.50, 0.50, 0.50], // 29 — Gris foncé
-  [0.82, 0.82, 0.80], // 30 — Blanc/Gris
-  [0.92, 0.92, 0.90], // 31 — Blanc dim
-];
-
-const CHANNEL_NAMES = [
-  'Violet foncé 404nm','Violet clair 421nm','Bleu-violet 435nm','Bleu marine 448nm','Bleu 479nm',
-  'Vert clair 513nm','Vert foncé','Jaune-vert 541nm','Orange 593nm','Orange-rouge 605nm',
-  'Rouge 629nm','Rouge pétant 642nm','Rouge cerise 658nm','Rouge cerise+ 658nm','Rouge foncé 698nm',
-  'Rouge IR 731nm','IR 758nm','IR 780nm',
-  'Jaune orange','Jaune orange clair','Jaune orange (dim)','Jaune orange (dim2)','Jaune orange (dim3)',
-  'Blanc chaud','Blanc jaunis','Blanc','Blanc (dim)','Blanc (dim2)',
-  'Gris','Gris foncé','Blanc/Gris','Blanc dim',
-];
-
-/* Canaux intéressants (bonne diversité chromatique, pas trop sombres) */
-const INTERESTING = [0, 1, 2, 4, 5, 6, 7, 8, 9, 11, 12, 18, 23, 24, 25];
+/* Canaux intéressants pour le type rouge (bonne diversité chromatique) */
+const INTERESTING_ROUGE = [0, 1, 2, 4, 5, 6, 7, 8, 9, 11, 12, 17, 22, 23, 24];
+/* Canaux intéressants pour le type bleu */
+const INTERESTING_BLEU  = [0, 2, 4, 6, 7, 9, 10, 12, 13, 15, 17, 18, 22, 23, 24];
 
 /* ─── Conversion couleur ─────────────────────────────────────────────── */
 function toLinear(c: number) {
@@ -71,10 +24,10 @@ function rgbLinToXyz(r: number, g: number, b: number) {
 }
 
 /** CIE xy du mélange additif de canaux (intensité égale pour chacun) */
-function mixChannelsXy(idxs: number[]): { x: number; y: number } {
+function mixChannelsXy(idxs: number[], profiles: [number,number,number][]): { x: number; y: number } {
   let X = 0, Y = 0, Z = 0;
   for (const i of idxs) {
-    const [r, g, b] = CHANNEL_PROFILES[i];
+    const [r, g, b] = profiles[i];
     const xyz = rgbLinToXyz(toLinear(r), toLinear(g), toLinear(b));
     X += xyz.X; Y += xyz.Y; Z += xyz.Z;
   }
@@ -84,10 +37,10 @@ function mixChannelsXy(idxs: number[]): { x: number; y: number } {
 }
 
 /** CIE xy du mélange additif PONDÉRÉ par l'intensité de chaque canal (0-1) */
-function mixWeightedXy(idxs: number[], weights: number[]): { x: number; y: number } {
+function mixWeightedXy(idxs: number[], weights: number[], profiles: [number,number,number][]): { x: number; y: number } {
   let X = 0, Y = 0, Z = 0;
   idxs.forEach((i, k) => {
-    const [r, g, b] = CHANNEL_PROFILES[i];
+    const [r, g, b] = profiles[i];
     const xyz = rgbLinToXyz(toLinear(r), toLinear(g), toLinear(b));
     const w = weights[k] ?? 0;
     X += xyz.X * w; Y += xyz.Y * w; Z += xyz.Z * w;
@@ -95,22 +48,6 @@ function mixWeightedXy(idxs: number[], weights: number[]): { x: number; y: numbe
   const s = X + Y + Z;
   if (s < 1e-9) return { x: 0.3127, y: 0.3290 };
   return { x: X / s, y: Y / s };
-}
-
-/** Couleur sRGB du mélange pour le rendu UI */
-function mixChannelsRgb255(idxs: number[]): { r: number; g: number; b: number } {
-  let R = 0, G = 0, B = 0;
-  for (const i of idxs) {
-    const [r, g, b] = CHANNEL_PROFILES[i];
-    R += r; G += g; B += b;
-  }
-  const mx = Math.max(R, G, B, 1e-9);
-  const gam = (c: number) => c <= 0.0031308 ? 12.92 * c : 1.055 * c ** (1 / 2.4) - 0.055;
-  return {
-    r: Math.round(Math.min(1, gam(R / mx)) * 255),
-    g: Math.round(Math.min(1, gam(G / mx)) * 255),
-    b: Math.round(Math.min(1, gam(B / mx)) * 255),
-  };
 }
 
 /* ─── CIE 1931 diagram ───────────────────────────────────────────────── */
@@ -215,10 +152,11 @@ const G: Record<string, React.CSSProperties> = {
 interface GameCanalMixProps extends GameTileProps {
   /** Envoi direct de 32 valeurs de canaux (0-100) vers une dalle */
   onSendRawChannels: (tileIdx: number, channels: number[]) => void;
+  plateType?: TileType;
 }
 
 export default function GameCanalMix({
-  onSendColor, onTurnOffAll, onQuit, onSendRawChannels, tileCount = 42, onComplete,
+  onSendColor, onTurnOffAll, onQuit, onSendRawChannels, tileCount = 42, onComplete, plateType = 'rouge',
 }: GameCanalMixProps) {
   const [phase, setPhase] = useState<'ready' | 'playing' | 'result' | 'finished'>('ready');
   const [round, setRound] = useState(0);
@@ -235,6 +173,11 @@ export default function GameCanalMix({
   const svgRef = useRef<SVGSVGElement | null>(null);
   const hwTimer = useRef<number>(0);
   const numTiles = Math.min(tileCount, 42);
+
+  const channelData = plateType === 'bleu' ? CHANNELS_BLEU : CHANNELS_ROUGE;
+  const profiles = channelData.map(ch => ch.rgb) as [number, number, number][];
+  const channelNames = channelData.map(ch => ch.nm != null ? `${ch.label} ${ch.nm}nm` : ch.label);
+  const INTERESTING = plateType === 'bleu' ? INTERESTING_BLEU : INTERESTING_ROUGE;
 
   /* ── Dessiner le diagramme CIE (une fois au montage) ── */
   useEffect(() => {
@@ -287,7 +230,7 @@ export default function GameCanalMix({
   function newRound(chans: number[]) {
     const tw = [0.25 + Math.random() * 0.75, 0.25 + Math.random() * 0.75, 0.25 + Math.random() * 0.75];
     setRoundChans(chans);
-    setTarget(mixWeightedXy(chans, tw));
+    setTarget(mixWeightedXy(chans, tw, profiles));
     setWeights([0.5, 0.5, 0.5]);
   }
 
@@ -318,7 +261,7 @@ export default function GameCanalMix({
 
   function confirm() {
     if (phase !== 'playing' || roundChans.length !== 3) return;
-    const p = mixWeightedXy(roundChans, weights);
+    const p = mixWeightedXy(roundChans, weights, profiles);
     const d = Math.sqrt((p.x - target.x) ** 2 + (p.y - target.y) ** 2);
     const pts = Math.max(0, Math.round(1000 * (1 - d / 0.3)));
     setDist(parseFloat(d.toFixed(4)));
@@ -327,14 +270,14 @@ export default function GameCanalMix({
   }
 
   /* ─── Calculs de rendu (triangle + marqueurs) ─── */
-  const vertices = roundChans.length === 3 ? roundChans.map((i) => mixChannelsXy([i])) : [];
-  const playerXy = roundChans.length === 3 ? mixWeightedXy(roundChans, weights) : target;
+  const vertices = roundChans.length === 3 ? roundChans.map((i) => mixChannelsXy([i], profiles)) : [];
+  const playerXy = roundChans.length === 3 ? mixWeightedXy(roundChans, weights, profiles) : target;
   const targetRgb = xyToRgb255(target.x, target.y);
   const playerRgb = xyToRgb255(playerXy.x, playerXy.y);
   const triangle: CiePolyline = { points: vertices, color: 'rgba(255,255,255,0.6)', width: 1.5, closed: true };
   const diagMarkers: CieMarker[] = [
     ...vertices.map((v, k) => {
-      const [r, g, b] = CHANNEL_PROFILES[roundChans[k]];
+      const [r, g, b] = profiles[roundChans[k]];
       return { x: v.x, y: v.y, color: `rgb(${Math.round(r * 255)},${Math.round(g * 255)},${Math.round(b * 255)})`, radius: 5 } as CieMarker;
     }),
     { x: target.x, y: target.y, color: targetRgb ? `rgb(${targetRgb.r},${targetRgb.g},${targetRgb.b})` : '#a78bfa', ring: true, label: 'Cible' } as CieMarker,
@@ -416,14 +359,14 @@ export default function GameCanalMix({
         {/* Sliders d'intensité (un par canal) — le point se déplace dans le triangle */}
         <div style={{ ...G.glass, padding:'12px 14px', display:'flex', flexDirection:'column', gap:11 }}>
           {roundChans.map((ci, k) => {
-            const [r,g,b] = CHANNEL_PROFILES[ci];
+            const [r,g,b] = profiles[ci];
             const col = `rgb(${Math.round(r*255)},${Math.round(g*255)},${Math.round(b*255)})`;
             return (
               <div key={ci} style={{ display:'flex', alignItems:'center', gap:10 }}>
                 <div style={{ width:22, height:22, borderRadius:6, flexShrink:0, background:col, border:'1.5px solid rgba(255,255,255,.25)' }} />
                 <div style={{ flex:1, minWidth:0 }}>
                   <div style={{ display:'flex', justifyContent:'space-between', fontSize:11, marginBottom:3 }}>
-                    <span style={{ color:'rgba(255,255,255,.6)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{CHANNEL_NAMES[ci]}</span>
+                    <span style={{ color:'rgba(255,255,255,.6)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{channelNames[ci]}</span>
                     <span style={{ fontWeight:800, color:'#e8eaf0', marginLeft:8 }}>{Math.round((weights[k] ?? 0)*100)}%</span>
                   </div>
                   <input
