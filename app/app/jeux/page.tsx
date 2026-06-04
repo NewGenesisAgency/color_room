@@ -1176,14 +1176,33 @@ export default function JeuxPage() {
   function flushHardwareBatch() {
     const pending = hwBatchPendingRef.current;
     if (pending.size === 0) return;
-    hwBatchPendingRef.current = new Map(); // nouveau map atomiquement
+    hwBatchPendingRef.current = new Map();
     const plates = buildHwPlates(pending);
     if (plates.length === 0) return;
 
     if (!hwInFlightRef.current) {
-      doSendBatch(plates);          // idle → envoyer immédiatement
+      doSendBatch(plates);
     } else {
-      hwPendingPlatesRef.current = plates; // sending → remplacer le pending
+      // MERGE avec le pending existant (au lieu de remplacer) :
+      // un plateau déjà dans le pending garde les nouvelles valeurs de canal
+      // mais les plateaux absents du nouveau batch sont conservés du pending précédent.
+      // Cela évite de perdre des états intermédiaires (ex: flash puis jeu rapide).
+      const prev = hwPendingPlatesRef.current;
+      if (!prev || prev.length === 0) {
+        hwPendingPlatesRef.current = plates;
+      } else {
+        const merged = new Map<number, Record<number, number>>();
+        for (const p of prev)  merged.set(p.plateId, Object.fromEntries(p.channels.map(c => [c.index, c.value])));
+        for (const p of plates) {
+          const m = merged.get(p.plateId) ?? {};
+          for (const c of p.channels) m[c.index] = c.value; // les nouvelles valeurs écrasent
+          merged.set(p.plateId, m);
+        }
+        hwPendingPlatesRef.current = Array.from(merged.entries()).map(([plateId, ch]) => ({
+          plateId,
+          channels: Object.entries(ch).map(([i, v]) => ({ index: Number(i), value: v })),
+        }));
+      }
     }
   }
 
@@ -1219,9 +1238,14 @@ export default function JeuxPage() {
   }
 
   function sendRgbToPlate(rgb: TargetColor, intensity100: number, plateId: number) {
-    const channels32 = rgbToChannels32(rgb, intensity100, plateId);
+    // rgbToChannels32 retourne toujours des indices en espace "rouge".
+    // Pour les dalles bleues on reméppe via remapChannels32 avant d'envoyer.
+    const channels32Rouge = rgbToChannels32(rgb, intensity100);
+    const ch = getPlateType(plateId) === 'rouge'
+      ? channels32Rouge
+      : remapChannels32(channels32Rouge, 'rouge', 'bleu');
     for (let i = 0; i < 32; i++) {
-      scheduleSetCanal(plateId, i, clamp255(channels32[i] ?? 0));
+      scheduleSetCanal(plateId, i, clamp255(ch[i] ?? 0));
     }
   }
 

@@ -301,9 +301,10 @@ export default function GamePuissance4({ onSendColor, onTurnOff, onTurnOffAll, o
     setTimeout(() => setDropAnim(null), 280);
     setGrid(result.grid.map(r => [...r]) as Grid);
 
-    // Flash hardware
-    for (let r = 0; r < ROWS; r++) onSendColor(tileIdx(r, col), 255, 255, 255, 30);
-    setTimeout(() => syncHardware(result.grid), 120);
+    // Flash blanc sur la colonne posée, puis resync (2 appels pour garantir le retour)
+    for (let r = 0; r < ROWS; r++) onSendColor(tileIdx(r, col), 255, 255, 255, 60);
+    setTimeout(() => syncHardware(result.grid), 300);
+    setTimeout(() => syncHardware(result.grid), 700); // filet de sécurité si batch lent
 
     const w = checkWin(result.grid);
     if (w) {
@@ -313,12 +314,13 @@ export default function GamePuissance4({ onSendColor, onTurnOff, onTurnOffAll, o
       phaseRef.current = 'finished';
       setPhase('finished');
       setScores(s => ({ ...s, [w === P1 ? 'p1' : 'p2']: s[w === P1 ? 'p1' : 'p2'] + 1 }));
-      // Win flash
-      for (let i = 0; i < 5; i++) setTimeout(() => {
+      // Win flash : alterne COULEUR / NOIR (commence par couleur = (i+1)%2 pour éviter dedup)
+      for (let i = 0; i < 6; i++) setTimeout(() => {
         const pc = PLAYER_COLORS[w];
-        for (let j=0;j<42;j++) onSendColor(j, pc.r*(i%2), pc.g*(i%2), pc.b*(i%2), 70);
-      }, i*280);
-      setTimeout(() => onTurnOffAll(), 5*280+100);
+        const on = (i + 1) % 2; // 0=on, 1=off → commence allumé
+        for (let j = 0; j < 42; j++) onSendColor(j, pc.r * on, pc.g * on, pc.b * on, 75);
+      }, i * 300);
+      setTimeout(() => onTurnOffAll(), 6 * 300 + 150);
       return;
     }
     if (result.grid[0].every(c => c !== 0)) {
