@@ -202,7 +202,13 @@ export default function LoginScreen({ sessionChecked, onSuccess, initialClassCod
               className="login-alt-link"
               onClick={() => { setView('register'); setLoginError(''); }}
             >
-              Pas encore de compte ? <strong>Créer un compte</strong>
+              <span className="login-alt-q">Pas encore de compte ?</span>
+              <span className="login-alt-sep" />
+              <span className="login-alt-cta">
+                <UserPlus size={14} />
+                Créer un compte
+                <span className="login-alt-arrow">→</span>
+              </span>
             </button>
           </div>
         )}
