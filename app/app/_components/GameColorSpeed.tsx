@@ -161,23 +161,9 @@ export default function GameColorSpeed({
       setCombo(0);
       setMissed(m => m + 1);
       const missIdx = activeTileRef.current!;
-      const missCol = activeColRef.current!;
-      // Single-tile red flash → restore → next tile
-      onSendColor(missIdx, 230, 20, 20, 95);
-      window.setTimeout(() => {
-        if (phaseRef.current !== 'playing') return;
-        onSendColor(missIdx, missCol.r, missCol.g, missCol.b, 92);
-        activeTileRef.current  = missIdx;
-        tileStartRef.current   = Date.now();
-        // Give one more chance at the same tile (pressure!)
-        window.clearTimeout(tileTimerRef.current);
-        tileTimerRef.current = window.setTimeout(() => {
-          if (phaseRef.current !== 'playing') return;
-          onTurnOff(missIdx);
-          activeTileRef.current = null;
-          window.setTimeout(() => lightNextTile(), 60);
-        }, Math.max(speedRef.current, 500));
-      }, 220);
+      onTurnOff(missIdx);
+      activeTileRef.current = null;
+      if (phaseRef.current === 'playing') lightNextTile();
     }, speedRef.current);
   }
 
@@ -248,15 +234,10 @@ export default function GameColorSpeed({
       showSpeed(tier);
 
       window.clearTimeout(tileTimerRef.current);
-
-      // ─ Single-tile white flash → off → next ─
       const hitIdx = activeTileRef.current;
-      activeTileRef.current = null;           // consumed
-      onSendColor(hitIdx, 255, 255, 255, 100); // white burst
-      window.setTimeout(() => {
-        onTurnOff(hitIdx);
-        window.setTimeout(() => { if (phaseRef.current === 'playing') lightNextTile(); }, 35);
-      }, 120);
+      activeTileRef.current = null;
+      onTurnOff(hitIdx);
+      if (phaseRef.current === 'playing') lightNextTile();
 
     } else {
       /* ❌ WRONG TILE */
@@ -265,19 +246,6 @@ export default function GameColorSpeed({
       setMissed(m => m + 1);
       bubble('−2', { color: '#ef4444', glow: 'rgba(239,68,68,0.5)' });
       setScore(s => Math.max(0, s - 2));
-
-      // Flash only the wrong tile red
-      onSendColor(idx, 230, 20, 20, 88);
-      window.setTimeout(() => onTurnOff(idx), 160);
-
-      // Pulse the CORRECT tile brighter as hint
-      const correctIdx = activeTileRef.current!;
-      const correctCol = activeColRef.current!;
-      onSendColor(correctIdx, correctCol.r, correctCol.g, correctCol.b, 100);
-      window.setTimeout(() => {
-        if (activeTileRef.current === correctIdx)
-          onSendColor(correctIdx, correctCol.r, correctCol.g, correctCol.b, 92);
-      }, 280);
     }
   }
 

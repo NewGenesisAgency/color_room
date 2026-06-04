@@ -252,7 +252,6 @@ export default function GamePuissance4({ onSendColor, onTurnOff, onTurnOffAll, o
   const [moveCount, setMoveCount]   = useState(0);
   const [scores, setScores]         = useState({ p1: 0, p2: 0 });
   const [winCells, setWinCells]     = useState<[number,number][]>([]);
-  const [dropAnim, setDropAnim]     = useState<{ col: number; player: Cell } | null>(null);
 
   const gridRef          = useRef<Grid>(emptyGrid());
   const currentRef       = useRef<Cell>(P1);
@@ -297,14 +296,10 @@ export default function GamePuissance4({ onSendColor, onTurnOff, onTurnOffAll, o
     gridRef.current = result.grid;
     moveCountRef.current += 1;
     setMoveCount(moveCountRef.current);
-    setDropAnim({ col, player });
-    setTimeout(() => setDropAnim(null), 280);
     setGrid(result.grid.map(r => [...r]) as Grid);
 
-    // Flash blanc sur la colonne posée, puis resync (2 appels pour garantir le retour)
-    for (let r = 0; r < ROWS; r++) onSendColor(tileIdx(r, col), 255, 255, 255, 60);
-    setTimeout(() => syncHardware(result.grid), 300);
-    setTimeout(() => syncHardware(result.grid), 700); // filet de sécurité si batch lent
+    // Mise à jour hardware directe, sans flash
+    syncHardware(result.grid);
 
     const w = checkWin(result.grid);
     if (w) {
@@ -314,13 +309,8 @@ export default function GamePuissance4({ onSendColor, onTurnOff, onTurnOffAll, o
       phaseRef.current = 'finished';
       setPhase('finished');
       setScores(s => ({ ...s, [w === P1 ? 'p1' : 'p2']: s[w === P1 ? 'p1' : 'p2'] + 1 }));
-      // Win flash : alterne COULEUR / NOIR (commence par couleur = (i+1)%2 pour éviter dedup)
-      for (let i = 0; i < 6; i++) setTimeout(() => {
-        const pc = PLAYER_COLORS[w];
-        const on = (i + 1) % 2; // 0=on, 1=off → commence allumé
-        for (let j = 0; j < 42; j++) onSendColor(j, pc.r * on, pc.g * on, pc.b * on, 75);
-      }, i * 300);
-      setTimeout(() => onTurnOffAll(), 6 * 300 + 150);
+      // Garder l'état final affiché 2s puis éteindre
+      setTimeout(() => onTurnOffAll(), 2000);
       return;
     }
     if (result.grid[0].every(c => c !== 0)) {
@@ -343,7 +333,7 @@ export default function GamePuissance4({ onSendColor, onTurnOff, onTurnOffAll, o
     diffRef.current = difficulty; moveCountRef.current = 0;
     setGrid(emptyGrid()); setCurrentPlayer(P1); setHoverCol(null);
     setWinner(null); setIsDraw(false); setThinking(false); setMoveCount(0);
-    setWinCells([]); setDropAnim(null); setPhase('playing');
+    setWinCells([]); setPhase('playing');
     onTurnOffAll();
   }
 
@@ -541,14 +531,13 @@ export default function GamePuissance4({ onSendColor, onTurnOff, onTurnOffAll, o
       </div>
 
       {/* Drop indicators */}
-      <div style={{ display:'grid', gridTemplateColumns:`repeat(${COLS},1fr)`, gap:6, pointerEvents: aiTurn ? 'none' : 'auto', opacity: aiTurn ? 0.35 : 1, transition:'opacity 160ms' }}>
+      <div style={{ display:'grid', gridTemplateColumns:`repeat(${COLS},1fr)`, gap:6, pointerEvents: aiTurn ? 'none' : 'auto', opacity: aiTurn ? 0.4 : 1 }}>
         {Array.from({length:COLS},(_,c) => {
           const active = hoverCol===c;
           return (
             <button key={c} onMouseEnter={() => setHoverCol(c)} onMouseLeave={() => setHoverCol(null)} onClick={() => makeMove(c)}
-              style={{ height:22, borderRadius:7, border:'none', cursor:'pointer', transition:'all 130ms',
+              style={{ height:22, borderRadius:7, border:'none', cursor:'pointer',
                 background: active ? curColor.css : 'rgba(255,255,255,0.05)',
-                boxShadow: active ? `0 3px 14px ${curColor.glow}` : 'none',
                 display:'flex', alignItems:'center', justifyContent:'center',
               }}>
               {active && <div style={{ width:7, height:7, borderRadius:'50%', background:'#fff' }} />}
@@ -564,18 +553,13 @@ export default function GamePuissance4({ onSendColor, onTurnOff, onTurnOffAll, o
             const isHover = hoverCol === c && !cell;
             const pc = cell ? PLAYER_COLORS[cell] : null;
             const isWin = winCells.some(([wr,wc]) => wr===r && wc===c);
-            const isDropping = dropAnim && dropAnim.col === c && cell === dropAnim.player && r === grid.map((ro,ri) => ro[c]).lastIndexOf(dropAnim.player as Cell);
             return (
               <div key={`${r}-${c}`} onClick={() => makeMove(c)} onMouseEnter={() => setHoverCol(c)} onMouseLeave={() => setHoverCol(null)}
                 style={{
-                  aspectRatio:'1', borderRadius:'50%', cursor:'pointer', transition: isDropping ? 'none' : 'all 130ms',
+                  aspectRatio:'1', borderRadius:'50%', cursor:'pointer',
                   background: pc ? pc.css : isHover ? `${curColor.css}22` : 'rgba(255,255,255,0.04)',
-                  border: isWin ? '2px solid #fff' : pc ? 'none' : `1px solid ${isHover ? `${curColor.css}66` : 'rgba(255,255,255,0.07)'}`,
-                  boxShadow: isWin
-                    ? `0 0 0 3px ${pc!.css}, 0 0 22px ${pc!.css}`
-                    : pc ? `0 0 14px ${pc.glow}, inset 0 2px 4px rgba(255,255,255,0.25), inset 0 -2px 5px rgba(0,0,0,0.28)`
-                    : 'inset 0 2px 5px rgba(0,0,0,0.35)',
-                  transform: isWin ? 'scale(1.07)' : isDropping ? 'scale(0.88)' : 'scale(1)',
+                  border: isWin ? '3px solid #fff' : pc ? 'none' : `1px solid ${isHover ? `${curColor.css}66` : 'rgba(255,255,255,0.07)'}`,
+                  outline: isWin ? `2px solid ${pc!.css}` : 'none',
                 }}
               />
             );
