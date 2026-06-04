@@ -933,6 +933,13 @@ export default function JeuxPage() {
 
   const [currentGame, setCurrentGame] = useState<string | null>(null);
   const [gameActive, setGameActive] = useState<boolean>(false);
+
+  // ── Vérification matériel avant démarrage ─────────────────────────────────
+  type HwError = { name: string; detail: string };
+  const [hwCheckModal, setHwCheckModal] = useState<{
+    checking: boolean;
+    errors: HwError[];
+  } | null>(null);
   const [tetrisStandalone, setTetrisStandalone] = useState(false);
 
   const [plateColors, setPlateColors] = useState<string[]>(Array(42).fill('#000000'));
@@ -2773,6 +2780,49 @@ export default function JeuxPage() {
     stopSimonGame();
   }
 
+  /** Détecte si le jeu sélectionné nécessite le CS-160 */
+  function gameNeedsCs160(): boolean {
+    const CS160_KINDS = new Set(['game_intrus', 'game_canal_mix']);
+    if (!hudRun) return false;
+    return (Array.isArray(hudRun.cfg.nodes) ? hudRun.cfg.nodes as {kind:string}[] : [])
+      .some(n => CS160_KINDS.has(n.kind));
+  }
+
+  /** Vérifie la disponibilité du matériel requis avant de lancer le jeu.
+   *  Ouvre un modal bloquant si supervision ou CS-160 est injoignable. */
+  async function checkHardwareBeforeStart() {
+    if (!currentGame) { setMessage('Veuillez d\'abord sélectionner un jeu.'); return; }
+    setHwCheckModal({ checking: true, errors: [] });
+    const errors: HwError[] = [];
+    const needsCs160 = gameNeedsCs160();
+    try {
+      const res = await fetch('/api/health?full=1', { cache: 'no-store' });
+      const data = await res.json() as {
+        apis?: {
+          supervision?: { reachable?: boolean; url?: string; error?: string };
+          cs160?:       { reachable?: boolean; url?: string; error?: string };
+        };
+      };
+      if (!data.apis?.supervision?.reachable) {
+        errors.push({
+          name: '🔴 Dalles LED — API Supervision',
+          detail: `${data.apis?.supervision?.url ?? 'URL inconnue'} : ${data.apis?.supervision?.error ?? 'injoignable'}`,
+        });
+      }
+      if (needsCs160 && !data.apis?.cs160?.reachable) {
+        errors.push({
+          name: '🔴 CS-160 — Colorimètre Konica',
+          detail: `${data.apis?.cs160?.url ?? 'URL inconnue'} : ${data.apis?.cs160?.error ?? 'injoignable'}`,
+        });
+      }
+    } catch {
+      errors.push({ name: '🔴 Serveur injoignable', detail: 'Impossible de vérifier le matériel (/api/health).' });
+    }
+    if (errors.length > 0) { setHwCheckModal({ checking: false, errors }); return; }
+    setHwCheckModal(null);
+    startGame();
+  }
+
   function startGame() {
     if (!currentGame) {
       setMessage('Veuillez d\'abord sélectionner un jeu.');
@@ -4380,7 +4430,7 @@ export default function JeuxPage() {
                 <h3>
                   <Settings2 size={18} /> Contrôles
                 </h3>
-                <button className="btn btn-success" onClick={startGame} disabled={gameActive}>
+                <button className="btn btn-success" onClick={() => void checkHardwareBeforeStart()} disabled={gameActive}>
                   <Play size={18} /> Démarrer le Jeu
                 </button>
                 <button className="btn btn-danger" onClick={stopGame} disabled={!gameActive}>
@@ -5828,6 +5878,68 @@ export default function JeuxPage() {
               }
             }
           `}</style>
+        </div>
+      )}
+
+      {/* ── Modal vérification matériel ──────────────────────────────────────── */}
+      {hwCheckModal && (
+        <div style={{ position:'fixed', inset:0, zIndex:10000, display:'grid', placeItems:'center', padding:20, background:'rgba(5,8,18,0.78)', backdropFilter:'blur(16px)' }}>
+          <div style={{ width:'min(480px,100%)', borderRadius:22, overflow:'hidden', background:'linear-gradient(180deg,#161a2a,#0e1120)', border:'1px solid rgba(255,255,255,0.1)', boxShadow:'0 32px 80px rgba(0,0,0,0.6)', animation:'fadeIn .18s ease' }}>
+
+            {/* En-tête */}
+            <div style={{ padding:'22px 24px 16px', borderBottom:'1px solid rgba(255,255,255,0.07)' }}>
+              <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+                <div style={{ width:44, height:44, borderRadius:14, background:'rgba(239,68,68,0.15)', border:'1px solid rgba(239,68,68,0.3)', display:'grid', placeItems:'center', flexShrink:0 }}>
+                  {hwCheckModal.checking
+                    ? <span style={{ width:20, height:20, borderRadius:'50%', border:'2.5px solid rgba(255,255,255,.2)', borderTopColor:'#fff', animation:'loginSpin .7s linear infinite', display:'inline-block' }} />
+                    : <span style={{ fontSize:20 }}>⚠️</span>}
+                </div>
+                <div>
+                  <div style={{ fontSize:16, fontWeight:900, color:'#f8fafc' }}>
+                    {hwCheckModal.checking ? 'Vérification du matériel…' : 'Matériel injoignable'}
+                  </div>
+                  <div style={{ fontSize:12, color:'rgba(255,255,255,.5)', marginTop:2 }}>
+                    {hwCheckModal.checking
+                      ? 'Contrôle des connexions API en cours'
+                      : 'Impossible de démarrer — corrigez les erreurs ci-dessous'}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Liste des erreurs */}
+            {!hwCheckModal.checking && hwCheckModal.errors.length > 0 && (
+              <div style={{ padding:'16px 24px', display:'flex', flexDirection:'column', gap:10 }}>
+                {hwCheckModal.errors.map((err, i) => (
+                  <div key={i} style={{ padding:'12px 14px', borderRadius:12, background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.22)' }}>
+                    <div style={{ fontSize:13, fontWeight:800, color:'#fca5a5', marginBottom:4 }}>{err.name}</div>
+                    <div style={{ fontSize:12, color:'rgba(255,255,255,.5)', fontFamily:'monospace', wordBreak:'break-all' }}>{err.detail}</div>
+                  </div>
+                ))}
+                <div style={{ fontSize:12, color:'rgba(255,255,255,.35)', marginTop:4 }}>
+                  Vérifiez la configuration dans <strong style={{color:'rgba(255,255,255,.55)'}}>⚙ Configuration</strong> ou branchez le matériel.
+                </div>
+              </div>
+            )}
+
+            {/* Actions */}
+            {!hwCheckModal.checking && (
+              <div style={{ padding:'0 24px 22px', display:'flex', gap:10 }}>
+                <button
+                  onClick={() => void checkHardwareBeforeStart()}
+                  style={{ flex:1, padding:'12px', borderRadius:14, border:'none', cursor:'pointer', fontFamily:'inherit', fontWeight:800, fontSize:14, color:'#fff', background:'linear-gradient(135deg,#4361ee,#7c3aed)', boxShadow:'0 4px 16px rgba(67,97,238,.35)' }}
+                >
+                  🔄 Réessayer
+                </button>
+                <button
+                  onClick={() => setHwCheckModal(null)}
+                  style={{ flex:1, padding:'12px', borderRadius:14, border:'1px solid rgba(255,255,255,.12)', cursor:'pointer', fontFamily:'inherit', fontWeight:700, fontSize:14, color:'rgba(255,255,255,.7)', background:'rgba(255,255,255,.06)' }}
+                >
+                  Annuler
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>
