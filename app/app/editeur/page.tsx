@@ -1061,7 +1061,8 @@ export default function EditeurPage() {
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const t = window.localStorage.getItem('crg_user_type') ?? '';
-    setIsTeacher(t === 'enseignant');
+    // admin ET enseignant ont accès à l'éditeur
+    setIsTeacher(t === 'enseignant' || t === 'admin');
   }, []);
 
   const [status, setStatus] = useState<string>('');
@@ -3479,29 +3480,61 @@ export default function EditeurPage() {
 
   if (isTeacher === false) {
     return (
-      <main className="editeur stage" style={{ display: 'grid', placeItems: 'center' }}>
-        <div
-          className="glass"
-          style={{
-            width: 'min(720px, calc(100vw - 28px))',
-            padding: 22,
-            borderRadius: 22,
-            textAlign: 'center',
-          }}
-        >
-          <div style={{ display: 'grid', gap: 8 }}>
-            <div style={{ fontSize: 14, opacity: 0.8 }}>Enseignant requis</div>
-            <div style={{ fontSize: 22, fontWeight: 900, letterSpacing: '-0.02em' }}>Accès refusé</div>
-            <div style={{ fontSize: 13, opacity: 0.82, lineHeight: 1.6, marginTop: 4 }}>
-              Cette page est réservée aux enseignants.
-              <br />
-              Connecte-toi en tant qu'enseignant depuis <a href="/jeux">/jeux</a>.
-            </div>
-          </div>
+      <main className="editeur stage" style={{
+        display: 'grid', placeItems: 'center', minHeight: '100vh',
+        background: 'radial-gradient(ellipse 80% 50% at 50% 0%, rgba(67,97,238,0.10) 0%, transparent 60%), #f2f4f8',
+      }}>
+        <div style={{
+          width: 'min(440px, calc(100vw - 32px))',
+          background: 'rgba(255,255,255,0.88)',
+          backdropFilter: 'blur(32px) saturate(180%)',
+          WebkitBackdropFilter: 'blur(32px) saturate(180%)',
+          borderRadius: 28,
+          border: '1px solid rgba(255,255,255,0.95)',
+          boxShadow: 'inset 0 1px 0 rgba(255,255,255,1), 0 20px 60px rgba(67,97,238,0.12), 0 4px 16px rgba(0,0,0,0.06)',
+          overflow: 'hidden',
+        }}>
+          {/* Bande colorée */}
+          <div style={{
+            height: 5,
+            background: 'linear-gradient(90deg, #4361ee 0%, #7c3aed 50%, #f72585 100%)',
+          }} />
 
-          <div style={{ display: 'flex', gap: 12, justifyContent: 'center', marginTop: 18, flexWrap: 'wrap' }}>
-            <a className="btn btn--hero" href="/jeux" style={{ textDecoration: 'none' }}>
-              Aller à /jeux
+          <div style={{ padding: '36px 32px 32px' }}>
+            {/* Icône */}
+            <div style={{
+              width: 56, height: 56, borderRadius: 18,
+              background: 'linear-gradient(135deg, rgba(67,97,238,0.12), rgba(124,58,237,0.08))',
+              display: 'grid', placeItems: 'center', marginBottom: 20,
+              border: '1px solid rgba(67,97,238,0.15)',
+            }}>
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#4361ee" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+              </svg>
+            </div>
+
+            <div style={{ fontSize: 22, fontWeight: 900, color: '#1a1d2e', letterSpacing: '-0.03em', marginBottom: 8 }}>
+              Accès réservé
+            </div>
+            <p style={{ fontSize: 13.5, color: 'rgba(26,29,46,0.62)', lineHeight: 1.65, margin: '0 0 28px' }}>
+              L&apos;éditeur de jeux est accessible aux <strong style={{ color: '#4361ee' }}>enseignants</strong> et <strong style={{ color: '#7c3aed' }}>administrateurs</strong> uniquement.
+              <br /><br />
+              Connecte-toi avec un compte enseignant ou demande à ton administrateur de changer ton rôle.
+            </p>
+
+            <a href="/jeux" style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              width: '100%', padding: '13px 20px', borderRadius: 14,
+              background: 'linear-gradient(135deg, #4361ee, #7c3aed)',
+              color: '#fff', fontWeight: 800, fontSize: 14,
+              textDecoration: 'none', fontFamily: 'inherit',
+              boxShadow: '0 4px 18px rgba(67,97,238,0.35)',
+            }}>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="m15 18-6-6 6-6"/>
+              </svg>
+              Retour à l&apos;accueil
             </a>
           </div>
         </div>
