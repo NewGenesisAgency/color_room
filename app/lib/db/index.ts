@@ -61,6 +61,61 @@ function migrate(db: Database.Database) {
     "CREATE TABLE IF NOT EXISTS crg_app_config (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at TEXT NOT NULL DEFAULT (datetime('now')));",
   );
 
+  // ─── Auth & utilisateurs ─────────────────────────────────────────────────────
+  // Ces tables doivent être créées ici pour survivre à un restart sur serveur neuf.
+  db.exec(`CREATE TABLE IF NOT EXISTS crg_users (
+    id            TEXT PRIMARY KEY,
+    name          TEXT NOT NULL UNIQUE,
+    user_type     TEXT NOT NULL DEFAULT 'apprenant',
+    password_hash TEXT,
+    niveau        TEXT,
+    created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+    avatar_color  TEXT DEFAULT '#4361ee',
+    avatar_icon   TEXT DEFAULT 'User'
+  );`);
+
+  db.exec(`CREATE TABLE IF NOT EXISTS crg_sessions (
+    id         TEXT PRIMARY KEY,
+    user_id    TEXT NOT NULL,
+    token      TEXT NOT NULL UNIQUE,
+    expires_at TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY(user_id) REFERENCES crg_users(id) ON DELETE CASCADE
+  );`);
+  db.exec('CREATE INDEX IF NOT EXISTS idx_crg_sessions_user ON crg_sessions(user_id);');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_crg_sessions_token ON crg_sessions(token);');
+
+  // ─── Classes pédagogiques ────────────────────────────────────────────────────
+  db.exec(`CREATE TABLE IF NOT EXISTS crg_classes (
+    id         TEXT PRIMARY KEY,
+    name       TEXT NOT NULL,
+    code       TEXT NOT NULL UNIQUE,
+    created_by TEXT NOT NULL,
+    niveau     TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );`);
+
+  db.exec(`CREATE TABLE IF NOT EXISTS crg_class_members (
+    id        TEXT PRIMARY KEY,
+    class_id  TEXT NOT NULL,
+    user_id   TEXT NOT NULL,
+    joined_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(class_id, user_id)
+  );`);
+  db.exec('CREATE INDEX IF NOT EXISTS idx_crg_class_members_class ON crg_class_members(class_id);');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_crg_class_members_user ON crg_class_members(user_id);');
+
+  // ─── Scores ──────────────────────────────────────────────────────────────────
+  db.exec(`CREATE TABLE IF NOT EXISTS crg_scores (
+    id        TEXT PRIMARY KEY,
+    user_id   TEXT NOT NULL,
+    game_name TEXT NOT NULL,
+    score     INTEGER NOT NULL,
+    played_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );`);
+  db.exec('CREATE INDEX IF NOT EXISTS idx_crg_scores_user ON crg_scores(user_id);');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_crg_scores_played ON crg_scores(played_at DESC);');
+
   // ─── Room system additions ────────────────────────────────────────────────
   try { db.exec("ALTER TABLE crg_mp_sessions ADD COLUMN room_code TEXT;"); } catch { /* already exists */ }
   try { db.exec("ALTER TABLE crg_mp_sessions ADD COLUMN room_name TEXT DEFAULT 'Partie';"); } catch { /* already exists */ }
