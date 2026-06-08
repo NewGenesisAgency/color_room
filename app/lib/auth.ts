@@ -17,7 +17,10 @@ export function verifyPassword(password: string, stored: string): boolean {
 export function createSession(userId: string): string {
   const db = getDb();
   const token = randomBytes(32).toString('hex');
-  const expiresAt = new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString();
+  // 30 jours — cohérent avec le maxAge cookie et renewSession()
+  const expiresAt = new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString();
+  // Purger les sessions expirées de cet utilisateur au passage
+  db.prepare('DELETE FROM crg_sessions WHERE user_id = ? AND expires_at < datetime(\'now\')').run(userId);
   db.prepare('INSERT INTO crg_sessions (id, user_id, token, expires_at) VALUES (?, ?, ?, ?)').run(
     randomBytes(16).toString('hex'), userId, token, expiresAt,
   );

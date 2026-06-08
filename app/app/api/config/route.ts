@@ -1,10 +1,6 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
+import { getSessionUser } from '@/lib/auth';
 import { getConfigSnapshot, setSetting, clearSetting, SETTING_KEYS, DEFAULTS } from '@/lib/settings';
-
-/**
- * Configuration des URLs d'API, modifiable à chaud depuis le site.
- * Accessible à tout le monde (outil de salle de classe hors-ligne).
- */
 
 export async function GET() {
   try {
@@ -25,7 +21,11 @@ function isValidUrl(u: string): boolean {
   }
 }
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
+  const token = req.cookies.get('crg_session')?.value;
+  const me = token ? getSessionUser(token) : null;
+  if (!me || (me.role !== 'enseignant' && me.role !== 'admin'))
+    return NextResponse.json({ ok: false, error: 'Non autorisé' }, { status: 401 });
   try {
     const body = (await req.json().catch(() => ({}))) as Body;
 

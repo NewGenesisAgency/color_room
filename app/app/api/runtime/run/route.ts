@@ -1,5 +1,5 @@
-import { NextResponse } from 'next/server';
-
+import { NextRequest, NextResponse } from 'next/server';
+import { getSessionUser } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { loadFlow } from '@/lib/flow/storage';
 import { executeFlow } from '@/lib/runtime/engine';
@@ -9,7 +9,11 @@ function randomId(): string {
   return `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
 }
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
+  const token = req.cookies.get('crg_session')?.value;
+  const me = token ? getSessionUser(token) : null;
+  if (!me || (me.role !== 'enseignant' && me.role !== 'admin'))
+    return NextResponse.json({ error: 'Non autorisé' }, { status: 401 });
   const body = (await req.json().catch(() => ({}))) as Partial<RuntimeRunRequest>;
 
   const flowName = body.flowName || 'default';

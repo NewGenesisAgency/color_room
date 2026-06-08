@@ -16,6 +16,8 @@ node_modules/
 # Ignorer les builds Next.js
 .next/
 out/
+next-env.d.ts
+tsconfig.tsbuildinfo
 
 # Ignorer les fichiers d'environnement
 .env

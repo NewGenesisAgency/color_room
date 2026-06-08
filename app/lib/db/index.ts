@@ -21,6 +21,7 @@ function migrate(db: Database.Database) {
   db.pragma('journal_mode = WAL');
   db.pragma('synchronous = NORMAL');
   db.pragma('busy_timeout = 5000');
+  db.pragma('foreign_keys = ON');
 
   db.exec(
     "CREATE TABLE IF NOT EXISTS crg_flows (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, flow_json TEXT NOT NULL, updated_at TEXT NOT NULL DEFAULT (datetime('now')));",
@@ -115,6 +116,11 @@ function migrate(db: Database.Database) {
   );`);
   db.exec('CREATE INDEX IF NOT EXISTS idx_crg_scores_user ON crg_scores(user_id);');
   db.exec('CREATE INDEX IF NOT EXISTS idx_crg_scores_played ON crg_scores(played_at DESC);');
+
+  // ─── Purge sessions expirées (exécutée à chaque démarrage) ───────────────────
+  try {
+    db.prepare("DELETE FROM crg_sessions WHERE expires_at < datetime('now')").run();
+  } catch { /* table peut ne pas exister sur très vieux schéma */ }
 
   // ─── Room system additions ────────────────────────────────────────────────
   try { db.exec("ALTER TABLE crg_mp_sessions ADD COLUMN room_code TEXT;"); } catch { /* already exists */ }

@@ -59,9 +59,17 @@ export async function POST(req: NextRequest) {
 
   const { gameName, score } = (await req.json()) as { gameName?: string; score?: number };
   if (!gameName?.trim()) return NextResponse.json({ error: 'Nom du jeu requis' }, { status: 400 });
-  if (typeof score !== 'number') return NextResponse.json({ error: 'Score invalide' }, { status: 400 });
+  if (gameName.trim().length > 100) return NextResponse.json({ error: 'Nom du jeu trop long' }, { status: 400 });
+  if (typeof score !== 'number' || !Number.isFinite(score)) return NextResponse.json({ error: 'Score invalide' }, { status: 400 });
+  if (score < 0 || score > 100_000) return NextResponse.json({ error: 'Score hors limites (0–100 000)' }, { status: 400 });
 
   const db = getDb();
+  // Anti-spam : un seul score par jeu toutes les 5 secondes par utilisateur
+  const recent = db.prepare(
+    "SELECT id FROM crg_scores WHERE user_id = ? AND game_name = ? AND played_at > datetime('now', '-5 seconds')"
+  ).get(me.id, gameName.trim());
+  if (recent) return NextResponse.json({ error: 'Trop de soumissions' }, { status: 429 });
+
   db.prepare('INSERT INTO crg_scores (id, user_id, game_name, score) VALUES (?, ?, ?, ?)').run(
     randomBytes(16).toString('hex'), me.id, gameName.trim(), Math.round(score),
   );
