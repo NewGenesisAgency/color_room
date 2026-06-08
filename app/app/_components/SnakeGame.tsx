@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, RotateCcw, Trophy, Zap } from 'lucide-react';
 import TouchControls, { type TouchKey } from './TouchControls';
 import type { GameTileProps } from './GameColorSpeed';
+import { DIFF_LABELS, type DifficultyLevel } from './GameColorSpeed';
 
 // ── Snake Chromatique — 42 dalles (6 col × 7 row) ───────────────────────────
 // Le serpent traverse les deux salles (gauche + droite).
@@ -53,8 +54,15 @@ const LEVEL_CLR = [
   { head: { r: 255, g:   0, b:  80 }, body: { r: 200, g:   0, b:  60 } },
   { head: { r: 255, g: 255, b: 255 }, body: { r: 180, g: 180, b: 180 } },
 ];
+const SNAKE_DIFF = {
+  facile:    { baseSpeed: 900,  minSpeed: 200, eatPerLevel: 7 },
+  moyen:     { baseSpeed: 700,  minSpeed: 120, eatPerLevel: 5 },
+  difficile: { baseSpeed: 500,  minSpeed: 100, eatPerLevel: 4 },
+  expert:    { baseSpeed: 350,  minSpeed: 80,  eatPerLevel: 3 },
+} satisfies Record<DifficultyLevel, { baseSpeed: number; minSpeed: number; eatPerLevel: number }>;
+
 const getLevelClr = (l: number) => LEVEL_CLR[Math.min(l - 1, LEVEL_CLR.length - 1)];
-const speedMs = (l: number) => Math.max(120, 700 - (l - 1) * 60);
+const speedMs = (l: number, cfg: typeof SNAKE_DIFF[DifficultyLevel]) => Math.max(cfg.minSpeed, cfg.baseSpeed - (l - 1) * 60);
 const foodCount = (l: number) => Math.min(2 + Math.floor((l - 1) / 2), 5);
 
 function pickFood(): FoodType {
@@ -101,7 +109,8 @@ const TOUCH_KEYS: TouchKey[] = [
   { key: 'ArrowDown',  slot: 'down',  label: <ChevronDown size={22} />, repeat: true },
 ];
 
-export default function SnakeGame({ onSendColor, onTurnOff, onTurnOffAll, onQuit, onComplete, onScoreDelta }: GameTileProps) {
+export default function SnakeGame({ onSendColor, onTurnOff, onTurnOffAll, onQuit, onComplete, onScoreDelta, difficulty = 'moyen' }: GameTileProps) {
+  const cfg = SNAKE_DIFF[difficulty];
   const gs = useRef<GS>(fresh());
   const onCompleteRef = useRef(onComplete);
   onCompleteRef.current = onComplete;
@@ -163,7 +172,7 @@ export default function SnakeGame({ onSendColor, onTurnOff, onTurnOffAll, onQuit
         s.score += ate.type.pts;
         onScoreDeltaRef.current?.(ate.type.pts, `${ate.type.nm}nm +${ate.type.pts}`);
         s.eaten++;
-        s.level = Math.floor(s.eaten / 5) + 1;
+        s.level = Math.floor(s.eaten / cfg.eatPerLevel) + 1;
         s.flash = FOODS.indexOf(ate.type);
         s.flashTick = 3;
         s.foods = s.foods.filter((_, i) => i !== fi);
@@ -172,7 +181,7 @@ export default function SnakeGame({ onSendColor, onTurnOff, onTurnOffAll, onQuit
           s.foods.push({ pos: spawnPos(s.snake, s.foods.map(f => f.pos)), type: pickFood() });
       }
       draw(s); rerender();
-    }, speedMs(s.level));
+    }, speedMs(s.level, cfg));
     return () => window.clearInterval(id);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gs.current.level, gs.current.over, draw, rerender]);
@@ -196,7 +205,14 @@ export default function SnakeGame({ onSendColor, onTurnOff, onTurnOffAll, onQuit
 
   return (
     <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:14, padding:'18px 14px', fontFamily:'system-ui,sans-serif', background:'#0b0f1c', color:'#e8eaf0', minHeight:'100%' }}>
-      <div style={{ fontSize:13, fontWeight:700, letterSpacing:'0.2em', color:'#06d6a0', textTransform:'uppercase' }}>Snake Chromatique</div>
+      <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+        <div style={{ fontSize:13, fontWeight:700, letterSpacing:'0.2em', color:'#06d6a0', textTransform:'uppercase' }}>Snake Chromatique</div>
+        {difficulty !== 'moyen' && (
+          <span style={{ display:'inline-flex', alignItems:'center', gap:4, padding:'2px 10px', borderRadius:20, fontSize:11, fontWeight:800, background:`${DIFF_LABELS[difficulty].color}22`, color:DIFF_LABELS[difficulty].color, border:`1px solid ${DIFF_LABELS[difficulty].color}44` }}>
+            {DIFF_LABELS[difficulty].emoji} {DIFF_LABELS[difficulty].label}
+          </span>
+        )}
+      </div>
 
       {/* Stats */}
       <div style={{ display:'flex', gap:8, width:'100%', maxWidth:380 }}>
@@ -204,7 +220,7 @@ export default function SnakeGame({ onSendColor, onTurnOff, onTurnOffAll, onQuit
           { lbl:'Score',   val:s.score,            clr:'#f8fafc' },
           { lbl:'Niveau',  val:s.level,             clr:`rgb(${lc.head.r},${lc.head.g},${lc.head.b})` },
           { lbl:'Longueur',val:s.snake.length,      clr:'#94a3b8' },
-          { lbl:'Vitesse', val:`${speedMs(s.level)}ms`, clr: s.level >= 5 ? '#f97316' : '#64748b' },
+          { lbl:'Vitesse', val:`${speedMs(s.level, cfg)}ms`, clr: s.level >= 5 ? '#f97316' : '#64748b' },
         ] as const).map(({ lbl, val, clr }) => (
           <div key={lbl} style={{ flex:1, background:'#0f172a', border:'1px solid #1e293b', borderRadius:10, padding:'7px 6px', textAlign:'center' }}>
             <div style={{ fontSize:9, fontWeight:700, color:'#475569', textTransform:'uppercase', letterSpacing:'.08em' }}>{lbl}</div>

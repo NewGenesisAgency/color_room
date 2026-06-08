@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Check, Ruler, X, RefreshCw } from 'lucide-react';
 import type { GameTileProps } from './GameColorSpeed';
+import { DIFF_LABELS, type DifficultyLevel } from './GameColorSpeed';
 import CieDiagramCanvas, { type CieMarker, type CiePolyline } from './CieDiagramCanvas';
 import { CHANNELS_ROUGE, CHANNELS_BLEU, type TileType } from '@/lib/tileChannels';
 
@@ -20,9 +21,14 @@ const INTERESTING_BLEU  = [0, 2, 4, 6, 7, 9, 10, 12, 13, 15, 17, 18, 22, 23, 24]
 const LEFT_IDX  = [0,1,2,6,7,8,12,13,14,18,19,20,24,25,26,30,31,32,36,37,38];
 const RIGHT_IDX = [3,4,5,9,10,11,15,16,17,21,22,23,27,28,29,33,34,35,39,40,41];
 
-const TOTAL_ROUNDS = 5;
+const CANAL_DIFF = {
+  facile:    { rounds: 3, autoS: 6 },
+  moyen:     { rounds: 5, autoS: 4 },
+  difficile: { rounds: 7, autoS: 3 },
+  expert:    { rounds: 8, autoS: 2 },
+} satisfies Record<DifficultyLevel, { rounds: number; autoS: number }>;
+
 const HW_INTENSITY = 80;
-const AUTO_S = 4;
 
 // ── Conversions couleur ────────────────────────────────────────────────────────
 function toLinear(c: number) {
@@ -198,8 +204,12 @@ interface GameCanalMixProps extends GameTileProps {
 }
 
 export default function GameCanalMix({
-  onSendColor, onTurnOffAll, onQuit, onSendRawChannels, tileCount = 42, onComplete, plateType = 'rouge',
+  onSendColor, onTurnOffAll, onQuit, onSendRawChannels, tileCount = 42, onComplete, plateType = 'rouge', difficulty = 'moyen',
 }: GameCanalMixProps) {
+  const cfg = CANAL_DIFF[difficulty];
+  const TOTAL_ROUNDS = cfg.rounds;
+  const AUTO_S = cfg.autoS;
+
   type Phase = 'ready' | 'playing' | 'measured' | 'result' | 'finished';
 
   const [phase, setPhase]               = useState<Phase>('ready');
@@ -389,7 +399,14 @@ export default function GameCanalMix({
     <div style={G.wrap}>
       <div style={{ display:'flex', alignItems:'flex-start', gap:20, padding:'18px 22px' }}>
         <div style={{ flex:1 }}>
-          <span style={G.tag}>Mix de Canaux · CS-160</span>
+          <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:10 }}>
+            <span style={G.tag}>Mix de Canaux · CS-160</span>
+            {difficulty !== 'moyen' && (
+              <span style={{ display:'inline-flex', alignItems:'center', gap:4, padding:'2px 10px', borderRadius:20, fontSize:11, fontWeight:800, background:`${DIFF_LABELS[difficulty].color}22`, color:DIFF_LABELS[difficulty].color, border:`1px solid ${DIFF_LABELS[difficulty].color}44` }}>
+                {DIFF_LABELS[difficulty].emoji} {DIFF_LABELS[difficulty].label}
+              </span>
+            )}
+          </div>
           <p style={{ fontSize:13, color:'rgba(255,255,255,.62)', lineHeight:1.65, margin:'0 0 10px' }}>
             La <strong style={{color:'#06d6a0'}}>salle droite</strong> s&apos;allume avec un mélange secret de 3 canaux LED.<br />
             Visez une dalle avec le <strong style={{color:'#a78bfa'}}>CS-160</strong> et cliquez <em>Mesurer</em>.<br />

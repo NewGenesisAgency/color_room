@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import type { TetrisSnapshot } from '@/app/_components/TetrisGame';
+import type { DifficultyLevel } from '@/app/_components/GameColorSpeed';
 import type { UILayoutComponent, UIDpadPreset } from '@/app/editeur/UIDesigner';
 import { SPRITE_ICONS } from '@/app/editeur/UIDesigner';
 import type { TouchKey } from '@/app/_components/TouchControls';
@@ -4847,7 +4848,11 @@ export default function JeuxPage() {
                   const gNode = nodes.find((n) => NATIVE_MAP[n.kind] && n.enabled !== false);
                   if (!gNode) return null;
                   const Comp = NATIVE_MAP[gNode.kind];
-                  const extra = gNode.kind === 'game_snake' && typeof gNode.params?.speed === 'number' ? { speed: gNode.params.speed } : {};
+                  const diff = (gNode.params?.difficulty as DifficultyLevel | undefined) ?? 'moyen';
+                  const extra: Record<string, unknown> = { difficulty: diff };
+                  if (gNode.kind === 'game_tetris' && typeof gNode.params?.speed === 'number') {
+                    extra.speed = gNode.params.speed;
+                  }
                   const ta = {
                     onSendColor: (idx: number, r: number, g: number, b: number, intensity = 80) => {
                       const p = PLATE_ID_BY_INDEX[idx]; if (!p) return;

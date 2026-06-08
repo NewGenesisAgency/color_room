@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { GameTileProps } from '../../_components/GameColorSpeed';
+import { DIFF_LABELS, type DifficultyLevel } from '../../_components/GameColorSpeed';
 import CieDiagramCanvas, { type CieMarker } from '../../_components/CieDiagramCanvas';
 
 // ── CIE 1931 spectral locus (horseshoe) ──────────────────────────────────────
@@ -103,8 +104,12 @@ function randomTarget(): { x: number; y: number; rgb: { r: number; g: number; b:
 }
 
 // ── Constantes jeu ────────────────────────────────────────────────────────────
-const SHOW_DURATION = 5;   // secondes d'affichage de la couleur cible
-const TOTAL_ROUNDS  = 5;
+const CHROMA_DIFF = {
+  facile:    { showDuration: 8, rounds: 4 },
+  moyen:     { showDuration: 5, rounds: 5 },
+  difficile: { showDuration: 3, rounds: 7 },
+  expert:    { showDuration: 2, rounds: 8 },
+} satisfies Record<DifficultyLevel, { showDuration: number; rounds: number }>;
 const INTENSITY     = 85;
 
 const LEFT_IDX  = [0,1,2,6,7,8,12,13,14,18,19,20,24,25,26,30,31,32,36,37,38];
@@ -177,7 +182,10 @@ const S: Record<string, React.CSSProperties> = {
 };
 
 // ── Composant principal ────────────────────────────────────────────────────────
-export default function ChromaticityDiagram({ onSendColor, onTurnOffAll, onQuit, tileCount = 42, onComplete }: GameTileProps) {
+export default function ChromaticityDiagram({ onSendColor, onTurnOffAll, onQuit, tileCount = 42, onComplete, difficulty = 'moyen' }: GameTileProps) {
+  const cfg = CHROMA_DIFF[difficulty];
+  const SHOW_DURATION = cfg.showDuration;
+  const TOTAL_ROUNDS = cfg.rounds;
   type Phase = 'ready' | 'show' | 'guess' | 'result' | 'finished';
 
   const [phase,      setPhase]      = useState<Phase>('ready');
@@ -355,7 +363,14 @@ export default function ChromaticityDiagram({ onSendColor, onTurnOffAll, onQuit,
   if (phase === 'ready') return (
     <div style={S.wrap}>
       <div style={{ padding: '28px 32px', display: 'flex', flexDirection: 'column', gap: 20 }}>
-        <span style={S.tag}>🔬 Chromaticité CIE 1931</span>
+        <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+          <span style={S.tag}>🔬 Chromaticité CIE 1931</span>
+          {difficulty !== 'moyen' && (
+            <span style={{ display:'inline-flex', alignItems:'center', gap:4, padding:'2px 10px', borderRadius:20, fontSize:11, fontWeight:800, background:`${DIFF_LABELS[difficulty].color}22`, color:DIFF_LABELS[difficulty].color, border:`1px solid ${DIFF_LABELS[difficulty].color}44` }}>
+              {DIFF_LABELS[difficulty].emoji} {DIFF_LABELS[difficulty].label}
+            </span>
+          )}
+        </div>
         <div style={{ fontSize: 14, color: 'rgba(255,255,255,.68)', lineHeight: 1.7, maxWidth: 500 }}>
           Une couleur s&apos;affichera sur toutes les dalles pendant <strong style={{ color: '#81e6d9' }}>{SHOW_DURATION} secondes</strong>.
           Mémorisez-la, puis retrouvez ses coordonnées <strong style={{ color: '#fbbf24' }}>x</strong>, <strong style={{ color: '#4ade80' }}>y</strong>, <strong style={{ color: '#a78bfa' }}>z</strong>

@@ -16,10 +16,28 @@ export interface GameTileProps {
   onComplete?: (points: number) => void;
   /** Appelé à chaque delta de score en cours de jeu (positif ou négatif). */
   onScoreDelta?: (delta: number, reason: string) => void;
+  /** Difficulté sélectionnée : 'facile' | 'moyen' | 'difficile' | 'expert'. Défaut: 'moyen'. */
+  difficulty?: 'facile' | 'moyen' | 'difficile' | 'expert';
 }
 
+export type DifficultyLevel = 'facile' | 'moyen' | 'difficile' | 'expert';
+
+export const DIFF_LABELS: Record<DifficultyLevel, { label: string; color: string; emoji: string }> = {
+  facile:    { label: 'Facile',    color: '#34d399', emoji: '🟢' },
+  moyen:     { label: 'Moyen',     color: '#fbbf24', emoji: '🟡' },
+  difficile: { label: 'Difficile', color: '#f97316', emoji: '🟠' },
+  expert:    { label: 'Expert',    color: '#ef4444', emoji: '🔴' },
+};
+
+/* ── Difficulty config ───────────────────────────────────────────────── */
+const CSPEED_DIFF = {
+  facile:    { startSpeed: 2500, minSpeed: 600,  duration: 70 },
+  moyen:     { startSpeed: 1800, minSpeed: 380,  duration: 60 },
+  difficile: { startSpeed: 1200, minSpeed: 280,  duration: 55 },
+  expert:    { startSpeed: 900,  minSpeed: 200,  duration: 45 },
+} satisfies Record<DifficultyLevel, { startSpeed: number; minSpeed: number; duration: number }>;
+
 /* ── Constants ──────────────────────────────────────────────────────── */
-const GAME_DURATION = 60;
 const COLORS: { r: number; g: number; b: number }[] = [
   { r: 255, g: 30,  b: 30  },   // rouge
   { r: 30,  g: 220, b: 80  },   // vert
@@ -96,12 +114,14 @@ const ANIM = `
 export default function GameColorSpeed({
   onSendColor, onTurnOff, onTurnOffAll, onQuit,
   tileCount = 42, onRegisterClickHandler, onComplete, onScoreDelta,
+  difficulty = 'moyen',
 }: GameTileProps) {
+  const cfg = CSPEED_DIFF[difficulty];
 
   type Phase = 'ready' | 'countdown' | 'playing' | 'finished';
 
   const [phase,      setPhase]      = useState<Phase>('ready');
-  const [timeLeft,   setTimeLeft]   = useState(GAME_DURATION);
+  const [timeLeft,   setTimeLeft]   = useState(cfg.duration);
   const [score,      setScore]      = useState(0);
   useEffect(() => { if (phase === 'finished') onComplete?.(0); }, [phase]); // eslint-disable-line react-hooks/exhaustive-deps
   const [missed,     setMissed]     = useState(0);
@@ -120,7 +140,7 @@ export default function GameColorSpeed({
   const activeTileRef = useRef<number | null>(null);
   const activeColRef  = useRef<{ r: number; g: number; b: number } | null>(null);
   const tileStartRef  = useRef(0);
-  const speedRef      = useRef(1800);   // miss-window ms
+  const speedRef      = useRef(cfg.startSpeed);   // miss-window ms
   const comboRef      = useRef(0);
   const lightRef      = useRef(0);
   const tileTimerRef  = useRef(0);
@@ -187,20 +207,20 @@ export default function GameColorSpeed({
   function startGame() {
     phaseRef.current = 'playing';
     setPhase('playing');
-    setTimeLeft(GAME_DURATION);
+    setTimeLeft(cfg.duration);
     setScore(0); setMissed(0); setCombo(0); setLightnings(0);
     setBubbles([]); setSpeedLbl(null);
-    comboRef.current = 0; lightRef.current = 0; speedRef.current = 1800;
+    comboRef.current = 0; lightRef.current = 0; speedRef.current = cfg.startSpeed;
 
     let elapsed = 0;
     window.clearInterval(gameTimerRef.current);
     gameTimerRef.current = window.setInterval(() => {
       elapsed++;
-      setTimeLeft(GAME_DURATION - elapsed);
+      setTimeLeft(cfg.duration - elapsed);
       // Accelerate every 8 s, floor at 380 ms
       if (elapsed % 8 === 0)
-        speedRef.current = Math.max(380, Math.round(speedRef.current * 0.84));
-      if (elapsed >= GAME_DURATION) {
+        speedRef.current = Math.max(cfg.minSpeed, Math.round(speedRef.current * 0.84));
+      if (elapsed >= cfg.duration) {
         window.clearInterval(gameTimerRef.current);
         window.clearTimeout(tileTimerRef.current);
         if (activeTileRef.current !== null) { onTurnOff(activeTileRef.current); activeTileRef.current = null; }
@@ -267,7 +287,7 @@ export default function GameColorSpeed({
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* ── derived ──────────────────────────────────────────────────────── */
-  const pct        = (timeLeft / GAME_DURATION) * 100;
+  const pct        = (timeLeft / cfg.duration) * 100;
   const tColor     = timeLeft > 20 ? '#4ade80' : timeLeft > 10 ? '#fbbf24' : '#ef4444';
   const urgentAnim = timeLeft <= 10 ? 'cs-pulse .7s ease-in-out infinite' : 'none';
 
@@ -279,7 +299,14 @@ export default function GameColorSpeed({
       <style>{ANIM}</style>
       <div style={P.readyRow}>
         <div style={{ flex: 1 }}>
-          <span style={P.tag}>⚡ Color Speed</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+            <span style={P.tag}>⚡ Color Speed</span>
+            {difficulty !== 'moyen' && (
+              <span style={{ display:'inline-flex', alignItems:'center', gap:4, padding:'2px 10px', borderRadius:20, fontSize:11, fontWeight:800, background:`${DIFF_LABELS[difficulty].color}22`, color:DIFF_LABELS[difficulty].color, border:`1px solid ${DIFF_LABELS[difficulty].color}44` }}>
+                {DIFF_LABELS[difficulty].emoji} {DIFF_LABELS[difficulty].label}
+              </span>
+            )}
+          </div>
           <p style={P.rules}>
             Une dalle s'allume dans la salle 3D — cliquez-la <em>le plus vite possible</em>.
             La vitesse augmente toutes les 8 s. Réagissez vite pour des bonus.

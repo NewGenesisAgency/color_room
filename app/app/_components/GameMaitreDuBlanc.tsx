@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import type { GameTileProps } from './GameColorSpeed';
+import { DIFF_LABELS, type DifficultyLevel } from './GameColorSpeed';
 
 function rgbToXYZ(r: number, g: number, b: number): { X: number; Y: number; Z: number } {
   const lin = (c: number) => {
@@ -39,8 +40,12 @@ const TARGETS = [
   { name: 'Blanc Soleil 4500K',       r: 255, g: 254, b: 200, kelvin: 4500 },
 ];
 
-const TOTAL_ROUNDS = 10;
-const WIN_THRESHOLD = 0.025; // XYZ distance < this = victory
+const BLANC_DIFF = {
+  facile:    { rounds: 7,  threshold: 0.050 },
+  moyen:     { rounds: 10, threshold: 0.025 },
+  difficile: { rounds: 12, threshold: 0.015 },
+  expert:    { rounds: 15, threshold: 0.008 },
+} satisfies Record<DifficultyLevel, { rounds: number; threshold: number }>;
 
 const LEFT_IDX  = [0,1,2,6,7,8,12,13,14,18,19,20,24,25,26,30,31,32,36,37,38];
 const RIGHT_IDX = [3,4,5,9,10,11,15,16,17,21,22,23,27,28,29,33,34,35,39,40,41];
@@ -102,7 +107,10 @@ const P: Record<string, React.CSSProperties> = {
   },
 };
 
-export default function GameMaitreDuBlanc({ onSendColor, onTurnOff, onTurnOffAll, onQuit, tileCount = 42, onComplete }: GameTileProps) {
+export default function GameMaitreDuBlanc({ onSendColor, onTurnOff, onTurnOffAll, onQuit, tileCount = 42, onComplete, difficulty = 'moyen' }: GameTileProps) {
+  const cfg = BLANC_DIFF[difficulty];
+  const TOTAL_ROUNDS = cfg.rounds;
+  const WIN_THRESHOLD = cfg.threshold;
   const [phase, setPhase] = useState<'ready' | 'playing' | 'result' | 'finished'>('ready');
   const [roundIdx, setRoundIdx] = useState(0);
   const [order, setOrder] = useState<number[]>([]);
@@ -201,7 +209,14 @@ export default function GameMaitreDuBlanc({ onSendColor, onTurnOff, onTurnOffAll
     <div style={P.wrap}>
       <div style={P.readyRow}>
         <div style={{ flex: 1 }}>
-          <span style={P.tag}>🔆 Maître du Blanc</span>
+          <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:4 }}>
+            <span style={P.tag}>🔆 Maître du Blanc</span>
+            {difficulty !== 'moyen' && (
+              <span style={{ display:'inline-flex', alignItems:'center', gap:4, padding:'2px 10px', borderRadius:20, fontSize:11, fontWeight:800, background:`${DIFF_LABELS[difficulty].color}22`, color:DIFF_LABELS[difficulty].color, border:`1px solid ${DIFF_LABELS[difficulty].color}44` }}>
+                {DIFF_LABELS[difficulty].emoji} {DIFF_LABELS[difficulty].label}
+              </span>
+            )}
+          </div>
           <p style={P.rules}>
             La moitié gauche des dalles affiche un <em>blanc cible</em>.
             Réglez vos curseurs R, G, B pour reproduire la même teinte sur la moitié droite.

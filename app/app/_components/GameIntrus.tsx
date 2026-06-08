@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Crosshair, Ruler, Target, Timer, Trophy, X } from 'lucide-react';
 import type { GameTileProps } from './GameColorSpeed';
+import { DIFF_LABELS, type DifficultyLevel } from './GameColorSpeed';
 
 // ── L'Intrus — mode "Sniper" de précision ─────────────────────────────────────
 // Toutes les dalles s'allument dans une couleur identique sauf UNE, légèrement
@@ -16,8 +17,12 @@ const RIGHT_IDX = [3,4,5,9,10,11,15,16,17,21,22,23,27,28,29,33,34,35,39,40,41];
 const COLS = 6;
 const ROWS = 7;
 const CELLS = COLS * ROWS;
-const LEVEL_TIME = 60;          // secondes par niveau
-const WRONG_PENALTY = 12;       // secondes perdues sur une mauvaise désignation
+const INTRUS_DIFF = {
+  facile:    { startDelta: 0.15, levelTime: 90, penalty: 8  },
+  moyen:     { startDelta: 0.09, levelTime: 60, penalty: 12 },
+  difficile: { startDelta: 0.06, levelTime: 45, penalty: 15 },
+  expert:    { startDelta: 0.04, levelTime: 30, penalty: 20 },
+} satisfies Record<DifficultyLevel, { startDelta: number; levelTime: number; penalty: number }>;
 
 type RGB = { r: number; g: number; b: number };
 type Reading = { x: number; y: number; Lv: number };
@@ -34,8 +39,8 @@ const BASE_PALETTE: RGB[] = [
 // Écart de l'intrus selon le niveau (de net à quasi invisible)
 // Écart de l'intrus : déjà SUBTIL dès le niveau 1 (≈9 % → à peine visible sur les
 // dalles, indétectable à l'écran), puis de plus en plus fin. Toujours mesurable au CS-160.
-function deltaForLevel(level: number): number {
-  return Math.max(0.012, 0.09 * Math.pow(0.8, level - 1));
+function deltaForLevel(level: number, startDelta: number): number {
+  return Math.max(0.012, startDelta * Math.pow(0.8, level - 1));
 }
 
 function makeIntruder(base: RGB, delta: number, mode: 'lum' | 'hue'): RGB {
@@ -75,12 +80,13 @@ const S: Record<string, React.CSSProperties> = {
   statLbl: { fontSize: 10, color: 'rgba(255,255,255,.4)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 3 },
 };
 
-export default function GameIntrus({ onSendColor, onTurnOff, onTurnOffAll, onQuit, onComplete, onScoreDelta, tileCount = 42 }: GameTileProps) {
+export default function GameIntrus({ onSendColor, onTurnOff, onTurnOffAll, onQuit, onComplete, onScoreDelta, tileCount = 42, difficulty = 'moyen' }: GameTileProps) {
+  const cfg = INTRUS_DIFF[difficulty];
   const numTiles = Math.min(tileCount, CELLS);
   const [phase, setPhase] = useState<'ready' | 'playing' | 'finished'>('ready');
   const [level, setLevel] = useState(1);
   const [score, setScore] = useState(0);
-  const [timeLeft, setTimeLeft] = useState(LEVEL_TIME);
+  const [timeLeft, setTimeLeft] = useState(cfg.levelTime);
   const [tiles, setTiles] = useState<RGB[]>([]);       // couleurs réelles envoyées aux dalles
   const [baseRgb, setBaseRgb] = useState<RGB>({ r: 128, g: 128, b: 128 }); // couleur commune affichée à l'écran
   const [intruderIdx, setIntruderIdx] = useState(-1);
@@ -101,7 +107,7 @@ export default function GameIntrus({ onSendColor, onTurnOff, onTurnOffAll, onQui
     const base = BASE_PALETTE[Math.floor(Math.random() * BASE_PALETTE.length)];
     const idx = Math.floor(Math.random() * numTiles);
     const mode: 'lum' | 'hue' = Math.random() < 0.6 ? 'lum' : 'hue';
-    const intr = makeIntruder(base, deltaForLevel(lvl), mode);
+    const intr = makeIntruder(base, deltaForLevel(lvl, cfg.startDelta), mode);
     const next: RGB[] = Array.from({ length: numTiles }, (_, i) => (i === idx ? intr : base));
     setTiles(next);
     setBaseRgb(base);
@@ -115,7 +121,7 @@ export default function GameIntrus({ onSendColor, onTurnOff, onTurnOffAll, onQui
   }, [numTiles, onSendColor]);
 
   function startGame() {
-    setLevel(1); setScore(0); setTimeLeft(LEVEL_TIME); setPhase('playing');
+    setLevel(1); setScore(0); setTimeLeft(cfg.levelTime); setPhase('playing');
     buildLevel(1);
   }
 
@@ -170,12 +176,12 @@ export default function GameIntrus({ onSendColor, onTurnOff, onTurnOffAll, onQui
       setMsg(`Intrus démasqué ! +${bonus} pts`);
       const nextLvl = level + 1;
       setLevel(nextLvl);
-      setTimeLeft(LEVEL_TIME);
+      setTimeLeft(cfg.levelTime);
       buildLevel(nextLvl);
     } else {
-      setTimeLeft((t) => Math.max(1, t - WRONG_PENALTY));
+      setTimeLeft((t) => Math.max(1, t - cfg.penalty));
       onScoreDelta?.(-40, 'Mauvaise accusation −40');
-      setMsg(`Ce n'est pas l'intrus. -${WRONG_PENALTY}s`);
+      setMsg(`Ce n'est pas l'intrus. -${cfg.penalty}s`);
     }
   }
 
@@ -203,6 +209,11 @@ export default function GameIntrus({ onSendColor, onTurnOff, onTurnOffAll, onQui
         <div style={{ flex: 1 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 18, fontWeight: 900, marginBottom: 8 }}>
             <Crosshair size={20} color="#06d6a0" /> L&apos;Intrus — Mode Sniper
+            {difficulty !== 'moyen' && (
+              <span style={{ display:'inline-flex', alignItems:'center', gap:4, padding:'2px 10px', borderRadius:20, fontSize:11, fontWeight:800, background:`${DIFF_LABELS[difficulty].color}22`, color:DIFF_LABELS[difficulty].color, border:`1px solid ${DIFF_LABELS[difficulty].color}44` }}>
+                {DIFF_LABELS[difficulty].emoji} {DIFF_LABELS[difficulty].label}
+              </span>
+            )}
           </div>
           <p style={{ fontSize: 13, color: 'rgba(255,255,255,.62)', lineHeight: 1.65, margin: '0 0 8px' }}>
             Toutes les dalles ont la <strong>même couleur</strong>… sauf une, à peine différente.<br />

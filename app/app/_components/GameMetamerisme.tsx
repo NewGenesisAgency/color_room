@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { GameTileProps } from './GameColorSpeed';
+import { DIFF_LABELS, type DifficultyLevel } from './GameColorSpeed';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -85,20 +86,24 @@ const PHYSICS_WORDS: { word: string; fg: RGB }[] = [
 const LEFT_IDX  = [0,1,2,6,7,8,12,13,14,18,19,20,24,25,26,30,31,32,36,37,38];
 const RIGHT_IDX = [3,4,5,9,10,11,15,16,17,21,22,23,27,28,29,33,34,35,39,40,41];
 
-const TOTAL_ROUNDS    = 8;
-const ROUND_TIME      = 90;
+const META_DIFF = {
+  facile:    { rounds: 5,  roundTime: 120 },
+  moyen:     { rounds: 8,  roundTime: 90  },
+  difficile: { rounds: 10, roundTime: 60  },
+  expert:    { rounds: 12, roundTime: 45  },
+} satisfies Record<DifficultyLevel, { rounds: number; roundTime: number }>;
 const HIDE_WIN_DIST   = 0.08;
 const REVEAL_WIN_DIST = 0.45;
 
 // ── Round generation ───────────────────────────────────────────────────────────
 
-function generateRounds(): Round[] {
+function generateRounds(totalRounds: number): Round[] {
   const indices = Array.from({ length: PHYSICS_WORDS.length }, (_, i) => i);
   for (let i = indices.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [indices[i], indices[j]] = [indices[j], indices[i]];
   }
-  return indices.slice(0, TOTAL_ROUNDS).map((wordIdx, i) => {
+  return indices.slice(0, totalRounds).map((wordIdx, i) => {
     const mode: Mode = i % 2 === 0 ? 'cacher' : 'révéler';
     const fg = PHYSICS_WORDS[wordIdx].fg;
     const startIllum: RGB = mode === 'cacher'
@@ -144,8 +149,11 @@ const S: Record<string, React.CSSProperties> = {
 // ── Component ──────────────────────────────────────────────────────────────────
 
 export default function GameMetamerisme({
-  onSendColor, onTurnOffAll, onQuit, tileCount = 42, onComplete,
+  onSendColor, onTurnOffAll, onQuit, tileCount = 42, onComplete, difficulty = 'moyen',
 }: GameTileProps) {
+  const cfg = META_DIFF[difficulty];
+  const TOTAL_ROUNDS = cfg.rounds;
+  const ROUND_TIME = cfg.roundTime;
   const [phase,      setPhase]      = useState<'ready' | 'playing' | 'result' | 'finished'>('ready');
   const [rounds,     setRounds]     = useState<Round[]>([]);
   const [roundIdx,   setRoundIdx]   = useState(0);
@@ -186,7 +194,7 @@ export default function GameMetamerisme({
 
   // ── Game flow ─────────────────────────────────────────────────────────────────
   function startGame() {
-    const r = generateRounds();
+    const r = generateRounds(TOTAL_ROUNDS);
     setRounds(r);
     setRoundIdx(0);
     setTotalScore(0);
@@ -288,14 +296,21 @@ export default function GameMetamerisme({
     <div style={S.wrap}>
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 20, padding: '18px 22px' }}>
         <div style={{ flex: 1 }}>
-          <span style={{
-            display: 'inline-block',
-            background: 'linear-gradient(135deg,rgba(124,58,237,.28),rgba(6,214,160,.18))',
-            border: '1px solid rgba(124,58,237,.4)', borderRadius: 8,
-            padding: '3px 10px', fontSize: 12, fontWeight: 800, color: '#a78bfa', marginBottom: 8,
-          }}>
-            🔬 Spectre de Mots
-          </span>
+          <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
+            <span style={{
+              display: 'inline-block',
+              background: 'linear-gradient(135deg,rgba(124,58,237,.28),rgba(6,214,160,.18))',
+              border: '1px solid rgba(124,58,237,.4)', borderRadius: 8,
+              padding: '3px 10px', fontSize: 12, fontWeight: 800, color: '#a78bfa',
+            }}>
+              🔬 Spectre de Mots
+            </span>
+            {difficulty !== 'moyen' && (
+              <span style={{ display:'inline-flex', alignItems:'center', gap:4, padding:'2px 10px', borderRadius:20, fontSize:11, fontWeight:800, background:`${DIFF_LABELS[difficulty].color}22`, color:DIFF_LABELS[difficulty].color, border:`1px solid ${DIFF_LABELS[difficulty].color}44` }}>
+                {DIFF_LABELS[difficulty].emoji} {DIFF_LABELS[difficulty].label}
+              </span>
+            )}
+          </div>
           <p style={{ fontSize: 13, color: 'rgba(255,255,255,.62)', lineHeight: 1.65, margin: '0 0 10px' }}>
             Un terme de physique lumineuse s&apos;affiche dans une couleur précise.
             Les dalles illuminent le fond avec la même couleur que l&apos;écran.{' '}

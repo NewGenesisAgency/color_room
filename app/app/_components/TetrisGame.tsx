@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ChevronDown, ChevronLeft, ChevronRight, ChevronsDown, RotateCw } from 'lucide-react';
 import TouchControls, { type TouchKey } from './TouchControls';
+import { DIFF_LABELS, type DifficultyLevel } from './GameColorSpeed';
 
 const TETRIS_TOUCH: TouchKey[] = [
   { key: 'ArrowUp',    slot: 'up',    label: <RotateCw size={20} /> },
@@ -28,14 +29,20 @@ const ROWS = 7;
 const CELL = 72;
 const GAP = 5;
 const OVER_CLR = '#ff2020';
-const LINES_PER_LEVEL = 10; // 10 lignes avant d'accélérer (au lieu de 5)
+
+const TETRIS_DIFF = {
+  facile:    { baseSpeed: 1300, linesPerLevel: 12 },
+  moyen:     { baseSpeed: 900,  linesPerLevel: 10 },
+  difficile: { baseSpeed: 600,  linesPerLevel: 8  },
+  expert:    { baseSpeed: 350,  linesPerLevel: 6  },
+} satisfies Record<DifficultyLevel, { baseSpeed: number; linesPerLevel: number }>;
 
 type Cell = string | null;
 type Grid = Cell[][];
 type Piece = { shape: number[][]; color: string; x: number; y: number };
 
 export type TetrisSnapshot = { grid: Grid; piece: Piece | null; score: number; gameOver: boolean };
-export type TetrisParams = { speed?: number };
+export type TetrisParams = { speed?: number; difficulty?: DifficultyLevel };
 
 // ─── 7-bag randomizer ────────────────────────────────────────────────────────
 // Closure : évite les class private fields qui posent problème avec SWC/Babel.
@@ -205,7 +212,9 @@ export default function TetrisGame({
   isPlaying: boolean;
   onSnapshot?: (snap: TetrisSnapshot) => void;
 }) {
-  const baseSpeed = params?.speed ?? 900;
+  const diffCfg = TETRIS_DIFF[params?.difficulty ?? 'moyen'];
+  const baseSpeed = params?.speed ?? diffCfg.baseSpeed;
+  const LINES_PER_LEVEL = diffCfg.linesPerLevel;
 
   const gs = useRef<GS>(initGS());
   const [render, setRender] = useState(0);
@@ -408,6 +417,11 @@ export default function TetrisGame({
             <div style={{ ...panelValue, color: '#06d6a0' }}>{level}</div>
             <div style={{ ...panelLabel, marginTop: 8 }}>Lignes</div>
             <div style={{ ...panelValue, fontSize: 18, color: '#cbd5e1' }}>{s.lines}</div>
+            {(params?.difficulty && params.difficulty !== 'moyen') && (
+              <div style={{ marginTop: 6, display:'inline-flex', alignItems:'center', gap:4, padding:'2px 8px', borderRadius:20, fontSize:10, fontWeight:800, background:`${DIFF_LABELS[params.difficulty].color}22`, color:DIFF_LABELS[params.difficulty].color, border:`1px solid ${DIFF_LABELS[params.difficulty].color}44` }}>
+                {DIFF_LABELS[params.difficulty].emoji} {DIFF_LABELS[params.difficulty].label}
+              </div>
+            )}
           </div>
           {s.combo > 1 && (
             <div style={{ ...panelBox, background: 'rgba(6,214,160,0.12)', border: '1px solid rgba(6,214,160,0.4)' }}>
