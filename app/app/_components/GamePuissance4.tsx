@@ -237,10 +237,15 @@ function bestMove(grid: Grid, difficulty: Difficulty): number {
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
-export default function GamePuissance4({ onSendColor, onTurnOff, onTurnOffAll, onQuit, onRegisterClickHandler, onComplete }: GameTileProps) {
+// Mapping de la difficulté universelle (4 niveaux) vers l'échelle interne P4 (5 niveaux)
+const DIFF_MAP: Record<string, Difficulty> = {
+  facile: 'facile', moyen: 'moyen', difficile: 'difficile', expert: 'legendaire',
+};
+
+export default function GamePuissance4({ onSendColor, onTurnOff, onTurnOffAll, onQuit, onRegisterClickHandler, onComplete, difficulty: externalDiff }: GameTileProps) {
   const [phase, setPhase]           = useState<Phase>('ready');
   const [mode, setMode]             = useState<Mode>('cpu');
-  const [difficulty, setDifficulty] = useState<Difficulty>('moyen');
+  const [difficulty, setDifficulty] = useState<Difficulty>(externalDiff ? (DIFF_MAP[externalDiff] ?? 'moyen') : 'moyen');
   const [grid, setGrid]             = useState<Grid>(emptyGrid);
   const [currentPlayer, setCurrentPlayer] = useState<Cell>(P1);
   const [hoverCol, setHoverCol]     = useState<number | null>(null);

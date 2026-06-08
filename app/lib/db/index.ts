@@ -161,11 +161,9 @@ function seedChromatectGame(db: Database.Database) {
     ],
   };
 
-  const existing = db.prepare("SELECT id FROM crg_games WHERE name = ?;").get(GAME_NAME) as { id: string } | undefined;
-  if (existing) {
-    db.prepare("UPDATE crg_games SET config_json = ?, kind = 'editor', updated_at = datetime('now') WHERE id = ?;")
-      .run(JSON.stringify(config), existing.id);
-  } else {
+  // INSERT uniquement si absent — ne pas écraser les personnalisations faites dans l'éditeur
+  const existing = db.prepare("SELECT id FROM crg_games WHERE name = ?;").get(GAME_NAME);
+  if (!existing) {
     const id = `chromadetect_${Date.now().toString(36)}`;
     db.prepare("INSERT INTO crg_games(id, name, kind, config_json, updated_at) VALUES(?, ?, 'editor', ?, datetime('now'));")
       .run(id, GAME_NAME, JSON.stringify(config));
@@ -193,11 +191,8 @@ function seedLibreRGBGame(db: Database.Database) {
       { id: 'u_cie',    kind: 'cie_diagram',  x: 40, y: 232, width: 420, height: 300 },
     ],
   };
-  const existing = db.prepare("SELECT id FROM crg_games WHERE name = ?;").get(GAME_NAME) as { id: string } | undefined;
-  if (existing) {
-    db.prepare("UPDATE crg_games SET config_json = ?, kind = 'editor', updated_at = datetime('now') WHERE id = ?;")
-      .run(JSON.stringify(config), existing.id);
-  } else {
+  const existing = db.prepare("SELECT id FROM crg_games WHERE name = ?;").get(GAME_NAME);
+  if (!existing) {
     const id = `libre_rgb_${Date.now().toString(36)}`;
     db.prepare("INSERT INTO crg_games(id, name, kind, config_json, updated_at) VALUES(?, ?, 'editor', ?, datetime('now'));")
       .run(id, GAME_NAME, JSON.stringify(config));

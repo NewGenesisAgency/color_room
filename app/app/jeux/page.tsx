@@ -2897,6 +2897,13 @@ export default function JeuxPage() {
     if (safePoints > 0) {
       setScorePlusValue(safePoints);
       setScorePlusAnimKey((k) => k + 1);
+      // Persister le delta de score en DB (best-effort, silencieux)
+      const gameName = (hudRun?.name ?? currentGame ?? 'Jeu').slice(0, 100);
+      fetch('/api/scores', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ gameName, score: safePoints }),
+      }).catch(() => {});
     }
   }
 

@@ -123,13 +123,16 @@ function rgbToChannels32(r: number, g: number, b: number, intensity: number): nu
 }
 
 async function sendColorToAllPlates(r: number, g: number, b: number, intensity = 85) {
-  const channels = rgbToChannels32(r, g, b, intensity);
-  const channelArray = channels.map((v, i) => ({ index: i, value: v }));
+  // PLATE_TYPE identifie les dalles bleues — on reméppe les canaux pour chaque type
+  const { PLATE_TYPE, remapChannels32 } = await import('@/lib/tileChannels');
+  const chRouge = rgbToChannels32(r, g, b, intensity);
+  const chBleu  = remapChannels32(chRouge, 'rouge', 'bleu');
   for (let plateId = 1; plateId <= 42; plateId++) {
+    const ch = PLATE_TYPE[plateId] === 'bleu' ? chBleu : chRouge;
     fetch('/api/supervision/batch', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ plateId, channels: channelArray }),
+      body: JSON.stringify({ plateId, channels: ch.map((v, i) => ({ index: i, value: v })) }),
       cache: 'no-store',
     }).catch(() => {});
   }
