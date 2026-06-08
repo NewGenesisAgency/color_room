@@ -172,23 +172,58 @@ function seedChromatectGame(db: Database.Database) {
 
 function seedLibreRGBGame(db: Database.Database) {
   const GAME_NAME = 'Mode Libre — Couleur RGB';
+  // Jeu construit en blocs réels (pas de composant natif monolithique) :
+  //   on_tick (50ms) → get_player_rgb → show_target_on_plates
+  // Les sliders R/G/B apparaissent dans la barre de l'éditeur pendant l'exécution.
+  // L'UI designer affiche la vraie interface du jeu.
   const config = {
     version: 1,
     tileCount: 42,
     bgColor: '#0b0f1c',
     accentColor: '#4361ee',
     icon: 'Palette',
-    description: 'Explorez librement les couleurs : 3 curseurs R/G/B allument les dalles, le diagramme CIE 1931 se met à jour en temps réel.',
+    description: 'Explorez librement les couleurs : 3 curseurs R/G/B allument les dalles et le diagramme CIE 1931 se met à jour en temps réel.',
     nodes: [
-      { id: 'n_start', kind: 'event_begin',   name: 'Démarrer', enabled: true, params: {}, pos: { x: 80, y: 120 } },
-      { id: 'n_game',  kind: 'game_libre_rgb', name: 'Mode Libre RGB', enabled: true, params: {}, pos: { x: 380, y: 120 } },
+      // ─ Déclencheur ─────────────────────────────────────────────────────────
+      { id: 'n_start',   kind: 'event_begin',          name: '▶ Démarrer',            enabled: true,  params: {}, pos: { x: 60,  y: 160 } },
+      // ─ Boucle temps réel (50 ms) ───────────────────────────────────────────
+      { id: 'n_tick',    kind: 'on_tick',               name: '⏱ Tick 50ms',           enabled: true,  params: { intervalMs: 50 }, pos: { x: 280, y: 160 } },
+      // ─ Lecture sliders joueur ──────────────────────────────────────────────
+      { id: 'n_rgb',     kind: 'get_player_rgb',        name: '🎨 Lire R/G/B joueur',  enabled: true,  params: { varR: 'r', varG: 'g', varB: 'b', varColor: 'couleur' }, pos: { x: 520, y: 160 } },
+      // ─ Envoi aux dalles ────────────────────────────────────────────────────
+      { id: 'n_send',    kind: 'show_target_on_plates', name: '💡 Allumer les dalles', enabled: true,  params: { varName: 'couleur', plates: 'all', intensity: 0.90 }, pos: { x: 760, y: 160 } },
+      // ─ Affichage CIE (optionnel – déclenchable manuellement) ───────────────
+      { id: 'n_cie',     kind: 'measure_show_cie',      name: '📊 Diagramme CIE',      enabled: true,  params: { showTarget: false, showResult: true }, pos: { x: 760, y: 320 } },
     ],
-    edges: [{ id: 'e1', from: 'n_start', to: 'n_game' }],
+    edges: [
+      { id: 'e1', from: 'n_start',  to: 'n_tick' },
+      { id: 'e2', from: 'n_tick',   to: 'n_rgb'  },
+      { id: 'e3', from: 'n_rgb',    to: 'n_send' },
+      { id: 'e4', from: 'n_send',   to: 'n_cie'  },
+    ],
     uiLayout: [
-      { id: 'u_title',  kind: 'title_banner', x: 40, y: 16,  width: 420, height: 52, text: 'Mode Libre — Couleur RGB' },
-      { id: 'u_swatch', kind: 'color_swatch', x: 40, y: 84,  width: 80,  height: 80  },
-      { id: 'u_slid',   kind: 'rgb_sliders',  x: 136, y: 84, width: 310, height: 130 },
-      { id: 'u_cie',    kind: 'cie_diagram',  x: 40, y: 232, width: 420, height: 300 },
+      // Titre
+      { id: 'u_title',   kind: 'title_banner',  x: 20,  y: 12,  width: 820, height: 52,
+        text: 'Mode Libre — Couleur RGB', bgColor: '#0b0f1c', textColor: '#e8eaf0' },
+      // Pastille couleur courante (liée à la variable 'couleur')
+      { id: 'u_swatch',  kind: 'color_swatch',  x: 20,  y: 80,  width: 100, height: 100,
+        colorBind: 'couleur' },
+      // Sliders R/G/B
+      { id: 'u_rgb',     kind: 'rgb_sliders',   x: 136, y: 80,  width: 360, height: 130 },
+      // Valeurs numériques R
+      { id: 'u_lr',      kind: 'label',         x: 510, y: 80,  width: 120, height: 36,
+        text: 'R', varBind: 'r', textColor: '#ef4444', fontSize: 18 },
+      // Valeurs numériques G
+      { id: 'u_lg',      kind: 'label',         x: 510, y: 122, width: 120, height: 36,
+        text: 'G', varBind: 'g', textColor: '#22c55e', fontSize: 18 },
+      // Valeurs numériques B
+      { id: 'u_lb',      kind: 'label',         x: 510, y: 164, width: 120, height: 36,
+        text: 'B', varBind: 'b', textColor: '#3b82f6', fontSize: 18 },
+      // Diagramme CIE 1931
+      { id: 'u_cie',     kind: 'cie_diagram',   x: 20,  y: 228, width: 400, height: 300,
+        cieRandom: false },
+      // Grille 42 dalles (preview)
+      { id: 'u_grid',    kind: 'plate_grid',    x: 440, y: 228, width: 400, height: 300 },
     ],
   };
   const existing = db.prepare("SELECT id FROM crg_games WHERE name = ?;").get(GAME_NAME);
