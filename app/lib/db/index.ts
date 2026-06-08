@@ -133,10 +133,9 @@ function migrate(db: Database.Database) {
   try { db.exec("ALTER TABLE crg_mp_players ADD COLUMN seat_score INTEGER DEFAULT 0;"); } catch { /* already exists */ }
   db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_crg_mp_sessions_room_code ON crg_mp_sessions(room_code) WHERE room_code IS NOT NULL;");
 
-  // ─── Jeu seed : ChromaDetect – Load Test CS-160 ──────────────────────────
-  // Créé ou remis à jour à chaque démarrage (le jeu est identifié par son nom).
-  // Utilise uniquement le CS-160 (jamais CS-150).
+  // ─── Jeux seed ───────────────────────────────────────────────────────────────
   seedChromatectGame(db);
+  seedLibreRGBGame(db);
 }
 
 function seedChromatectGame(db: Database.Database) {
@@ -168,6 +167,38 @@ function seedChromatectGame(db: Database.Database) {
       .run(JSON.stringify(config), existing.id);
   } else {
     const id = `chromadetect_${Date.now().toString(36)}`;
+    db.prepare("INSERT INTO crg_games(id, name, kind, config_json, updated_at) VALUES(?, ?, 'editor', ?, datetime('now'));")
+      .run(id, GAME_NAME, JSON.stringify(config));
+  }
+}
+
+function seedLibreRGBGame(db: Database.Database) {
+  const GAME_NAME = 'Mode Libre — Couleur RGB';
+  const config = {
+    version: 1,
+    tileCount: 42,
+    bgColor: '#0b0f1c',
+    accentColor: '#4361ee',
+    icon: 'Palette',
+    description: 'Explorez librement les couleurs : 3 curseurs R/G/B allument les dalles, le diagramme CIE 1931 se met à jour en temps réel.',
+    nodes: [
+      { id: 'n_start', kind: 'event_begin',   name: 'Démarrer', enabled: true, params: {}, pos: { x: 80, y: 120 } },
+      { id: 'n_game',  kind: 'game_libre_rgb', name: 'Mode Libre RGB', enabled: true, params: {}, pos: { x: 380, y: 120 } },
+    ],
+    edges: [{ id: 'e1', from: 'n_start', to: 'n_game' }],
+    uiLayout: [
+      { id: 'u_title',  kind: 'title_banner', x: 40, y: 16,  width: 420, height: 52, text: 'Mode Libre — Couleur RGB' },
+      { id: 'u_swatch', kind: 'color_swatch', x: 40, y: 84,  width: 80,  height: 80  },
+      { id: 'u_slid',   kind: 'rgb_sliders',  x: 136, y: 84, width: 310, height: 130 },
+      { id: 'u_cie',    kind: 'cie_diagram',  x: 40, y: 232, width: 420, height: 300 },
+    ],
+  };
+  const existing = db.prepare("SELECT id FROM crg_games WHERE name = ?;").get(GAME_NAME) as { id: string } | undefined;
+  if (existing) {
+    db.prepare("UPDATE crg_games SET config_json = ?, kind = 'editor', updated_at = datetime('now') WHERE id = ?;")
+      .run(JSON.stringify(config), existing.id);
+  } else {
+    const id = `libre_rgb_${Date.now().toString(36)}`;
     db.prepare("INSERT INTO crg_games(id, name, kind, config_json, updated_at) VALUES(?, ?, 'editor', ?, datetime('now'));")
       .run(id, GAME_NAME, JSON.stringify(config));
   }

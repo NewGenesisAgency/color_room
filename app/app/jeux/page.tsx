@@ -25,6 +25,7 @@ const CieMeasureWidget = dynamic(() => import('@/app/_components/CieMeasureWidge
 const TouchControls = dynamic(() => import('@/app/_components/TouchControls'), { ssr: false });
 const SnakeGame = dynamic(() => import('@/app/_components/SnakeGame'), { ssr: false });
 const GameIntrus = dynamic(() => import('@/app/_components/GameIntrus'), { ssr: false });
+const GameLibreRGB = dynamic(() => import('@/app/_components/GameLibreRGB'), { ssr: false });
 const SpectrePage = dynamic(() => import('@/app/spectre/page').then((m) => m.SpectreGame), { ssr: false });
 const ChromaticitePage = dynamic(() => import('@/app/chromaticite/page'), { ssr: false });
 import {
@@ -4841,6 +4842,7 @@ export default function JeuxPage() {
                     game_canal_mix: GameCanalMix,
                     game_intrus: GameIntrus,
                     game_snake: SnakeGame,
+                    game_libre_rgb: GameLibreRGB,
                   };
                   const gNode = nodes.find((n) => NATIVE_MAP[n.kind] && n.enabled !== false);
                   if (!gNode) return null;

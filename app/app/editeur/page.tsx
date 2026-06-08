@@ -65,6 +65,7 @@ type EditorNodeKind =
   | 'game_intrus'
   | 'game_chromaticite'
   | 'game_snake'
+  | 'game_libre_rgb'
   | 'play_sound'
   | 'on_score_reached'
   | 'on_plate_click'
@@ -343,7 +344,8 @@ const NODE_CATALOG: NodeCatalogItem[] = [
   { kind: 'game_canal_mix', category: 'Jeux', title: 'Mix de Canaux', defaults: {} },
   { kind: 'game_intrus', category: 'Jeux', title: "L'Intrus (Sniper)", defaults: {} },
   { kind: 'game_chromaticite', category: 'Jeux', title: 'Chromaticité CIE', defaults: {} },
-  { kind: 'game_snake', category: 'Jeux', title: 'Snake Lumière', defaults: { speed: 350 } },
+  { kind: 'game_snake',     category: 'Jeux', title: 'Snake Lumière',     defaults: { speed: 350 } },
+  { kind: 'game_libre_rgb', category: 'Jeux', title: 'Mode Libre RGB',    defaults: {} },
   { kind: 'play_sound', category: 'Audio', title: 'Jouer un son', defaults: { sound: 'click' } },
   { kind: 'on_score_reached', category: 'Évènements', title: 'Score atteint', defaults: { target: 100 } },
   { kind: 'on_plate_click', category: 'Évènements', title: 'Clic sur dalle', defaults: {} },
@@ -1054,7 +1056,7 @@ export default function EditeurPage() {
   const [showGrid, setShowGrid] = useState<boolean>(true);
   const [zoomLevel, setZoomLevel] = useState<number>(100);
   const [newProjectName, setNewProjectName] = useState<string>('');
-  const [newProjectTemplate, setNewProjectTemplate] = useState<'blank' | 'tutorial' | 'animation' | 'interactive' | 'fluorescence' | 'color-demo' | 'pulse-advanced' | 'rainbow' | 'tetris' | 'memory' | 'tetris-blueprint' | 'snake' | 'puissance4' | 'color_speed' | 'maitre_blanc' | 'intrus' | 'canal_mix' | 'metamere' | 'chromaticite' | 'spectre'>('blank');
+  const [newProjectTemplate, setNewProjectTemplate] = useState<'blank' | 'tutorial' | 'animation' | 'interactive' | 'fluorescence' | 'color-demo' | 'pulse-advanced' | 'rainbow' | 'tetris' | 'memory' | 'tetris-blueprint' | 'snake' | 'puissance4' | 'color_speed' | 'maitre_blanc' | 'intrus' | 'canal_mix' | 'metamere' | 'chromaticite' | 'spectre' | 'libre_rgb'>('blank');
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -2535,7 +2537,7 @@ export default function EditeurPage() {
     }
   };
 
-  const createGame = async (forcedName?: string, template: 'blank' | 'tutorial' | 'animation' | 'interactive' | 'fluorescence' | 'color-demo' | 'pulse-advanced' | 'rainbow' | 'tetris' | 'memory' | 'tetris-blueprint' | 'snake' | 'puissance4' | 'color_speed' | 'maitre_blanc' | 'intrus' | 'canal_mix' | 'metamere' | 'chromaticite' | 'spectre' = 'blank') => {
+  const createGame = async (forcedName?: string, template: 'blank' | 'tutorial' | 'animation' | 'interactive' | 'fluorescence' | 'color-demo' | 'pulse-advanced' | 'rainbow' | 'tetris' | 'memory' | 'tetris-blueprint' | 'snake' | 'puissance4' | 'color_speed' | 'maitre_blanc' | 'intrus' | 'canal_mix' | 'metamere' | 'chromaticite' | 'spectre' | 'libre_rgb' = 'blank') => {
     const makeId: IdFactory = () => `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
     const provisionalId = makeId();
     const nextIndex = (editorRef.current.games.length || 0) + 1;
@@ -2929,6 +2931,19 @@ export default function EditeurPage() {
         { id: makeId(), kind: 'leaderboard',   x: 256, y: 84,  width: 200, height: 160 },
         { id: makeId(), kind: 'color_swatch',  x: 40,  y: 260, width: 120, height: 120, bgColor: '#ff3b6e' },
         { id: makeId(), kind: 'message_box',   x: 176, y: 260, width: 280, height: 120, text: 'Mémorize la couleur puis retrouve-la sur le diagramme CIE. Multijoueur 1-8 joueurs.', bgColor: '#7209b7' },
+      ] as UILayoutComponent[];
+    } else if (template === 'libre_rgb') {
+      const gameId = makeId();
+      initialNodes = [
+        { id: eventId, kind: 'event_begin',   name: 'Démarrer', enabled: true, params: {}, pos: { x: 80, y: 120 } },
+        { id: gameId,  kind: 'game_libre_rgb', name: 'Mode Libre RGB', enabled: true, params: {}, pos: { x: 380, y: 120 } },
+      ];
+      initialEdges = [{ id: makeId(), from: eventId, to: gameId }];
+      templateUiLayout = [
+        { id: makeId(), kind: 'title_banner', x: 40, y: 16,  width: 420, height: 52, text: 'Mode Libre — Couleur RGB' },
+        { id: makeId(), kind: 'color_swatch', x: 40, y: 84,  width: 80,  height: 80  },
+        { id: makeId(), kind: 'rgb_sliders',  x: 136, y: 84, width: 310, height: 130 },
+        { id: makeId(), kind: 'cie_diagram',  x: 40, y: 232, width: 420, height: 300 },
       ] as UILayoutComponent[];
     }
 
@@ -7704,6 +7719,7 @@ export default function EditeurPage() {
                         { id: 'metamere',     icon: Palette,           label: 'Métamérie',       desc: 'Illuminants et métamérie' },
                         { id: 'chromaticite', icon: Crosshair,         label: 'Chromaticité',    desc: 'Diagramme CIE 1931' },
                         { id: 'spectre',      icon: Gamepad2,          label: 'Spectre',         desc: 'Spectre chromatique multijoueur' },
+                        { id: 'libre_rgb',    icon: Palette,           label: 'Mode Libre RGB',  desc: '3 sliders R/G/B + diagramme CIE libre' },
                       ].map((t) => (
                         <button
                           key={t.id}
