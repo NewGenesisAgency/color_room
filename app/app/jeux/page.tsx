@@ -988,6 +988,9 @@ export default function JeuxPage() {
   const [mpSessionId, setMpSessionId] = useState<string>('');
   const [mpStatus, setMpStatus] = useState<'active' | 'finished' | ''>('');
   const [mpPlayers, setMpPlayers] = useState<Array<{ seat: MpSeat; name: string }>>([]);
+  // Puissance 4 multijoueur (2 téléphones) : salle + état affiché sur les dalles
+  const [p4RoomId, setP4RoomId] = useState<string>('');
+  const [p4Host, setP4Host] = useState<{ board: string[]; turn: string; winner: string | null; status: string; players: { r: boolean; j: boolean } } | null>(null);
   const [mpValue, setMpValue] = useState<number>(0);
   const [mpAutoFollow, setMpAutoFollow] = useState<boolean>(true);
   const [mpSnoozedSessionId, setMpSnoozedSessionId] = useState<string>('');
@@ -2018,6 +2021,39 @@ export default function JeuxPage() {
     }
     setPlateColors(colors); setPlateActive(actives);
   }, [mpState, currentGame, gameActive]);
+
+  // ── Hôte Puissance 4 (2 téléphones) : poll + rendu du plateau sur les dalles ──
+  const lastP4Ref = useRef<string>('');
+  useEffect(() => {
+    if (!gameActive || currentGame !== 'p4-multi' || !p4RoomId) return;
+    let alive = true;
+    const COL_R = { r: 255, g: 59, b: 110 };
+    const COL_J = { r: 59, g: 130, b: 246 };
+    const poll = async () => {
+      try {
+        const res = await fetch(`/api/p4/state?roomId=${encodeURIComponent(p4RoomId)}`, { cache: 'no-store' });
+        const d = await res.json();
+        if (alive && d?.ok) {
+          setP4Host({ board: d.board, turn: d.turn, winner: d.winner, status: d.status, players: d.players });
+          const key = JSON.stringify(d.board) + String(d.winner);
+          if (key !== lastP4Ref.current) {
+            lastP4Ref.current = key;
+            const colors = Array(42).fill('#000000'); const actives = Array(42).fill(false);
+            for (let i = 0; i < 42; i++) {
+              const cell = d.board[i]; const pid = PLATE_ID_BY_INDEX[i]; if (!pid) continue;
+              if (cell === 'R') { sendRgbToPlate(COL_R, 88, pid); colors[i] = '#ff3b6e'; actives[i] = true; }
+              else if (cell === 'J') { sendRgbToPlate(COL_J, 88, pid); colors[i] = '#3b82f6'; actives[i] = true; }
+              else { turnOffPlateImmediate(pid); }
+            }
+            setPlateColors(colors); setPlateActive(actives);
+          }
+        }
+      } catch { /* ignore */ }
+      if (alive) setTimeout(poll, 900);
+    };
+    void poll();
+    return () => { alive = false; };
+  }, [gameActive, currentGame, p4RoomId]);
 
   // Auto-stop multiplayer game if no players for 15 seconds
   useEffect(() => {
@@ -4663,7 +4699,30 @@ export default function JeuxPage() {
                     },
                   };
 
-                  const allCards: GameCard[] = [...nativeCards, ...builtinCards, spectreCard, platesCard, ...dbCards];
+                  const p4MultiCard: GameCard = {
+                    key: 'p4-multi',
+                    title: 'Puissance 4 — 2 téléphones',
+                    desc: 'Vrai multijoueur compétitif : 2 joueurs sur téléphone, plateau sur les dalles',
+                    Icon: Users,
+                    iconBg: 'linear-gradient(135deg,#ff3b6e,#3b82f6)',
+                    iconColor: '#fff',
+                    badgeLabel: 'multi',
+                    accent: '#ec4899',
+                    selected: currentGame === 'p4-multi',
+                    howTo: "Lance ce mode sur la tablette : une salle est créée et un QR s'affiche. Les 2 joueurs scannent le QR (page /p4), chacun joue son tour depuis son téléphone ; le plateau s'affiche sur les dalles de la Color Room.",
+                    launch: async () => {
+                      setTetrisStandalone(false); setCustomRun(null); setHudRun(null);
+                      setActiveBuiltinGame(null); setSimonActive(false); setSpectreActive(false); setP4Host(null);
+                      try {
+                        const res = await fetch('/api/p4/create', { method: 'POST' });
+                        const d = await res.json();
+                        if (d?.ok) { setP4RoomId(d.roomId); setCurrentGame('p4-multi'); setGameActive(true); setMessage('Puissance 4 multi — les joueurs scannent le QR'); }
+                        else setMessage('Création de la partie Puissance 4 impossible.');
+                      } catch { setMessage('Erreur réseau (Puissance 4).'); }
+                    },
+                  };
+
+                  const allCards: GameCard[] = [...nativeCards, ...builtinCards, spectreCard, platesCard, p4MultiCard, ...dbCards];
 
                   const q = gameSearch.toLowerCase().trim();
                   const filtered = q
@@ -4782,6 +4841,32 @@ export default function JeuxPage() {
                     </div>
                     <div style={{ marginTop: 12, fontSize: 15, fontWeight: 800 }}>{mpPlayers.length} joueur{mpPlayers.length > 1 ? 's' : ''} connecté{mpPlayers.length > 1 ? 's' : ''}</div>
                     <div style={{ marginTop: 4, fontSize: 12, opacity: 0.6 }}>👁️ Regarde les dalles de la Color Room, pas l&apos;écran.</div>
+                  </div>
+                )}
+                {gameActive && currentGame === 'p4-multi' && (
+                  <div className="glass" style={{ padding: 20, borderRadius: 18, marginTop: 12, textAlign: 'center' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 6 }}>
+                      <Users size={20} color="#ec4899" />
+                      <strong style={{ fontSize: 18 }}>Puissance 4 — 2 téléphones</strong>
+                    </div>
+                    {(!p4Host || p4Host.status === 'waiting') ? (
+                      <>
+                        <p style={{ fontSize: 13, opacity: 0.75, margin: '0 0 14px' }}>Les 2 joueurs scannent ce QR (page <code>/p4</code>) pour rejoindre. 1er = Rose, 2e = Bleu.</p>
+                        <div style={{ display: 'inline-block', background: '#fff', padding: 10, borderRadius: 14 }}>
+                          <QrCode value={(typeof window !== 'undefined' ? window.location.origin : '') + '/p4?room=' + p4RoomId} size={180} />
+                        </div>
+                        <div style={{ marginTop: 12, fontSize: 14, fontWeight: 700 }}>
+                          {p4Host?.players.r ? '🌹 Rose ✓' : '🌹 Rose…'} {'  ·  '} {p4Host?.players.j ? '🔵 Bleu ✓' : '🔵 Bleu…'}
+                        </div>
+                      </>
+                    ) : (
+                      <div>
+                        {p4Host.winner === 'draw' ? <div style={{ fontSize: 18, fontWeight: 900 }}>Match nul !</div>
+                          : p4Host.winner ? <div style={{ fontSize: 18, fontWeight: 900, color: p4Host.winner === 'R' ? '#ff3b6e' : '#3b82f6' }}>{p4Host.winner === 'R' ? 'Rose' : 'Bleu'} gagne ! 🏆</div>
+                          : <div style={{ fontSize: 16, fontWeight: 800 }}>Au tour de <span style={{ color: p4Host.turn === 'R' ? '#ff3b6e' : '#3b82f6' }}>{p4Host.turn === 'R' ? 'Rose' : 'Bleu'}</span></div>}
+                        <div style={{ marginTop: 6, fontSize: 12, opacity: 0.6 }}>👁️ Le plateau est sur les dalles de la Color Room.</div>
+                      </div>
+                    )}
                   </div>
                 )}
                 {gameActive && customRun ? (

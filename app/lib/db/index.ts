@@ -65,6 +65,21 @@ function migrate(db: Database.Database) {
   db.exec('CREATE INDEX IF NOT EXISTS idx_crg_ai_chats_game ON crg_ai_chats(game_id);');
   db.exec('CREATE INDEX IF NOT EXISTS idx_crg_ai_chats_updated ON crg_ai_chats(updated_at);');
 
+  // Puissance 4 multijoueur (2 joueurs sur téléphone, plateau sur les dalles).
+  // board_json = 42 cases (row*6+col), valeurs '' | 'R' | 'J'. turn/winner = 'R'|'J'.
+  db.exec(`CREATE TABLE IF NOT EXISTS crg_p4_rooms (
+    id              TEXT PRIMARY KEY,
+    created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at      TEXT NOT NULL DEFAULT (datetime('now')),
+    player_r_token  TEXT,
+    player_j_token  TEXT,
+    board_json      TEXT NOT NULL DEFAULT '[]',
+    turn            TEXT NOT NULL DEFAULT 'R',
+    winner          TEXT,
+    status          TEXT NOT NULL DEFAULT 'waiting'
+  );`);
+  db.exec('CREATE INDEX IF NOT EXISTS idx_crg_p4_rooms_updated ON crg_p4_rooms(updated_at);');
+
   // Réglages applicatifs clé/valeur (URLs des APIs modifiables à chaud depuis le site)
   db.exec(
     "CREATE TABLE IF NOT EXISTS crg_app_config (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at TEXT NOT NULL DEFAULT (datetime('now')));",
