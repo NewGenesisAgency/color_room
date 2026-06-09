@@ -35,6 +35,8 @@ const NODE_KINDS = [
   'grid_create', 'grid_get', 'grid_set', 'grid_clear', 'grid_sync_tiles', 'grid_check_4_in_row',
   // Rendu plaques
   'fill', 'pulse', 'tile', 'tile_set', 'tile_get', 'clear_tiles', 'tile_set_var', 'tiles_from_array',
+  // Animations
+  'anim_fade', 'anim_strobe', 'anim_rainbow', 'anim_wave',
   // Couleur / temps / aléatoire
   'gen_target_color', 'color_mix', 'color_hsl', 'color_complement', 'color_temperature',
   'color_distance', 'color_match_score', 'show_target_on_plates', 'get_player_rgb',
@@ -91,6 +93,8 @@ RÈGLES :
 - Rendu: fill {color,intensity(0..1),mask('all'|'border')}; tile/tile_set {tileIndex,color,intensity}; pulse {baseColor,targetColor,speed}.
 - Boucles: for_range {varName,start,end,step}; loop_count {count}.
 - Évènements d'entrée: on_key {key}, on_tile_click {tileIndex}, on_timer {intervalMs}, on_tick {intervalMs}.
+- Animations (sur les dalles, durée en ms puis on continue) : anim_fade {color,fromIntensity,toIntensity,durationMs}, anim_strobe {color,hz,durationMs}, anim_rainbow {speed,durationMs}, anim_wave {color,direction('left'|'right'),speed,durationMs}.
+- Boucle : while {varName,op,value,bodyNodeId} répète le corps tant que vrai.
 - Audio (hors-ligne): play_sound {sound}. Sons: click, select, tick, pop, swoosh, correct, wrong, success, error, alert, win, lose, levelup, coin, powerup, countdown, start, score. Utilise 'correct'/'wrong' pour le feedback pédagogique, 'win'/'lose' en fin de partie, 'coin'/'score' pour les points.
 - L'UI est posée sur un canvas 860×500. Place les composants sans chevauchement.
 - Lie les affichages à des variables via "varBind" (ex: un score_display avec varBind "score").

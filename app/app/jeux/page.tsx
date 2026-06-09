@@ -2661,6 +2661,56 @@ export default function JeuxPage() {
         return;
       }
 
+      // ── Animations (fondu / strobe / arc-en-ciel / vague) sur les dalles ──
+      // Cadence ~120 ms (comme Snake) pour ne pas saturer le bus série.
+      if (node.kind === 'anim_fade' || node.kind === 'anim_strobe' || node.kind === 'anim_rainbow' || node.kind === 'anim_wave') {
+        const durationMs = Math.max(200, getNum(params, 'durationMs', 2000));
+        const startT = Date.now();
+        const c01 = (v: number) => Math.max(0, Math.min(1, v));
+        const hslToRgb = (h: number, s: number, l: number): TargetColor => {
+          s /= 100; l /= 100; const k = (n: number) => (n + h / 30) % 12;
+          const a = s * Math.min(l, 1 - l);
+          const f = (n: number) => l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
+          return { r: Math.round(255 * f(0)), g: Math.round(255 * f(8)), b: Math.round(255 * f(4)) };
+        };
+        const rgbHex = (c: TargetColor) => `#${[c.r, c.g, c.b].map((v) => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0')).join('')}`;
+        const applyFrame = () => {
+          if (hudGraphRunRef.current.stop) return;
+          const elapsed = Date.now() - startT;
+          const colorsState = Array(42).fill('#000000'); const activeState = Array(42).fill(false);
+          if (node.kind === 'anim_fade') {
+            const from = c01(getNum(params, 'fromIntensity', 0)); const to = c01(getNum(params, 'toIntensity', 1));
+            const t = Math.min(1, elapsed / durationMs); const inten = Math.round((from + (to - from) * t) * 90);
+            const hex = getColor(params, 'color', '#ffffff'); const rgb = hexToRgb255(hex);
+            for (let i = 0; i < 42; i++) { const pid = PLATE_ID_BY_INDEX[i]; if (pid) sendRgbToPlate(rgb, inten, pid); colorsState[i] = hex; activeState[i] = inten > 0; }
+          } else if (node.kind === 'anim_strobe') {
+            const hz = Math.max(0.5, getNum(params, 'hz', 4)); const on = Math.sin(elapsed / 1000 * hz * 2 * Math.PI) > 0;
+            const hex = getColor(params, 'color', '#ffffff'); const rgb = on ? hexToRgb255(hex) : { r: 0, g: 0, b: 0 };
+            for (let i = 0; i < 42; i++) { const pid = PLATE_ID_BY_INDEX[i]; if (pid) sendRgbToPlate(rgb, on ? 90 : 0, pid); colorsState[i] = on ? hex : '#000000'; activeState[i] = on; }
+          } else if (node.kind === 'anim_rainbow') {
+            const speed = Math.max(0.1, getNum(params, 'speed', 1));
+            for (let i = 0; i < 42; i++) { const pid = PLATE_ID_BY_INDEX[i]; const hue = ((elapsed / 1000 * speed * 60) + (i / 42) * 360) % 360; const rgb = hslToRgb(hue, 90, 55); if (pid) sendRgbToPlate(rgb, 85, pid); colorsState[i] = rgbHex(rgb); activeState[i] = true; }
+          } else { // anim_wave
+            const speed = Math.max(0.1, getNum(params, 'speed', 1)); const dir = String(params.direction ?? 'left');
+            const hex = getColor(params, 'color', '#00d7ff'); const rgb = hexToRgb255(hex);
+            const pos = (elapsed / 1000 * speed) % 1.25;
+            for (let i = 0; i < 42; i++) { const pid = PLATE_ID_BY_INDEX[i]; const col = i % 6; let x = col / 5; if (dir === 'right') x = 1 - x; const lit = Math.abs(x - pos) < 0.22; if (pid) sendRgbToPlate(lit ? rgb : { r: 0, g: 0, b: 0 }, lit ? 85 : 0, pid); colorsState[i] = lit ? hex : '#000000'; activeState[i] = lit; }
+          }
+          setPlateColors(colorsState); setPlateActive(activeState);
+        };
+        applyFrame();
+        const iv = window.setInterval(() => {
+          if (hudGraphRunRef.current.stop || Date.now() - startT >= durationMs) {
+            window.clearInterval(iv);
+            const nextId = g.out.get(node.id)?.[0]; if (nextId && !hudGraphRunRef.current.stop) walk(nextId);
+            return;
+          }
+          applyFrame();
+        }, 120);
+        hudGraphRunRef.current.timers.push(iv);
+        return;
+      }
+
       // ── Tableaux / chaînes / rendu depuis tableau (aligné sur l'aperçu éditeur) ──
       if (node.kind.startsWith('array_') || node.kind === 'string_concat' || node.kind === 'string_from_num' || node.kind === 'tiles_from_array') {
         const V = hudVarsRef.current; const A = hudArraysRef.current;

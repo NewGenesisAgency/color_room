@@ -6654,6 +6654,35 @@ export default function EditeurPage() {
                         </div>
                       );
                     })()
+                  ) : ['anim_fade','anim_strobe','anim_rainbow','anim_wave'].includes(selectedNode.kind) ? (
+                    <div style={{ display: 'grid', gap: 12 }}>
+                      <div style={{ padding: 10, borderRadius: 10, background: 'rgba(34,211,238,0.08)', border: '1px solid rgba(34,211,238,0.2)', fontSize: 12, lineHeight: 1.5 }}>
+                        Animation jouée sur les dalles pendant la durée indiquée, puis l&apos;exécution continue.
+                      </div>
+                      {(selectedNode.kind==='anim_fade' || selectedNode.kind==='anim_strobe' || selectedNode.kind==='anim_wave') && (
+                        <label style={{ display:'grid', gap:4 }}><span className="g-label">Couleur</span>
+                          <input type="color" value={String(selectedNode.params.color ?? (selectedNode.kind==='anim_wave'?'#00d7ff':'#ffffff'))} onChange={(e)=>updateSelectedParams({ color: e.target.value })} style={{ width:60, height:32, border:'none', background:'none', cursor:'pointer' }} /></label>
+                      )}
+                      {selectedNode.kind==='anim_fade' && (
+                        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+                          <label style={{ display:'grid', gap:4 }}><span className="g-label">Intensité début (0..1)</span><input className="g-input" type="number" step="0.05" min={0} max={1} style={{ height:36, fontSize:13 }} value={getNum(selectedNode.params,'fromIntensity',0)} onChange={(e)=>updateSelectedParams({ fromIntensity: Number(e.target.value) })} /></label>
+                          <label style={{ display:'grid', gap:4 }}><span className="g-label">Intensité fin (0..1)</span><input className="g-input" type="number" step="0.05" min={0} max={1} style={{ height:36, fontSize:13 }} value={getNum(selectedNode.params,'toIntensity',1)} onChange={(e)=>updateSelectedParams({ toIntensity: Number(e.target.value) })} /></label>
+                        </div>
+                      )}
+                      {selectedNode.kind==='anim_strobe' && (
+                        <label style={{ display:'grid', gap:4 }}><span className="g-label">Fréquence (Hz)</span><input className="g-input" type="number" step="0.5" min={0.5} style={{ height:36, fontSize:13 }} value={getNum(selectedNode.params,'hz',4)} onChange={(e)=>updateSelectedParams({ hz: Number(e.target.value) })} /></label>
+                      )}
+                      {(selectedNode.kind==='anim_rainbow' || selectedNode.kind==='anim_wave') && (
+                        <label style={{ display:'grid', gap:4 }}><span className="g-label">Vitesse</span><input className="g-input" type="number" step="0.1" min={0.1} style={{ height:36, fontSize:13 }} value={getNum(selectedNode.params,'speed',1)} onChange={(e)=>updateSelectedParams({ speed: Number(e.target.value) })} /></label>
+                      )}
+                      {selectedNode.kind==='anim_wave' && (
+                        <label style={{ display:'grid', gap:4 }}><span className="g-label">Direction</span>
+                          <select className="g-select" style={{ height:36, fontSize:13 }} value={String(selectedNode.params.direction ?? 'left')} onChange={(e)=>updateSelectedParams({ direction: e.target.value })}>
+                            <option value="left">Gauche → Droite</option><option value="right">Droite → Gauche</option>
+                          </select></label>
+                      )}
+                      <label style={{ display:'grid', gap:4 }}><span className="g-label">Durée (ms)</span><input className="g-input" type="number" min={200} step={100} style={{ height:36, fontSize:13 }} value={getNum(selectedNode.params,'durationMs',2000)} onChange={(e)=>updateSelectedParams({ durationMs: Number(e.target.value) })} /></label>
+                    </div>
                   ) : selectedNode.kind === 'play_sound' ? (
                     <div style={{ display: 'grid', gap: 12 }}>
                       <label style={{ display: 'grid', gap: 4 }}>
