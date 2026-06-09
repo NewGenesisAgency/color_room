@@ -1168,6 +1168,8 @@ export default function EditeurPage() {
   const [aiMessages, setAiMessages] = useState<AiMsg[]>([]);
   const [aiConvId, setAiConvId] = useState<string | null>(null);
   const [aiStatus, setAiStatus] = useState<{ ready: boolean; message: string } | null>(null);
+  const [aiConvList, setAiConvList] = useState<Array<{ id: string; title: string; updatedAt: string; messages: AiMsg[] }>>([]);
+  const [aiShowList, setAiShowList] = useState(false);
   const aiBeforeRef = useRef<Record<string, EditorSnapshot>>({}); // snapshot avant chaque réponse IA (pour annuler)
   const aiScrollRef = useRef<HTMLDivElement | null>(null);
 
@@ -3374,6 +3376,27 @@ export default function EditeurPage() {
 
   const newAiConversation = () => { setAiMessages([]); setAiConvId(null); setAiError(''); aiBeforeRef.current = {}; };
 
+  // Navigateur de conversations (lister / charger / supprimer).
+  const loadAiConvList = async () => {
+    if (!activeGameId) { setAiConvList([]); return; }
+    try {
+      const res = await fetch(`/api/ai/conversations?gameId=${encodeURIComponent(activeGameId)}`, { cache: 'no-store' });
+      const d = await res.json();
+      setAiConvList(Array.isArray(d?.conversations) ? d.conversations : []);
+    } catch { setAiConvList([]); }
+  };
+  const openAiConversation = (c: { id: string; messages: AiMsg[] }) => {
+    setAiConvId(c.id);
+    setAiMessages(Array.isArray(c.messages) ? c.messages : []);
+    aiBeforeRef.current = {};
+    setAiShowList(false);
+  };
+  const deleteAiConversation = async (id: string) => {
+    try { await fetch(`/api/ai/conversations/${id}`, { method: 'DELETE' }); } catch { /* ignore */ }
+    setAiConvList((l) => l.filter((c) => c.id !== id));
+    if (aiConvId === id) newAiConversation();
+  };
+
   // Charge la dernière conversation du jeu actif à l'ouverture du chat.
   useEffect(() => {
     if (!aiOpen || !activeGameId || aiConvId || aiMessages.length > 0) return;
@@ -3819,9 +3842,25 @@ export default function EditeurPage() {
               <p style={{ margin: 0, fontSize: 11, color: 'rgba(255,255,255,0.5)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{activeGame ? `Jeu : ${activeGame.name}` : 'Aucun jeu — il en créera un'}</p>
               {aiStatus && !aiStatus.ready && <p style={{ margin: '2px 0 0', fontSize: 10.5, color: '#fbbf24', display: 'flex', alignItems: 'center', gap: 5 }}><span style={{ width: 7, height: 7, borderRadius: '50%', background: '#fbbf24', animation: 'aiPulse 1.1s ease-in-out infinite' }} />{aiStatus.message}</p>}
             </div>
+            <button onClick={() => { const n = !aiShowList; setAiShowList(n); if (n) void loadAiConvList(); }} title="Conversations enregistrées" style={{ background: aiShowList ? 'rgba(124,58,237,0.25)' : 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.7)', borderRadius: 8, padding: '6px 8px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}><Clock size={13} /></button>
             <button onClick={newAiConversation} title="Nouvelle conversation" style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.7)', borderRadius: 8, padding: '6px 8px', cursor: 'pointer', fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}><Plus size={13} /> Nouveau</button>
             <button onClick={() => setAiOpen(false)} style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.6)', cursor: 'pointer', padding: 4 }}><X size={18} /></button>
           </div>
+
+          {aiShowList && (
+            <div style={{ borderBottom: '1px solid rgba(255,255,255,0.08)', maxHeight: 200, overflowY: 'auto', background: 'rgba(0,0,0,0.25)', flexShrink: 0 }}>
+              {aiConvList.length === 0 ? (
+                <div style={{ padding: 12, fontSize: 12, color: 'rgba(255,255,255,0.4)', textAlign: 'center' }}>Aucune conversation enregistrée pour ce jeu.</div>
+              ) : aiConvList.map((c) => (
+                <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                  <button onClick={() => openAiConversation(c)} style={{ flex: 1, textAlign: 'left', background: 'transparent', border: 'none', color: c.id === aiConvId ? '#c4b5fd' : '#e2e8f0', cursor: 'pointer', fontSize: 12.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {c.title || 'Conversation'} <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)' }}>· {new Date(c.updatedAt).toLocaleDateString()}</span>
+                  </button>
+                  <button onClick={() => void deleteAiConversation(c.id)} title="Supprimer" style={{ background: 'transparent', border: 'none', color: 'rgba(239,68,68,0.7)', cursor: 'pointer', padding: 2, display: 'flex' }}><Trash2 size={13} /></button>
+                </div>
+              ))}
+            </div>
+          )}
 
           <div ref={aiScrollRef} style={{ flex: 1, overflowY: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
             {aiMessages.length === 0 && !aiBusy && (
