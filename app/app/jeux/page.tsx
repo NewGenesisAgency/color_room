@@ -2188,6 +2188,7 @@ export default function JeuxPage() {
   const gameClickHandlerRef = useRef<((idx: number) => void) | null>(null);
   // Moteur de variables des jeux éditeur : les nœuds écrivent ici, les composants UI lisent.
   const hudVarsRef = useRef<Record<string, number | string>>({});
+  const hudArraysRef = useRef<Record<string, Array<number | string | null>>>({}); // tableaux du runtime
   const bumpHudVars = () => setHudVarsTick((t) => (t + 1) % 1_000_000);
   // Walker du graphe en cours : permet de déclencher un sous-graphe (événement UI)
   // SANS arrêter la boucle principale (on_timer), contrairement à runHudGraphFrom.
@@ -2230,6 +2231,7 @@ export default function JeuxPage() {
     stopHudGraph();
     hudGraphRunRef.current.stop = false;
     const graphT0 = Date.now(); // base de temps pour le bloc "Secondes" (time_seconds)
+    hudArraysRef.current = {};  // tableaux remis à zéro au démarrage du jeu
 
     const g = buildGraph(run.cfg);
     const start = g.byId.get(String(startNodeId));
@@ -2616,6 +2618,42 @@ export default function JeuxPage() {
         const onEndId = g.out.get(node.id)?.[0];
         if (onEndId) setTimeout(() => { if (!hudGraphRunRef.current.stop) walk(onEndId); }, 500);
         return;
+      }
+
+      // ── Tableaux / chaînes / rendu depuis tableau (aligné sur l'aperçu éditeur) ──
+      if (node.kind.startsWith('array_') || node.kind === 'string_concat' || node.kind === 'string_from_num' || node.kind === 'tiles_from_array') {
+        const V = hudVarsRef.current; const A = hudArraysRef.current;
+        const aname = String(params.arrayName ?? params.name ?? 'arr');
+        switch (node.kind) {
+          case 'array_create': A[String(params.name ?? 'arr')] = Array.from({ length: Math.max(0, Math.round(getNum(params, 'size', 42))) }, () => (params.initValue !== undefined ? (params.initValue as number | string | null) : null)); break;
+          case 'array_literal': A[String(params.name ?? 'arr')] = String(params.values ?? '').split(',').map((s) => { const t = s.trim(); if (t === '' || t === 'null') return null; const n = Number(t); return Number.isFinite(n) ? n : t; }); break;
+          case 'array_get': { const arr = A[aname] ?? []; const idx = Math.round(Number(V[String(params.indexVar ?? 'i')] ?? 0)); V[String(params.outVar ?? 'item')] = (idx >= 0 && idx < arr.length && arr[idx] != null) ? (arr[idx] as number | string) : 0; break; }
+          case 'array_set': { const arr = A[aname]; if (arr) { const idx = Math.round(Number(V[String(params.indexVar ?? 'i')] ?? 0)); const val = V[String(params.valueVar ?? 'val')] ?? getNum(params, 'value', 0); if (idx >= 0 && idx < arr.length) arr[idx] = val as number | string; } break; }
+          case 'array_fill': { const arr = A[aname]; if (arr) { const vv = String(params.valueVar ?? ''); const val = (vv && V[vv] !== undefined) ? V[vv] : (params.value ?? 0); arr.fill(val as number | string | null); } break; }
+          case 'array_length': V[String(params.outVar ?? 'len')] = (A[aname] ?? []).length; break;
+          case 'array_push': { const arr = A[aname]; if (arr) arr.push((V[String(params.valueVar ?? 'val')] ?? 0) as number | string); break; }
+          case 'array_pop': { const arr = A[aname]; const v = arr ? arr.pop() : undefined; V[String(params.outVar ?? 'item')] = (v != null) ? (v as number | string) : 0; break; }
+          case 'array_shuffle': { const arr = A[aname]; if (arr) for (let k = arr.length - 1; k > 0; k--) { const j = Math.floor(Math.random() * (k + 1)); [arr[k], arr[j]] = [arr[j], arr[k]]; } break; }
+          case 'array_contains': V[String(params.outVar ?? 'found')] = (A[aname] ?? []).includes((V[String(params.valueVar ?? 'val')] ?? 0) as number | string) ? 1 : 0; break;
+          case 'array_index_of': V[String(params.outVar ?? 'idx')] = (A[aname] ?? []).indexOf((V[String(params.valueVar ?? 'val')] ?? 0) as number | string); break;
+          case 'string_concat': V[String(params.outVar ?? 'result')] = String(V[String(params.aVar ?? 'a')] ?? '') + String(V[String(params.bVar ?? 'b')] ?? ''); break;
+          case 'string_from_num': V[String(params.outVar ?? 'text')] = Number(V[String(params.varName ?? 'x')] ?? 0).toFixed(Math.max(0, Math.round(getNum(params, 'decimals', 0)))); break;
+          case 'tiles_from_array': {
+            const arr = A[aname] ?? []; const bg = getColor(params, 'bgColor', '#000000');
+            const inten = Math.max(0, Math.min(1, getNum(params, 'intensity', 0.85)));
+            const colors = Array(42).fill('#000000'); const actives = Array(42).fill(false);
+            for (let k = 0; k < Math.min(arr.length, 42); k++) {
+              const v = arr[k];
+              if (v == null || v === 0 || v === '') { colors[k] = bg; actives[k] = false; }
+              else if (typeof v === 'string' && v.startsWith('#')) { colors[k] = v; actives[k] = true; }
+              else { colors[k] = '#ffffff'; actives[k] = true; }
+            }
+            setPlateColors(colors); setPlateActive(actives); setMasterIntensity(Math.round(inten * 100));
+            break;
+          }
+        }
+        bumpHudVars();
+        const nextId = g.out.get(node.id)?.[0]; if (nextId) walk(nextId); return;
       }
 
       // ── Maths / logique / comparaison / constantes (blocs "dataflow" → variable) ──
