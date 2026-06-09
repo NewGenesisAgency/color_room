@@ -35,15 +35,22 @@ cd <dossier-du-dépôt>
 
 ### 2. Configurer les variables d'environnement
 
-Dans `docker_javascript/app/`, créez ou éditez le fichier `.env.local` :
+Dans `app/`, créez le fichier `.env` (jamais versionné — un modèle existe dans `app/.env.example`) :
 
 ```env
 # Compte administrateur créé automatiquement au premier démarrage
 ADMIN_USERNAME=admin
 ADMIN_PASSWORD=***REDACTED***
+
+# Génération de jeux par IA dans l'éditeur (Google Gemini)
+# Obtenir une clé : https://aistudio.google.com/apikey
+GEMINI_API_KEY=VOTRE_CLE_GEMINI
+# Optionnel : cascade de modèles (du plus capable au repli)
+# GEMINI_MODELS=gemini-3.5-flash,gemini-3.1-flash-lite,gemini-3-flash,gemini-2.5-flash
 ```
 
 > ⚠️ Changez le mot de passe avant la mise en production.
+> La clé `GEMINI_API_KEY` ne sert qu'à l'assistant IA de l'éditeur (côté serveur). L'audio et les jeux fonctionnent **hors-ligne**.
 
 ### 3. Démarrage avec Docker (recommandé)
 
@@ -197,6 +204,7 @@ POST   /api/scores                — Enregistrer un score
 | `/chromaticite` | Diagramme CIE 1931 | Tous |
 | `/mesure` | Mesures CS-160 | Tous |
 | `/aide` | Guide d'utilisation | Tous |
+| `/health` | Santé & diagnostic (connexion APIs, test des plaques, contrôle des 32 canaux) | Tous |
 
 ---
 
@@ -233,13 +241,27 @@ Les diagrammes de chromaticité partagent le composant `CieDiagramCanvas` (gamut
 - **Mini-tutoriel** skippable à chaque création de jeu.
 - Métadonnées : description (textarea), **icône + couleur + dégradé** (popup, ~55 icônes), difficulté, mode (solo/coop/versus), dalles cibles.
 
+### Assistant IA (Google Gemini)
+
+- Bouton **« Créer avec l'IA »** → panneau de **chat** (style outil de code) docké à droite : l'éditeur reste visible et les **blocs + liaisons se construisent en direct**.
+- **Multi-tours** : créer puis **modifier** le jeu par messages successifs (l'IA reçoit le jeu actuel + l'historique).
+- **Annuler / Réessayer** par réponse (chaque génération IA = un seul pas d'historique, branché sur l'undo/redo de l'éditeur).
+- **Conversations persistées** en base (`crg_ai_chats`), rechargées à l'ouverture.
+- Cascade de modèles avec repli, configurable via `GEMINI_MODELS`. Route serveur : `POST /api/ai/generate-game`, `/api/ai/conversations`.
+
+### Audio & visuels
+
+- **Sons hors-ligne** : bloc « Jouer un son » avec 18 effets synthétisés (Web Audio, aucun fichier) — `correct`, `wrong`, `win`, `lose`, `levelup`, `coin`… Moteur partagé `lib/audio/sfx.ts`, aperçu **« Écouter »** dans l'éditeur.
+- **Icônes** : composant **Sprite** (icônes Lucide étendues) et **Icône SVG** (markup SVG personnalisé), cliquables (événement) et **affichables selon une variable** (visibilité pilotée par événement).
+- **Bloc `Si` (condition)** : teste une variable réelle (`>`, `≥`, `<`, `≤`, `=`, `≠`) — 1ʳᵉ sortie = Alors.
+
 ---
 
 ## Structure du projet
 
 ```
-docker_javascript/
-├── app/
+.                            # racine du dépôt
+├── app/                     # projet Next.js
 │   ├── app/
 │   │   ├── _components/     # Composants partagés (LoginScreen, NavigationMenu, Room3D…)
 │   │   ├── _games/          # Jeux embarqués (maitre-du-blanc, chromaticity-diagram…)
@@ -248,7 +270,10 @@ docker_javascript/
 │   │   │   ├── admin/       # Gestion utilisateurs
 │   │   │   ├── classes/     # Gestion classes
 │   │   │   ├── scores/      # Historique scores
-│   │   │   └── games/       # CRUD jeux
+│   │   │   ├── games/       # CRUD jeux
+│   │   │   ├── ai/          # Génération de jeu par IA (Gemini) + conversations
+│   │   │   ├── health/      # Santé / diagnostic
+│   │   │   └── supervision/ # Proxy plaques LED
 │   │   ├── jeux/            # Page jeux + moteur custom
 │   │   ├── editeur/         # Éditeur visuel (ReactFlow)
 │   │   ├── gestion/         # Tableau de bord admin/prof
@@ -258,6 +283,7 @@ docker_javascript/
 │   │   └── mesure/          # Mesures instruments
 │   └── lib/
 │       ├── db/              # Connexion SQLite + migrations
+│       ├── audio/           # Moteur SFX hors-ligne (sfx.ts)
 │       └── auth.ts          # PBKDF2, sessions, getSessionUser
 ├── rpi/                     # Scripts d'installation Raspberry Pi
 ├── docker-compose.yml
