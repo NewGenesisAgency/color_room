@@ -2008,8 +2008,10 @@ export default function JeuxPage() {
     if (key === lastMpPlatesRef.current) return; // anti-lag : ne renvoie que si ça change
     lastMpPlatesRef.current = key;
     const colors = Array(42).fill('#000000'); const actives = Array(42).fill(false);
+    // Siège -> plaque VISIBLE du mur du fond (bas d'abord, gauche->droite), pas le plafond.
+    const SEAT_PLATE_IDX = [36, 37, 38, 39, 40, 41, 30, 31];
     for (let seat = 1; seat <= 8; seat++) {
-      const idx = seat - 1; const pid = PLATE_ID_BY_INDEX[idx]; if (!pid) continue;
+      const idx = SEAT_PLATE_IDX[seat - 1]; const pid = PLATE_ID_BY_INDEX[idx]; if (!pid) continue;
       const packed = Number(sub[String(seat)] ?? -1);
       if (packed >= 0) {
         const r = (packed >> 16) & 255, g = (packed >> 8) & 255, b = packed & 255;
@@ -4865,6 +4867,12 @@ export default function JeuxPage() {
                           : p4Host.winner ? <div style={{ fontSize: 18, fontWeight: 900, color: p4Host.winner === 'R' ? '#ff3b6e' : '#3b82f6' }}>{p4Host.winner === 'R' ? 'Rose' : 'Bleu'} gagne ! 🏆</div>
                           : <div style={{ fontSize: 16, fontWeight: 800 }}>Au tour de <span style={{ color: p4Host.turn === 'R' ? '#ff3b6e' : '#3b82f6' }}>{p4Host.turn === 'R' ? 'Rose' : 'Bleu'}</span></div>}
                         <div style={{ marginTop: 6, fontSize: 12, opacity: 0.6 }}>👁️ Le plateau est sur les dalles de la Color Room.</div>
+                        {p4Host.winner && (
+                          <button onClick={async () => { try { const res = await fetch('/api/p4/create', { method: 'POST' }); const d = await res.json(); if (d?.ok) { setP4Host(null); setP4RoomId(d.roomId); } } catch { /* ignore */ } }}
+                            style={{ marginTop: 12, padding: '10px 18px', borderRadius: 12, border: 'none', cursor: 'pointer', fontWeight: 800, color: '#fff', background: 'linear-gradient(135deg,#ff3b6e,#3b82f6)' }}>
+                            Rejouer (nouvelle salle)
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>

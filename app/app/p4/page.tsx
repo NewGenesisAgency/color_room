@@ -20,17 +20,23 @@ export default function P4PhonePage() {
   const [msg, setMsg] = useState('');
   const tokenRef = useRef('');
 
-  // Récupère la salle depuis l'URL puis rejoint.
+  // Récupère la salle depuis l'URL puis rejoint (ou restaure le siège au refresh).
   useEffect(() => {
     const rid = new URLSearchParams(window.location.search).get('room') || '';
     if (!rid) { setMsg('Lien invalide : scanne le QR affiché dans la Color Room.'); return; }
     setRoomId(rid);
+    // Restauration : si on a déjà rejoint cette salle, on ne re-rejoint pas (sinon double-join).
+    try {
+      const saved = window.localStorage.getItem(`crg_p4_${rid}`);
+      if (saved) { const o = JSON.parse(saved); if (o?.token && o?.disc) { setToken(o.token); tokenRef.current = o.token; setDisc(o.disc); return; } }
+    } catch { /* ignore */ }
     (async () => {
       try {
         const res = await fetch('/api/p4/join', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ roomId: rid }) });
         const d = await res.json();
         if (!d?.ok) { setMsg(d?.error === 'room_full' ? 'La partie est déjà complète (2 joueurs).' : 'Impossible de rejoindre.'); return; }
         setToken(d.token); tokenRef.current = d.token; setDisc(d.disc);
+        try { window.localStorage.setItem(`crg_p4_${rid}`, JSON.stringify({ token: d.token, disc: d.disc })); } catch { /* ignore */ }
       } catch { setMsg('Erreur réseau.'); }
     })();
   }, []);
