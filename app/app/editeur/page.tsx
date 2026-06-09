@@ -1060,9 +1060,25 @@ export default function EditeurPage() {
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const t = window.localStorage.getItem('crg_user_type') ?? '';
-    // admin ET enseignant ont accès à l'éditeur
-    setIsTeacher(t === 'enseignant' || t === 'admin');
+    // Lit le cache localStorage (même clé que jeux/page.tsx)
+    const raw = window.localStorage.getItem('crg_user');
+    if (raw) {
+      try {
+        const u = JSON.parse(raw) as { role?: string };
+        const role = u.role ?? '';
+        setIsTeacher(role === 'enseignant' || role === 'admin');
+        return;
+      } catch { /* cache corrompu → fallback API */ }
+    }
+    // Pas de cache → vérification session serveur
+    void fetch('/api/auth/me', { cache: 'no-store' })
+      .then(r => r.json())
+      .then(data => {
+        const role = data.user?.role ?? '';
+        setIsTeacher(role === 'enseignant' || role === 'admin');
+        if (data.user) window.localStorage.setItem('crg_user', JSON.stringify(data.user));
+      })
+      .catch(() => setIsTeacher(false));
   }, []);
 
   const [status, setStatus] = useState<string>('');
