@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Brain, Circle, Cpu, Flame, Minus, Play, RotateCcw, Square, Star, Trophy, Users, Zap } from 'lucide-react';
 import type { GameTileProps } from './GameColorSpeed';
+import { SHOW_SCREEN_BOARD } from '@/lib/game/displayMode';
+import { playSfx, vibrate } from '@/lib/audio/sfx';
 
 // ── Board constants ───────────────────────────────────────────────────────────
 const ROWS = 7;
@@ -253,6 +255,13 @@ export default function GamePuissance4({ onSendColor, onTurnOff, onTurnOffAll, o
   const [isDraw, setIsDraw]         = useState(false);
   // Ne compte comme "réussi" qu'une victoire du joueur (P1) ou un nul — pas une défaite.
   useEffect(() => { if (phase === 'finished' && (winner === P1 || isDraw)) onComplete?.(winner === P1 ? 300 : 100); }, [phase]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Son + vibration de fin de partie.
+  useEffect(() => {
+    if (phase !== 'finished') return;
+    if (isDraw) { playSfx('alert'); vibrate(80); }
+    else if (winner === P1) { playSfx('win'); vibrate([60, 40, 60, 40, 140]); }
+    else { playSfx('lose'); vibrate([120, 60, 120]); }
+  }, [phase]); // eslint-disable-line react-hooks/exhaustive-deps
   const [thinking, setThinking]     = useState(false);
   const [moveCount, setMoveCount]   = useState(0);
   const [scores, setScores]         = useState({ p1: 0, p2: 0 });
@@ -297,6 +306,7 @@ export default function GamePuissance4({ onSendColor, onTurnOff, onTurnOffAll, o
     const player = currentRef.current;
     const result = dropAt(gridRef.current, col, player);
     if (!result) return;
+    playSfx('pop'); // son de dépôt d'un jeton
 
     gridRef.current = result.grid;
     moveCountRef.current += 1;
@@ -553,6 +563,7 @@ export default function GamePuissance4({ onSendColor, onTurnOff, onTurnOffAll, o
 
       {/* Board */}
       <div style={{ borderRadius:16, padding:9, background:C.board, border:`1px solid ${C.line}`, pointerEvents: aiTurn ? 'none' : 'auto' }}>
+        {SHOW_SCREEN_BOARD ? (
         <div style={{ display:'grid', gridTemplateColumns:`repeat(${COLS},1fr)`, gridTemplateRows:`repeat(${ROWS},1fr)`, gap:6 }}>
           {grid.map((row, r) => row.map((cell, c) => {
             const isHover = hoverCol === c && !cell;
@@ -570,6 +581,13 @@ export default function GamePuissance4({ onSendColor, onTurnOff, onTurnOffAll, o
             );
           }))}
         </div>
+        ) : (
+          <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:8, textAlign:'center', padding:'28px 16px' }}>
+            <div style={{ fontSize:34 }}>👁️</div>
+            <div style={{ fontSize:16, fontWeight:900, color:'#e2e8f0' }}>Regarde la Color Room</div>
+            <div style={{ fontSize:12, color:C.textFaint, maxWidth:220 }}>Choisis une colonne ci-dessus ; les jetons s&apos;affichent sur les dalles.</div>
+          </div>
+        )}
       </div>
 
       {/* Keyboard hint */}
