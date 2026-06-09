@@ -1,9 +1,9 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { MousePointerClick, Type, SlidersHorizontal, Trophy, Timer, Flag, Palette, Gauge, Crosshair, Gamepad2, LayoutGrid, Plus, ZoomIn, ZoomOut, Maximize, Trash2, Layers, Square, Circle, Image as ImageIcon, Minus, Heart, Users, CircleDot, Award, MessageSquare, Smile, Activity, Copy, type LucideIcon } from 'lucide-react';
+import { MousePointerClick, Type, SlidersHorizontal, Trophy, Timer, Flag, Palette, Gauge, Crosshair, Gamepad2, LayoutGrid, Plus, ZoomIn, ZoomOut, Maximize, Trash2, Layers, Square, Circle, Image as ImageIcon, Minus, Heart, Users, CircleDot, Award, MessageSquare, Smile, Activity, Copy, Star, Check, X as XIcon, Zap, Bell, Crown, Target, Music, Sparkles, ThumbsUp, AlertTriangle, Sun, Moon, Lightbulb, Eye, Rocket, Brain, Puzzle, Shapes, type LucideIcon } from 'lucide-react';
 
 export type UICompKind = 'button' | 'label' | 'slider' | 'score_display' | 'timer_display' | 'round_badge' | 'color_swatch' | 'progress_bar' | 'cie_diagram' | 'dpad' | 'shape_rect' | 'shape_circle' | 'image' | 'divider' | 'plate_grid' | 'heart_life'
-  | 'gauge_ring' | 'players_list' | 'turn_indicator' | 'leaderboard' | 'button_grid' | 'rgb_sliders' | 'sprite' | 'message_box' | 'title_banner';
+  | 'gauge_ring' | 'players_list' | 'turn_indicator' | 'leaderboard' | 'button_grid' | 'rgb_sliders' | 'sprite' | 'svg_icon' | 'message_box' | 'title_banner';
 
 /** Préréglages de touches pour le D-pad tactile (converties en KeyboardEvent). */
 export type UIDpadPreset = 'arrows_space' | 'lr_space' | 'arrows' | 'lr';
@@ -35,6 +35,8 @@ export type UILayoutComponent = {
   src?: string;
   // Sprite : nom d'icône Lucide
   icon?: string;
+  // svg_icon : markup SVG personnalisé (soit un <svg>…</svg>, soit un attribut "d" de path)
+  svg?: string;
   // button_grid : nb de colonnes ; gauge/leaderboard : valeur indicative
   gridCols?: number;
   value?: number;
@@ -106,13 +108,24 @@ const PALETTE: { kind: UICompKind; label: string; Icon: LucideIcon; color: strin
   { kind: 'button_grid',   label: 'Grille boutons', Icon: LayoutGrid,     color: '#a855f7', w: 200, h: 200 },
   { kind: 'rgb_sliders',   label: 'Sliders RGB',  Icon: SlidersHorizontal, color: '#ec4899', w: 240, h: 130 },
   { kind: 'sprite',        label: 'Sprite (icône)', Icon: Smile,          color: '#f97316', w: 80,  h: 80 },
+  { kind: 'svg_icon',      label: 'Icône SVG',    Icon: Shapes,           color: '#10b981', w: 80,  h: 80 },
   { kind: 'message_box',   label: 'Message',      Icon: MessageSquare,    color: '#38bdf8', w: 280, h: 90 },
   { kind: 'title_banner',  label: 'Bandeau titre', Icon: Type,            color: '#94a3b8', w: 320, h: 60 },
 ];
 
 export const SPRITE_ICONS: Record<string, LucideIcon> = {
   Smile, Heart, Trophy, Award, Flag, Crosshair, Gamepad2, Users, CircleDot, Activity, Palette, Timer, Gauge,
+  Star, Check, X: XIcon, Zap, Bell, Crown, Target, Music, Sparkles, ThumbsUp, AlertTriangle, Sun, Moon, Lightbulb, Eye, Rocket, Brain, Puzzle,
 };
+
+/** Rend un SVG personnalisé : soit un markup <svg> complet, soit un attribut "d" de path. */
+export function renderCustomSvg(svg: string | undefined, color: string, size: number): React.ReactNode {
+  const s = (svg ?? '').trim();
+  if (!s) return <Shapes size={size} color={color} />;
+  if (s.startsWith('<svg')) return <span style={{ width: size, height: size, display: 'inline-flex', color }} dangerouslySetInnerHTML={{ __html: s }} />;
+  // Sinon : on suppose un attribut "d" de path dans un viewBox 24x24
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d={s} /></svg>;
+}
 
 function defaultText(k: UICompKind) {
   return k === 'button' ? 'Soumettre' : k === 'label' ? 'Texte' : k === 'score_display' ? 'Score' : k === 'timer_display' ? 'Temps' : k === 'round_badge' ? 'Manche' : '';
@@ -143,6 +156,7 @@ function Preview({ c }: { c: UILayoutComponent }) {
     case 'button_grid': return <div style={{ ...base, padding:6, background:'#0d1119', borderRadius:12, border:'1px solid rgba(255,255,255,0.08)' }}><div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gridTemplateRows:'repeat(4,1fr)', gap:5, width:'100%', height:'100%' }}>{Array.from({length:16},(_,i)=><span key={i} style={{ borderRadius:7, background:['#ef4444','#22c55e','#3b82f6','#eab308'][i%4], opacity:0.9 }} />)}</div></div>;
     case 'rgb_sliders': return <div style={{ ...base, flexDirection:'column', justifyContent:'center', gap:8, padding:'8px 12px', background:'#141a26', borderRadius:12, border:'1px solid rgba(255,255,255,0.08)' }}>{['#ef4444','#22c55e','#3b82f6'].map((col,i)=><div key={i} style={{ display:'flex', alignItems:'center', gap:8 }}><span style={{ width:14, height:14, borderRadius:4, background:col, flexShrink:0 }} /><div style={{ flex:1, height:5, borderRadius:3, background:'rgba(255,255,255,0.1)' }}><div style={{ width:`${[70,40,90][i]}%`, height:'100%', borderRadius:3, background:col }} /></div></div>)}</div>;
     case 'sprite': { const Ico = SPRITE_ICONS[c.icon ?? 'Smile'] ?? Smile; return <div style={{ ...base }}><Ico size={Math.max(16, Math.min(c.width, c.height) - 14)} color={c.bgColor ?? '#f97316'} /></div>; }
+    case 'svg_icon': return <div style={{ ...base }}>{renderCustomSvg(c.svg, c.bgColor ?? '#10b981', Math.max(16, Math.min(c.width, c.height) - 12))}</div>;
     case 'message_box': return <div style={{ ...base, flexDirection:'column', alignItems:'flex-start', justifyContent:'center', gap:4, padding:'10px 13px', background:'#141a26', borderRadius:12, border:'1px solid rgba(255,255,255,0.08)', color:'#cdd3e0' }}><span style={{ fontSize:11, fontWeight:800, color: c.bgColor ?? '#38bdf8' }}>Message</span><span style={{ fontSize:12.5, lineHeight:1.4 }}>{c.text || 'Bravo, niveau réussi !'}</span></div>;
     case 'title_banner': return <div style={{ ...base, background:'linear-gradient(135deg,#1a2030,#0d1119)', borderRadius:14, border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontWeight:900, fontSize:Math.min(20, c.height/3), letterSpacing:'-0.02em' }}>{c.text || 'TITRE DU JEU'}</div>;
     case 'plate_grid':    return <div style={{ ...base, padding:6, background:'#0d1119', borderRadius:12, border:'1px solid rgba(255,255,255,0.08)' }}>
@@ -292,7 +306,7 @@ export default function UIDesigner({ components, onChange, gameVariables = [] }:
             <datalist id="vl">{gameVariables.map(v=><option key={v} value={v}/>)}</datalist>
           </label>
           {selComp.kind==='color_swatch' && <label><span style={lbl}>Variable couleur</span><input style={inp} value={selComp.colorBind??''} onChange={e=>upd(selComp.id,{colorBind:e.target.value})} placeholder="ex: target" /></label>}
-          {['button','button_grid','sprite','color_swatch'].includes(selComp.kind) && <label><span style={lbl}>Événement (au clic)</span><input style={inp} value={selComp.eventId??''} onChange={e=>upd(selComp.id,{eventId:e.target.value})} placeholder="ex: submit" /></label>}
+          {['button','button_grid','sprite','svg_icon','color_swatch'].includes(selComp.kind) && <label><span style={lbl}>Événement (au clic)</span><input style={inp} value={selComp.eventId??''} onChange={e=>upd(selComp.id,{eventId:e.target.value})} placeholder="ex: submit" /></label>}
           {selComp.kind==='cie_diagram' && <>
             <label style={{ display:'flex', alignItems:'center', gap:7, cursor:'pointer' }}>
               <input type="checkbox" checked={!!selComp.cieRandom} onChange={e=>upd(selComp.id,{cieRandom:e.target.checked})} />
@@ -316,6 +330,11 @@ export default function UIDesigner({ components, onChange, gameVariables = [] }:
             </select>
           </label>}
           {selComp.kind==='image' && <label><span style={lbl}>Source (URL)</span><input style={inp} value={selComp.src??''} onChange={e=>upd(selComp.id,{src:e.target.value})} placeholder="https://..." /></label>}
+          {selComp.kind==='svg_icon' && <label><span style={lbl}>SVG (markup &lt;svg&gt; ou attribut « d » de path)</span>
+            <textarea style={{ ...inp, height: 90, fontFamily: 'monospace', fontSize: 11, resize: 'vertical' }} value={selComp.svg??''} onChange={e=>upd(selComp.id,{svg:e.target.value})} placeholder={'<svg viewBox="0 0 24 24">…</svg>  ou  M12 2l3 7h7l-6 4'} />
+            <span style={{ fontSize: 10, color: '#94a3b8' }}>Couleur via « Couleur de fond ». Vide ⇒ icône par défaut.</span>
+          </label>}
+          {(selComp.kind==='sprite' || selComp.kind==='svg_icon') && <div style={{ fontSize: 10.5, color: '#94a3b8', lineHeight: 1.4 }}>Astuce : renseigne « Variable liée » pour n&apos;afficher l&apos;icône que lorsque cette variable est non nulle (ex. afficher un trophée quand <code>gagne</code> = 1).</div>}
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:7 }}>
             <label><span style={lbl}>L</span><input type="number" style={inp} value={selComp.x} onChange={e=>upd(selComp.id,{x:snap(Number(e.target.value))})} /></label>
             <label><span style={lbl}>T</span><input type="number" style={inp} value={selComp.y} onChange={e=>upd(selComp.id,{y:snap(Number(e.target.value))})} /></label>

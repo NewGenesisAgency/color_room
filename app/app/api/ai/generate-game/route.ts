@@ -49,7 +49,7 @@ const UI_KINDS = [
   'button', 'label', 'slider', 'rgb_sliders', 'score_display', 'timer_display', 'round_badge',
   'color_swatch', 'progress_bar', 'cie_diagram', 'dpad', 'plate_grid', 'shape_rect', 'shape_circle',
   'image', 'divider', 'heart_life', 'gauge_ring', 'players_list', 'turn_indicator', 'leaderboard',
-  'button_grid', 'sprite', 'message_box', 'title_banner',
+  'button_grid', 'sprite', 'svg_icon', 'message_box', 'title_banner',
 ] as const;
 
 const DEFAULT_MODELS = [
@@ -90,6 +90,7 @@ RÈGLES :
 - Audio (hors-ligne): play_sound {sound}. Sons: click, select, tick, pop, swoosh, correct, wrong, success, error, alert, win, lose, levelup, coin, powerup, countdown, start, score. Utilise 'correct'/'wrong' pour le feedback pédagogique, 'win'/'lose' en fin de partie, 'coin'/'score' pour les points.
 - L'UI est posée sur un canvas 860×500. Place les composants sans chevauchement.
 - Lie les affichages à des variables via "varBind" (ex: un score_display avec varBind "score").
+- Icônes : "sprite" (icône Lucide via "icon", ex Trophy, Star, Heart, Check, X, Zap, Crown, ThumbsUp) ou "svg_icon" (SVG perso). Pour sprite/svg_icon, "varBind" sert de visibilité : l'icône n'apparaît que si la variable est non nulle (ex. afficher un Trophy avec varBind "gagne"). Couleur via "bgColor".
 - Relie les boutons à la logique via "eventId" et un nœud "on_ui_click" {buttonId} correspondant.
 - Sois COHÉRENT : chaque eventId d'UI doit avoir son nœud on_ui_click; chaque variable affichée doit être écrite par la logique.
 - Si un "JEU ACTUEL" est fourni, MODIFIE-le selon la demande et renvoie le jeu COMPLET mis à jour (jamais un diff ni un fragment). Conserve ce qui n'est pas concerné.
@@ -171,6 +172,8 @@ function sanitize(raw: GameJson, tileCount: number) {
       ...(Number.isFinite(c.fontSize as number) ? { fontSize: Number(c.fontSize) } : {}),
       ...(typeof c.dpadPreset === 'string' ? { dpadPreset: c.dpadPreset } : {}),
       ...(Number.isFinite(c.gridCols as number) ? { gridCols: Number(c.gridCols) } : {}),
+      ...(typeof c.icon === 'string' ? { icon: c.icon } : {}),
+      ...(typeof c.svg === 'string' ? { svg: c.svg.slice(0, 4000) } : {}),
     }));
 
   return {

@@ -5,7 +5,7 @@ import dynamic from 'next/dynamic';
 import type { TetrisSnapshot } from '@/app/_components/TetrisGame';
 import type { DifficultyLevel } from '@/app/_components/GameColorSpeed';
 import type { UILayoutComponent, UIDpadPreset } from '@/app/editeur/UIDesigner';
-import { SPRITE_ICONS } from '@/app/editeur/UIDesigner';
+import { SPRITE_ICONS, renderCustomSvg } from '@/app/editeur/UIDesigner';
 import type { TouchKey } from '@/app/_components/TouchControls';
 import NavigationMenu from '@/app/_components/NavigationMenu';
 import LoginScreen from '@/app/_components/LoginScreen';
@@ -839,7 +839,17 @@ function renderHudComp(c: UILayoutComponent, plate: HudPlateActions, vars: Recor
     case 'leaderboard': return <div style={{ ...base, flexDirection: 'column', alignItems: 'stretch', justifyContent: 'flex-start', gap: 5, padding: 9, background: '#141a26', borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', overflowY: 'auto' }}>{[['1', 'Lea', '120'], ['2', 'Tom', '95'], ['3', 'Sam', '80']].map((r, i) => <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: i === 0 ? '#f59e0b' : '#cdd3e0', fontWeight: i === 0 ? 800 : 600 }}><span>{r[0]}. {r[1]}</span><span>{r[2]}</span></div>)}</div>;
     case 'button_grid': { const n = Math.max(2, Math.min(6, c.gridCols ?? 4)); const cols = ['#ef4444', '#22c55e', '#3b82f6', '#eab308', '#a855f7', '#06d6a0']; return <div style={{ width: '100%', height: '100%', padding: 6, background: '#0d1119', borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', boxSizing: 'border-box' }}><div style={{ display: 'grid', gridTemplateColumns: `repeat(${n},1fr)`, gridTemplateRows: `repeat(${n},1fr)`, gap: 5, width: '100%', height: '100%' }}>{Array.from({ length: n * n }, (_, i) => <button key={i} onClick={() => c.eventId && plate.onEvent?.(`${c.eventId}:${i}`)} style={{ borderRadius: 8, border: 'none', cursor: 'pointer', background: cols[i % cols.length], opacity: 0.9 }} />)}</div></div>; }
     case 'rgb_sliders': return <div style={{ ...base, flexDirection: 'column', justifyContent: 'center', gap: 9, padding: '8px 12px', background: '#141a26', borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)' }}>{(['#ef4444', '#22c55e', '#3b82f6'] as const).map((col, i) => <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ width: 14, height: 14, borderRadius: 4, background: col, flexShrink: 0 }} /><input type="range" min={0} max={255} defaultValue={128} style={{ flex: 1, accentColor: col }} /></div>)}</div>;
-    case 'sprite': { const Ico = SPRITE_ICONS[c.icon ?? 'Smile'] ?? SPRITE_ICONS.Smile; const el = <Ico size={Math.max(16, Math.min(c.width, c.height) - 12)} color={c.bgColor ?? '#f97316'} />; return c.eventId ? <button onClick={() => plate.onEvent?.(c.eventId!)} style={{ ...base, border: 'none', background: 'transparent', cursor: 'pointer' }}>{el}</button> : <div style={{ ...base }}>{el}</div>; }
+    case 'sprite': {
+      if (c.varBind && !vars[c.varBind]) return null; // visibilité pilotée par variable
+      const Ico = SPRITE_ICONS[c.icon ?? 'Smile'] ?? SPRITE_ICONS.Smile;
+      const el = <Ico size={Math.max(16, Math.min(c.width, c.height) - 12)} color={c.bgColor ?? '#f97316'} />;
+      return c.eventId ? <button onClick={() => plate.onEvent?.(c.eventId!)} style={{ ...base, border: 'none', background: 'transparent', cursor: 'pointer' }}>{el}</button> : <div style={{ ...base }}>{el}</div>;
+    }
+    case 'svg_icon': {
+      if (c.varBind && !vars[c.varBind]) return null; // visibilité pilotée par variable
+      const el = renderCustomSvg(c.svg, c.bgColor ?? '#10b981', Math.max(16, Math.min(c.width, c.height) - 12));
+      return c.eventId ? <button onClick={() => plate.onEvent?.(c.eventId!)} style={{ ...base, border: 'none', background: 'transparent', cursor: 'pointer' }}>{el}</button> : <div style={{ ...base }}>{el}</div>;
+    }
     case 'message_box': return <div style={{ ...base, flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'center', gap: 4, padding: '10px 13px', background: '#141a26', borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', color: '#cdd3e0' }}><span style={{ fontSize: 11, fontWeight: 800, color: c.bgColor ?? '#38bdf8' }}>Message</span><span style={{ fontSize: 12.5, lineHeight: 1.4 }}>{c.varBind ? boundStr(c.text || 'Bravo !') : (c.text || 'Bravo !')}</span></div>;
     case 'title_banner': return <div style={{ ...base, background: 'linear-gradient(135deg,#1a2030,#0d1119)', borderRadius: 14, border: '1px solid rgba(255,255,255,0.08)', color: '#fff', fontWeight: 900, fontSize: Math.min(22, c.height / 2.6), letterSpacing: '-0.02em' }}>{c.text || 'TITRE'}</div>;
     default:              return null;
