@@ -334,7 +334,7 @@ const NODE_CATALOG: NodeCatalogItem[] = [
   { kind: 'logic_not', category: 'Logique', title: 'NON', defaults: {} },
   { kind: 'time_seconds', category: 'Temps', title: 'Secondes', defaults: {} },
   { kind: 'random_01', category: 'Aléatoire', title: 'Aléatoire 0..1', defaults: {} },
-  { kind: 'game_tetris', category: 'Jeux', title: 'Tetris Lumière', defaults: { speed: 500, bgColor: '#0a0a0f', borderColor: '#222233' } },
+  { kind: 'game_tetris', category: 'Jeux', title: 'Tetris Lumière', defaults: { speed: 3000, bgColor: '#0a0a0f', borderColor: '#222233' } },
   { kind: 'game_simon', category: 'Jeux', title: 'Simon', defaults: { speed: 800, colors: 4 } },
   { kind: 'game_memory', category: 'Jeux', title: 'Mémoire', defaults: { pairs: 8 } },
   { kind: 'game_spectrum', category: 'Jeux', title: 'Spectre Chromatique', defaults: { maxRounds: 5, revealMs: 5000, guessMs: 30000 } },
@@ -2735,7 +2735,7 @@ export default function EditeurPage() {
       initialNodes = [
         { id: eventId, kind: 'event_begin', name: 'Démarrer', enabled: true, params: {}, pos: { x: 80, y: 300 } },
         // Nœud principal du jeu (celui sur lequel on double-clique)
-        { id: tetrisMainId, kind: 'game_tetris', name: 'Tetris Lumière', enabled: true, params: { speed: 500, bgColor: '#0a0a0f', borderColor: '#222233' }, pos: { x: 300, y: 300 } },
+        { id: tetrisMainId, kind: 'game_tetris', name: 'Tetris Lumière', enabled: true, params: { speed: 3000, bgColor: '#0a0a0f', borderColor: '#222233' }, pos: { x: 300, y: 300 } },
         
         // Nœuds internes visibles quand on double-clique
         { id: bgFill, kind: 'fill', name: 'Fond noir', enabled: true, params: { color: '#0a0a0f', intensity: 1, mask: 'all', seconds: 0 }, pos: { x: 520, y: 80 } },
@@ -6156,15 +6156,15 @@ export default function EditeurPage() {
                       <div style={{ padding: 16, borderRadius: 12, background: '#fff', border: '1px solid rgba(0,0,0,0.06)', display: 'grid', gap: 14 }}>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 60px', gap: 10, alignItems: 'center' }}>
                           <div>
-                            <span className="g-label" style={{ marginBottom: 6, display: 'block' }}>Vitesse (ms)</span>
+                            <span className="g-label" style={{ marginBottom: 6, display: 'block' }}>Vitesse de chute (ms — plus grand = plus lent/facile)</span>
                             <input
-                              type="range" className="g-slider g-slider--accent" min={80} max={1200} step={10}
-                              value={getNum(selectedNode.params, 'speed', 500)}
+                              type="range" className="g-slider g-slider--accent" min={800} max={5000} step={100}
+                              value={getNum(selectedNode.params, 'speed', 3000)}
                               onChange={(e) => updateSelectedParams({ speed: Number(e.target.value) })}
-                              style={{ ['--pct' as any]: `${((getNum(selectedNode.params, 'speed', 500) - 80) / 1120) * 100}%` }}
+                              style={{ ['--pct' as any]: `${((getNum(selectedNode.params, 'speed', 3000) - 800) / 4200) * 100}%` }}
                             />
                           </div>
-                          <span style={{ fontSize: 13, fontWeight: 700, color: '#1a1a1a', textAlign: 'right' }}>{Math.round(getNum(selectedNode.params, 'speed', 500))}ms</span>
+                          <span style={{ fontSize: 13, fontWeight: 700, color: '#1a1a1a', textAlign: 'right' }}>{Math.round(getNum(selectedNode.params, 'speed', 3000))}ms</span>
                         </div>
 
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 60px', gap: 10, alignItems: 'center' }}>

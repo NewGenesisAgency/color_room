@@ -1012,6 +1012,7 @@ export default function JeuxPage() {
   const [tetrixLevel, setTetrixLevel] = useState<number>(1);
   const [tetrixLines, setTetrixLines] = useState<number>(0);
   const tetrixTimerRef = useRef<number>(0);
+  const tetrixBaseSpeedRef = useRef<number>(3050); // vitesse de chute de base (ms), pilotable par le nœud game_tetris
   const tetrixColors = ['#00d4ff', '#ff3d71', '#ffc700', '#00ff88', '#b829dd', '#ff5e3a', '#4facfe'];
 
   const [scorePlusAnimKey, setScorePlusAnimKey] = useState<number>(0);
@@ -2553,6 +2554,8 @@ export default function JeuxPage() {
 
       // ── game_tetris: launch Tetrix as black-box node ──
       if (node.kind === 'game_tetris') {
+        // Le nœud pilote la vitesse de chute (paramètre éditable, plus de valeur ignorée).
+        tetrixBaseSpeedRef.current = Math.max(800, Math.min(6000, getNum(params, 'speed', 3050)));
         setTetrisStandalone(false);
         setTetrixActive(true);
         startTetrixGame();
@@ -3197,9 +3200,9 @@ export default function JeuxPage() {
     // Spawn first piece
     spawnTetrixPiece();
 
-    // Start game loop — grille minuscule (6×7) : on laisse beaucoup de temps
-    // pour réagir (chute lente) et la difficulté monte très doucement.
-    const speed = Math.max(1600, 3200 - (tetrixLevel * 150));
+    // Start game loop — grille minuscule (6×7) : vitesse de base pilotée par le
+    // nœud game_tetris (tetrixBaseSpeedRef), montant très doucement avec le niveau.
+    const speed = Math.max(1200, tetrixBaseSpeedRef.current - (tetrixLevel - 1) * 150);
     tetrixTimerRef.current = window.setInterval(() => {
       gameLoop();
     }, speed);
