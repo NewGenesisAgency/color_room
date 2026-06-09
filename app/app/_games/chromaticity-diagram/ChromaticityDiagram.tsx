@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { GameTileProps } from '../../_components/GameColorSpeed';
 import { DIFF_LABELS, type DifficultyLevel } from '../../_components/GameColorSpeed';
 import CieDiagramCanvas, { type CieMarker } from '../../_components/CieDiagramCanvas';
+import { playSfx, vibrate } from '@/lib/audio/sfx';
 
 // ── CIE 1931 spectral locus (horseshoe) ──────────────────────────────────────
 const HORSESHOE: [number, number][] = [
@@ -193,6 +194,8 @@ export default function ChromaticityDiagram({ onSendColor, onTurnOffAll, onQuit,
   const [target,     setTarget]     = useState<{ x: number; y: number; rgb: { r: number; g: number; b: number } } | null>(null);
   const [guessX,     setGuessX]     = useState(0.3127);
   const [guessY,     setGuessY]     = useState(0.3290);
+  const [measuring,  setMeasuring]  = useState(false);
+  const [measureMsg, setMeasureMsg] = useState('');
   const [confirmed,  setConfirmed]  = useState<{ x: number; y: number } | null>(null);
   const [countdown,  setCountdown]  = useState(SHOW_DURATION);
   const [roundScore, setRoundScore] = useState(0);
@@ -310,19 +313,39 @@ export default function ChromaticityDiagram({ onSendColor, onTurnOffAll, onQuit,
     handleSvgClick(e);
   }
 
-  // ── Valider la devinette ──────────────────────────────────────────────────
-  function validate() {
+  // ── Score d'un point (x,y) contre la cible ────────────────────────────────
+  function scoreAt(px: number, py: number) {
     if (!target) return;
-    const d = Math.sqrt((guessX - target.x) ** 2 + (guessY - target.y) ** 2);
+    const d = Math.sqrt((px - target.x) ** 2 + (py - target.y) ** 2);
     const pts = Math.max(0, Math.round(1000 * (1 - d / 0.25)));
-    setConfirmed({ x: guessX, y: guessY });
+    setGuessX(px); setGuessY(py);
+    setConfirmed({ x: px, y: py });
     setDist(parseFloat(d.toFixed(5)));
     setRoundScore(pts);
+    if (pts >= 600) playSfx('correct'); else { playSfx('wrong'); vibrate(60); }
     setPhase('result');
-    // Révéler la couleur cible (droite) + réponse joueur (gauche)
     for (const i of RIGHT_IDX) onSendColor(i, target.rgb.r, target.rgb.g, target.rgb.b, INTENSITY);
-    const gc = xyToRgb255(guessX, guessY);
+    const gc = xyToRgb255(px, py);
     if (gc) for (const i of LEFT_IDX) onSendColor(i, gc.r, gc.g, gc.b, INTENSITY);
+  }
+
+  // Estimation (sliders / clic sur le diagramme)
+  function validate() { scoreAt(guessX, guessY); }
+
+  // Validation par VRAIE mesure CS-160 de la dalle reproduite (salle gauche).
+  async function validateByMeasure() {
+    if (!target || measuring) return;
+    setMeasuring(true); setMeasureMsg('Mesure en cours…');
+    let m: { x: number; y: number } | null = null;
+    try {
+      const res = await fetch('/api/cs160', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'measure' }) });
+      const data = await res.json();
+      if (data.success && data.data?.lvxy) { const { x, y } = data.data.lvxy; if (Number.isFinite(x) && Number.isFinite(y)) m = { x, y }; }
+    } catch { /* appareil absent */ }
+    setMeasuring(false);
+    if (!m) { setMeasureMsg('CS-160 non connecté — pointez l\'appareil sur une dalle de la salle gauche, puis réessayez.'); return; }
+    setMeasureMsg('');
+    scoreAt(m.x, m.y);
   }
 
   // ── Passer à la manche suivante / terminer ────────────────────────────────
@@ -539,8 +562,12 @@ export default function ChromaticityDiagram({ onSendColor, onTurnOffAll, onQuit,
                 }} />
               </div>
 
-              <button style={S.validateBtn} onClick={validate}>
-                Valider ma réponse
+              <button style={{ ...S.validateBtn, background: 'linear-gradient(135deg,#06d6a0,#4361ee)', opacity: measuring ? 0.6 : 1, cursor: measuring ? 'not-allowed' : 'pointer' }} onClick={() => void validateByMeasure()} disabled={measuring}>
+                {measuring ? 'Mesure…' : 'Valider par mesure (CS-160)'}
+              </button>
+              {measureMsg && <div style={{ fontSize: 12, color: measureMsg.startsWith('CS-160') ? '#fca5a5' : '#94a3b8', marginTop: 6, textAlign: 'center' }}>{measureMsg}</div>}
+              <button style={{ ...S.validateBtn, marginTop: 8, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.7)' }} onClick={validate}>
+                Valider l&apos;estimation (sans mesure)
               </button>
             </>
           )}
