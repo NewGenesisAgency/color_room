@@ -105,6 +105,10 @@ RÈGLES :
 - Relie les boutons à la logique via "eventId" et un nœud "on_ui_click" {buttonId} correspondant.
 - Sois COHÉRENT : chaque eventId d'UI doit avoir son nœud on_ui_click; chaque variable affichée doit être écrite par la logique.
 - Si un "JEU ACTUEL" est fourni, MODIFIE-le selon la demande et renvoie le jeu COMPLET mis à jour (jamais un diff ni un fragment). Conserve ce qui n'est pas concerné.
+
+EXEMPLE de sortie valide (jeu de réflexe simple — inspire-t'en) :
+{"name":"Tape la dalle","icon":"Zap","difficulty":2,"description":"Clique les dalles allumées pour marquer.","bgColor":"#0d1119","accentColor":"#22d3ee","nodes":[{"kind":"event_begin","name":"Démarrer","params":{},"x":80,"y":80},{"kind":"variable_set","name":"Score 0","params":{"name":"score","value":0,"op":"set"},"x":320,"y":80},{"kind":"fill","name":"Allumer","params":{"color":"#22d3ee","intensity":0.7,"mask":"all"},"x":560,"y":80},{"kind":"on_plate_click","name":"Clic dalle","params":{},"x":80,"y":300},{"kind":"add_score","name":"Plus 1","params":{"amount":1},"x":320,"y":300},{"kind":"play_sound","name":"Son","params":{"sound":"coin"},"x":560,"y":300}],"edges":[[0,1],[1,2],[3,4],[4,5]],"ui":[{"kind":"title_banner","x":20,"y":20,"width":400,"height":60,"text":"Tape la dalle"},{"kind":"score_display","x":20,"y":100,"width":200,"height":90,"varBind":"score","text":"Score"}]}
+
 - Génère un jeu complet et JOUABLE, pas un squelette. Réponds en JSON pur.`;
 }
 
@@ -216,7 +220,8 @@ async function callOllama(sys: string, user: string): Promise<GameJson | null> {
     headers: { 'content-type': 'application/json' },
     cache: 'no-store',
     signal: AbortSignal.timeout(180000), // le Raspberry Pi est lent
-    body: JSON.stringify({ model, system: sys, prompt: user, format: 'json', stream: false, options: { temperature: 0.8 } }),
+    // Température basse + assez de tokens : un petit modèle local suit mieux le schéma.
+    body: JSON.stringify({ model, system: sys, prompt: user, format: 'json', stream: false, options: { temperature: 0.35, num_predict: 4096, num_ctx: 8192 } }),
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const data = await res.json();

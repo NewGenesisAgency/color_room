@@ -3326,7 +3326,7 @@ export default function EditeurPage() {
     if (!text || aiBusy) return;
     const baseMsgs: AiMsg[] = override ? aiMessages : [...aiMessages, { id: aiMkId(), role: 'user', content: text, ts: Date.now() }];
     if (!override) { setAiMessages(baseMsgs); setAiPrompt(''); }
-    setAiBusy(true); setAiError(''); setAiStep('Connexion à Gemini…'); setAiModel('');
+    setAiBusy(true); setAiError(''); setAiStep('Génération en cours… (modèle local : ça peut prendre un moment)'); setAiModel('');
     try {
       const curGame = activeGame ? serializeGameForAi(activeGame) : null;
       const res = await fetch('/api/ai/generate-game', {
@@ -3346,7 +3346,13 @@ export default function EditeurPage() {
       const game = data.game;
       setAiModel(String(data.model || ''));
       let gid = activeGameId;
-      if (!gid) { setAiStep('Création du jeu…'); await createGame(game.name || 'Jeu IA', 'blank'); await aiSleep(80); gid = editorRef.current.activeGameId; }
+      if (!gid) {
+        setAiStep('Création du jeu…');
+        await createGame(game.name || 'Jeu IA', 'blank');
+        await aiSleep(150);
+        // Robustesse : la course React peut retarder activeGameId → repli sur le dernier jeu créé.
+        gid = editorRef.current.activeGameId ?? editorRef.current.games[editorRef.current.games.length - 1]?.id ?? null;
+      }
       if (!gid) { setAiError('Création du jeu impossible.'); return; }
       const before = editorRef.current;
       await applyAiGame(gid, game, before);
