@@ -6,6 +6,7 @@ import type { GameTileProps } from './GameColorSpeed';
 import { DIFF_LABELS, type DifficultyLevel } from './GameColorSpeed';
 import CieDiagramCanvas, { type CieMarker, type CiePolyline } from './CieDiagramCanvas';
 import { CHANNELS_ROUGE, CHANNELS_BLEU, type TileType } from '@/lib/tileChannels';
+import { playSfx, vibrate } from '@/lib/audio/sfx';
 
 // ── Mix de Canaux — nouveau concept ────────────────────────────────────────────
 // 1. La salle DROITE s'allume avec un mélange secret de 3 canaux spectraux.
@@ -362,6 +363,7 @@ export default function GameCanalMix({
     const pts = Math.max(0, Math.round(1000 * (1 - d / 0.3)));
     setDist(parseFloat(d.toFixed(4)));
     setRoundPts(pts);
+    if (pts >= 600) { playSfx('correct'); } else { playSfx('wrong'); vibrate(60); }
     setPhase('result');
   }
 

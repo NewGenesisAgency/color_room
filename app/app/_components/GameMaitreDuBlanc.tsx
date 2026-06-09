@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { GameTileProps } from './GameColorSpeed';
 import { DIFF_LABELS, type DifficultyLevel } from './GameColorSpeed';
+import { playSfx, vibrate } from '@/lib/audio/sfx';
 
 function rgbToXYZ(r: number, g: number, b: number): { X: number; Y: number; Z: number } {
   const lin = (c: number) => {
@@ -182,6 +183,7 @@ export default function GameMaitreDuBlanc({ onSendColor, onTurnOff, onTurnOffAll
     setRoundScore(pts);
     setDist(parseFloat(d.toFixed(4)));
     setValidated(true);
+    if (d <= WIN_THRESHOLD) { playSfx('correct'); } else { playSfx('wrong'); vibrate(60); }
     setPhase('result');
   }
 

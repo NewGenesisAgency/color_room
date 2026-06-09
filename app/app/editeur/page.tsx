@@ -6,7 +6,7 @@ import dynamic from 'next/dynamic';
 import type { TetrisSnapshot } from '@/app/_components/TetrisGame';
 import type { UILayoutComponent } from './UIDesigner';
 import Coachmarks, { type CoachStep } from '@/app/_components/Coachmarks';
-import { playSfx, SFX_LIST, unlockAudio } from '@/lib/audio/sfx';
+import { playSfx, SFX_LIST, unlockAudio, vibrate } from '@/lib/audio/sfx';
 import { LOGIC_OP_KINDS, applyLogicOp, logicOpShape } from '@/lib/game/logicOps';
 
 // Modules lourds (3D Three.js, éditeur Python/Pyodide, designer UI, panneau CS160)
@@ -69,6 +69,7 @@ type EditorNodeKind =
   | 'game_snake'
   | 'game_libre_rgb'
   | 'play_sound'
+  | 'vibrate'
   | 'on_score_reached'
   | 'on_plate_click'
   | 'on_key'
@@ -349,6 +350,7 @@ const NODE_CATALOG: NodeCatalogItem[] = [
   { kind: 'game_snake',     category: 'Jeux', title: 'Snake Lumière',     defaults: { speed: 350 } },
   { kind: 'game_libre_rgb', category: 'Jeux', title: 'Mode Libre RGB',    defaults: {} },
   { kind: 'play_sound', category: 'Audio', title: 'Jouer un son', defaults: { sound: 'click' } },
+  { kind: 'vibrate', category: 'Audio', title: 'Vibrer (tablette)', defaults: { durationMs: 200 } },
   { kind: 'on_score_reached', category: 'Évènements', title: 'Score atteint', defaults: { target: 100 } },
   { kind: 'on_plate_click', category: 'Évènements', title: 'Clic sur dalle', defaults: {} },
   { kind: 'on_key', category: 'Évènements', title: 'Touche clavier', defaults: { key: 'ArrowLeft' } },
@@ -1995,6 +1997,7 @@ export default function EditeurPage() {
           break;
         }
         case 'play_sound': { playSfx(String(node.params.sound ?? 'click')); break; }
+        case 'vibrate': { vibrate(Math.max(10, getNum(node.params, 'durationMs', 200))); break; }
         case 'while': {
           const wVar = String(node.params.varName ?? '');
           const wOp = String(node.params.op ?? 'lt');
@@ -6753,6 +6756,19 @@ export default function EditeurPage() {
                           </select></label>
                       )}
                       <label style={{ display:'grid', gap:4 }}><span className="g-label">Durée (ms)</span><input className="g-input" type="number" min={200} step={100} style={{ height:36, fontSize:13 }} value={getNum(selectedNode.params,'durationMs',2000)} onChange={(e)=>updateSelectedParams({ durationMs: Number(e.target.value) })} /></label>
+                    </div>
+                  ) : selectedNode.kind === 'vibrate' ? (
+                    <div style={{ display: 'grid', gap: 12 }}>
+                      <label style={{ display: 'grid', gap: 4 }}>
+                        <span className="g-label">Durée (ms)</span>
+                        <input className="g-input" type="number" min={10} max={2000} step={10} style={{ height: 36, fontSize: 13 }}
+                          value={getNum(selectedNode.params, 'durationMs', 200)}
+                          onChange={(e) => updateSelectedParams({ durationMs: Number(e.target.value) })} />
+                      </label>
+                      <button type="button" className="g-btn g-btn--sm" onClick={() => vibrate(Math.max(10, getNum(selectedNode.params, 'durationMs', 200)))}>
+                        Tester la vibration
+                      </button>
+                      <div style={{ fontSize: 11, color: '#94a3b8' }}>Fonctionne sur tablette Android (pas sur iOS).</div>
                     </div>
                   ) : selectedNode.kind === 'play_sound' ? (
                     <div style={{ display: 'grid', gap: 12 }}>

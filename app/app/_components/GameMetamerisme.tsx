@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { GameTileProps } from './GameColorSpeed';
 import { DIFF_LABELS, type DifficultyLevel } from './GameColorSpeed';
+import { playSfx, vibrate } from '@/lib/audio/sfx';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -243,6 +244,7 @@ export default function GameMetamerisme({
     setValidated(true);
     const pts = forcePts !== undefined ? forcePts : computeScore();
     setRoundScore(pts);
+    if (hasWon) { playSfx('correct'); } else { playSfx('wrong'); vibrate(60); }
     setPhase('result');
     // Show reference (word colour) on RIGHT, player illuminant on LEFT
     if (round && entry) {

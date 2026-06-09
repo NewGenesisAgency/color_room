@@ -768,6 +768,11 @@ function scoreFeedback(delta: number, reason: string) {
   else if (delta > 0) { playSfx('coin'); }
 }
 
+// Fin de partie : son de victoire + vibration festive si des points sont marqués.
+function completeFeedback(points: number) {
+  if (Math.round(points) > 0) { playSfx('win'); vibrate([60, 40, 60, 40, 140]); }
+}
+
 // ── Overlay UI des jeux éditeur (uiLayout dessiné dans /editeur) ───────────────
 const HUD_CANVAS_W = 860;
 const HUD_CANVAS_H = 500;
@@ -2533,6 +2538,10 @@ export default function JeuxPage() {
         playSfx(String(params.sound ?? 'click'));
         const nextId = g.out.get(node.id)?.[0]; if (nextId) walk(nextId); return;
       }
+      if (node.kind === 'vibrate') {
+        vibrate(Math.max(10, getNum(params, 'durationMs', 200)));
+        const nextId = g.out.get(node.id)?.[0]; if (nextId) walk(nextId); return;
+      }
       if (node.kind === 'score_reset') {
         hudVarsRef.current.score = 0; bumpHudVars();
         const nextId = g.out.get(node.id)?.[0]; if (nextId) walk(nextId); return;
@@ -3443,12 +3452,14 @@ export default function JeuxPage() {
 
     // Update score
     if (linesCleared > 0) {
+      playSfx(linesCleared >= 2 ? 'success' : 'correct');
       const points = linesCleared * 100 * tetrixLevel;
       setTetrixScore((s) => s + points);
       setTetrixLines((l) => {
         const newLines = l + linesCleared;
         if (newLines >= tetrixLevel * 5) {
           setTetrixLevel((lvl) => lvl + 1);
+          playSfx('levelup');
         }
         return newLines;
       });
@@ -3459,6 +3470,7 @@ export default function JeuxPage() {
     // Check game over (top row has locked pieces)
     const topRowHasPieces = newGrid.slice(0, TETRIX_COLS).some(c => c !== null);
     if (topRowHasPieces) {
+      playSfx('lose'); vibrate([120, 60, 120]);
       setTetrixGameOver(true);
       if (tetrixTimerRef.current) {
         window.clearInterval(tetrixTimerRef.current);
@@ -5174,6 +5186,7 @@ export default function JeuxPage() {
                     // Score universel + jeux réussis : appelé à la fin de chaque partie
                     onComplete: (points: number) => {
                       const pts = Math.max(0, Math.round(points));
+                      completeFeedback(pts);
                       setScore((s) => s + pts);
                       setGamesCompleted((v) => v + 1);
                       if (pts > 0) { setScorePlusValue(pts); setScorePlusAnimKey((k) => k + 1); }
@@ -5277,7 +5290,7 @@ export default function JeuxPage() {
                     onQuit: () => { void blackoutHardware(); setHudRun(null); setGameActive(false); },
                     tileCount: 42,
                     onRegisterClickHandler: (fn: ((idx: number) => void) | null) => { gameClickHandlerRef.current = fn; },
-                    onComplete: (points: number) => { const pts = Math.max(0, Math.round(points)); setScore((s) => s + pts); setGamesCompleted((v) => v + 1); if (pts > 0) { setScorePlusValue(pts); setScorePlusAnimKey((k) => k + 1); } },
+                    onComplete: (points: number) => { const pts = Math.max(0, Math.round(points)); completeFeedback(pts); setScore((s) => s + pts); setGamesCompleted((v) => v + 1); if (pts > 0) { setScorePlusValue(pts); setScorePlusAnimKey((k) => k + 1); } },
                     onScoreDelta: (delta: number, reason: string) => {
                       scoreFeedback(delta, reason);
                       if (delta > 0) {
@@ -5320,6 +5333,7 @@ export default function JeuxPage() {
                         onTurnOffAll: () => { void blackoutHardware(); },
                         onComplete: (points: number) => {
                           const pts = Math.max(0, Math.round(points));
+                          completeFeedback(pts);
                           setScore((s) => s + pts);
                           setGamesCompleted((v) => v + 1);
                           if (pts > 0) { setScorePlusValue(pts); setScorePlusAnimKey((k) => k + 1); }
