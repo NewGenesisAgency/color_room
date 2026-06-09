@@ -1170,6 +1170,7 @@ export default function EditeurPage() {
   const [aiStatus, setAiStatus] = useState<{ ready: boolean; message: string } | null>(null);
   const [aiConvList, setAiConvList] = useState<Array<{ id: string; title: string; updatedAt: string; messages: AiMsg[] }>>([]);
   const [aiShowList, setAiShowList] = useState(false);
+  const [aiHighlightIds, setAiHighlightIds] = useState<Set<string>>(new Set()); // blocs ajoutes par l'IA (diff visuel)
   const aiBeforeRef = useRef<Record<string, EditorSnapshot>>({}); // snapshot avant chaque réponse IA (pour annuler)
   const aiScrollRef = useRef<HTMLDivElement | null>(null);
 
@@ -3302,6 +3303,9 @@ export default function EditeurPage() {
     // UN seul pas d'historique pour toute la génération (annulable d'un coup)
     setHistory((h) => ({ past: [...h.past, before], future: [] }));
     setDirty(true);
+    // Diff visuel : surligne les blocs ajoutés/modifiés par l'IA pendant ~6 s.
+    setAiHighlightIds(new Set(ids));
+    window.setTimeout(() => setAiHighlightIds(new Set()), 6000);
   };
 
   const persistConversation = async (gid: string | null, msgs: AiMsg[]) => {
@@ -4768,7 +4772,7 @@ export default function EditeurPage() {
                             selected ? 'bp-node--active' : '',
                             !n.enabled ? 'bp-node--disabled' : '',
                           ].filter(Boolean).join(' ')}
-                          style={{ left: n.pos.x, top: n.pos.y }}
+                          style={{ left: n.pos.x, top: n.pos.y, ...(aiHighlightIds.has(n.id) ? { outline: '2px solid #a855f7', boxShadow: '0 0 18px rgba(168,85,247,0.55)', borderRadius: 14 } : {}) }}
                           data-nodeid={n.id}
                           onPointerDown={(e) => {
                             e.stopPropagation();
