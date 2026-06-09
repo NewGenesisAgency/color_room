@@ -12,6 +12,7 @@ import LoginScreen from '@/app/_components/LoginScreen';
 import { PLATE_TYPE, CHANNELS_ROUGE, CHANNELS_BLEU, getPlateType, MAP_ROUGE_TO_BLEU, remapChannels32 } from '@/lib/tileChannels';
 import { playSfx, vibrate } from '@/lib/audio/sfx';
 import { LOGIC_OP_KINDS, applyLogicOp } from '@/lib/game/logicOps';
+import { SHOW_SCREEN_BOARD } from '@/lib/game/displayMode';
 
 // Modules lourds (3D Three.js, jeux, pages spectre/chromaticité) chargés à la
 // demande : ils n'alourdissent plus le bundle initial de /jeux, ce qui accélère
@@ -209,6 +210,10 @@ function plateIdForIndex(i: number): number {
 const PLATE_ID_BY_INDEX: number[] = Array.from({ length: 42 }, (_, i) => plateIdForIndex(i));
 const INSTRUMENT_PLATE_ID = 1;
 const SPECTRUM_GRAPH_MAX = 100;
+// Pendant une partie, la vue 3D ne doit RIEN révéler (couleurs/dalle allumée) :
+// le joueur regarde la vraie Color Room. La vue reste cliquable, mais neutre.
+const HIDDEN_PLATE_COLORS: string[] = Array(42).fill('#11151f');
+const HIDDEN_PLATE_ACTIVE: boolean[] = Array(42).fill(false);
 
 // Les jeux sont maintenant créés dans l'éditeur et chargés depuis la base de données
 
@@ -4560,8 +4565,8 @@ export default function JeuxPage() {
               </h3>
 
               <Room3D
-                plateColors={plateColors}
-                plateActive={plateActive}
+                plateColors={gameActive && !SHOW_SCREEN_BOARD ? HIDDEN_PLATE_COLORS : plateColors}
+                plateActive={gameActive && !SHOW_SCREEN_BOARD ? HIDDEN_PLATE_ACTIVE : plateActive}
                 onPlateClick={handlePlateClick}
                 height={420}
               />
