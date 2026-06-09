@@ -2353,7 +2353,8 @@ export default function JeuxPage() {
         const name = String(params.name ?? 'grid');
         const cols = Math.max(1, Math.round(getNum(params, 'cols', 6)));
         const rows = Math.max(1, Math.round(getNum(params, 'rows', 7)));
-        hudGridsRef.current[name] = Array.from({ length: rows }, () => Array(cols).fill(null) as (string | null)[]);
+        const initV = params.initValue !== undefined && params.initValue !== null ? String(params.initValue) : null;
+        hudGridsRef.current[name] = Array.from({ length: rows }, () => Array(cols).fill(initV) as (string | null)[]);
         const nextId = g.out.get(node.id)?.[0]; if (nextId) walk(nextId); return;
       }
       if (node.kind === 'grid_set') {
@@ -2385,8 +2386,10 @@ export default function JeuxPage() {
           for (let r = 0; r < 7; r++) for (let c = 0; c < 6; c++) {
             const idx = r * 6 + c; const plateId = PLATE_ID_BY_INDEX[idx]; if (!plateId) continue;
             const cell = grid[r]?.[c] ?? null;
-            const lit = typeof cell === 'string' && cell.length > 0;
-            const col = lit ? (cell as string) : bg;
+            // Sémantique alignée sur l'aperçu : null/''/'0' = fond ; hex = couleur ; sinon = blanc.
+            const isBg = cell === null || cell === '' || cell === '0';
+            const lit = !isBg;
+            const col = isBg ? bg : (typeof cell === 'string' && cell.startsWith('#')) ? (cell as string) : '#ffffff';
             const rgb = parseCssColorToRgb255(col);
             sendRgbToPlate(rgb, lit ? 85 : 0, plateId);
             setPlateColor(idx, lit ? col : '#000000', lit);
