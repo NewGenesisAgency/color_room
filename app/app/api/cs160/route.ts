@@ -35,7 +35,14 @@ export async function POST(req: NextRequest) {
       case 'connect':    return NextResponse.json(await cs160Bridge.connect());
       case 'disconnect': return NextResponse.json(await cs160Bridge.disconnect());
       case 'measure': {
-        const r = await cs160Bridge.measure();
+        let r = await cs160Bridge.measure();
+        if (!r.success) {
+          // Auto-connexion : contrairement à /mesure (bouton « Connecter »), les
+          // jeux mesurent directement. Si l'appareil n'est pas ouvert, on le
+          // connecte puis on réessaie une fois.
+          await cs160Bridge.connect();
+          r = await cs160Bridge.measure();
+        }
         if (!r.success) return NextResponse.json(r);
         // Measure response is direct: { timestamp, xyz, lvxy }
         // Normalise into { success, data: { timestamp, xyz, lvxy } }

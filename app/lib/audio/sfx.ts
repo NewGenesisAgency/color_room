@@ -67,6 +67,13 @@ export function unlockAudio(): void {
   if (c && c.state === 'suspended') void c.resume();
 }
 
+/** Vibration haptique (tablettes Android). Silencieux si non supporté (iOS). */
+export function vibrate(pattern: number | number[]): void {
+  try {
+    if (typeof navigator !== 'undefined' && 'vibrate' in navigator) navigator.vibrate(pattern);
+  } catch { /* non supporté */ }
+}
+
 /** Un oscillateur enveloppé (attaque rapide, déclin exponentiel), avec slide optionnel. */
 function tone(
   c: AudioContext,

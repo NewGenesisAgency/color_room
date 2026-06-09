@@ -10,7 +10,7 @@ import type { TouchKey } from '@/app/_components/TouchControls';
 import NavigationMenu from '@/app/_components/NavigationMenu';
 import LoginScreen from '@/app/_components/LoginScreen';
 import { PLATE_TYPE, CHANNELS_ROUGE, CHANNELS_BLEU, getPlateType, MAP_ROUGE_TO_BLEU, remapChannels32 } from '@/lib/tileChannels';
-import { playSfx } from '@/lib/audio/sfx';
+import { playSfx, vibrate } from '@/lib/audio/sfx';
 import { LOGIC_OP_KINDS, applyLogicOp } from '@/lib/game/logicOps';
 
 // Modules lourds (3D Three.js, jeux, pages spectre/chromaticité) chargés à la
@@ -751,6 +751,15 @@ function spectrum32ToRgb255(channels32: number[]): TargetColor {
 // ── Sons de jeu : délègue au moteur SFX partagé 100% hors-ligne (lib/audio/sfx) ─
 function playGameSound(type: string) {
   playSfx(type);
+}
+
+// Retour sonore + vibration commun à TOUS les jeux, déclenché à chaque variation
+// de score (les jeux signalent "game over" via le motif du message).
+function scoreFeedback(delta: number, reason: string) {
+  const over = /game ?over|perdu|d[eé]faite|termin/i.test(reason || '');
+  if (over) { playSfx('lose'); vibrate([120, 60, 120]); }
+  else if (delta < 0) { playSfx('wrong'); vibrate(60); }
+  else if (delta > 0) { playSfx('coin'); }
 }
 
 // ── Overlay UI des jeux éditeur (uiLayout dessiné dans /editeur) ───────────────
@@ -4857,6 +4866,7 @@ export default function JeuxPage() {
                       if (pts > 0) { setScorePlusValue(pts); setScorePlusAnimKey((k) => k + 1); }
                     },
                     onScoreDelta: (delta: number, reason: string) => {
+                      scoreFeedback(delta, reason);
                       if (delta > 0) {
                         awardPoints(delta, reason);
                       } else {
@@ -4956,6 +4966,7 @@ export default function JeuxPage() {
                     onRegisterClickHandler: (fn: ((idx: number) => void) | null) => { gameClickHandlerRef.current = fn; },
                     onComplete: (points: number) => { const pts = Math.max(0, Math.round(points)); setScore((s) => s + pts); setGamesCompleted((v) => v + 1); if (pts > 0) { setScorePlusValue(pts); setScorePlusAnimKey((k) => k + 1); } },
                     onScoreDelta: (delta: number, reason: string) => {
+                      scoreFeedback(delta, reason);
                       if (delta > 0) {
                         awardPoints(delta, reason);
                       } else {
