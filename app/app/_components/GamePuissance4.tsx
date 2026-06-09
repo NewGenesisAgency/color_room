@@ -255,12 +255,11 @@ export default function GamePuissance4({ onSendColor, onTurnOff, onTurnOffAll, o
   const [isDraw, setIsDraw]         = useState(false);
   // Ne compte comme "réussi" qu'une victoire du joueur (P1) ou un nul — pas une défaite.
   useEffect(() => { if (phase === 'finished' && (winner === P1 || isDraw)) onComplete?.(winner === P1 ? 300 : 100); }, [phase]); // eslint-disable-line react-hooks/exhaustive-deps
-  // Son + vibration de fin de partie.
+  // Son + vibration de fin de partie. Victoire/nul -> géré par onComplete (retour
+  // central, évite le double son) ; ici uniquement la DÉFAITE (onComplete non appelé).
   useEffect(() => {
     if (phase !== 'finished') return;
-    if (isDraw) { playSfx('alert'); vibrate(80); }
-    else if (winner === P1) { playSfx('win'); vibrate([60, 40, 60, 40, 140]); }
-    else { playSfx('lose'); vibrate([120, 60, 120]); }
+    if (!isDraw && winner !== P1) { playSfx('lose'); vibrate([120, 60, 120]); }
   }, [phase]); // eslint-disable-line react-hooks/exhaustive-deps
   const [thinking, setThinking]     = useState(false);
   const [moveCount, setMoveCount]   = useState(0);
