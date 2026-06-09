@@ -66,7 +66,7 @@ services:
         required: false
     environment:
       - OLLAMA_HOST=http://ollama:11434
-    entrypoint: ["/bin/sh", "-c", "until ollama list >/dev/null 2>&1; do echo 'attente du serveur ollama…'; sleep 2; done; ollama pull \"$${OLLAMA_MODEL:-qwen2.5:7b}\"; echo 'Modèle IA prêt'"]
+    entrypoint: ["/bin/sh", "-c", "until ollama list >/dev/null 2>&1; do echo 'attente du serveur ollama…'; sleep 2; done; ollama pull \"$${OLLAMA_MODEL:-qwen2.5:3b}\"; echo 'Modèle IA prêt'"]
 
 volumes:
   portainer_data:
