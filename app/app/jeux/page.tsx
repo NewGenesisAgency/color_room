@@ -11,6 +11,7 @@ import NavigationMenu from '@/app/_components/NavigationMenu';
 import LoginScreen from '@/app/_components/LoginScreen';
 import { PLATE_TYPE, CHANNELS_ROUGE, CHANNELS_BLEU, getPlateType, MAP_ROUGE_TO_BLEU, remapChannels32 } from '@/lib/tileChannels';
 import { playSfx } from '@/lib/audio/sfx';
+import { LOGIC_OP_KINDS, applyLogicOp } from '@/lib/game/logicOps';
 
 // Modules lourds (3D Three.js, jeux, pages spectre/chromaticité) chargés à la
 // demande : ils n'alourdissent plus le bundle initial de /jeux, ce qui accélère
@@ -2228,6 +2229,7 @@ export default function JeuxPage() {
     if (!run?.cfg) return;
     stopHudGraph();
     hudGraphRunRef.current.stop = false;
+    const graphT0 = Date.now(); // base de temps pour le bloc "Secondes" (time_seconds)
 
     const g = buildGraph(run.cfg);
     const start = g.byId.get(String(startNodeId));
@@ -2614,6 +2616,18 @@ export default function JeuxPage() {
         const onEndId = g.out.get(node.id)?.[0];
         if (onEndId) setTimeout(() => { if (!hudGraphRunRef.current.stop) walk(onEndId); }, 500);
         return;
+      }
+
+      // ── Maths / logique / comparaison / constantes (blocs "dataflow" → variable) ──
+      if (LOGIC_OP_KINDS.has(node.kind)) {
+        applyLogicOp(
+          node.kind, params,
+          (name) => Number(hudVarsRef.current[name] ?? 0),
+          (name, value) => { hudVarsRef.current[name] = value; },
+          (Date.now() - graphT0) / 1000,
+        );
+        bumpHudVars();
+        const nextId = g.out.get(node.id)?.[0]; if (nextId) walk(nextId); return;
       }
 
       // ── Render nodes (fill, tile, pulse) ──

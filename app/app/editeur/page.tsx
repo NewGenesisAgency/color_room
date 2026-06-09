@@ -7,6 +7,7 @@ import type { TetrisSnapshot } from '@/app/_components/TetrisGame';
 import type { UILayoutComponent } from './UIDesigner';
 import Coachmarks, { type CoachStep } from '@/app/_components/Coachmarks';
 import { playSfx, SFX_LIST, unlockAudio } from '@/lib/audio/sfx';
+import { LOGIC_OP_KINDS, applyLogicOp, logicOpShape } from '@/lib/game/logicOps';
 
 // Modules lourds (3D Three.js, éditeur Python/Pyodide, designer UI, panneau CS160)
 // chargés à la demande pour alléger le bundle initial de /editeur.
@@ -1606,6 +1607,18 @@ export default function EditeurPage() {
 
       const tiles = runtimeTilesRef.current;
       const vars = runtimeVariablesRef.current;
+
+      // Maths / logique / comparaison / constantes → écrivent dans une variable.
+      if (LOGIC_OP_KINDS.has(node.kind)) {
+        applyLogicOp(
+          node.kind, node.params,
+          (n) => Number(vars[n] ?? 0),
+          (n, value) => { vars[n] = value; },
+          performance.now() / 1000,
+        );
+        for (const edge of game.edges.filter((e) => e.from === nodeId)) executeNodeSync(edge.to, depth + 1);
+        return;
+      }
 
       switch (node.kind) {
         case 'fill': {
@@ -6593,6 +6606,44 @@ export default function EditeurPage() {
                       </div>
                       <p style={{ fontSize: 12, opacity: 0.7, lineHeight: 1.5 }}>Exécute les nœuds connectés en série, l&apos;un après l&apos;autre.</p>
                     </div>
+                  ) : LOGIC_OP_KINDS.has(selectedNode.kind) ? (
+                    (() => {
+                      const shape = logicOpShape(selectedNode.kind);
+                      const p = selectedNode.params;
+                      const opField = (key: string, label: string) => (
+                        <label style={{ display: 'grid', gap: 4 }}>
+                          <span className="g-label">{label}</span>
+                          <input className="g-input" style={{ height: 36, fontSize: 13 }} value={String(p[key] ?? '')}
+                            placeholder="variable ou nombre"
+                            onChange={(e) => updateSelectedParams({ [key]: e.target.value })} />
+                        </label>
+                      );
+                      return (
+                        <div style={{ display: 'grid', gap: 12 }}>
+                          <div style={{ padding: 10, borderRadius: 10, background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.18)', fontSize: 11.5, opacity: 0.85, lineHeight: 1.5 }}>
+                            Les opérandes acceptent un <b>nom de variable</b> (ex. <code>score</code>) ou un <b>nombre</b> (ex. <code>5</code>). Le résultat est écrit dans la variable de sortie (les comparaisons/logique donnent 1 ou 0).
+                          </div>
+                          {shape === 'const_num' && (
+                            <label style={{ display: 'grid', gap: 4 }}><span className="g-label">Valeur</span>
+                              <input className="g-input" type="number" style={{ height: 36, fontSize: 13 }} value={getNum(p, 'value', 0)} onChange={(e) => updateSelectedParams({ value: Number(e.target.value) })} /></label>
+                          )}
+                          {shape === 'const_bool' && (
+                            <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                              <input type="checkbox" checked={p.value === true || p.value === 'true' || Number(p.value) === 1} onChange={(e) => updateSelectedParams({ value: e.target.checked })} />
+                              <span className="g-label" style={{ margin: 0 }}>Vrai</span></label>
+                          )}
+                          {shape === 'const_color' && (
+                            <label style={{ display: 'grid', gap: 4 }}><span className="g-label">Couleur</span>
+                              <input type="color" value={String(p.value ?? '#ffffff')} onChange={(e) => updateSelectedParams({ value: e.target.value })} style={{ width: 60, height: 32, border: 'none', background: 'none', cursor: 'pointer' }} /></label>
+                          )}
+                          {(shape === 'binary' || shape === 'unary' || shape === 'lerp') && opField('a', 'Opérande A')}
+                          {(shape === 'binary' || shape === 'lerp') && opField('b', 'Opérande B')}
+                          {shape === 'lerp' && opField('t', 'Facteur t (0..1)')}
+                          <label style={{ display: 'grid', gap: 4 }}><span className="g-label">Variable de sortie</span>
+                            <input className="g-input" style={{ height: 36, fontSize: 13 }} value={String(p.out ?? 'result')} onChange={(e) => updateSelectedParams({ out: e.target.value })} /></label>
+                        </div>
+                      );
+                    })()
                   ) : selectedNode.kind === 'play_sound' ? (
                     <div style={{ display: 'grid', gap: 12 }}>
                       <label style={{ display: 'grid', gap: 4 }}>

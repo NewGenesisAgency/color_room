@@ -24,7 +24,10 @@ const NODE_KINDS = [
   'emit_event', 'wait_event', 'define_sub', 'call_sub',
   // Variables / score / maths
   'variable_set', 'variable_get', 'add_score', 'get_score', 'score_set', 'score_reset', 'random_int',
-  'math_mod', 'math_floor', 'math_ceil', 'math_round', 'math_abs', 'math_min', 'math_max', 'math_pow', 'math_sqrt',
+  'math_add', 'math_sub', 'math_mul', 'math_div', 'math_mod', 'math_min', 'math_max', 'math_pow',
+  'math_floor', 'math_ceil', 'math_round', 'math_abs', 'math_sqrt', 'math_clamp01', 'math_lerp',
+  'compare_eq', 'compare_gt', 'compare_lt', 'logic_and', 'logic_or', 'logic_not',
+  'const_number', 'const_bool', 'const_color', 'time_seconds', 'random_01',
   'string_concat', 'string_from_num',
   // Tableaux / grille
   'array_create', 'array_get', 'array_set', 'array_fill', 'array_length', 'array_push', 'array_pop',
@@ -84,6 +87,7 @@ RÈGLES :
 - Commence toujours par un nœud "event_begin" (index 0) relié à la logique.
 - Le bloc "if" se configure avec params {varName, op('gt'|'gte'|'lt'|'lte'|'eq'|'neq'), value}; sa 1re sortie = vrai, la 2e = faux.
 - Variables: variable_set {name,value,op('set'|'add'|'sub'|'mul')}; random_int {min,max,varName}; add_score {amount}.
+- Maths/logique : math_add/sub/mul/div/mod/min/max/pow {a,b,out}, math_floor/ceil/round/abs/sqrt/clamp01 {a,out}, math_lerp {a,b,t,out}, compare_eq/gt/lt {a,b,out}, logic_and/or/not {a,b,out}, const_number/bool/color {value,out}. a/b = nom de variable OU nombre ; out = variable résultat (comparaisons/logique → 1 ou 0).
 - Rendu: fill {color,intensity(0..1),mask('all'|'border')}; tile/tile_set {tileIndex,color,intensity}; pulse {baseColor,targetColor,speed}.
 - Boucles: for_range {varName,start,end,step}; loop_count {count}.
 - Évènements d'entrée: on_key {key}, on_tile_click {tileIndex}, on_timer {intervalMs}, on_tick {intervalMs}.
