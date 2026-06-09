@@ -1060,11 +1060,10 @@ export default function JeuxPage() {
   }, [ledValues, apiSpectrum]);
 
   const spectrumHeightsPercent = useMemo(() => {
-    return spectrumHeights.map((v) => {
-      const raw = Number.isFinite(v) ? Number(v) : 0;
-      const capped = Math.max(0, Math.min(SPECTRUM_GRAPH_MAX, raw));
-      return Math.round((capped / SPECTRUM_GRAPH_MAX) * 100);
-    });
+    // Normalisation par le pic réel : fonctionne quelle que soit l'échelle du
+    // spectre renvoyé par l'API (0-255 pour des canaux, ou unités spectrales).
+    const dataMax = Math.max(1, ...spectrumHeights.map((v) => (Number.isFinite(v) ? Number(v) : 0)));
+    return spectrumHeights.map((v) => Math.round((Math.max(0, Number(v) || 0) / dataMax) * 100));
   }, [spectrumHeights]);
 
   const hwLastSentRef = useRef<Record<string, number>>({});
@@ -1897,8 +1896,13 @@ export default function JeuxPage() {
       const sum = used.reduce((a, b) => a + (Number.isFinite(b) ? b : 0), 0);
 
       const payloadObj = plaquePayload && typeof plaquePayload === 'object' ? (plaquePayload as Record<string, unknown>) : null;
-      const rgbFromApi = payloadObj && Array.isArray(payloadObj.rgb) ? (payloadObj.rgb as number[]) : null;
-      const spectreFromApi = payloadObj && Array.isArray(payloadObj.spectre) ? (payloadObj.spectre as number[]) : null;
+      const arrField = (o: Record<string, unknown> | null, ...keys: string[]): number[] | null => {
+        if (!o) return null;
+        for (const k of keys) if (Array.isArray(o[k])) return o[k] as number[];
+        return null;
+      };
+      const rgbFromApi = arrField(payloadObj, 'rgb', 'couleur', 'color');
+      const spectreFromApi = arrField(payloadObj, 'spectre', 'spectrum');
 
       const bBand = used.slice(0, 7).reduce((a, b) => a + b, 0);
       const gBand = used.slice(7, 17).reduce((a, b) => a + b, 0);
@@ -1906,21 +1910,26 @@ export default function JeuxPage() {
 
       const tempKFromRgb = rgbFromApi ? rgbToCctK(rgbFromApi) : 0;
       const tempK = tempKFromRgb > 0 ? tempKFromRgb : inferColorTempK(rBand, gBand, bBand);
+      // Spectre RÉEL émis (champ `spectre` de /state/plaque/{id}/all) si présent.
+      const hasRealSpectre = Array.isArray(spectreFromApi) && spectreFromApi.length > 0;
       const criEst = inferCriFromSpectre(spectreFromApi || [], { r: rBand, g: gBand, b: bBand });
 
-      // On préfère les vraies valeurs de l'API si elles existent (plusieurs noms
-      // possibles selon la version de la supervision) ; sinon on estime (préfixe ≈).
+      // On préfère les vraies valeurs de l'API si elles existent ; sinon on estime (préfixe ≈).
       const apiPower = payloadObj ? (payloadObj.power ?? payloadObj.puissance ?? payloadObj.watt) : null;
       const apiCri   = payloadObj ? (payloadObj.cri ?? payloadObj.irc) : null;
       const apiCct   = payloadObj ? (payloadObj.cct ?? payloadObj.colorTemp ?? payloadObj.temperature) : null;
 
       // Connexion + courbe spectrale réelles (lues depuis la supervision)
       setApiUp(payloadObj != null);
-      if (payloadObj && used.length === 32) setApiSpectrum(used);
+      if (hasRealSpectre) setApiSpectrum(spectreFromApi!);
+      else if (payloadObj && used.length === 32) setApiSpectrum(used);
 
       setInstrument({
         colorTemp: apiCct != null ? `${Math.round(Number(apiCct))}K` : (tempK > 0 ? `${tempK}K` : '-'),
-        cri: apiCri != null ? `${apiCri}` : `≈${criEst}`,
+        // IRC calculé à partir du spectre RÉEL = valeur légitime (pas de ≈) ;
+        // sinon estimation depuis la couleur (≈).
+        cri: apiCri != null ? `${apiCri}` : (hasRealSpectre ? `${criEst}` : `≈${criEst}`),
+        // La supervision n'expose pas la puissance électrique → estimation (≈).
         power: apiPower != null ? `${apiPower}W` : `≈${Math.floor(sum * 3)}W`,
         apiLatency,
       });

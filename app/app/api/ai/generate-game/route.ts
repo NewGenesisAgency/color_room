@@ -188,15 +188,34 @@ function sanitize(raw: GameJson, tileCount: number) {
   };
 }
 
-export async function POST(req: Request) {
+// Choix du fournisseur d'IA : explicite (AI_PROVIDER) sinon auto (Gemini si clé, sinon Ollama local).
+function aiProvider(): 'gemini' | 'ollama' {
+  const p = (process.env.AI_PROVIDER || '').toLowerCase();
+  if (p === 'ollama' || p === 'gemini') return p;
   const key = process.env.GEMINI_API_KEY;
-  if (!key || key === 'XXX') {
-    return NextResponse.json(
-      { ok: false, error: 'NO_API_KEY', message: 'GEMINI_API_KEY manquante dans .env (mettre la vraie clé sur le serveur).' },
-      { status: 503 },
-    );
-  }
+  return key && key !== 'XXX' ? 'gemini' : 'ollama';
+}
 
+// Appel d'un modèle local via Ollama (hors-ligne). format:json force une sortie JSON.
+async function callOllama(sys: string, user: string): Promise<GameJson | null> {
+  const base = (process.env.OLLAMA_URL || 'http://ollama:11434').replace(/\/$/, '');
+  const model = process.env.OLLAMA_MODEL || 'qwen2.5:7b';
+  const res = await fetch(`${base}/api/generate`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    cache: 'no-store',
+    signal: AbortSignal.timeout(180000), // le Raspberry Pi est lent
+    body: JSON.stringify({ model, system: sys, prompt: user, format: 'json', stream: false, options: { temperature: 0.8 } }),
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const data = await res.json();
+  const text: string | undefined = data?.response;
+  if (!text) return null;
+  const cleaned = text.trim().replace(/^```json\s*/i, '').replace(/```$/i, '').trim();
+  try { return JSON.parse(cleaned) as GameJson; } catch { return null; }
+}
+
+export async function POST(req: Request) {
   let body: any;
   try { body = await req.json(); } catch { body = {}; }
   const prompt = String(body?.prompt ?? '').trim();
@@ -220,9 +239,35 @@ export async function POST(req: Request) {
   }
   userContent += 'DEMANDE :\n' + prompt;
 
-  const models = (process.env.GEMINI_MODELS?.split(',').map((s) => s.trim()).filter(Boolean)) || DEFAULT_MODELS;
   const sys = systemInstruction(tileCount);
+  const provider = aiProvider();
 
+  // ── Modèle local (Ollama, hors-ligne) ──────────────────────────────────────
+  if (provider === 'ollama') {
+    const model = process.env.OLLAMA_MODEL || 'qwen2.5:7b';
+    try {
+      const raw = await callOllama(sys, userContent);
+      if (!raw) return NextResponse.json({ ok: false, error: 'OLLAMA_EMPTY', message: `Le modèle local ${model} a renvoyé une réponse vide.` }, { status: 502 });
+      const game = sanitize(raw, tileCount);
+      if (game.nodes.length === 0) return NextResponse.json({ ok: false, error: 'OLLAMA_INVALID', message: 'Le modèle local n\'a produit aucun bloc valide.' }, { status: 502 });
+      return NextResponse.json({ ok: true, model: `ollama/${model}`, game });
+    } catch (e: any) {
+      return NextResponse.json(
+        { ok: false, error: 'OLLAMA_NOT_READY', message: `Modèle local indisponible (${model}). Il est peut-être encore en cours de démarrage/téléchargement. ${e?.message ?? ''}` },
+        { status: 503 },
+      );
+    }
+  }
+
+  // ── Gemini (cloud) ─────────────────────────────────────────────────────────
+  const key = process.env.GEMINI_API_KEY;
+  if (!key || key === 'XXX') {
+    return NextResponse.json(
+      { ok: false, error: 'NO_API_KEY', message: 'Aucune IA configurée : ni GEMINI_API_KEY, ni modèle local (AI_PROVIDER=ollama).' },
+      { status: 503 },
+    );
+  }
+  const models = (process.env.GEMINI_MODELS?.split(',').map((s) => s.trim()).filter(Boolean)) || DEFAULT_MODELS;
   const errors: string[] = [];
   for (const model of models) {
     try {
@@ -233,7 +278,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true, model, game });
     } catch (e: any) {
       errors.push(`${model}: ${e?.message ?? 'erreur'}`);
-      // on passe au modèle suivant (repli)
     }
   }
 

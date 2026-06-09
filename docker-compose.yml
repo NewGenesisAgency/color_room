@@ -5,12 +5,20 @@ services:
     container_name: color-room
     ports:
       - "8080:3000"
+    # Injecte app/.env dans le conteneur (clé Gemini, AI_PROVIDER, OLLAMA_MODEL…).
+    # required:false => l'app démarre même sans fichier .env.
+    env_file:
+      - path: ./app/.env
+        required: false
     environment:
       - COLOR_ROOM_PORT=3000
       - COLOR_ROOM_DB_PATH=/data/ColorRoomDB.db
+      - OLLAMA_URL=http://ollama:11434
     volumes:
       - ./app/data:/data
     restart: unless-stopped
+    # NB : pas de depends_on bloquant sur ollama → l'app démarre vite (phase 1),
+    # jouable et éditable sans IA. L'IA locale s'active dès que le modèle est prêt.
     healthcheck:
       # Check via node (fetch intégré à Node 20) — l'image n'embarque plus curl.
       test: ["CMD", "node", "-e", "fetch('http://localhost:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
@@ -33,5 +41,33 @@ services:
       - "9000:9000"
       - "9443:9443"
 
+  # ── IA locale (Ollama) — démarrage en 2 temps ───────────────────────────────
+  # Phase 1 : l'app et Ollama démarrent (l'app est tout de suite utilisable).
+  # Phase 2 : ollama-pull télécharge le modèle en arrière-plan ; dès qu'il est
+  #           prêt, l'assistant IA de l'éditeur devient disponible (hors-ligne).
+  ollama:
+    image: ollama/ollama:latest
+    container_name: color-room-ollama
+    restart: unless-stopped
+    volumes:
+      - ollama_models:/root/.ollama
+    ports:
+      - "11434:11434"
+
+  # Conteneur jetable qui télécharge le modèle puis s'arrête (non bloquant).
+  ollama-pull:
+    image: ollama/ollama:latest
+    container_name: color-room-ollama-pull
+    depends_on:
+      - ollama
+    restart: "no"
+    env_file:
+      - path: ./app/.env
+        required: false
+    environment:
+      - OLLAMA_HOST=http://ollama:11434
+    entrypoint: ["/bin/sh", "-c", "until ollama list >/dev/null 2>&1; do echo 'attente du serveur ollama…'; sleep 2; done; ollama pull \"$${OLLAMA_MODEL:-qwen2.5:7b}\"; echo 'Modèle IA prêt'"]
+
 volumes:
   portainer_data:
+  ollama_models:

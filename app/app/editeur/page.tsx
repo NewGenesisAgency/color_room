@@ -1166,6 +1166,7 @@ export default function EditeurPage() {
   const [aiModel, setAiModel] = useState('');
   const [aiMessages, setAiMessages] = useState<AiMsg[]>([]);
   const [aiConvId, setAiConvId] = useState<string | null>(null);
+  const [aiStatus, setAiStatus] = useState<{ ready: boolean; message: string } | null>(null);
   const aiBeforeRef = useRef<Record<string, EditorSnapshot>>({}); // snapshot avant chaque réponse IA (pour annuler)
   const aiScrollRef = useRef<HTMLDivElement | null>(null);
 
@@ -3367,6 +3368,22 @@ export default function EditeurPage() {
     return () => { cancelled = true; };
   }, [aiOpen, activeGameId]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Statut de l'IA (Gemini prêt / modèle local en cours de chargement) — mode 2 temps.
+  useEffect(() => {
+    if (!aiOpen) return;
+    let cancelled = false;
+    const check = async () => {
+      try {
+        const r = await fetch('/api/ai/status', { cache: 'no-store' });
+        const d = await r.json();
+        if (!cancelled) setAiStatus({ ready: !!d.ready, message: String(d.message || '') });
+      } catch { if (!cancelled) setAiStatus({ ready: false, message: 'IA injoignable' }); }
+    };
+    void check();
+    const iv = setInterval(check, 6000); // re-vérifie tant que le modèle se charge
+    return () => { cancelled = true; clearInterval(iv); };
+  }, [aiOpen]);
+
   const [dragBaseSnapshot, setDragBaseSnapshot] = useState<EditorSnapshot | null>(null);
   const [dragDidMove, setDragDidMove] = useState<boolean>(false);
 
@@ -3777,6 +3794,7 @@ export default function EditeurPage() {
             <div style={{ flex: 1, minWidth: 0 }}>
               <h2 style={{ margin: 0, fontSize: 15, fontWeight: 800, color: '#fff' }}>Assistant IA</h2>
               <p style={{ margin: 0, fontSize: 11, color: 'rgba(255,255,255,0.5)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{activeGame ? `Jeu : ${activeGame.name}` : 'Aucun jeu — il en créera un'}</p>
+              {aiStatus && !aiStatus.ready && <p style={{ margin: '2px 0 0', fontSize: 10.5, color: '#fbbf24', display: 'flex', alignItems: 'center', gap: 5 }}><span style={{ width: 7, height: 7, borderRadius: '50%', background: '#fbbf24', animation: 'aiPulse 1.1s ease-in-out infinite' }} />{aiStatus.message}</p>}
             </div>
             <button onClick={newAiConversation} title="Nouvelle conversation" style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.7)', borderRadius: 8, padding: '6px 8px', cursor: 'pointer', fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}><Plus size={13} /> Nouveau</button>
             <button onClick={() => setAiOpen(false)} style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.6)', cursor: 'pointer', padding: 4 }}><X size={18} /></button>
