@@ -5,6 +5,7 @@ import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, RotateCcw, Trophy, Z
 import TouchControls, { type TouchKey } from './TouchControls';
 import type { GameTileProps } from './GameColorSpeed';
 import { DIFF_LABELS, type DifficultyLevel } from './GameColorSpeed';
+import { SHOW_SCREEN_BOARD } from '@/lib/game/displayMode';
 
 // ── Snake Chromatique — 42 dalles (6 col × 7 row) ───────────────────────────
 // Le serpent traverse les deux salles (gauche + droite).
@@ -235,7 +236,7 @@ export default function SnakeGame({ onSendColor, onTurnOff, onTurnOffAll, onQuit
           {/* Séparateur salles */}
           <div style={{ position:'absolute', left:6+3*52+3*4, top:6, bottom:6, width:2, background:'rgba(255,255,255,0.05)', borderRadius:1 }} />
 
-          {Array.from({ length:CELLS }, (_, i) => {
+          {SHOW_SCREEN_BOARD && Array.from({ length:CELLS }, (_, i) => {
             const x = i % COLS, y = Math.floor(i / COLS);
             const si = s.snake.findIndex(p => p.x === x && p.y === y);
             const fd = s.foods.find(f => f.pos.x === x && f.pos.y === y && si < 0);
@@ -268,6 +269,14 @@ export default function SnakeGame({ onSendColor, onTurnOff, onTurnOffAll, onQuit
             );
           })}
         </div>
+
+        {!SHOW_SCREEN_BOARD && !s.over && (
+          <div style={{ position:'absolute', inset:0, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:8, textAlign:'center', padding:20, pointerEvents:'none' }}>
+            <div style={{ fontSize:34 }}>👁️</div>
+            <div style={{ fontSize:16, fontWeight:900, color:'#e2e8f0' }}>Regarde la Color Room</div>
+            <div style={{ fontSize:12, color:'#64748b', maxWidth:240 }}>Le jeu se joue sur les dalles — utilise les contrôles ci-dessous.</div>
+          </div>
+        )}
 
         {s.over && (
           <div style={{ position:'absolute', inset:0, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:10, background:'rgba(0,0,0,0.84)', borderRadius:12 }}>

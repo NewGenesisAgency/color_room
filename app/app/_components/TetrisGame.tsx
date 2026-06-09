@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ChevronDown, ChevronLeft, ChevronRight, ChevronsDown, RotateCw } from 'lucide-react';
 import TouchControls, { type TouchKey } from './TouchControls';
 import { DIFF_LABELS, type DifficultyLevel } from './GameColorSpeed';
+import { SHOW_SCREEN_BOARD } from '@/lib/game/displayMode';
 
 const TETRIS_TOUCH: TouchKey[] = [
   { key: 'ArrowUp',    slot: 'up',    label: <RotateCw size={20} /> },
@@ -435,7 +436,8 @@ export default function TetrisGame({
           </div>
         </div>
 
-        {/* Grille */}
+        {/* Grille — masquée par défaut : on joue sur les dalles de la Color Room */}
+        {SHOW_SCREEN_BOARD ? (
         <div style={{
           display: 'grid',
           gridTemplateColumns: `repeat(${COLS}, ${CELL}px)`,
@@ -470,6 +472,13 @@ export default function TetrisGame({
             );
           })}
         </div>
+        ) : (
+          <div style={{ width: COLS * CELL + (COLS - 1) * GAP + 16, minHeight: 240, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, textAlign: 'center', padding: 20, background: '#0f172a', border: '2px solid #1e293b', borderRadius: 12, boxShadow: '0 0 40px rgba(6,214,160,0.08)' }}>
+            <div style={{ fontSize: 34 }}>👁️</div>
+            <div style={{ fontSize: 16, fontWeight: 900, color: '#e2e8f0' }}>Regarde la Color Room</div>
+            <div style={{ fontSize: 12, color: '#64748b', maxWidth: 200 }}>Le Tetris se joue sur les dalles — utilise les contrôles.</div>
+          </div>
+        )}
 
         {/* Queue des 3 pièces suivantes */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10, width: 80 }}>
