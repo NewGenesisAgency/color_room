@@ -57,6 +57,14 @@ function migrate(db: Database.Database) {
   );
   db.exec('CREATE INDEX IF NOT EXISTS idx_crg_games_updated ON crg_games(updated_at);');
 
+  // Conversations IA (chat de génération de jeux dans l'éditeur). messages_json :
+  // [{ id, role:'user'|'assistant', content, ts, model?, summary? }]
+  db.exec(
+    "CREATE TABLE IF NOT EXISTS crg_ai_chats (id TEXT PRIMARY KEY, game_id TEXT, title TEXT NOT NULL DEFAULT '', messages_json TEXT NOT NULL DEFAULT '[]', created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now')));",
+  );
+  db.exec('CREATE INDEX IF NOT EXISTS idx_crg_ai_chats_game ON crg_ai_chats(game_id);');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_crg_ai_chats_updated ON crg_ai_chats(updated_at);');
+
   // Réglages applicatifs clé/valeur (URLs des APIs modifiables à chaud depuis le site)
   db.exec(
     "CREATE TABLE IF NOT EXISTS crg_app_config (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at TEXT NOT NULL DEFAULT (datetime('now')));",

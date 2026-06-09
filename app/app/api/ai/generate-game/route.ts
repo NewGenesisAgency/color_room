@@ -92,6 +92,7 @@ RÈGLES :
 - Lie les affichages à des variables via "varBind" (ex: un score_display avec varBind "score").
 - Relie les boutons à la logique via "eventId" et un nœud "on_ui_click" {buttonId} correspondant.
 - Sois COHÉRENT : chaque eventId d'UI doit avoir son nœud on_ui_click; chaque variable affichée doit être écrite par la logique.
+- Si un "JEU ACTUEL" est fourni, MODIFIE-le selon la demande et renvoie le jeu COMPLET mis à jour (jamais un diff ni un fragment). Conserve ce qui n'est pas concerné.
 - Génère un jeu complet et JOUABLE, pas un squelette. Réponds en JSON pur.`;
 }
 
@@ -201,13 +202,28 @@ export async function POST(req: Request) {
   }
   const tileCount = Math.max(1, Math.min(42, Math.round(Number(body?.tileCount) || 42)));
 
+  // Multi-tours : jeu actuel à modifier + historique de conversation (optionnels).
+  const currentGame = body?.currentGame && typeof body.currentGame === 'object' ? body.currentGame : null;
+  const history = Array.isArray(body?.history) ? body.history.slice(-8) : [];
+
+  let userContent = '';
+  if (history.length > 0) {
+    userContent += 'CONVERSATION PRÉCÉDENTE :\n'
+      + history.map((m: any) => `${m?.role === 'assistant' ? 'IA' : 'Utilisateur'}: ${String(m?.content ?? '').slice(0, 500)}`).join('\n')
+      + '\n\n';
+  }
+  if (currentGame) {
+    userContent += 'JEU ACTUEL (à modifier) :\n' + JSON.stringify(currentGame).slice(0, 60000) + '\n\n';
+  }
+  userContent += 'DEMANDE :\n' + prompt;
+
   const models = (process.env.GEMINI_MODELS?.split(',').map((s) => s.trim()).filter(Boolean)) || DEFAULT_MODELS;
   const sys = systemInstruction(tileCount);
 
   const errors: string[] = [];
   for (const model of models) {
     try {
-      const raw = await callGemini(model, key, sys, prompt);
+      const raw = await callGemini(model, key, sys, userContent);
       if (!raw) { errors.push(`${model}: réponse vide/illisible`); continue; }
       const game = sanitize(raw, tileCount);
       if (game.nodes.length === 0) { errors.push(`${model}: aucun bloc valide`); continue; }

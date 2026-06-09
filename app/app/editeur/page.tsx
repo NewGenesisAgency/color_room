@@ -16,7 +16,7 @@ const CS160Panel = dynamic(() => import('@/app/_components/CS160Panel'), { ssr: 
 const PythonEditor = dynamic(() => import('./PythonEditor'), { ssr: false });
 const UIDesigner = dynamic(() => import('./UIDesigner'), { ssr: false });
 
-import { Boxes, Gamepad2, Plus, Play, Pause, RotateCcw, Save, Trash2, FolderPlus, X, Lightbulb, Layers, Zap, Palette, Clock, MousePointer2, LayoutGrid, Maximize2, Minimize2, Eye, Star, Heart, Sun, Moon, Flame, Snowflake, Music, Target, Puzzle, Sparkles, Trophy, Rocket, Ghost, Dice1, Brain, Check, GitBranch, Hash, Settings2, Shuffle, Search, Users, Film, Thermometer, ScanLine, Wifi, WifiOff, Crown, Gem, Bug, Bot, Atom, Bird, Cat, Dog, Fish, Leaf, Cloud, Droplet, Mountain, Anchor, Bell, Bomb, Camera, Egg, Feather, Gift, Hexagon, Key, Lock, Medal, Pizza, Plane, Rainbow, Skull, Smile, Wand2, Waves, Crosshair, Dice5, Joystick, FlaskConical, Swords, ChevronDown, GraduationCap, SlidersHorizontal, type LucideIcon } from 'lucide-react';
+import { Boxes, Gamepad2, Plus, Play, Pause, RotateCcw, Save, Trash2, FolderPlus, X, Lightbulb, Layers, Zap, Palette, Clock, MousePointer2, LayoutGrid, Maximize2, Minimize2, Eye, Star, Heart, Sun, Moon, Flame, Snowflake, Music, Target, Puzzle, Sparkles, Trophy, Rocket, Ghost, Dice1, Brain, Check, GitBranch, Hash, Settings2, Shuffle, Search, Users, Film, Thermometer, ScanLine, Wifi, WifiOff, Crown, Gem, Bug, Bot, Atom, Bird, Cat, Dog, Fish, Leaf, Cloud, Droplet, Mountain, Anchor, Bell, Bomb, Camera, Egg, Feather, Gift, Hexagon, Key, Lock, Medal, Pizza, Plane, Rainbow, Skull, Smile, Wand2, Waves, Crosshair, Dice5, Joystick, FlaskConical, Swords, ChevronDown, GraduationCap, SlidersHorizontal, RefreshCw, type LucideIcon } from 'lucide-react';
 
 type IdFactory = () => string;
 
@@ -1156,13 +1156,18 @@ export default function EditeurPage() {
   const activeGameId = editor.activeGameId ?? null;
   const selectedNodeId = editor.selectedNodeId;
 
-  // ── IA : génération de jeu via Google Gemini ───────────────────────────────
+  // ── IA : chat de génération de jeu (Google Gemini) ─────────────────────────
+  type AiMsg = { id: string; role: 'user' | 'assistant'; content: string; ts: number; model?: string; summary?: string; error?: boolean };
   const [aiOpen, setAiOpen] = useState(false);
   const [aiPrompt, setAiPrompt] = useState('');
   const [aiBusy, setAiBusy] = useState(false);
   const [aiStep, setAiStep] = useState('');
   const [aiError, setAiError] = useState('');
   const [aiModel, setAiModel] = useState('');
+  const [aiMessages, setAiMessages] = useState<AiMsg[]>([]);
+  const [aiConvId, setAiConvId] = useState<string | null>(null);
+  const aiBeforeRef = useRef<Record<string, EditorSnapshot>>({}); // snapshot avant chaque réponse IA (pour annuler)
+  const aiScrollRef = useRef<HTMLDivElement | null>(null);
 
   const commit = (recipe: (cur: EditorSnapshot) => EditorSnapshot) => {
     setEditor((cur) => {
@@ -3212,97 +3217,155 @@ export default function EditeurPage() {
     }));
   };
 
-  // Génère un jeu complet via l'IA (Gemini) puis l'injecte bloc après bloc.
-  const generateWithAI = async () => {
-    const prompt = aiPrompt.trim();
-    if (!prompt || aiBusy) return;
-    setAiBusy(true); setAiError(''); setAiStep('Connexion à Gemini…'); setAiModel('');
-    const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+  // ── Chat IA : helpers ──────────────────────────────────────────────────────
+  const aiMkId = () => `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 9)}${Math.floor(Math.random() * 1000)}`;
+  const aiSleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+  // Sérialise le jeu actif au format attendu par l'IA (nœuds référencés par index).
+  const serializeGameForAi = (g: GameDoc) => {
+    const idToIdx = new Map(g.nodes.map((n, i) => [n.id, i] as const));
+    return {
+      name: g.name, icon: g.icon, difficulty: g.difficulty, description: g.description,
+      bgColor: g.bgColor, accentColor: g.accentColor, tileCount: g.tileCount,
+      nodes: g.nodes.map((n) => ({ kind: n.kind, name: n.name, params: n.params, x: n.pos.x, y: n.pos.y })),
+      edges: g.edges.map((e) => [idToIdx.get(e.from), idToIdx.get(e.to)]).filter((p) => p[0] != null && p[1] != null),
+      ui: (g.uiLayout ?? []).map((c) => { const { id, ...rest } = c as Record<string, unknown>; void id; return rest; }),
+    };
+  };
+
+  // Applique un jeu IA sur le jeu cible avec animation, en UN seul pas d'historique.
+  const applyAiGame = async (gid: string, game: any, before: EditorSnapshot) => {
+    const ids: string[] = (game.nodes as unknown[]).map(() => aiMkId());
+    setEditor((cur) => ({ ...cur, games: cur.games.map((g) => g.id === gid ? { ...g, nodes: [], edges: [], uiLayout: [] } : g), selectedNodeId: null }));
+    await aiSleep(120);
+    for (let i = 0; i < game.nodes.length; i++) {
+      const n = game.nodes[i];
+      const spec = NODE_CATALOG.find((x) => x.kind === n.kind);
+      const node: EditorNode = {
+        id: ids[i], kind: n.kind as EditorNodeKind,
+        name: (n.name && String(n.name).trim()) || spec?.title || String(n.kind), enabled: true,
+        params: { ...(spec?.defaults ?? {}), ...(n.params ?? {}) },
+        pos: { x: Number(n.x) || (80 + i * 36), y: Number(n.y) || (80 + (i % 6) * 92) },
+      };
+      setAiStep(`Bloc ${i + 1}/${game.nodes.length} : ${node.name}`);
+      setEditor((cur) => ({ ...cur, games: cur.games.map((g) => g.id === gid ? { ...g, nodes: [...g.nodes, node] } : g), selectedNodeId: ids[i] }));
+      await aiSleep(150);
+    }
+    setAiStep('Connexion des blocs…');
+    for (const pair of (game.edges as [number, number][])) {
+      const from = ids[pair[0]]; const to = ids[pair[1]];
+      if (!from || !to) continue;
+      const edge = { id: aiMkId(), from, to };
+      setEditor((cur) => ({ ...cur, games: cur.games.map((g) => g.id === gid ? { ...g, edges: [...g.edges, edge] } : g) }));
+      await aiSleep(80);
+    }
+    setAiStep('Construction de l’interface…');
+    const uiLayout = ((game.ui ?? []) as Record<string, unknown>[]).map((c) => ({ id: aiMkId(), ...c })) as unknown as UILayoutComponent[];
+    const diff = Math.max(1, Math.min(5, Math.round(Number(game.difficulty) || 2))) as GameDoc['difficulty'];
+    setEditor((cur) => ({
+      ...cur,
+      games: cur.games.map((g) => g.id === gid ? {
+        ...g, uiLayout, difficulty: diff,
+        description: String(game.description ?? g.description ?? ''),
+        bgColor: String(game.bgColor ?? g.bgColor ?? '#0d1119'),
+        accentColor: String(game.accentColor ?? g.accentColor ?? '#7c3aed'),
+        tileCount: Number(game.tileCount ?? g.tileCount ?? 42),
+        ...(game.icon ? { icon: game.icon as GameDoc['icon'] } : {}),
+      } : g),
+    }));
+    // UN seul pas d'historique pour toute la génération (annulable d'un coup)
+    setHistory((h) => ({ past: [...h.past, before], future: [] }));
+    setDirty(true);
+  };
+
+  const persistConversation = async (gid: string | null, msgs: AiMsg[]) => {
     try {
+      const title = (msgs.find((m) => m.role === 'user')?.content ?? 'Conversation').slice(0, 60);
+      const res = await fetch('/api/ai/conversations', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ id: aiConvId ?? undefined, gameId: gid, title, messages: msgs }),
+      });
+      const d = await res.json();
+      if (d?.ok && d.id && !aiConvId) setAiConvId(d.id);
+    } catch { /* best-effort */ }
+  };
+
+  // Envoi d'un message au chat IA (crée ou modifie le jeu actif).
+  const sendAiMessage = async (override?: string) => {
+    const text = (override ?? aiPrompt).trim();
+    if (!text || aiBusy) return;
+    const baseMsgs: AiMsg[] = override ? aiMessages : [...aiMessages, { id: aiMkId(), role: 'user', content: text, ts: Date.now() }];
+    if (!override) { setAiMessages(baseMsgs); setAiPrompt(''); }
+    setAiBusy(true); setAiError(''); setAiStep('Connexion à Gemini…'); setAiModel('');
+    try {
+      const curGame = activeGame ? serializeGameForAi(activeGame) : null;
       const res = await fetch('/api/ai/generate-game', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ prompt, tileCount: activeGame?.tileCount ?? 42 }),
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          prompt: text, currentGame: curGame,
+          history: baseMsgs.filter((m) => !m.error).map((m) => ({ role: m.role, content: m.content })),
+          tileCount: activeGame?.tileCount ?? 42,
+        }),
       });
       const data = await res.json();
       if (!data?.ok) {
-        setAiError(data?.message || 'Échec de la génération.');
-        setAiBusy(false); setAiStep('');
+        setAiError(data?.message || 'Échec.');
+        setAiMessages([...baseMsgs, { id: aiMkId(), role: 'assistant', content: '⚠ ' + (data?.message || 'Échec de la génération.'), ts: Date.now(), error: true }]);
         return;
       }
-      const game = data.game as {
-        name: string; icon: string; difficulty: number; description: string;
-        bgColor: string; accentColor: string; tileCount: number;
-        nodes: Array<{ kind: string; name?: string; params: Record<string, unknown>; x: number; y: number }>;
-        edges: Array<[number, number]>;
-        ui: Array<Record<string, unknown>>;
-      };
+      const game = data.game;
       setAiModel(String(data.model || ''));
-
-      // 1) Nouveau jeu vierge, puis on vide le gabarit par défaut
-      setAiStep('Création du jeu…');
-      await createGame(game.name, 'blank');
-      const gid = editorRef.current.activeGameId;
-      if (!gid) { setAiError('Création du jeu impossible.'); setAiBusy(false); setAiStep(''); return; }
-      commit((cur) => ({
-        ...cur,
-        games: cur.games.map((g) => (g.id === gid ? { ...g, nodes: [], edges: [], uiLayout: [] } : g)),
-        selectedNodeId: null,
-      }));
-      await sleep(150);
-
-      // 2) Injection des blocs un par un (effet « construction en direct »)
-      const ids: string[] = [];
-      for (let i = 0; i < game.nodes.length; i++) {
-        const n = game.nodes[i];
-        setAiStep(`Bloc ${i + 1}/${game.nodes.length} : ${n.name || n.kind}`);
-        const id = addNodeForGame(
-          gid,
-          n.kind as EditorNodeKind,
-          { x: Number(n.x) || (80 + i * 36), y: Number(n.y) || (80 + (i % 6) * 92) },
-          { name: n.name, params: n.params },
-        );
-        ids.push(id);
-        await sleep(200);
-      }
-
-      // 3) Liens entre blocs
-      setAiStep('Connexion des blocs…');
-      for (const [from, to] of game.edges) {
-        const a = ids[from]; const b = ids[to];
-        if (a && b) { addEdge(a, b); await sleep(90); }
-      }
-
-      // 4) Interface utilisateur
-      if (game.ui.length > 0) {
-        setAiStep('Construction de l’interface…');
-        const mkId = () => `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
-        const uiLayout = game.ui.map((c) => ({ id: mkId(), ...c })) as unknown as UILayoutComponent[];
-        commit((cur) => ({ ...cur, games: cur.games.map((g) => (g.id === gid ? { ...g, uiLayout } : g)) }));
-        await sleep(150);
-      }
-
-      // 5) Métadonnées + finalisation
-      updateActiveGameMeta({
-        difficulty: game.difficulty as 1 | 2 | 3 | 4 | 5,
-        description: game.description,
-        bgColor: game.bgColor,
-        accentColor: game.accentColor,
-        tileCount: game.tileCount,
-        ...(game.icon ? { icon: game.icon as GameDoc['icon'] } : {}),
-      });
-      setDirty(true);
-      setAiStep('Terminé ✓');
-      setStatus(`Jeu IA généré : ${game.nodes.length} blocs, ${game.ui.length} éléments UI (${data.model}) — pense à sauvegarder`);
-      await sleep(600);
-      setAiOpen(false);
+      let gid = activeGameId;
+      if (!gid) { setAiStep('Création du jeu…'); await createGame(game.name || 'Jeu IA', 'blank'); await aiSleep(80); gid = editorRef.current.activeGameId; }
+      if (!gid) { setAiError('Création du jeu impossible.'); return; }
+      const before = editorRef.current;
+      await applyAiGame(gid, game, before);
+      const summary = `${game.nodes.length} blocs · ${game.edges.length} liens · ${game.ui.length} UI`;
+      const aMsg: AiMsg = { id: aiMkId(), role: 'assistant', content: String(game.description || 'Jeu mis à jour.'), ts: Date.now(), model: String(data.model || ''), summary };
+      aiBeforeRef.current[aMsg.id] = before;
+      const allMsgs = [...baseMsgs, aMsg];
+      setAiMessages(allMsgs);
+      void persistConversation(gid, allMsgs);
+      setStatus(`IA : ${summary} (${data.model}) — pense à sauvegarder`);
     } catch (e: unknown) {
       setAiError('Erreur réseau ou serveur. ' + (e instanceof Error ? e.message : ''));
     } finally {
-      setAiBusy(false);
-      setAiStep('');
+      setAiBusy(false); setAiStep('');
+      requestAnimationFrame(() => aiScrollRef.current?.scrollTo({ top: aiScrollRef.current.scrollHeight, behavior: 'smooth' }));
     }
   };
+
+  // Annule une réponse IA (restaure le snapshot d'avant — annulable/refaisable via l'historique).
+  const revertAiMessage = (msgId: string) => {
+    const before = aiBeforeRef.current[msgId];
+    if (!before) { setStatus('Snapshot indisponible'); return; }
+    commit(() => before);
+    setStatus('Modification IA annulée');
+  };
+
+  const retryAi = () => {
+    const lastUser = [...aiMessages].reverse().find((m) => m.role === 'user');
+    if (lastUser && !aiBusy) void sendAiMessage(lastUser.content);
+  };
+
+  const newAiConversation = () => { setAiMessages([]); setAiConvId(null); setAiError(''); aiBeforeRef.current = {}; };
+
+  // Charge la dernière conversation du jeu actif à l'ouverture du chat.
+  useEffect(() => {
+    if (!aiOpen || !activeGameId || aiConvId || aiMessages.length > 0) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/ai/conversations?gameId=${encodeURIComponent(activeGameId)}`, { cache: 'no-store' });
+        const d = await res.json();
+        if (!cancelled && d?.ok && d.conversations?.[0]) {
+          setAiConvId(d.conversations[0].id);
+          setAiMessages(Array.isArray(d.conversations[0].messages) ? d.conversations[0].messages : []);
+        }
+      } catch { /* ignore */ }
+    })();
+    return () => { cancelled = true; };
+  }, [aiOpen, activeGameId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [dragBaseSnapshot, setDragBaseSnapshot] = useState<EditorSnapshot | null>(null);
   const [dragDidMove, setDragDidMove] = useState<boolean>(false);
@@ -3705,53 +3768,70 @@ export default function EditeurPage() {
     <main className="editeur stage">
       <Coachmarks open={tourOpen} steps={tourSteps} onClose={() => setTourOpen(false)} finishLabel="Commencer" />
 
-      {/* ── Panneau IA : génération de jeu par Gemini ──────────────────────── */}
+      {/* ── Chat IA (style outil, docké à droite : l'éditeur reste visible) ──── */}
       {aiOpen && (
-        <div onClick={() => !aiBusy && setAiOpen(false)}
-          style={{ position: 'fixed', inset: 0, zIndex: 10050, display: 'grid', placeItems: 'center', background: 'rgba(8,10,18,0.55)', backdropFilter: 'blur(10px)' }}>
+        <div style={{ position: 'fixed', top: 0, right: 0, bottom: 0, width: 'min(420px,96vw)', zIndex: 10050, display: 'flex', flexDirection: 'column', background: 'linear-gradient(180deg,#12131d,#0c0d14)', borderLeft: '1px solid rgba(255,255,255,0.1)', boxShadow: '-20px 0 60px rgba(0,0,0,0.5)' }}>
           <style>{'@keyframes aiPulse{0%,100%{opacity:.45}50%{opacity:1}}'}</style>
-          <div onClick={(e) => e.stopPropagation()}
-            style={{ width: 'min(560px,92vw)', borderRadius: 20, overflow: 'hidden', background: 'linear-gradient(160deg,#12131d,#0c0d14)', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 30px 80px rgba(0,0,0,0.6)' }}>
-            <div style={{ padding: '18px 20px', display: 'flex', alignItems: 'center', gap: 12, borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-              <div style={{ width: 40, height: 40, borderRadius: 12, display: 'grid', placeItems: 'center', background: 'linear-gradient(135deg,#7c3aed,#ec4899)', flexShrink: 0 }}>
-                <Sparkles size={20} color="#fff" />
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <h2 style={{ margin: 0, fontSize: 17, fontWeight: 800, color: '#fff' }}>Créer un jeu avec l'IA</h2>
-                <p style={{ margin: '2px 0 0', fontSize: 12, color: 'rgba(255,255,255,0.55)' }}>Décris ton jeu — Gemini construit les blocs et l'interface en direct.</p>
-              </div>
-              {!aiBusy && <button onClick={() => setAiOpen(false)} style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.6)', cursor: 'pointer', padding: 4 }}><X size={20} /></button>}
+          <div style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 10, borderBottom: '1px solid rgba(255,255,255,0.08)', flexShrink: 0 }}>
+            <div style={{ width: 34, height: 34, borderRadius: 10, display: 'grid', placeItems: 'center', background: 'linear-gradient(135deg,#7c3aed,#ec4899)', flexShrink: 0 }}><Sparkles size={18} color="#fff" /></div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <h2 style={{ margin: 0, fontSize: 15, fontWeight: 800, color: '#fff' }}>Assistant IA</h2>
+              <p style={{ margin: 0, fontSize: 11, color: 'rgba(255,255,255,0.5)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{activeGame ? `Jeu : ${activeGame.name}` : 'Aucun jeu — il en créera un'}</p>
             </div>
-            <div style={{ padding: 20 }}>
-              <textarea value={aiPrompt} onChange={(e) => setAiPrompt(e.target.value)} disabled={aiBusy} rows={4}
-                placeholder="Ex : Un jeu de rapidité — une dalle s'allume d'une couleur aléatoire, le joueur doit la cliquer avant 2 s, +10 points par réussite, fin après 60 s avec un écran de score."
-                style={{ width: '100%', resize: 'vertical', borderRadius: 12, padding: '12px 14px', fontSize: 13.5, lineHeight: 1.5, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }} />
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 10 }}>
-                {['Jeu de réflexes sur les couleurs', 'Reproduire un blanc avec sliders RGB', 'Snake sur les plaques', 'Quiz couleurs avec score et vies'].map((ex) => (
-                  <button key={ex} disabled={aiBusy} onClick={() => setAiPrompt(ex)}
-                    style={{ fontSize: 11.5, padding: '5px 10px', borderRadius: 999, border: '1px solid rgba(255,255,255,0.14)', background: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.75)', cursor: aiBusy ? 'not-allowed' : 'pointer' }}>{ex}</button>
-                ))}
-              </div>
+            <button onClick={newAiConversation} title="Nouvelle conversation" style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.7)', borderRadius: 8, padding: '6px 8px', cursor: 'pointer', fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}><Plus size={13} /> Nouveau</button>
+            <button onClick={() => setAiOpen(false)} style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.6)', cursor: 'pointer', padding: 4 }}><X size={18} /></button>
+          </div>
 
-              {aiError && (
-                <div style={{ marginTop: 14, padding: '10px 12px', borderRadius: 10, background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.3)', color: '#fca5a5', fontSize: 12.5 }}>⚠ {aiError}</div>
-              )}
-
-              {aiBusy && (
-                <div style={{ marginTop: 16, padding: '14px 16px', borderRadius: 12, background: 'rgba(124,58,237,0.12)', border: '1px solid rgba(124,58,237,0.3)' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: '#c4b5fd', fontSize: 13, fontWeight: 700 }}>
-                    <Bot size={16} style={{ animation: 'aiPulse 1.1s ease-in-out infinite' }} /> {aiStep || 'Génération…'}
-                  </div>
-                  {aiModel && <div style={{ marginTop: 4, fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>Modèle : {aiModel}</div>}
+          <div ref={aiScrollRef} style={{ flex: 1, overflowY: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {aiMessages.length === 0 && !aiBusy && (
+              <div style={{ margin: 'auto', textAlign: 'center', color: 'rgba(255,255,255,0.45)', fontSize: 13, maxWidth: 300 }}>
+                <Bot size={32} color="rgba(255,255,255,0.25)" />
+                <p style={{ marginTop: 10 }}>Décris le jeu à créer, ou demande une modification. L'IA construit les blocs et l'interface en direct.</p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 12 }}>
+                  {['Crée un jeu de réflexes sur les couleurs', 'Ajoute un timer de 60 secondes', 'Joue un son « bonne réponse » quand on réussit'].map((ex) => (
+                    <button key={ex} onClick={() => setAiPrompt(ex)} style={{ fontSize: 12, padding: '8px 10px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.7)', cursor: 'pointer', textAlign: 'left' }}>{ex}</button>
+                  ))}
                 </div>
-              )}
+              </div>
+            )}
+            {aiMessages.map((m) => (
+              <div key={m.id} style={{ alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start', maxWidth: '90%' }}>
+                <div style={{ padding: '10px 13px', borderRadius: 14, fontSize: 13, lineHeight: 1.5, whiteSpace: 'pre-wrap',
+                  background: m.role === 'user' ? 'linear-gradient(135deg,#4361ee,#7c3aed)' : (m.error ? 'rgba(239,68,68,0.14)' : 'rgba(255,255,255,0.07)'),
+                  color: m.error ? '#fca5a5' : '#fff', border: m.role === 'assistant' && !m.error ? '1px solid rgba(255,255,255,0.1)' : 'none' }}>
+                  {m.content}
+                  {m.summary && <div style={{ marginTop: 6, fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>🧩 {m.summary}{m.model ? ` · ${m.model}` : ''}</div>}
+                </div>
+                {m.role === 'assistant' && !m.error && aiBeforeRef.current[m.id] && (
+                  <div style={{ display: 'flex', gap: 6, marginTop: 5 }}>
+                    <button onClick={() => revertAiMessage(m.id)} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, padding: '4px 8px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.14)', background: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.7)', cursor: 'pointer' }}><RotateCcw size={12} /> Annuler</button>
+                    <button onClick={retryAi} disabled={aiBusy} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, padding: '4px 8px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.14)', background: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.7)', cursor: aiBusy ? 'not-allowed' : 'pointer' }}><RefreshCw size={12} /> Réessayer</button>
+                  </div>
+                )}
+              </div>
+            ))}
+            {aiBusy && (
+              <div style={{ alignSelf: 'flex-start', padding: '10px 13px', borderRadius: 14, background: 'rgba(124,58,237,0.14)', border: '1px solid rgba(124,58,237,0.3)', color: '#c4b5fd', fontSize: 12.5, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Bot size={15} style={{ animation: 'aiPulse 1.1s ease-in-out infinite' }} /> {aiStep || 'Génération…'}
+              </div>
+            )}
+          </div>
 
-              <button onClick={() => void generateWithAI()} disabled={aiBusy || !aiPrompt.trim()}
-                style={{ marginTop: 18, width: '100%', padding: 14, borderRadius: 12, border: 'none', cursor: aiBusy || !aiPrompt.trim() ? 'not-allowed' : 'pointer', fontWeight: 800, fontSize: 15, color: '#fff', background: aiBusy || !aiPrompt.trim() ? 'rgba(124,58,237,0.4)' : 'linear-gradient(135deg,#7c3aed,#ec4899)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-                <Sparkles size={18} /> {aiBusy ? 'Construction en cours…' : 'Générer le jeu'}
+          {aiError && <div style={{ margin: '0 16px', padding: '8px 10px', borderRadius: 8, background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.3)', color: '#fca5a5', fontSize: 12 }}>⚠ {aiError}</div>}
+
+          <div style={{ padding: 12, borderTop: '1px solid rgba(255,255,255,0.08)', flexShrink: 0 }}>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
+              <textarea value={aiPrompt} onChange={(e) => setAiPrompt(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void sendAiMessage(); } }}
+                disabled={aiBusy} rows={2}
+                placeholder={activeGame ? 'Demande une modification… (Entrée pour envoyer)' : 'Décris le jeu à créer…'}
+                style={{ flex: 1, resize: 'none', borderRadius: 12, padding: '10px 12px', fontSize: 13, lineHeight: 1.4, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }} />
+              <button onClick={() => void sendAiMessage()} disabled={aiBusy || !aiPrompt.trim()}
+                style={{ width: 42, height: 42, flexShrink: 0, borderRadius: 12, border: 'none', cursor: aiBusy || !aiPrompt.trim() ? 'not-allowed' : 'pointer', color: '#fff', background: aiBusy || !aiPrompt.trim() ? 'rgba(124,58,237,0.4)' : 'linear-gradient(135deg,#7c3aed,#ec4899)', display: 'grid', placeItems: 'center' }}>
+                <Sparkles size={18} />
               </button>
-              <p style={{ margin: '10px 0 0', fontSize: 11, color: 'rgba(255,255,255,0.35)', textAlign: 'center' }}>Propulsé par Google Gemini · les blocs apparaissent en direct dans l'éditeur</p>
             </div>
+            <p style={{ margin: '6px 2px 0', fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>Gemini · modifs en direct · « Annuler » sur chaque réponse · sauvegarde auto de la conversation</p>
           </div>
         </div>
       )}
