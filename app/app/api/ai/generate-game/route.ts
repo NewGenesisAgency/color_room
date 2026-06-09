@@ -212,6 +212,18 @@ function aiProvider(): 'gemini' | 'ollama' {
   return key && key !== 'XXX' ? 'gemini' : 'ollama';
 }
 
+// Prompt COURT pour les petits modèles locaux (moins de contexte/RAM, plus fiable).
+function systemInstructionLite(tileCount: number): string {
+  return `Génère UNIQUEMENT un JSON décrivant un mini-jeu pour une salle de ${tileCount} dalles LED (grille 6x7, index 0..${tileCount - 1}). Aucun texte autour.
+Format: {"name":str,"icon":"Zap","difficulty":2,"description":str,"bgColor":"#0d1119","accentColor":"#22d3ee","nodes":[{"kind":K,"name":str,"params":{},"x":n,"y":n}],"edges":[[from,to]],"ui":[{"kind":U,"x":n,"y":n,"width":n,"height":n,"text"?:str,"varBind"?:str}]}
+K possibles: event_begin, variable_set{name,value,op:"set"|"add"}, random_int{min,max,varName}, add_score{amount}, if{varName,op:"gt"|"lt"|"eq",value}, fill{color,intensity}, tile{tileIndex,color,intensity}, pulse{baseColor,targetColor,speed}, on_plate_click, on_tile_click{tileIndex}, on_timer{intervalMs}, on_key{key}, wait{seconds}, for_range{varName,start,end,step}, play_sound{sound}, vibrate{durationMs}, color_hsl{hue,saturation,lightness}.
+U possibles: title_banner, label, score_display{varBind}, timer_display, button{eventId}, color_swatch, progress_bar{varBind}, rgb_sliders, plate_grid, message_box.
+sons: click, correct, wrong, win, lose, coin, levelup.
+Commence par event_begin (index 0). Lie l'UI aux variables via varBind. Reste SIMPLE et JOUABLE.
+EXEMPLE valide:
+{"name":"Tape la dalle","icon":"Zap","difficulty":2,"description":"Clique les dalles allumees.","bgColor":"#0d1119","accentColor":"#22d3ee","nodes":[{"kind":"event_begin","name":"Demarrer","params":{},"x":80,"y":80},{"kind":"variable_set","name":"Score","params":{"name":"score","value":0,"op":"set"},"x":320,"y":80},{"kind":"fill","name":"Allumer","params":{"color":"#22d3ee","intensity":0.7},"x":560,"y":80},{"kind":"on_plate_click","name":"Clic","params":{},"x":80,"y":300},{"kind":"add_score","name":"+1","params":{"amount":1},"x":320,"y":300},{"kind":"play_sound","name":"Son","params":{"sound":"coin"},"x":560,"y":300}],"edges":[[0,1],[1,2],[3,4],[4,5]],"ui":[{"kind":"title_banner","x":20,"y":20,"width":400,"height":60,"text":"Tape la dalle"},{"kind":"score_display","x":20,"y":100,"width":200,"height":90,"varBind":"score","text":"Score"}]}`;
+}
+
 // Appel d'un modèle local via Ollama (hors-ligne). format:json force une sortie JSON.
 async function callOllama(sys: string, user: string): Promise<GameJson | null> {
   const base = (process.env.OLLAMA_URL || 'http://ollama:11434').replace(/\/$/, '');
@@ -224,7 +236,12 @@ async function callOllama(sys: string, user: string): Promise<GameJson | null> {
     // Température basse + assez de tokens : un petit modèle local suit mieux le schéma.
     body: JSON.stringify({ model, system: sys, prompt: user, format: 'json', stream: false, options: { temperature: 0.35, num_predict: 4096, num_ctx: 8192 } }),
   });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  if (!res.ok) {
+    // Remonte le VRAI message d'Ollama (ex: "model not found, try pulling it first", OOM…)
+    let detail = '';
+    try { detail = String((await res.json())?.error ?? ''); } catch { try { detail = await res.text(); } catch { /* ignore */ } }
+    throw new Error(`HTTP ${res.status}${detail ? ' — ' + detail.slice(0, 240) : ''}`);
+  }
   const data = await res.json();
   const text: string | undefined = data?.response;
   if (!text) return null;
@@ -263,14 +280,20 @@ export async function POST(req: Request) {
   if (provider === 'ollama') {
     const model = process.env.OLLAMA_MODEL || 'qwen2.5:7b';
     try {
-      const raw = await callOllama(sys, userContent);
-      if (!raw) return NextResponse.json({ ok: false, error: 'OLLAMA_EMPTY', message: `Le modèle local ${model} a renvoyé une réponse vide.` }, { status: 502 });
+      // Prompt court : plus fiable + moins de RAM sur un petit modèle local.
+      const raw = await callOllama(systemInstructionLite(tileCount), userContent);
+      if (!raw) return NextResponse.json({ ok: false, error: 'OLLAMA_EMPTY', message: `Le modèle local ${model} a renvoyé une réponse vide ou non-JSON. Réessaie avec une demande plus simple.` }, { status: 502 });
       const game = sanitize(raw, tileCount);
-      if (game.nodes.length === 0) return NextResponse.json({ ok: false, error: 'OLLAMA_INVALID', message: 'Le modèle local n\'a produit aucun bloc valide.' }, { status: 502 });
+      if (game.nodes.length === 0) return NextResponse.json({ ok: false, error: 'OLLAMA_INVALID', message: 'Le modèle local n\'a produit aucun bloc valide. Réessaie ou utilise un modèle plus capable.' }, { status: 502 });
       return NextResponse.json({ ok: true, model: `ollama/${model}`, game });
     } catch (e: any) {
+      const msg = String(e?.message ?? '');
+      let hint: string;
+      if (/not found|try pulling/i.test(msg)) hint = `Le modèle "${model}" n'est pas encore téléchargé. Attends la fin du téléchargement (docker logs -f color-room-ollama-pull), ou lance: docker exec color-room-ollama ollama pull ${model}.`;
+      else if (/memory|oom|resource|allocat|cuda|out of/i.test(msg)) hint = `Mémoire insuffisante pour "${model}" sur ce matériel. Essaie un modèle plus léger : mets OLLAMA_MODEL=llama3.2:3b dans app/.env puis redémarre.`;
+      else hint = `Le serveur Ollama a renvoyé une erreur. Vérifie qu'il tourne et que "${model}" est téléchargé.`;
       return NextResponse.json(
-        { ok: false, error: 'OLLAMA_NOT_READY', message: `Modèle local indisponible (${model}). Il est peut-être encore en cours de démarrage/téléchargement. ${e?.message ?? ''}` },
+        { ok: false, error: 'OLLAMA_NOT_READY', message: `${hint} (détail: ${msg || 'inconnu'})` },
         { status: 503 },
       );
     }
