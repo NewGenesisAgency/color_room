@@ -1,346 +1,253 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { 
-  cs160Service, 
-  type XYZ, 
-  type Lvxy, 
+import {
+  cs160Service,
+  type XYZ,
+  type Lvxy,
   type CS160Status,
-  type CalibType 
+  type CalibType
 } from '@/app/_services/cs160';
-import { 
-  Plug, 
-  Unplug, 
-  Play, 
-  Settings2, 
+import {
+  Plug,
+  Unplug,
+  Play,
   Lightbulb,
   Target,
   Palette,
   Save,
-  RefreshCw,
   ChevronDown,
   ChevronUp
 } from 'lucide-react';
+
+// ── Tokens dark glass (identiques aux jeux) ────────────────────────────────────
+const D: Record<string, React.CSSProperties> = {
+  wrap: {
+    background: 'linear-gradient(160deg,#0b0f1c,#0d1226)',
+    border: '1px solid rgba(255,255,255,.07)',
+    borderRadius: 18,
+    color: '#e8eaf0',
+    fontFamily: 'system-ui,-apple-system,sans-serif',
+    overflow: 'hidden',
+  },
+  section: {
+    background: 'rgba(255,255,255,.04)',
+    border: '1px solid rgba(255,255,255,.08)',
+    borderRadius: 12,
+    padding: '12px 14px',
+  },
+  sectionTitle: {
+    fontSize: 10,
+    fontWeight: 800,
+    color: 'rgba(255,255,255,.38)',
+    textTransform: 'uppercase' as const,
+    letterSpacing: '.1em',
+    marginBottom: 10,
+  },
+  btnPrimary: {
+    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+    padding: '10px 16px', borderRadius: 10, border: 'none',
+    background: 'linear-gradient(135deg,#06d6a0,#4361ee)',
+    boxShadow: '0 4px 14px rgba(6,214,160,.25)',
+    color: '#fff', fontSize: 13, fontWeight: 800, cursor: 'pointer',
+    fontFamily: 'inherit',
+  },
+  btnGhost: {
+    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+    padding: '8px 14px', borderRadius: 10,
+    border: '1px solid rgba(255,255,255,.12)',
+    background: 'rgba(255,255,255,.05)',
+    color: 'rgba(255,255,255,.7)', fontSize: 12, fontWeight: 700, cursor: 'pointer',
+    fontFamily: 'inherit',
+  },
+  input: {
+    width: '100%', padding: '7px 10px', borderRadius: 8,
+    background: 'rgba(255,255,255,.07)',
+    border: '1px solid rgba(255,255,255,.12)',
+    color: '#e8eaf0', fontSize: 12, fontFamily: 'monospace',
+    boxSizing: 'border-box' as const,
+  },
+  select: {
+    width: '100%', padding: '7px 8px', borderRadius: 8,
+    background: 'rgba(255,255,255,.07)',
+    border: '1px solid rgba(255,255,255,.12)',
+    color: '#e8eaf0', fontSize: 12,
+    boxSizing: 'border-box' as const,
+  },
+  label: {
+    fontSize: 10, color: 'rgba(255,255,255,.38)', fontWeight: 700,
+    textTransform: 'uppercase' as const, letterSpacing: '.06em',
+    display: 'block', marginBottom: 4,
+  },
+};
 
 interface CS160PanelProps {
   className?: string;
 }
 
 export default function CS160Panel({ className = '' }: CS160PanelProps) {
-  // Connection state
-  const [isConnected, setIsConnected] = useState(false);
-  const [isConnecting, setIsConnecting] = useState(false);
-  const [deviceInfo, setDeviceInfo] = useState<string>('');
-  
-  // Measurement state
-  const [isMeasuring, setIsMeasuring] = useState(false);
+  const [isConnected, setIsConnected]     = useState(false);
+  const [isConnecting, setIsConnecting]   = useState(false);
+  const [deviceInfo, setDeviceInfo]       = useState<string>('');
+  const [isMeasuring, setIsMeasuring]     = useState(false);
   const [lastMeasurement, setLastMeasurement] = useState<{ xyz: XYZ | null; lvxy: Lvxy | null } | null>(null);
-  
-  // Calibration state
   const [activeCalibCh, setActiveCalibCh] = useState(0);
   const [showCalibPanel, setShowCalibPanel] = useState(false);
-  
-  // Calibration inputs
-  const [calibType, setCalibType] = useState<CalibType>('RGB');
-  const [trueRed, setTrueRed] = useState<XYZ>({ X: 800, Y: 400, Z: 300 });
-  const [trueGreen, setTrueGreen] = useState<XYZ>({ X: 600, Y: 1000, Z: 400 });
-  const [trueBlue, setTrueBlue] = useState<XYZ>({ X: 500, Y: 600, Z: 1000 });
-  const [trueWhite, setTrueWhite] = useState<Lvxy>({ Lv: 11.0, x: 0.4, y: 0.4 });
-  const [calibId, setCalibId] = useState('calib_001');
+  const [calibType, setCalibType]         = useState<CalibType>('RGB');
+  const [trueRed, setTrueRed]             = useState<XYZ>({ X: 800, Y: 400, Z: 300 });
+  const [trueGreen, setTrueGreen]         = useState<XYZ>({ X: 600, Y: 1000, Z: 400 });
+  const [trueBlue, setTrueBlue]           = useState<XYZ>({ X: 500, Y: 600, Z: 1000 });
+  const [trueWhite, setTrueWhite]         = useState<Lvxy>({ Lv: 11.0, x: 0.4, y: 0.4 });
+  const [calibId, setCalibId]             = useState('calib_001');
   const [targetChannel, setTargetChannel] = useState(1);
-  
-  // Message/Log
-  const [message, setMessage] = useState('');
+  const [message, setMessage]             = useState('');
 
-  const log = useCallback((msg: string) => {
-    setMessage(msg);
-    console.log('[CS160]', msg);
-  }, []);
+  const log = useCallback((msg: string) => { setMessage(msg); }, []);
 
-  // Connect/Disconnect
   const handleConnect = async () => {
+    setIsConnecting(true);
     if (isConnected) {
-      setIsConnecting(true);
-      const success = await cs160Service.disconnect();
-      if (success) {
-        setIsConnected(false);
-        setDeviceInfo('');
-        log('Déconnecté du CS160');
-      }
-      setIsConnecting(false);
+      const ok = await cs160Service.disconnect();
+      if (ok) { setIsConnected(false); setDeviceInfo(''); log('Déconnecté'); }
     } else {
-      setIsConnecting(true);
-      const success = await cs160Service.connect();
-      if (success) {
+      const ok = await cs160Service.connect();
+      if (ok) {
         setIsConnected(true);
         const status = await cs160Service.getStatus();
-        setDeviceInfo(status.deviceInfo || 'CS160');
+        setDeviceInfo(status.deviceInfo || 'CS-160');
         setActiveCalibCh(status.calibChannel);
-        log('Connecté au CS160');
+        log('Connecté — ' + (status.deviceInfo || 'CS-160'));
       } else {
         log('Erreur de connexion');
       }
-      setIsConnecting(false);
     }
+    setIsConnecting(false);
   };
 
-  // One-shot measurement
   const handleMeasure = async () => {
-    if (!isConnected) {
-      log('Non connecté');
-      return;
-    }
-    
+    if (!isConnected) { log('Non connecté'); return; }
     setIsMeasuring(true);
-    log('Mesure en cours...');
-    
+    log('Mesure en cours…');
     const result = await cs160Service.oneShotMeasurement();
-    
     if (result.xyz || result.lvxy) {
       setLastMeasurement(result);
-      log(`Mesure OK - Lv: ${result.lvxy?.Lv.toFixed(2)} cd/m²`);
+      log(`Lv: ${result.lvxy?.Lv.toFixed(2)} cd/m²  x: ${result.lvxy?.x.toFixed(4)}  y: ${result.lvxy?.y.toFixed(4)}`);
     } else {
       log('Erreur de mesure');
     }
-    
     setIsMeasuring(false);
   };
 
-  // Set backlight
   const handleBacklight = async (on: boolean) => {
-    if (!isConnected) {
-      log('Non connecté');
-      return;
-    }
-    
-    const success = await cs160Service.setBacklight(on ? 'on' : 'off');
-    log(success ? `Rétroéclairage ${on ? 'ON' : 'OFF'}` : 'Erreur rétroéclairage');
+    if (!isConnected) { log('Non connecté'); return; }
+    const ok = await cs160Service.setBacklight(on ? 'on' : 'off');
+    log(ok ? `Rétroéclairage ${on ? 'ON' : 'OFF'}` : 'Erreur rétroéclairage');
   };
 
-  // Set calibration channel
   const handleSetCalibCh = async (ch: number) => {
-    if (!isConnected) {
-      log('Non connecté');
-      return;
-    }
-    
-    const success = await cs160Service.setCalibrationCh(ch);
-    if (success) {
-      setActiveCalibCh(ch);
-      log(`Canal de calibration ${ch} activé`);
-    }
+    if (!isConnected) { log('Non connecté'); return; }
+    const ok = await cs160Service.setCalibrationCh(ch);
+    if (ok) { setActiveCalibCh(ch); log(`Canal ${ch} actif`); }
   };
 
-  // RGB Calibration
   const handleRGBCalibration = async () => {
-    if (!isConnected) {
-      log('Non connecté');
-      return;
-    }
-    
+    if (!isConnected) { log('Non connecté'); return; }
     setIsMeasuring(true);
-    log('Calibration RGB démarrée... Mesurez R, puis G, puis B');
-    
-    const success = await cs160Service.performRGBCalibration(
-      trueRed,
-      trueGreen,
-      trueBlue,
-      calibId,
-      targetChannel
-    );
-    
-    if (success) {
-      setActiveCalibCh(targetChannel);
-      log(`Calibration RGB terminée - Canal ${targetChannel} actif`);
-    } else {
-      log('Erreur calibration RGB');
-    }
-    
+    log('Calibration RGB…');
+    const ok = await cs160Service.performRGBCalibration(trueRed, trueGreen, trueBlue, calibId, targetChannel);
+    if (ok) { setActiveCalibCh(targetChannel); log(`Calibration RGB terminée — canal ${targetChannel}`); }
+    else log('Erreur calibration RGB');
     setIsMeasuring(false);
   };
 
-  // Single Point Calibration
   const handleSinglePointCalibration = async () => {
-    if (!isConnected) {
-      log('Non connecté');
-      return;
-    }
-    
+    if (!isConnected) { log('Non connecté'); return; }
     setIsMeasuring(true);
-    log('Calibration Single Point démarrée...');
-    
-    const success = await cs160Service.performSinglePointCalibration(
-      trueWhite,
-      calibId,
-      targetChannel
-    );
-    
-    if (success) {
-      setActiveCalibCh(targetChannel);
-      log(`Calibration Single Point terminée - Canal ${targetChannel} actif`);
-    } else {
-      log('Erreur calibration');
-    }
-    
+    log('Calibration Single Point…');
+    const ok = await cs160Service.performSinglePointCalibration(trueWhite, calibId, targetChannel);
+    if (ok) { setActiveCalibCh(targetChannel); log(`Calibration terminée — canal ${targetChannel}`); }
+    else log('Erreur calibration');
     setIsMeasuring(false);
   };
+
+  const connectedColor = isConnected ? '#06d6a0' : '#ef4444';
 
   return (
-    <div className={`cs160-panel ${className}`} style={{ 
-      padding: 16, 
-      background: '#fff', 
-      borderRadius: 12,
-      border: '1px solid rgba(0,0,0,0.08)',
-      boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
-    }}>
-      {/* Header */}
-      <div style={{ 
-        display: 'flex', 
-        alignItems: 'center', 
-        justifyContent: 'space-between',
-        marginBottom: 16,
-        paddingBottom: 12,
-        borderBottom: '1px solid rgba(0,0,0,0.06)'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div style={{ 
-            width: 10, 
-            height: 10, 
-            borderRadius: '50%', 
-            background: isConnected ? '#22c55e' : '#ef4444',
-            transition: 'background 0.2s'
-          }} />
-          <span style={{ fontWeight: 600, fontSize: 14 }}>CS160 Colorimètre</span>
-          {deviceInfo && (
-            <span style={{ fontSize: 12, color: '#666' }}>({deviceInfo})</span>
-          )}
-        </div>
-        
-        <button
-          onClick={handleConnect}
-          disabled={isConnecting}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 6,
-            padding: '6px 12px',
-            borderRadius: 6,
-            border: 'none',
-            background: isConnected ? '#fee2e2' : '#dcfce7',
-            color: isConnected ? '#dc2626' : '#16a34a',
-            fontSize: 12,
-            fontWeight: 500,
-            cursor: isConnecting ? 'wait' : 'pointer',
-            opacity: isConnecting ? 0.7 : 1
-          }}
-        >
-          {isConnected ? <Unplug size={14} /> : <Plug size={14} />}
-          {isConnecting ? '...' : (isConnected ? 'Déconnecter' : 'Connecter')}
-        </button>
-      </div>
+    <div className={`cs160-panel ${className}`} style={D.wrap}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '14px 14px' }}>
 
-      {/* Message */}
-      {message && (
-        <div style={{ 
-          padding: '8px 12px', 
-          background: '#f0f9ff', 
-          borderRadius: 6,
-          fontSize: 12,
-          color: '#0369a1',
-          marginBottom: 12
-        }}>
-          {message}
-        </div>
-      )}
-
-      {/* Controls */}
-      <div style={{ display: 'grid', gap: 12 }}>
-        
-        {/* Measurement Section */}
-        <div style={{ 
-          padding: 12, 
-          background: '#f8fafc', 
-          borderRadius: 8,
-          display: 'grid',
-          gap: 10
-        }}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: '#475569' }}>
-            Mesure
+        {/* ── Header connexion ── */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.08)', borderRadius: 12 }}>
+          <div style={{ width: 10, height: 10, borderRadius: '50%', background: connectedColor, flexShrink: 0, boxShadow: `0 0 8px ${connectedColor}` }} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontWeight: 800, fontSize: 13 }}>CS-160 Colorimètre</div>
+            {deviceInfo && <div style={{ fontSize: 11, color: 'rgba(255,255,255,.45)', marginTop: 1 }}>{deviceInfo}</div>}
           </div>
-          
+          <button
+            onClick={handleConnect}
+            disabled={isConnecting}
+            style={{
+              ...D.btnGhost,
+              color: isConnected ? '#ef9999' : '#06d6a0',
+              borderColor: isConnected ? 'rgba(239,68,68,.3)' : 'rgba(6,214,160,.3)',
+              opacity: isConnecting ? 0.6 : 1,
+              cursor: isConnecting ? 'wait' : 'pointer',
+              flexShrink: 0,
+            }}
+          >
+            {isConnected ? <Unplug size={13} /> : <Plug size={13} />}
+            {isConnecting ? '…' : (isConnected ? 'Déconnecter' : 'Connecter')}
+          </button>
+        </div>
+
+        {/* ── Message log ── */}
+        {message && (
+          <div style={{ fontSize: 11, color: 'rgba(255,255,255,.55)', padding: '7px 10px', background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.07)', borderRadius: 8, fontFamily: 'monospace' }}>
+            {message}
+          </div>
+        )}
+
+        {/* ── Mesure ── */}
+        <div style={D.section}>
+          <div style={D.sectionTitle}>Mesure</div>
           <div style={{ display: 'flex', gap: 8 }}>
             <button
               onClick={handleMeasure}
               disabled={!isConnected || isMeasuring}
-              style={{
-                flex: 1,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 6,
-                padding: '10px 16px',
-                borderRadius: 8,
-                border: 'none',
-                background: isConnected ? '#3b82f6' : '#94a3b8',
-                color: '#fff',
-                fontSize: 13,
-                fontWeight: 600,
-                cursor: (!isConnected || isMeasuring) ? 'not-allowed' : 'pointer',
-                opacity: (!isConnected || isMeasuring) ? 0.6 : 1
-              }}
+              style={{ ...D.btnPrimary, flex: 1, opacity: (!isConnected || isMeasuring) ? 0.5 : 1, cursor: (!isConnected || isMeasuring) ? 'not-allowed' : 'pointer' }}
             >
-              <Play size={16} />
-              {isMeasuring ? 'Mesure...' : 'One-Shot'}
+              <Play size={14} />
+              {isMeasuring ? 'Mesure…' : 'One-Shot'}
             </button>
-            
             <button
               onClick={() => handleBacklight(true)}
               disabled={!isConnected}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                padding: '10px 12px',
-                borderRadius: 8,
-                border: '1px solid #e2e8f0',
-                background: '#fff',
-                color: '#475569',
-                cursor: isConnected ? 'pointer' : 'not-allowed',
-                opacity: isConnected ? 1 : 0.5
-              }}
+              style={{ ...D.btnGhost, opacity: isConnected ? 1 : 0.4, cursor: isConnected ? 'pointer' : 'not-allowed', flexShrink: 0 }}
+              title="Rétroéclairage ON"
             >
-              <Lightbulb size={16} />
+              <Lightbulb size={14} />
             </button>
           </div>
 
-          {/* Last Measurement Display */}
-          {lastMeasurement && (lastMeasurement.xyz || lastMeasurement.lvxy) && (
-            <div style={{ 
-              display: 'grid', 
-              gridTemplateColumns: '1fr 1fr',
-              gap: 8,
-              padding: 10,
-              background: '#fff',
-              borderRadius: 6,
-              border: '1px solid #e2e8f0'
-            }}>
-              {lastMeasurement.xyz && (
-                <div>
-                  <div style={{ fontSize: 10, color: '#94a3b8', marginBottom: 2 }}>XYZ</div>
-                  <div style={{ fontSize: 11, fontFamily: 'monospace' }}>
-                    X: {lastMeasurement.xyz.X.toFixed(2)}<br/>
-                    Y: {lastMeasurement.xyz.Y.toFixed(2)}<br/>
-                    Z: {lastMeasurement.xyz.Z.toFixed(2)}
+          {lastMeasurement && (lastMeasurement.lvxy || lastMeasurement.xyz) && (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 10 }}>
+              {lastMeasurement.lvxy && (
+                <div style={{ padding: '8px 10px', background: 'rgba(6,214,160,.08)', border: '1px solid rgba(6,214,160,.2)', borderRadius: 8 }}>
+                  <div style={{ fontSize: 9, fontWeight: 800, color: '#06d6a0', letterSpacing: '.06em', marginBottom: 4 }}>Lvxy</div>
+                  <div style={{ fontFamily: 'monospace', fontSize: 11, lineHeight: 1.6, color: '#e8eaf0' }}>
+                    Lv: {lastMeasurement.lvxy.Lv.toFixed(2)}<br />
+                    x: {lastMeasurement.lvxy.x.toFixed(4)}<br />
+                    y: {lastMeasurement.lvxy.y.toFixed(4)}
                   </div>
                 </div>
               )}
-              {lastMeasurement.lvxy && (
-                <div>
-                  <div style={{ fontSize: 10, color: '#94a3b8', marginBottom: 2 }}>Lvxy</div>
-                  <div style={{ fontSize: 11, fontFamily: 'monospace' }}>
-                    Lv: {lastMeasurement.lvxy.Lv.toFixed(2)}<br/>
-                    x: {lastMeasurement.lvxy.x.toFixed(4)}<br/>
-                    y: {lastMeasurement.lvxy.y.toFixed(4)}
+              {lastMeasurement.xyz && (
+                <div style={{ padding: '8px 10px', background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.08)', borderRadius: 8 }}>
+                  <div style={{ fontSize: 9, fontWeight: 800, color: 'rgba(255,255,255,.38)', letterSpacing: '.06em', marginBottom: 4 }}>XYZ</div>
+                  <div style={{ fontFamily: 'monospace', fontSize: 11, lineHeight: 1.6, color: '#e8eaf0' }}>
+                    X: {lastMeasurement.xyz.X.toFixed(2)}<br />
+                    Y: {lastMeasurement.xyz.Y.toFixed(2)}<br />
+                    Z: {lastMeasurement.xyz.Z.toFixed(2)}
                   </div>
                 </div>
               )}
@@ -348,276 +255,135 @@ export default function CS160Panel({ className = '' }: CS160PanelProps) {
           )}
         </div>
 
-        {/* Calibration Section */}
-        <div style={{ 
-          padding: 12, 
-          background: '#f8fafc', 
-          borderRadius: 8,
-          display: 'grid',
-          gap: 10
-        }}>
-          <div style={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            justifyContent: 'space-between'
-          }}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: '#475569' }}>
-              Calibration (Ch: {activeCalibCh})
-            </div>
+        {/* ── Calibration ── */}
+        <div style={D.section}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: showCalibPanel ? 10 : 0 }}>
+            <div style={D.sectionTitle}>Calibration — <span style={{ color: '#a78bfa' }}>Ch {activeCalibCh}</span></div>
             <button
-              onClick={() => setShowCalibPanel(!showCalibPanel)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                padding: '4px 8px',
-                borderRadius: 4,
-                border: 'none',
-                background: 'transparent',
-                color: '#64748b',
-                cursor: 'pointer',
-                fontSize: 11
-              }}
+              onClick={() => setShowCalibPanel(v => !v)}
+              style={{ ...D.btnGhost, padding: '4px 8px', fontSize: 11 }}
             >
-              {showCalibPanel ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+              {showCalibPanel ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
             </button>
           </div>
 
-          {showCalibPanel && (
-            <div style={{ display: 'grid', gap: 12 }}>
-              {/* Calibration Type */}
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button
-                  onClick={() => setCalibType('RGB')}
-                  style={{
-                    flex: 1,
-                    padding: '6px 10px',
-                    borderRadius: 6,
-                    border: '1px solid',
-                    borderColor: calibType === 'RGB' ? '#3b82f6' : '#e2e8f0',
-                    background: calibType === 'RGB' ? '#eff6ff' : '#fff',
-                    color: calibType === 'RGB' ? '#3b82f6' : '#475569',
-                    fontSize: 11,
-                    fontWeight: 500,
-                    cursor: 'pointer'
-                  }}
-                >
-                  <Palette size={12} style={{ display: 'inline', marginRight: 4 }} />
-                  RGB
-                </button>
-                <button
-                  onClick={() => setCalibType('OnePoint')}
-                  style={{
-                    flex: 1,
-                    padding: '6px 10px',
-                    borderRadius: 6,
-                    border: '1px solid',
-                    borderColor: calibType === 'OnePoint' ? '#3b82f6' : '#e2e8f0',
-                    background: calibType === 'OnePoint' ? '#eff6ff' : '#fff',
-                    color: calibType === 'OnePoint' ? '#3b82f6' : '#475569',
-                    fontSize: 11,
-                    fontWeight: 500,
-                    cursor: 'pointer'
-                  }}
-                >
-                  <Target size={12} style={{ display: 'inline', marginRight: 4 }} />
-                  Single Point
-                </button>
-              </div>
-
-              {/* Calibration ID & Target Channel */}
-              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 8 }}>
-                <div>
-                  <label style={{ fontSize: 10, color: '#64748b' }}>ID Calibration</label>
-                  <input
-                    type="text"
-                    value={calibId}
-                    onChange={(e) => setCalibId(e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '6px 8px',
-                      borderRadius: 4,
-                      border: '1px solid #e2e8f0',
-                      fontSize: 11
-                    }}
-                  />
-                </div>
-                <div>
-                  <label style={{ fontSize: 10, color: '#64748b' }}>Canal Cible</label>
-                  <select
-                    value={targetChannel}
-                    onChange={(e) => setTargetChannel(Number(e.target.value))}
-                    style={{
-                      width: '100%',
-                      padding: '6px 8px',
-                      borderRadius: 4,
-                      border: '1px solid #e2e8f0',
-                      fontSize: 11
-                    }}
-                  >
-                    {[1,2,3,4,5,6,7,8,9,10].map(ch => (
-                      <option key={ch} value={ch}>{ch}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {/* Reference Values */}
-              {calibType === 'RGB' ? (
-                <div style={{ display: 'grid', gap: 8 }}>
-                  <div style={{ fontSize: 10, color: '#64748b' }}>Valeurs de référence XYZ</div>
-                  
-                  {/* Red */}
-                  <div style={{ 
-                    display: 'grid', 
-                    gridTemplateColumns: 'auto 1fr 1fr 1fr',
-                    gap: 4,
-                    alignItems: 'center'
-                  }}>
-                    <span style={{ fontSize: 10, color: '#ef4444' }}>R</span>
-                    <input type="number" value={trueRed.X} onChange={e => setTrueRed({...trueRed, X: Number(e.target.value)})} style={{ padding: 4, fontSize: 10, borderRadius: 4, border: '1px solid #e2e8f0' }} placeholder="X" />
-                    <input type="number" value={trueRed.Y} onChange={e => setTrueRed({...trueRed, Y: Number(e.target.value)})} style={{ padding: 4, fontSize: 10, borderRadius: 4, border: '1px solid #e2e8f0' }} placeholder="Y" />
-                    <input type="number" value={trueRed.Z} onChange={e => setTrueRed({...trueRed, Z: Number(e.target.value)})} style={{ padding: 4, fontSize: 10, borderRadius: 4, border: '1px solid #e2e8f0' }} placeholder="Z" />
-                  </div>
-                  
-                  {/* Green */}
-                  <div style={{ 
-                    display: 'grid', 
-                    gridTemplateColumns: 'auto 1fr 1fr 1fr',
-                    gap: 4,
-                    alignItems: 'center'
-                  }}>
-                    <span style={{ fontSize: 10, color: '#22c55e' }}>G</span>
-                    <input type="number" value={trueGreen.X} onChange={e => setTrueGreen({...trueGreen, X: Number(e.target.value)})} style={{ padding: 4, fontSize: 10, borderRadius: 4, border: '1px solid #e2e8f0' }} placeholder="X" />
-                    <input type="number" value={trueGreen.Y} onChange={e => setTrueGreen({...trueGreen, Y: Number(e.target.value)})} style={{ padding: 4, fontSize: 10, borderRadius: 4, border: '1px solid #e2e8f0' }} placeholder="Y" />
-                    <input type="number" value={trueGreen.Z} onChange={e => setTrueGreen({...trueGreen, Z: Number(e.target.value)})} style={{ padding: 4, fontSize: 10, borderRadius: 4, border: '1px solid #e2e8f0' }} placeholder="Z" />
-                  </div>
-                  
-                  {/* Blue */}
-                  <div style={{ 
-                    display: 'grid', 
-                    gridTemplateColumns: 'auto 1fr 1fr 1fr',
-                    gap: 4,
-                    alignItems: 'center'
-                  }}>
-                    <span style={{ fontSize: 10, color: '#3b82f6' }}>B</span>
-                    <input type="number" value={trueBlue.X} onChange={e => setTrueBlue({...trueBlue, X: Number(e.target.value)})} style={{ padding: 4, fontSize: 10, borderRadius: 4, border: '1px solid #e2e8f0' }} placeholder="X" />
-                    <input type="number" value={trueBlue.Y} onChange={e => setTrueBlue({...trueBlue, Y: Number(e.target.value)})} style={{ padding: 4, fontSize: 10, borderRadius: 4, border: '1px solid #e2e8f0' }} placeholder="Y" />
-                    <input type="number" value={trueBlue.Z} onChange={e => setTrueBlue({...trueBlue, Z: Number(e.target.value)})} style={{ padding: 4, fontSize: 10, borderRadius: 4, border: '1px solid #e2e8f0' }} placeholder="Z" />
-                  </div>
-
-                  <button
-                    onClick={handleRGBCalibration}
-                    disabled={!isConnected || isMeasuring}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: 6,
-                      padding: '8px 12px',
-                      borderRadius: 6,
-                      border: 'none',
-                      background: isConnected ? '#8b5cf6' : '#94a3b8',
-                      color: '#fff',
-                      fontSize: 12,
-                      fontWeight: 600,
-                      cursor: (!isConnected || isMeasuring) ? 'not-allowed' : 'pointer',
-                      opacity: (!isConnected || isMeasuring) ? 0.6 : 1,
-                      marginTop: 4
-                    }}
-                  >
-                    <Save size={14} />
-                    {isMeasuring ? 'Calibration...' : 'Calibrer RGB'}
-                  </button>
-                </div>
-              ) : (
-                <div style={{ display: 'grid', gap: 8 }}>
-                  <div style={{ fontSize: 10, color: '#64748b' }}>Valeur de référence blanc (Lv, x, y)</div>
-                  
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4 }}>
-                    <div>
-                      <label style={{ fontSize: 9, color: '#94a3b8' }}>Lv (cd/m²)</label>
-                      <input 
-                        type="number" 
-                        step="0.1"
-                        value={trueWhite.Lv} 
-                        onChange={e => setTrueWhite({...trueWhite, Lv: Number(e.target.value)})} 
-                        style={{ width: '100%', padding: 4, fontSize: 10, borderRadius: 4, border: '1px solid #e2e8f0' }} 
-                      />
-                    </div>
-                    <div>
-                      <label style={{ fontSize: 9, color: '#94a3b8' }}>x</label>
-                      <input 
-                        type="number" 
-                        step="0.001"
-                        value={trueWhite.x} 
-                        onChange={e => setTrueWhite({...trueWhite, x: Number(e.target.value)})} 
-                        style={{ width: '100%', padding: 4, fontSize: 10, borderRadius: 4, border: '1px solid #e2e8f0' }} 
-                      />
-                    </div>
-                    <div>
-                      <label style={{ fontSize: 9, color: '#94a3b8' }}>y</label>
-                      <input 
-                        type="number" 
-                        step="0.001"
-                        value={trueWhite.y} 
-                        onChange={e => setTrueWhite({...trueWhite, y: Number(e.target.value)})} 
-                        style={{ width: '100%', padding: 4, fontSize: 10, borderRadius: 4, border: '1px solid #e2e8f0' }} 
-                      />
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={handleSinglePointCalibration}
-                    disabled={!isConnected || isMeasuring}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: 6,
-                      padding: '8px 12px',
-                      borderRadius: 6,
-                      border: 'none',
-                      background: isConnected ? '#8b5cf6' : '#94a3b8',
-                      color: '#fff',
-                      fontSize: 12,
-                      fontWeight: 600,
-                      cursor: (!isConnected || isMeasuring) ? 'not-allowed' : 'pointer',
-                      opacity: (!isConnected || isMeasuring) ? 0.6 : 1,
-                      marginTop: 4
-                    }}
-                  >
-                    <Save size={14} />
-                    {isMeasuring ? 'Calibration...' : 'Calibrer Single Point'}
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Quick Channel Select */}
+          {/* Sélection rapide canal */}
           <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-            {[0,1,2,3,4,5].map(ch => (
+            {[0, 1, 2, 3, 4, 5].map(ch => (
               <button
                 key={ch}
                 onClick={() => handleSetCalibCh(ch)}
                 disabled={!isConnected}
                 style={{
-                  padding: '4px 8px',
-                  borderRadius: 4,
-                  border: '1px solid',
-                  borderColor: activeCalibCh === ch ? '#3b82f6' : '#e2e8f0',
-                  background: activeCalibCh === ch ? '#eff6ff' : '#fff',
-                  color: activeCalibCh === ch ? '#3b82f6' : '#475569',
-                  fontSize: 10,
-                  cursor: isConnected ? 'pointer' : 'not-allowed',
-                  opacity: isConnected ? 1 : 0.5
+                  padding: '4px 10px', borderRadius: 7,
+                  border: `1px solid ${activeCalibCh === ch ? 'rgba(139,92,246,.5)' : 'rgba(255,255,255,.1)'}`,
+                  background: activeCalibCh === ch ? 'rgba(139,92,246,.2)' : 'rgba(255,255,255,.04)',
+                  color: activeCalibCh === ch ? '#a78bfa' : 'rgba(255,255,255,.45)',
+                  fontSize: 11, fontWeight: 700, cursor: isConnected ? 'pointer' : 'not-allowed',
+                  opacity: isConnected ? 1 : 0.4, fontFamily: 'inherit',
                 }}
               >
                 Ch{ch}
               </button>
             ))}
           </div>
+
+          {showCalibPanel && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 12 }}>
+
+              {/* Type de calibration */}
+              <div style={{ display: 'flex', gap: 6 }}>
+                {(['RGB', 'OnePoint'] as CalibType[]).map(t => (
+                  <button
+                    key={t}
+                    onClick={() => setCalibType(t)}
+                    style={{
+                      flex: 1, padding: '7px 10px', borderRadius: 8,
+                      border: `1px solid ${calibType === t ? 'rgba(139,92,246,.5)' : 'rgba(255,255,255,.1)'}`,
+                      background: calibType === t ? 'rgba(139,92,246,.15)' : 'rgba(255,255,255,.04)',
+                      color: calibType === t ? '#a78bfa' : 'rgba(255,255,255,.55)',
+                      fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+                      fontFamily: 'inherit',
+                    }}
+                  >
+                    {t === 'RGB' ? <Palette size={12} /> : <Target size={12} />}
+                    {t === 'RGB' ? 'RGB' : '1 Point'}
+                  </button>
+                ))}
+              </div>
+
+              {/* ID + canal cible */}
+              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 8 }}>
+                <div>
+                  <label style={D.label}>ID Calib</label>
+                  <input type="text" value={calibId} onChange={e => setCalibId(e.target.value)} style={D.input} />
+                </div>
+                <div>
+                  <label style={D.label}>Canal</label>
+                  <select value={targetChannel} onChange={e => setTargetChannel(Number(e.target.value))} style={D.select}>
+                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(ch => <option key={ch} value={ch}>{ch}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              {calibType === 'RGB' ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <div style={D.sectionTitle}>Valeurs de référence XYZ</div>
+                  {([
+                    { label: 'R', color: '#ef4444', val: trueRed,   set: setTrueRed   },
+                    { label: 'G', color: '#22c55e', val: trueGreen, set: setTrueGreen },
+                    { label: 'B', color: '#3b82f6', val: trueBlue,  set: setTrueBlue  },
+                  ] as { label: string; color: string; val: XYZ; set: (v: XYZ) => void }[]).map(({ label, color, val, set }) => (
+                    <div key={label} style={{ display: 'grid', gridTemplateColumns: 'auto 1fr 1fr 1fr', gap: 4, alignItems: 'center' }}>
+                      <span style={{ fontSize: 12, fontWeight: 800, color, width: 14, textAlign: 'center' }}>{label}</span>
+                      {(['X', 'Y', 'Z'] as (keyof XYZ)[]).map(k => (
+                        <input key={k} type="number" value={val[k]} onChange={e => set({ ...val, [k]: Number(e.target.value) })}
+                          placeholder={k}
+                          style={{ ...D.input, textAlign: 'center' as const }} />
+                      ))}
+                    </div>
+                  ))}
+                  <button
+                    onClick={handleRGBCalibration}
+                    disabled={!isConnected || isMeasuring}
+                    style={{ ...D.btnPrimary, background: 'linear-gradient(135deg,#8b5cf6,#4361ee)', opacity: (!isConnected || isMeasuring) ? 0.5 : 1, cursor: (!isConnected || isMeasuring) ? 'not-allowed' : 'pointer' }}
+                  >
+                    <Save size={13} />
+                    {isMeasuring ? 'Calibration…' : 'Calibrer RGB'}
+                  </button>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <div style={D.sectionTitle}>Référence blanc (Lv, x, y)</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
+                    {[
+                      { k: 'Lv', label: 'Lv (cd/m²)', step: '0.1' },
+                      { k: 'x',  label: 'x',           step: '0.001' },
+                      { k: 'y',  label: 'y',           step: '0.001' },
+                    ].map(({ k, label, step }) => (
+                      <div key={k}>
+                        <label style={D.label}>{label}</label>
+                        <input type="number" step={step} value={trueWhite[k as keyof Lvxy]}
+                          onChange={e => setTrueWhite({ ...trueWhite, [k]: Number(e.target.value) })}
+                          style={D.input} />
+                      </div>
+                    ))}
+                  </div>
+                  <button
+                    onClick={handleSinglePointCalibration}
+                    disabled={!isConnected || isMeasuring}
+                    style={{ ...D.btnPrimary, background: 'linear-gradient(135deg,#8b5cf6,#4361ee)', opacity: (!isConnected || isMeasuring) ? 0.5 : 1, cursor: (!isConnected || isMeasuring) ? 'not-allowed' : 'pointer' }}
+                  >
+                    <Save size={13} />
+                    {isMeasuring ? 'Calibration…' : 'Calibrer Single Point'}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
+
       </div>
     </div>
   );

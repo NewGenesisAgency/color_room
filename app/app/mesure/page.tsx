@@ -611,10 +611,10 @@ export default function MesurePage() {
       </button>
 
       {/* Main layout: diagram + results */}
-      <div style={{ display: 'grid', gridTemplateColumns: '480px 1fr', gap: 20, marginBottom: 20, alignItems: 'start' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 20, marginBottom: 20, alignItems: 'start' }}>
 
         {/* Chromaticity diagram */}
-        <div style={{ background: '#1e293b', borderRadius: 14, padding: 12, border: '1px solid #334155', boxShadow: '0 4px 16px rgba(0,0,0,0.12)' }}>
+        <div style={{ flex: '0 1 480px', minWidth: 0, background: '#1e293b', borderRadius: 14, padding: 12, border: '1px solid #334155', boxShadow: '0 4px 16px rgba(0,0,0,0.12)' }}>
           <div style={{ fontSize: 12, fontWeight: 600, color: '#94a3b8', marginBottom: 10, letterSpacing: 0.5 }}>
             DIAGRAMME DE CHROMATICITÉ CIE 1931
             {currentPoint && <span style={{ marginLeft: 8, color: '#e2e8f0' }}>● mesure courante</span>}
@@ -624,7 +624,7 @@ export default function MesurePage() {
         </div>
 
         {/* Results panel */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div style={{ flex: '1 1 280px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
           {measurement ? (
             <>
               <div style={{ padding: 16, borderRadius: 12, background: '#eff6ff', border: '2px solid #93c5fd' }}>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { X } from 'lucide-react';
 import type { GameTileProps } from './GameColorSpeed';
 import CieDiagramCanvas, { type CieMarker } from './CieDiagramCanvas';
@@ -77,7 +77,18 @@ export default function GameLibreRGB({ onSendColor, onTurnOffAll, onQuit }: Game
   const [hexInput, setHexInput] = useState('');
   const [hexFocus, setHexFocus] = useState(false);
   const [history, setHistory] = useState<HistEntry[]>([]);
-  const debounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const debounce    = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const diagContRef = useRef<HTMLDivElement>(null);
+  const [diagSize, setDiagSize] = useState(300);
+  useLayoutEffect(() => {
+    const el = diagContRef.current;
+    if (!el) return;
+    const obs = new ResizeObserver(([e]) => {
+      setDiagSize(Math.min(Math.floor(e.contentRect.width), 460));
+    });
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
 
   // Envoie la couleur aux dalles (debounce 25ms pour sliders)
   const sendToTiles = useCallback((rv: number, gv: number, bv: number, z: Zone) => {
@@ -257,9 +268,9 @@ export default function GameLibreRGB({ onSendColor, onTurnOffAll, onQuit }: Game
           </div>
 
           {/* Colonne droite : diagramme CIE */}
-          <div style={{ flex: '0 0 auto', display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'center' }}>
+          <div ref={diagContRef} style={{ flex: '1 1 240px', display: 'flex', flexDirection: 'column', gap: 8 }}>
             <div style={{ ...S.label, textAlign: 'center' }}>Chromaticité CIE 1931</div>
-            <CieDiagramCanvas size={340} markers={markers} />
+            <CieDiagramCanvas size={diagSize} markers={markers} />
             {xy && (
               <div style={{ fontSize: 11, color: 'rgba(255,255,255,.35)', textAlign: 'center', fontFamily: 'monospace' }}>
                 x = {xy.x.toFixed(4)} · y = {xy.y.toFixed(4)} · z = {(1 - xy.x - xy.y).toFixed(4)}

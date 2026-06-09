@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, useLayoutEffect } from 'react';
 import { Check, Ruler, X, RefreshCw } from 'lucide-react';
 import type { GameTileProps } from './GameColorSpeed';
 import { DIFF_LABELS, type DifficultyLevel } from './GameColorSpeed';
@@ -227,8 +227,19 @@ export default function GameCanalMix({
   const [msg, setMsg]                   = useState('');
   useEffect(() => { if (phase === 'finished') onComplete?.(Math.round(totalPts / 5)); }, [phase]); // eslint-disable-line
 
-  const hwTimer  = useRef<number>(0);
-  const numTiles = Math.min(tileCount, 42);
+  const hwTimer    = useRef<number>(0);
+  const numTiles   = Math.min(tileCount, 42);
+  const diagContRef = useRef<HTMLDivElement>(null);
+  const [diagSize, setDiagSize] = useState(360);
+  useLayoutEffect(() => {
+    const el = diagContRef.current;
+    if (!el) return;
+    const obs = new ResizeObserver(([e]) => {
+      setDiagSize(Math.min(Math.floor(e.contentRect.width), 500));
+    });
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
 
   const channelData  = plateType === 'bleu' ? CHANNELS_BLEU : CHANNELS_ROUGE;
   const profiles     = channelData.map(ch => ch.rgb) as [number,number,number][];
@@ -326,12 +337,12 @@ export default function GameCanalMix({
         const {Lv, x, y} = data.data.lvxy;
         if (Number.isFinite(x) && Number.isFinite(y)) result = {x, y, Lv};
       }
-    } catch { /* appareil absent → simulation */ }
+    } catch { /* appareil absent */ }
 
     if (!result) {
-      // Simulation : ajouter un léger bruit autour de la vraie cible
-      const n = () => (Math.random() - 0.5) * 0.015;
-      result = { x: target.x + n(), y: target.y + n(), Lv: 12 + Math.random() * 5 };
+      setMsg('CS-160 non connecté — pointez l\'appareil sur une dalle de la salle droite et réessayez.');
+      setMeasuring(false);
+      return;
     }
 
     // Retrouver les poids depuis la mesure
@@ -453,37 +464,36 @@ export default function GameCanalMix({
         </div>
 
         {/* Couleurs cible + joueur */}
-        <div style={{ ...G.glass, padding:'10px 14px', display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
-          <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-            <div style={{ width:44, height:44, borderRadius:10, flexShrink:0, background: targetRgb ? `rgb(${targetRgb.r},${targetRgb.g},${targetRgb.b})` : '#111', border:'2px solid rgba(255,255,255,.3)' }} />
-            <div>
-              <div style={{ fontSize:11, fontWeight:800, color:'#a78bfa' }}>Cible (salle droite)</div>
-              <div style={{ fontSize:10, color:'rgba(255,255,255,.45)' }}>x={target.x.toFixed(4)}, y={target.y.toFixed(4)}</div>
+        <div style={{ ...G.glass, padding:'10px 14px', display:'flex', alignItems:'flex-start', gap:8, flexWrap:'wrap' }}>
+          <div style={{ display:'flex', alignItems:'center', gap:8, flex:'1 1 120px', minWidth:0 }}>
+            <div style={{ width:36, height:36, borderRadius:8, flexShrink:0, background: targetRgb ? `rgb(${targetRgb.r},${targetRgb.g},${targetRgb.b})` : '#111', border:'2px solid rgba(255,255,255,.3)' }} />
+            <div style={{ minWidth:0 }}>
+              <div style={{ fontSize:11, fontWeight:800, color:'#a78bfa' }}>Cible</div>
+              <div style={{ fontSize:10, color:'rgba(255,255,255,.45)', fontFamily:'monospace' }}>x={target.x.toFixed(3)}, y={target.y.toFixed(3)}</div>
             </div>
           </div>
-          <div style={{ width:1, height:44, background:'rgba(255,255,255,.1)', flexShrink:0 }} />
           {measured && (
-            <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-              <div style={{ width:44, height:44, borderRadius:10, flexShrink:0, background: measuredRgb ? `rgb(${measuredRgb.r},${measuredRgb.g},${measuredRgb.b})` : '#111', border:'2px solid #06d6a0' }} />
-              <div>
+            <div style={{ display:'flex', alignItems:'center', gap:8, flex:'1 1 120px', minWidth:0 }}>
+              <div style={{ width:36, height:36, borderRadius:8, flexShrink:0, background: measuredRgb ? `rgb(${measuredRgb.r},${measuredRgb.g},${measuredRgb.b})` : '#111', border:'2px solid #06d6a0' }} />
+              <div style={{ minWidth:0 }}>
                 <div style={{ fontSize:11, fontWeight:800, color:'#06d6a0' }}>Mesure CS-160</div>
-                <div style={{ fontSize:10, color:'rgba(255,255,255,.45)' }}>x={measured.x.toFixed(4)}, y={measured.y.toFixed(4)}</div>
+                <div style={{ fontSize:10, color:'rgba(255,255,255,.45)', fontFamily:'monospace' }}>x={measured.x.toFixed(3)}, y={measured.y.toFixed(3)}</div>
                 <div style={{ fontSize:10, color:'rgba(255,255,255,.35)' }}>Lv={measured.Lv.toFixed(1)} cd/m²</div>
               </div>
             </div>
           )}
-          <div style={{ marginLeft:'auto', display:'flex', alignItems:'center', gap:8 }}>
-            <div>
-              <div style={{ fontSize:11, fontWeight:800, color:'#4361ee' }}>Votre mix (salle gauche)</div>
-              <div style={{ fontSize:10, color:'rgba(255,255,255,.45)' }}>x={playerXy.x.toFixed(4)}, y={playerXy.y.toFixed(4)}</div>
+          <div style={{ display:'flex', alignItems:'center', gap:8, flex:'1 1 120px', minWidth:0, justifyContent:'flex-end' }}>
+            <div style={{ minWidth:0, textAlign:'right' }}>
+              <div style={{ fontSize:11, fontWeight:800, color:'#4361ee' }}>Votre mix</div>
+              <div style={{ fontSize:10, color:'rgba(255,255,255,.45)', fontFamily:'monospace' }}>x={playerXy.x.toFixed(3)}, y={playerXy.y.toFixed(3)}</div>
             </div>
-            <div style={{ width:44, height:44, borderRadius:10, flexShrink:0, background: playerRgb ? `rgb(${playerRgb.r},${playerRgb.g},${playerRgb.b})` : '#111', border:'2px solid rgba(67,97,238,.5)' }} />
+            <div style={{ width:36, height:36, borderRadius:8, flexShrink:0, background: playerRgb ? `rgb(${playerRgb.r},${playerRgb.g},${playerRgb.b})` : '#111', border:'2px solid rgba(67,97,238,.5)' }} />
           </div>
         </div>
 
         {/* Diagramme CIE */}
-        <div style={{ display:'flex', justifyContent:'center' }}>
-          <CieDiagramCanvas size={DW} markers={diagMarkers} polylines={[triangle]} />
+        <div ref={diagContRef} style={{ width: '100%' }}>
+          <CieDiagramCanvas size={diagSize} markers={diagMarkers} polylines={[triangle]} />
         </div>
 
         {/* Bouton mesure CS-160 */}

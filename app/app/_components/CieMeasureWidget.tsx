@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Crosshair, RefreshCcw, Ruler } from 'lucide-react';
 import cs160Service from '@/app/_services/cs160';
 import CieDiagramCanvas, { type CieMarker } from './CieDiagramCanvas';
@@ -16,17 +16,6 @@ const HORSESHOE: [number, number][] = [
   [0.8000, 0.2000], [0.8210, 0.1790], [0.8507, 0.1493],
 ];
 
-// ── Diagram coordinate system ─────────────────────────────────────────────────
-const DW = 440, DH = 400;
-const X_MIN = 0.0, X_MAX = 0.86, Y_MIN = 0.0, Y_MAX = 0.92;
-const PAD_L = 30, PAD_R = 14, PAD_T = 10, PAD_B = 24;
-
-function xyToSvg(x: number, y: number) {
-  const px = PAD_L + (x - X_MIN) / (X_MAX - X_MIN) * (DW - PAD_L - PAD_R);
-  const py = (DH - PAD_B) - (y - Y_MIN) / (Y_MAX - Y_MIN) * (DH - PAD_T - PAD_B);
-  return { px, py };
-}
-
 function inHorseshoe(cx: number, cy: number): boolean {
   let inside = false;
   for (let i = 0, j = HORSESHOE.length - 1; i < HORSESHOE.length; j = i++) {
@@ -37,7 +26,6 @@ function inHorseshoe(cx: number, cy: number): boolean {
   return inside;
 }
 
-// ── CIE xy → sRGB 0-255 (D65, IEC 61966-2-1) ─────────────────────────────────
 function xyToRgb255(x: number, y: number): { r: number; g: number; b: number } | null {
   if (y < 1e-8 || x < 0 || x + y > 1) return null;
   const X = x / y, Y = 1.0, Z = (1 - x - y) / y;
@@ -56,7 +44,6 @@ function xyToRgb255(x: number, y: number): { r: number; g: number; b: number } |
   };
 }
 
-// ── ΔE76 entre deux chromaticités (Lab via D65, Y=100 commun) ─────────────────
 const WHITE = { X: 95.047, Y: 100, Z: 108.883 };
 function labFromXy(x: number, y: number): { L: number; a: number; b: number } {
   const Yl = 100;
@@ -71,7 +58,6 @@ function deltaE76(x1: number, y1: number, x2: number, y2: number): number {
   return Math.sqrt((A.L - B.L) ** 2 + (A.a - B.a) ** 2 + (A.b - B.b) ** 2);
 }
 
-// ── Cible aléatoire dans le gamut sRGB, pas trop terne ────────────────────────
 function randomTarget(): { x: number; y: number; rgb: { r: number; g: number; b: number } } {
   const candidates: [number, number][] = [
     [0.6400, 0.3300], [0.3000, 0.6000], [0.1500, 0.0600], [0.4338, 0.4760],
@@ -94,39 +80,42 @@ function randomTarget(): { x: number; y: number; rgb: { r: number; g: number; b:
 export type CieMeasureWidgetProps = {
   targetX?: number;
   targetY?: number;
-  tolerance?: number;       // seuil ΔE pour "réussi"
-  randomTarget?: boolean;   // génère une cible aléatoire + bouton "Nouvelle cible"
-  points?: number;          // points max attribués à un ΔE = 0
+  tolerance?: number;
+  randomTarget?: boolean;
+  points?: number;
   width?: number;
   height?: number;
-  /** Optionnel : allume la couleur cible sur les dalles physiques. */
   onSendColor?: (idx: number, r: number, g: number, b: number, intensity: number) => void;
   onTurnOffAll?: () => void;
 };
 
-const horseshoePath = (() => {
-  let d = '';
-  HORSESHOE.forEach((p, i) => {
-    const { px, py } = xyToSvg(p[0], p[1]);
-    d += `${i === 0 ? 'M' : 'L'}${px.toFixed(1)},${py.toFixed(1)} `;
-  });
-  return d + 'Z';
-})();
-
 export default function CieMeasureWidget({
   targetX = 0.3127, targetY = 0.3290, tolerance = 8, randomTarget: rnd = false,
-  points = 1000, width = 360, height, onSendColor,
+  points = 1000, onSendColor,
 }: CieMeasureWidgetProps) {
   const initialTarget = useMemo(
     () => (rnd ? randomTarget() : { x: targetX, y: targetY, rgb: xyToRgb255(targetX, targetY) ?? { r: 255, g: 255, b: 255 } }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
   );
-  const [target, setTarget] = useState(initialTarget);
+  const [target, setTarget]     = useState(initialTarget);
   const [measured, setMeasured] = useState<{ x: number; y: number } | null>(null);
   const [measuring, setMeasuring] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [best, setBest] = useState<number | null>(null);
+  const [error, setError]       = useState<string | null>(null);
+  const [best, setBest]         = useState<number | null>(null);
+
+  // Responsive canvas
+  const diagContRef = useRef<HTMLDivElement>(null);
+  const [diagSize, setDiagSize] = useState(300);
+  useLayoutEffect(() => {
+    const el = diagContRef.current;
+    if (!el) return;
+    const obs = new ResizeObserver(([e]) => {
+      setDiagSize(Math.min(Math.floor(e.contentRect.width), 500));
+    });
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
 
   const lightTarget = (t: { rgb: { r: number; g: number; b: number } }) => {
     if (!onSendColor) return;
@@ -153,7 +142,7 @@ export default function CieMeasureWidget({
         const pts = Math.round(points * Math.max(0, 1 - dE / 100));
         setBest((b) => (b === null ? pts : Math.max(b, pts)));
       } else {
-        setError('Mesure indisponible — appareil CS-160 non connecté ?');
+        setError('CS-160 non connecté — pointez l\'appareil et réessayez.');
       }
     } catch {
       setError('Erreur de communication avec le CS-160');
@@ -173,67 +162,88 @@ export default function CieMeasureWidget({
   ];
 
   const cell: React.CSSProperties = {
-    flex: 1, padding: '7px 9px', borderRadius: 10, background: 'rgba(255,255,255,0.7)',
-    border: '1px solid rgba(0,0,0,0.07)', textAlign: 'center',
+    flex: 1, padding: '7px 9px', borderRadius: 10,
+    background: 'rgba(255,255,255,.05)',
+    border: '1px solid rgba(255,255,255,.08)',
+    textAlign: 'center',
   };
   const cellLabel: React.CSSProperties = {
-    fontSize: 9.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em', color: '#8a8f9c',
+    fontSize: 9.5, fontWeight: 700, textTransform: 'uppercase',
+    letterSpacing: '.06em', color: 'rgba(255,255,255,.38)',
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontFamily: 'inherit', width: '100%' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5, fontWeight: 700, color: '#5a6072' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontFamily: 'inherit', width: '100%', color: '#e8eaf0' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5, fontWeight: 700, color: 'rgba(255,255,255,.55)' }}>
         <Crosshair size={13} /> Diagramme CIE 1931
       </div>
 
-      <div style={{ display: 'flex', justifyContent: 'center' }}>
-        <CieDiagramCanvas size={Math.max(300, Math.round(width))} markers={markers} />
+      <div ref={diagContRef} style={{ width: '100%' }}>
+        <CieDiagramCanvas size={diagSize} markers={markers} />
       </div>
 
-      {/* Lecture */}
+      {/* Valeurs */}
       <div style={{ display: 'flex', gap: 6 }}>
         <div style={cell}>
           <div style={cellLabel}>Cible x,y</div>
-          <div style={{ fontFamily: 'monospace', fontSize: 13, fontWeight: 700, color: '#1a1d2e' }}>{target.x.toFixed(3)}, {target.y.toFixed(3)}</div>
+          <div style={{ fontFamily: 'monospace', fontSize: 12, fontWeight: 700 }}>{target.x.toFixed(3)}, {target.y.toFixed(3)}</div>
         </div>
         <div style={cell}>
           <div style={cellLabel}>Mesure x,y</div>
-          <div style={{ fontFamily: 'monospace', fontSize: 13, fontWeight: 700, color: measured ? '#1a1d2e' : '#c2c6d0' }}>{measured ? `${measured.x.toFixed(3)}, ${measured.y.toFixed(3)}` : '—, —'}</div>
+          <div style={{ fontFamily: 'monospace', fontSize: 12, fontWeight: 700, color: measured ? '#e8eaf0' : 'rgba(255,255,255,.2)' }}>
+            {measured ? `${measured.x.toFixed(3)}, ${measured.y.toFixed(3)}` : '—, —'}
+          </div>
         </div>
-        <div style={{ ...cell, background: dE === null ? 'rgba(255,255,255,0.7)' : success ? 'rgba(5,150,105,0.1)' : 'rgba(239,68,68,0.08)' }}>
+        <div style={{ ...cell, background: dE === null ? 'rgba(255,255,255,.05)' : success ? 'rgba(6,214,160,.12)' : 'rgba(239,68,68,.1)', borderColor: dE === null ? 'rgba(255,255,255,.08)' : success ? 'rgba(6,214,160,.3)' : 'rgba(239,68,68,.3)' }}>
           <div style={cellLabel}>ΔE</div>
-          <div style={{ fontSize: 16, fontWeight: 900, color: dE === null ? '#c2c6d0' : success ? '#059669' : '#ef4444' }}>{dE === null ? '—' : dE.toFixed(1)}</div>
+          <div style={{ fontSize: 16, fontWeight: 900, color: dE === null ? 'rgba(255,255,255,.2)' : success ? '#06d6a0' : '#ef4444' }}>
+            {dE === null ? '—' : dE.toFixed(1)}
+          </div>
         </div>
       </div>
 
       {dE !== null && (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '7px 11px', borderRadius: 10, background: success ? 'rgba(5,150,105,0.1)' : 'rgba(0,0,0,0.04)', border: `1px solid ${success ? 'rgba(5,150,105,0.25)' : 'rgba(0,0,0,0.06)'}` }}>
-          <span style={{ fontSize: 12.5, fontWeight: 700, color: success ? '#059669' : '#5a6072' }}>
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '7px 11px', borderRadius: 10,
+          background: success ? 'rgba(6,214,160,.1)' : 'rgba(255,255,255,.04)',
+          border: `1px solid ${success ? 'rgba(6,214,160,.25)' : 'rgba(255,255,255,.08)'}`,
+        }}>
+          <span style={{ fontSize: 12, fontWeight: 700, color: success ? '#06d6a0' : 'rgba(255,255,255,.55)' }}>
             {success ? `Réussi ! (≤ ${tolerance})` : `Trop loin (cible ≤ ${tolerance})`}
           </span>
-          <span style={{ fontSize: 13, fontWeight: 800, color: '#4361ee' }}>+{score} pts{best !== null && best !== score ? ` · record ${best}` : ''}</span>
+          <span style={{ fontSize: 13, fontWeight: 800, color: '#a78bfa' }}>
+            +{score} pts{best !== null && best !== score ? ` · record ${best}` : ''}
+          </span>
         </div>
       )}
 
       {error && (
-        <div style={{ fontSize: 12, color: '#ef4444', fontWeight: 600, padding: '6px 10px', borderRadius: 9, background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.2)' }}>{error}</div>
+        <div style={{ fontSize: 12, color: '#ef9999', fontWeight: 600, padding: '6px 10px', borderRadius: 9, background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.25)' }}>
+          {error}
+        </div>
       )}
 
       {/* Actions */}
       <div style={{ display: 'flex', gap: 7 }}>
         <button onClick={measure} disabled={measuring} style={{
-          flex: 1, padding: '11px 14px', borderRadius: 12, border: 'none', cursor: measuring ? 'wait' : 'pointer',
+          flex: 1, padding: '11px 14px', borderRadius: 12, border: 'none',
+          cursor: measuring ? 'wait' : 'pointer',
           fontFamily: 'inherit', fontWeight: 800, fontSize: 14, color: '#fff',
-          background: measuring ? '#94a3b8' : 'linear-gradient(135deg,#4361ee,#7c3aed)',
-          boxShadow: measuring ? 'none' : '0 4px 14px rgba(67,97,238,0.3)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, transition: 'all 150ms',
+          background: measuring ? 'rgba(255,255,255,.1)' : 'linear-gradient(135deg,#06d6a0,#4361ee)',
+          boxShadow: measuring ? 'none' : '0 4px 14px rgba(6,214,160,.25)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
+          transition: 'all 150ms',
+          opacity: measuring ? 0.6 : 1,
         }}>
           <Ruler size={15} /> {measuring ? 'Mesure en cours…' : 'Mesurer (CS-160)'}
         </button>
         {rnd && (
           <button onClick={newTarget} disabled={measuring} style={{
-            padding: '11px 14px', borderRadius: 12, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700, fontSize: 13,
-            border: '1px solid rgba(0,0,0,0.1)', background: 'rgba(255,255,255,0.8)', color: '#5a6072',
+            padding: '11px 14px', borderRadius: 12, cursor: 'pointer',
+            fontFamily: 'inherit', fontWeight: 700, fontSize: 13,
+            border: '1px solid rgba(255,255,255,.12)',
+            background: 'rgba(255,255,255,.06)', color: 'rgba(255,255,255,.7)',
             display: 'flex', alignItems: 'center', gap: 6,
           }}>
             <RefreshCcw size={14} /> Nouvelle cible

@@ -52,18 +52,6 @@ function makeIntruder(base: RGB, delta: number, mode: 'lum' | 'hue'): RGB {
   return { r: clamp255(base.r * (1 + delta)), g: clamp255(base.g * (1 - delta * 0.7)), b: clamp255(base.b * (1 - delta * 0.4)) };
 }
 
-// RGB → lecture colorimétrique (x, y, Lv) — sert de simulation quand le CS-160
-// n'est pas connecté, et de référence interne.
-function rgbToReading(c: RGB): Reading {
-  const lin = (v: number) => { const s = v / 255; return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4; };
-  const r = lin(c.r), g = lin(c.g), b = lin(c.b);
-  const X = 0.4124 * r + 0.3576 * g + 0.1805 * b;
-  const Y = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-  const Z = 0.0193 * r + 0.1192 * g + 0.9505 * b;
-  const s = X + Y + Z;
-  return { x: s > 1e-9 ? X / s : 0.33, y: s > 1e-9 ? Y / s : 0.33, Lv: Y * 250 };
-}
-
 // Écart perçu entre deux lectures (chromaticité + luminance relative)
 function readingDelta(a: Reading, b: Reading): number {
   const dxy = Math.hypot(a.x - b.x, a.y - b.y) * 1000;
@@ -76,7 +64,7 @@ const S: Record<string, React.CSSProperties> = {
   btn: { padding: '11px 22px', borderRadius: 13, border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 800, fontSize: 14, color: '#fff', background: 'linear-gradient(135deg,#06d6a0,#4361ee)', boxShadow: '0 4px 18px rgba(6,214,160,.3)' },
   ghost: { padding: '10px 18px', borderRadius: 13, border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.06)', color: 'rgba(255,255,255,.75)', fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' },
   glass: { background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.08)', borderRadius: 12 },
-  stat: { background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.08)', borderRadius: 12, padding: '8px 14px', textAlign: 'center', minWidth: 66 },
+  stat: { background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.08)', borderRadius: 12, padding: '8px 14px', textAlign: 'center', minWidth: 60, flex: '1 1 60px' },
   statLbl: { fontSize: 10, color: 'rgba(255,255,255,.4)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 3 },
 };
 
@@ -137,7 +125,7 @@ export default function GameIntrus({ onSendColor, onTurnOff, onTurnOffAll, onQui
     return () => window.clearInterval(id);
   }, [phase, level]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Analyse de la dalle sélectionnée via le CS-160 (sinon simulation)
+  // Analyse de la dalle sélectionnée via le CS-160
   async function analyse() {
     if (selected === null || phase !== 'playing' || measuring) return;
     setMeasuring(true);
@@ -155,12 +143,11 @@ export default function GameIntrus({ onSendColor, onTurnOff, onTurnOffAll, onQui
           reading = { x, y, Lv };
         }
       }
-    } catch { /* appareil indisponible → simulation */ }
+    } catch { /* appareil indisponible */ }
     if (!reading) {
-      // Simulation : la dalle réellement allumée + un léger bruit de mesure
-      const base = rgbToReading(tiles[selected] ?? { r: 0, g: 0, b: 0 });
-      const n = () => (Math.random() - 0.5) * 0.0006;
-      reading = { x: base.x + n(), y: base.y + n(), Lv: base.Lv * (1 + (Math.random() - 0.5) * 0.01) };
+      setMsg('CS-160 non connecté — pointez l\'appareil sur une dalle et réessayez.');
+      setMeasuring(false);
+      return;
     }
     setReadings((r) => ({ ...r, [selected]: reading! }));
     setMsg(`Dalle ${selected + 1} analysée — Lv=${reading.Lv.toFixed(1)} · x=${reading.x.toFixed(4)} y=${reading.y.toFixed(4)}`);
@@ -251,14 +238,14 @@ export default function GameIntrus({ onSendColor, onTurnOff, onTurnOffAll, onQui
     <div style={S.wrap}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '14px 16px' }}>
         {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           <div style={S.stat}><div style={S.statLbl}>Niveau</div><div style={{ fontSize: 20, fontWeight: 900, color: '#06d6a0' }}>{level}</div></div>
           <div style={S.stat}><div style={S.statLbl}>Score</div><div style={{ fontSize: 20, fontWeight: 900 }}>{score}</div></div>
           <div style={{ ...S.stat, background: low ? 'rgba(239,68,68,.14)' : S.stat.background }}>
             <div style={S.statLbl}>Temps</div>
             <div style={{ fontSize: 20, fontWeight: 900, color: low ? '#ef4444' : '#fff', display: 'flex', alignItems: 'center', gap: 4, justifyContent: 'center' }}><Timer size={15} /> {timeLeft}s</div>
           </div>
-          <button onClick={() => { onTurnOffAll(); onQuit(); }} style={{ ...S.ghost, marginLeft: 'auto', padding: 8 }}><X size={14} /></button>
+          <button onClick={() => { onTurnOffAll(); onQuit(); }} style={{ ...S.ghost, marginLeft: 'auto', padding: 8, flexShrink: 0 }}><X size={14} /></button>
         </div>
 
         {/* Grille à l'écran : TOUTES les dalles montrent la couleur de base (aucune triche
@@ -287,22 +274,22 @@ export default function GameIntrus({ onSendColor, onTurnOff, onTurnOffAll, onQui
         </div>
 
         {/* Lecture CS-160 de la dalle sélectionnée */}
-        <div style={{ ...S.glass, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-          <div style={{ fontSize: 12, color: 'rgba(255,255,255,.7)' }}>
+        <div style={{ ...S.glass, padding: '10px 14px', display: 'flex', alignItems: 'flex-start', gap: 10, flexWrap: 'wrap' }}>
+          <div style={{ fontSize: 12, color: 'rgba(255,255,255,.7)', flex: '1 1 160px', minWidth: 0 }}>
             {selected === null ? 'Sélectionnez une dalle à analyser' : `Dalle ${selected + 1}`}
             {selected !== null && readings[selected] && (
-              <span style={{ marginLeft: 8, fontFamily: 'monospace', color: '#06d6a0' }}>
+              <div style={{ marginTop: 3, fontFamily: 'monospace', color: '#06d6a0', fontSize: 11, wordBreak: 'break-all' }}>
                 Lv={readings[selected].Lv.toFixed(1)} · x={readings[selected].x.toFixed(4)} · y={readings[selected].y.toFixed(4)}
                 {refReading && <> · écart={(deviations[selected] ?? 0).toFixed(1)}</>}
-              </span>
+              </div>
             )}
           </div>
-          <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
-            <button onClick={analyse} disabled={selected === null || measuring} style={{ ...S.btn, padding: '9px 16px', opacity: selected === null || measuring ? 0.5 : 1, display: 'flex', alignItems: 'center', gap: 6 }}>
-              <Ruler size={15} /> {measuring ? 'Mesure…' : 'Analyser (CS-160)'}
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', flexShrink: 0 }}>
+            <button onClick={analyse} disabled={selected === null || measuring} style={{ ...S.btn, padding: '9px 14px', opacity: selected === null || measuring ? 0.5 : 1, display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
+              <Ruler size={14} /> {measuring ? 'Mesure…' : 'Analyser'}
             </button>
-            <button onClick={accuse} disabled={selected === null} style={{ ...S.btn, background: 'linear-gradient(135deg,#ef4444,#a855f7)', padding: '9px 16px', opacity: selected === null ? 0.5 : 1, display: 'flex', alignItems: 'center', gap: 6 }}>
-              <Target size={15} /> C&apos;est l&apos;intrus
+            <button onClick={accuse} disabled={selected === null} style={{ ...S.btn, background: 'linear-gradient(135deg,#ef4444,#a855f7)', padding: '9px 14px', opacity: selected === null ? 0.5 : 1, display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
+              <Target size={14} /> Intrus
             </button>
           </div>
         </div>
