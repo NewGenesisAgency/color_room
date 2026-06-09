@@ -9,6 +9,7 @@ import { SPRITE_ICONS, renderCustomSvg } from '@/app/editeur/UIDesigner';
 import type { TouchKey } from '@/app/_components/TouchControls';
 import NavigationMenu from '@/app/_components/NavigationMenu';
 import LoginScreen from '@/app/_components/LoginScreen';
+import QrCode from '@/app/_components/QrCode';
 import { PLATE_TYPE, CHANNELS_ROUGE, CHANNELS_BLEU, getPlateType, MAP_ROUGE_TO_BLEU, remapChannels32 } from '@/lib/tileChannels';
 import { playSfx, vibrate } from '@/lib/audio/sfx';
 import { LOGIC_OP_KINDS, applyLogicOp } from '@/lib/game/logicOps';
@@ -1729,7 +1730,8 @@ export default function JeuxPage() {
     if (view !== 'main') return;
 
     // Ne poll que si un token MP existe OU si le status est actif OU si une session existe
-    const shouldPoll = mpToken || mpStatus === 'active' || mpSessionId;
+    // OU si on est en mode hôte « 1 joueur = 1 plaque » (qui doit suivre les couleurs).
+    const shouldPoll = mpToken || mpStatus === 'active' || mpSessionId || currentGame === 'multiplayer-plates';
     if (!shouldPoll) return;
 
     let alive = true;
@@ -1991,10 +1993,36 @@ export default function JeuxPage() {
     };
   }, [gameActive, currentGame, mpState?.endsAtMs]);
 
+  // ── Hôte « 1 joueur = 1 plaque » : chaque siège allume SA plaque avec sa
+  // couleur (RGB encodé 0xRRGGBB dans la valeur soumise depuis /jouer). ──
+  const lastMpPlatesRef = useRef<string>('');
+  useEffect(() => {
+    if (!gameActive) return;
+    if (currentGame !== 'multiplayer-plates') return;
+    if (!mpState) return;
+    const sub = ((mpState as unknown as { submittedValueBySeat?: Record<string, number> }).submittedValueBySeat) ?? {};
+    const key = JSON.stringify(sub);
+    if (key === lastMpPlatesRef.current) return; // anti-lag : ne renvoie que si ça change
+    lastMpPlatesRef.current = key;
+    const colors = Array(42).fill('#000000'); const actives = Array(42).fill(false);
+    for (let seat = 1; seat <= 8; seat++) {
+      const idx = seat - 1; const pid = PLATE_ID_BY_INDEX[idx]; if (!pid) continue;
+      const packed = Number(sub[String(seat)] ?? -1);
+      if (packed >= 0) {
+        const r = (packed >> 16) & 255, g = (packed >> 8) & 255, b = packed & 255;
+        sendRgbToPlate({ r, g, b }, 88, pid);
+        colors[idx] = `#${[r, g, b].map((v) => v.toString(16).padStart(2, '0')).join('')}`; actives[idx] = true;
+      } else {
+        turnOffPlateImmediate(pid);
+      }
+    }
+    setPlateColors(colors); setPlateActive(actives);
+  }, [mpState, currentGame, gameActive]);
+
   // Auto-stop multiplayer game if no players for 15 seconds
   useEffect(() => {
     if (!gameActive) return;
-    if (currentGame !== 'multiplayer-split') return;
+    if (currentGame !== 'multiplayer-split' && currentGame !== 'multiplayer-plates') return;
     if (mpPlayers.length > 0) return;
     const t = window.setTimeout(() => {
       setGameActive(false);
@@ -4615,7 +4643,27 @@ export default function JeuxPage() {
                     };
                   });
 
-                  const allCards: GameCard[] = [...nativeCards, ...builtinCards, spectreCard, ...dbCards];
+                  const platesCard: GameCard = {
+                    key: 'mp-plates',
+                    title: 'Multijoueur — 1 joueur / plaque',
+                    desc: 'Chaque joueur pilote SA plaque depuis son téléphone (page /jouer)',
+                    Icon: Users,
+                    iconBg: 'linear-gradient(135deg,#3b82f6,#06d6a0)',
+                    iconColor: '#fff',
+                    badgeLabel: 'multi',
+                    accent: '#3b82f6',
+                    selected: currentGame === 'multiplayer-plates',
+                    howTo: "Lance ce mode sur la tablette de la salle. Chaque joueur ouvre la page /jouer sur son téléphone, rejoint la partie, et choisit une couleur : sa plaque s'allume en temps réel dans la Color Room. À regarder sur les dalles.",
+                    launch: () => {
+                      setTetrisStandalone(false); setCustomRun(null); setHudRun(null);
+                      setActiveBuiltinGame(null); setSimonActive(false); setSpectreActive(false);
+                      setCurrentGame('multiplayer-plates');
+                      setGameActive(true);
+                      setMessage('Multijoueur plaques — les joueurs rejoignent sur la page /jouer de leur téléphone');
+                    },
+                  };
+
+                  const allCards: GameCard[] = [...nativeCards, ...builtinCards, spectreCard, platesCard, ...dbCards];
 
                   const q = gameSearch.toLowerCase().trim();
                   const filtered = q
@@ -4722,6 +4770,20 @@ export default function JeuxPage() {
               />
 
               <div>
+                {gameActive && currentGame === 'multiplayer-plates' && (
+                  <div className="glass" style={{ padding: 20, borderRadius: 18, marginTop: 12, textAlign: 'center' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 6 }}>
+                      <Users size={20} color="#3b82f6" />
+                      <strong style={{ fontSize: 18 }}>1 joueur = 1 plaque</strong>
+                    </div>
+                    <p style={{ fontSize: 13, opacity: 0.75, margin: '0 0 14px' }}>Chaque joueur scanne ce QR (ou ouvre <code>/jouer</code>) et choisit une couleur : sa plaque s&apos;allume dans la Color Room.</p>
+                    <div style={{ display: 'inline-block', background: '#fff', padding: 10, borderRadius: 14 }}>
+                      <QrCode value={(typeof window !== 'undefined' ? window.location.origin : '') + '/jouer'} size={180} />
+                    </div>
+                    <div style={{ marginTop: 12, fontSize: 15, fontWeight: 800 }}>{mpPlayers.length} joueur{mpPlayers.length > 1 ? 's' : ''} connecté{mpPlayers.length > 1 ? 's' : ''}</div>
+                    <div style={{ marginTop: 4, fontSize: 12, opacity: 0.6 }}>👁️ Regarde les dalles de la Color Room, pas l&apos;écran.</div>
+                  </div>
+                )}
                 {gameActive && customRun ? (
                   <div className="glass" style={{ padding: 14, borderRadius: 18, marginBottom: 12 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
