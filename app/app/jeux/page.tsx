@@ -1960,6 +1960,7 @@ export default function JeuxPage() {
     };
   }, [gameActive]); // Pause le poll quand un jeu est actif
 
+  const lastMpCh32Ref = useRef<string>('');
   useEffect(() => {
     if (!gameActive) return;
     if (currentGame !== 'multiplayer-split') return;
@@ -1968,6 +1969,11 @@ export default function JeuxPage() {
     if (Number(mpState.endsAtMs ?? 0) <= 0) return;
     const activeSeats = mpPlayers.map((p) => p.seat);
     const ch32 = computeTeamChannels32FromState(mpState, { activeSeats });
+    // Anti-lag : on ne réenvoie au matériel QUE si les valeurs ont changé
+    // (le poll renvoie le même état toutes les 800 ms → évite un churn inutile).
+    const key = ch32.join(',');
+    if (key === lastMpCh32Ref.current) return;
+    lastMpCh32Ref.current = key;
     applyChannels32ToSelectedPlates(ch32);
   }, [mpState, currentGame, gameActive, mpPlayers]);
 
@@ -4256,7 +4262,7 @@ export default function JeuxPage() {
             </code>
             {/* Body */}
             <div style={{ fontSize: 14, color: 'rgba(26,29,46,0.75)', lineHeight: 1.6 }}>
-              Un autre poste a lancé le jeu <strong style={{ color: '#1a1d2e' }}>Multijoueur - Teintes</strong>.
+              Un autre poste a lancé le jeu <strong style={{ color: '#1a1d2e' }}>Écran scindé</strong>.
               <br />
               Voulez-vous rejoindre ? La partie démarrera automatiquement dès qu'il y aura 2 joueurs.
             </div>
@@ -5189,7 +5195,7 @@ export default function JeuxPage() {
                     }
                   >
                     <div style={{ marginTop: 10, fontSize: 12, opacity: 0.8 }}>
-                      Mode coop: 2 à 8 joueurs. Chaque joueur contrôle une teinte (1 canal parmi 32). Objectif: atteindre les cibles ensemble en 2 minutes.
+                      Écran scindé (coopératif) : 2 à 8 joueurs. Chaque joueur contrôle une teinte (1 canal parmi 32). Objectif : atteindre les cibles ensemble en 2 minutes. Jeu à regarder sur les dalles de la Color Room.
                     </div>
 
                     {mpState && Number(mpState.endsAtMs ?? 0) <= 0 ? (
