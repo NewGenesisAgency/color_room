@@ -952,6 +952,8 @@ export default function JeuxPage() {
     power: '-',
     apiLatency: '-',
   });
+  const [apiUp, setApiUp] = useState<boolean | null>(null);      // supervision joignable (dernier poll)
+  const [apiSpectrum, setApiSpectrum] = useState<number[]>([]);  // 32 canaux lus depuis l'API (courbe réelle)
 
   const [secretRevealed, setSecretRevealed] = useState<boolean>(false);
   const [cancelColor, setCancelColor] = useState<{ r: number; g: number }>({ r: 0, g: 0 });
@@ -1049,10 +1051,13 @@ export default function JeuxPage() {
   }, []);
 
   const spectrumHeights = useMemo(() => {
+    // Courbe = canaux RÉELS lus depuis l'API (apiSpectrum) si disponibles,
+    // sinon les valeurs commandées localement (ledValues) en repli.
+    const src = apiSpectrum.length === 32 ? apiSpectrum : null;
     const h: number[] = [];
-    for (let i = 0; i < 32; i++) h.push(ledValues[i] ?? 0);
+    for (let i = 0; i < 32; i++) h.push((src ? src[i] : ledValues[i]) ?? 0);
     return h;
-  }, [ledValues]);
+  }, [ledValues, apiSpectrum]);
 
   const spectrumHeightsPercent = useMemo(() => {
     return spectrumHeights.map((v) => {
@@ -1901,12 +1906,22 @@ export default function JeuxPage() {
 
       const tempKFromRgb = rgbFromApi ? rgbToCctK(rgbFromApi) : 0;
       const tempK = tempKFromRgb > 0 ? tempKFromRgb : inferColorTempK(rBand, gBand, bBand);
-      const cri = inferCriFromSpectre(spectreFromApi || [], { r: rBand, g: gBand, b: bBand });
+      const criEst = inferCriFromSpectre(spectreFromApi || [], { r: rBand, g: gBand, b: bBand });
+
+      // On préfère les vraies valeurs de l'API si elles existent (plusieurs noms
+      // possibles selon la version de la supervision) ; sinon on estime (préfixe ≈).
+      const apiPower = payloadObj ? (payloadObj.power ?? payloadObj.puissance ?? payloadObj.watt) : null;
+      const apiCri   = payloadObj ? (payloadObj.cri ?? payloadObj.irc) : null;
+      const apiCct   = payloadObj ? (payloadObj.cct ?? payloadObj.colorTemp ?? payloadObj.temperature) : null;
+
+      // Connexion + courbe spectrale réelles (lues depuis la supervision)
+      setApiUp(payloadObj != null);
+      if (payloadObj && used.length === 32) setApiSpectrum(used);
 
       setInstrument({
-        colorTemp: tempK > 0 ? `${tempK}K` : '-',
-        cri: `${cri}`,
-        power: `${Math.floor(sum * 3)}W`,
+        colorTemp: apiCct != null ? `${Math.round(Number(apiCct))}K` : (tempK > 0 ? `${tempK}K` : '-'),
+        cri: apiCri != null ? `${apiCri}` : `≈${criEst}`,
+        power: apiPower != null ? `${apiPower}W` : `≈${Math.floor(sum * 3)}W`,
         apiLatency,
       });
 
@@ -5617,6 +5632,12 @@ export default function JeuxPage() {
                   <Activity size={18} /> Instruments de Mesure
                 </h3>
                 <div className="instruments-panel">
+                  <div className="instrument-reading">
+                    <span style={{ display: 'inline-flex', gap: 8, alignItems: 'center' }}>
+                      <span style={{ width: 9, height: 9, borderRadius: '50%', flexShrink: 0, background: apiUp == null ? '#9ca3af' : apiUp ? '#22c55e' : '#ef4444', boxShadow: apiUp ? '0 0 8px #22c55e' : 'none' }} /> API Supervision
+                    </span>
+                    <span>{apiUp == null ? '—' : apiUp ? 'Connectée' : 'Hors ligne'}</span>
+                  </div>
                   <div className="instrument-reading">
                     <span style={{ display: 'inline-flex', gap: 8, alignItems: 'center' }}>
                       <Thermometer size={16} /> Temp. Couleur
