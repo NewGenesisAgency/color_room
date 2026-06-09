@@ -206,21 +206,24 @@ class CS160Service {
    * One-shot measurement: measure + poll + read
    */
   async oneShotMeasurement(): Promise<{ xyz: XYZ | null; lvxy: Lvxy | null }> {
-    if (!await this.measure()) {
-      return { xyz: null, lvxy: null };
-    }
-
-    const status = await this.pollMeasurement();
-    if (status !== 'completed') {
-      return { xyz: null, lvxy: null };
-    }
-
-    const [xyz, lvxy] = await Promise.all([
-      this.readXYZ(),
-      this.readLvxy()
-    ]);
-
-    return { xyz, lvxy };
+    // MÊME méthode que la page /mesure : un seul POST {action:'measure'} qui
+    // renvoie directement data.data.{xyz,lvxy}. (La route /api/cs160 n'implémente
+    // PAS les actions polling/read_xyz/read_lvxy — l'ancien flux échouait toujours.)
+    try {
+      const res = await fetch(this.baseUrl, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ action: 'measure' }),
+      });
+      const data = await res.json();
+      if (data?.success && data.data) {
+        return {
+          xyz: (data.data.xyz ?? null) as XYZ | null,
+          lvxy: (data.data.lvxy ?? null) as Lvxy | null,
+        };
+      }
+    } catch { /* appareil indisponible */ }
+    return { xyz: null, lvxy: null };
   }
 
   /**
