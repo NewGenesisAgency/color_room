@@ -87,7 +87,7 @@ RÈGLES :
 - Rendu: fill {color,intensity(0..1),mask('all'|'border')}; tile/tile_set {tileIndex,color,intensity}; pulse {baseColor,targetColor,speed}.
 - Boucles: for_range {varName,start,end,step}; loop_count {count}.
 - Évènements d'entrée: on_key {key}, on_tile_click {tileIndex}, on_timer {intervalMs}, on_tick {intervalMs}.
-- Audio: play_sound {sound('click'|'score'|'win'|'lose'|'tick'|'error')}.
+- Audio (hors-ligne): play_sound {sound}. Sons: click, select, tick, pop, swoosh, correct, wrong, success, error, alert, win, lose, levelup, coin, powerup, countdown, start, score. Utilise 'correct'/'wrong' pour le feedback pédagogique, 'win'/'lose' en fin de partie, 'coin'/'score' pour les points.
 - L'UI est posée sur un canvas 860×500. Place les composants sans chevauchement.
 - Lie les affichages à des variables via "varBind" (ex: un score_display avec varBind "score").
 - Relie les boutons à la logique via "eventId" et un nœud "on_ui_click" {buttonId} correspondant.

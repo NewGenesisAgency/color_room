@@ -6,6 +6,7 @@ import dynamic from 'next/dynamic';
 import type { TetrisSnapshot } from '@/app/_components/TetrisGame';
 import type { UILayoutComponent } from './UIDesigner';
 import Coachmarks, { type CoachStep } from '@/app/_components/Coachmarks';
+import { playSfx, SFX_LIST, unlockAudio } from '@/lib/audio/sfx';
 
 // Modules lourds (3D Three.js, éditeur Python/Pyodide, designer UI, panneau CS160)
 // chargés à la demande pour alléger le bundle initial de /editeur.
@@ -1971,6 +1972,7 @@ export default function EditeurPage() {
           if (cst) executeNodeSync(cst, depth+1);
           break;
         }
+        case 'play_sound': { playSfx(String(node.params.sound ?? 'click')); break; }
         default: break;
       }
 
@@ -6492,6 +6494,21 @@ export default function EditeurPage() {
                         <div style={{ fontWeight: 700, fontSize: 14 }}>Séquence</div>
                       </div>
                       <p style={{ fontSize: 12, opacity: 0.7, lineHeight: 1.5 }}>Exécute les nœuds connectés en série, l&apos;un après l&apos;autre.</p>
+                    </div>
+                  ) : selectedNode.kind === 'play_sound' ? (
+                    <div style={{ display: 'grid', gap: 12 }}>
+                      <label style={{ display: 'grid', gap: 4 }}>
+                        <span className="g-label">Effet sonore (hors-ligne)</span>
+                        <select className="g-select" style={{ height: 36, fontSize: 13 }}
+                          value={String(selectedNode.params.sound ?? 'click')}
+                          onChange={(e) => updateSelectedParams({ sound: e.target.value })}>
+                          {SFX_LIST.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
+                        </select>
+                      </label>
+                      <button type="button" className="g-btn g-btn--sm"
+                        onClick={() => { unlockAudio(); playSfx(String(selectedNode.params.sound ?? 'click')); }}>
+                        <Play size={13} /> Écouter
+                      </button>
                     </div>
                   ) : selectedNode.kind === 'loop_count' ? (
                     <div style={{ display: 'grid', gap: 12 }}>

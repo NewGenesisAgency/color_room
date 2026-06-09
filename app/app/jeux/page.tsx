@@ -10,6 +10,7 @@ import type { TouchKey } from '@/app/_components/TouchControls';
 import NavigationMenu from '@/app/_components/NavigationMenu';
 import LoginScreen from '@/app/_components/LoginScreen';
 import { PLATE_TYPE, CHANNELS_ROUGE, CHANNELS_BLEU, getPlateType, MAP_ROUGE_TO_BLEU, remapChannels32 } from '@/lib/tileChannels';
+import { playSfx } from '@/lib/audio/sfx';
 
 // Modules lourds (3D Three.js, jeux, pages spectre/chromaticité) chargés à la
 // demande : ils n'alourdissent plus le bundle initial de /jeux, ce qui accélère
@@ -746,29 +747,9 @@ function spectrum32ToRgb255(channels32: number[]): TargetColor {
   };
 }
 
-// ── Sons de jeu (Web Audio, aucun fichier requis) ────────────────────────────
-let _gameAudioCtx: AudioContext | null = null;
-function playGameSound(type: 'click' | 'score' | 'win' | 'lose' | 'tick' | 'error') {
-  try {
-    if (!_gameAudioCtx) _gameAudioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
-    const ctx = _gameAudioCtx;
-    if (ctx.state === 'suspended') void ctx.resume();
-    const now = ctx.currentTime;
-    const blip = (f: number, t0: number, dur: number, wave: OscillatorType, vol = 0.16) => {
-      const o = ctx.createOscillator(), g = ctx.createGain();
-      o.connect(g); g.connect(ctx.destination);
-      o.type = wave; o.frequency.value = f;
-      g.gain.setValueAtTime(0.0001, t0);
-      g.gain.exponentialRampToValueAtTime(vol, t0 + 0.008);
-      g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
-      o.start(t0); o.stop(t0 + dur + 0.02);
-    };
-    if (type === 'click') blip(520, now, 0.06, 'square', 0.12);
-    else if (type === 'tick') blip(380, now, 0.04, 'square', 0.08);
-    else if (type === 'score') { blip(660, now, 0.09, 'sine'); blip(990, now + 0.06, 0.1, 'sine'); }
-    else if (type === 'error' || type === 'lose') { blip(200, now, 0.18, 'sawtooth'); blip(150, now + 0.12, 0.22, 'sawtooth'); }
-    else if (type === 'win') [660, 880, 1100, 1320].forEach((f, i) => blip(f, now + i * 0.09, 0.2, 'triangle', 0.15));
-  } catch { /* audio indisponible */ }
+// ── Sons de jeu : délègue au moteur SFX partagé 100% hors-ligne (lib/audio/sfx) ─
+function playGameSound(type: string) {
+  playSfx(type);
 }
 
 // ── Overlay UI des jeux éditeur (uiLayout dessiné dans /editeur) ───────────────
@@ -2397,8 +2378,7 @@ export default function JeuxPage() {
         const nextId = g.out.get(node.id)?.[0]; if (nextId) walk(nextId); return;
       }
       if (node.kind === 'play_sound') {
-        const s = String(params.sound ?? 'click');
-        playGameSound((['click', 'score', 'win', 'lose', 'tick', 'error'].includes(s) ? s : 'click') as any);
+        playSfx(String(params.sound ?? 'click'));
         const nextId = g.out.get(node.id)?.[0]; if (nextId) walk(nextId); return;
       }
       if (node.kind === 'score_reset') {
