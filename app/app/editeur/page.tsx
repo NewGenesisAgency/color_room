@@ -1704,7 +1704,7 @@ export default function EditeurPage() {
           const condOp = String(node.params.op ?? 'gt');
           const condVal = getNum(node.params, 'value', 0);
           const rawVal = vars[condVar];
-          const varVal = typeof rawVal === 'number' ? rawVal : 0;
+          const varVal = typeof rawVal === 'number' ? rawVal : (Number(rawVal) || 0);
           let condResult = false;
           if (condOp === 'gt') condResult = varVal > condVal;
           else if (condOp === 'lt') condResult = varVal < condVal;
@@ -1712,10 +1712,10 @@ export default function EditeurPage() {
           else if (condOp === 'gte') condResult = varVal >= condVal;
           else if (condOp === 'lte') condResult = varVal <= condVal;
           else if (condOp === 'neq') condResult = varVal !== condVal;
-          const trueTarget = String(node.params.trueTarget ?? '');
-          const falseTarget = String(node.params.falseTarget ?? '');
-          if (condResult && trueTarget) executeNodeSync(trueTarget, depth + 1);
-          else if (!condResult && falseTarget) executeNodeSync(falseTarget, depth + 1);
+          // Branche par les liens : 1re sortie = Alors (vrai), 2e (si présente) = Sinon (faux)
+          const ifOuts = game.edges.filter((e) => e.from === nodeId);
+          const ifBranch = condResult ? ifOuts[0] : ifOuts[1];
+          if (ifBranch) executeNodeSync(ifBranch.to, depth + 1);
           setRuntimeTiles([...runtimeTilesRef.current]);
           return;
         }
@@ -5034,12 +5034,29 @@ export default function EditeurPage() {
                           ) : n.kind === 'if' ? (
                             <div className="bp-node__vars" onPointerDown={(e) => e.stopPropagation()}>
                               <div className="bp-node__var">
-                                <span className="bp-node__varlabel">Condition</span>
+                                <span className="bp-node__varlabel">Si variable</span>
                                 <div className="bp-node__varctrl">
-                                  <input type="checkbox" checked={Boolean(n.params.condition)}
-                                    onChange={(e) => updateNodeParamsById(n.id, { condition: e.target.checked })} />
+                                  <input type="text" value={String(n.params.varName ?? '')} placeholder="score"
+                                    onChange={(e) => updateNodeParamsById(n.id, { varName: e.target.value })} />
                                 </div>
                               </div>
+                              <div className="bp-node__var">
+                                <span className="bp-node__varlabel">Est</span>
+                                <div className="bp-node__varctrl" style={{ display: 'flex', gap: 4 }}>
+                                  <select value={String(n.params.op ?? 'gt')}
+                                    onChange={(e) => updateNodeParamsById(n.id, { op: e.target.value })}>
+                                    <option value="gt">&gt;</option>
+                                    <option value="gte">&ge;</option>
+                                    <option value="lt">&lt;</option>
+                                    <option value="lte">&le;</option>
+                                    <option value="eq">=</option>
+                                    <option value="neq">&ne;</option>
+                                  </select>
+                                  <input type="number" value={getNum(n.params, 'value', 0)} style={{ width: 56 }}
+                                    onChange={(e) => updateNodeParamsById(n.id, { value: Number(e.target.value) })} />
+                                </div>
+                              </div>
+                              <div style={{ fontSize: 10, opacity: 0.6, marginTop: 2 }}>1ʳᵉ sortie = Alors • 2ᵉ lien = Sinon</div>
                             </div>
                           ) : n.kind === 'mp_session' ? (
                             <div className="bp-node__vars" onPointerDown={(e) => e.stopPropagation()}>

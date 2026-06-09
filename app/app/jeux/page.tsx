@@ -2432,11 +2432,28 @@ export default function JeuxPage() {
         return;
       }
 
-      // ── If: branch on boolean param ──
+      // ── If: teste une variable réelle puis branche ──
+      // 1re sortie = Alors (condition vraie), 2e sortie (si présente) = Sinon.
       if (node.kind === 'if') {
-        const condition = Boolean(params.condition);
+        const condVar = String(params.varName ?? '');
+        const op = String(params.op ?? 'gt');
+        const cmpVal = getNum(params, 'value', 0);
+        const raw = hudVarsRef.current[condVar];
+        const cur = typeof raw === 'number' ? raw : (Number(raw) || 0);
+        let cond: boolean;
+        switch (op) {
+          case 'eq':  cond = cur === cmpVal; break;
+          case 'neq': cond = cur !== cmpVal; break;
+          case 'gte': cond = cur >= cmpVal; break;
+          case 'lt':  cond = cur <  cmpVal; break;
+          case 'lte': cond = cur <= cmpVal; break;
+          case 'gt':
+          default:    cond = cur >  cmpVal; break;
+        }
+        // Rétro-compatibilité : ancien paramètre statique si aucune variable définie
+        if (!condVar && params.condition !== undefined) cond = Boolean(params.condition);
         const outputs = g.out.get(node.id) ?? [];
-        const nextId = condition ? outputs[0] : outputs[1];
+        const nextId = cond ? outputs[0] : outputs[1];
         if (nextId) walk(nextId);
         return;
       }
