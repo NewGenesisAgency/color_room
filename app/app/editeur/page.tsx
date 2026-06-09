@@ -1155,6 +1155,14 @@ export default function EditeurPage() {
   const activeGameId = editor.activeGameId ?? null;
   const selectedNodeId = editor.selectedNodeId;
 
+  // ── IA : génération de jeu via Google Gemini ───────────────────────────────
+  const [aiOpen, setAiOpen] = useState(false);
+  const [aiPrompt, setAiPrompt] = useState('');
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiStep, setAiStep] = useState('');
+  const [aiError, setAiError] = useState('');
+  const [aiModel, setAiModel] = useState('');
+
   const commit = (recipe: (cur: EditorSnapshot) => EditorSnapshot) => {
     setEditor((cur) => {
       const next = recipe(cur);
@@ -3202,6 +3210,98 @@ export default function EditeurPage() {
     }));
   };
 
+  // Génère un jeu complet via l'IA (Gemini) puis l'injecte bloc après bloc.
+  const generateWithAI = async () => {
+    const prompt = aiPrompt.trim();
+    if (!prompt || aiBusy) return;
+    setAiBusy(true); setAiError(''); setAiStep('Connexion à Gemini…'); setAiModel('');
+    const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+    try {
+      const res = await fetch('/api/ai/generate-game', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ prompt, tileCount: activeGame?.tileCount ?? 42 }),
+      });
+      const data = await res.json();
+      if (!data?.ok) {
+        setAiError(data?.message || 'Échec de la génération.');
+        setAiBusy(false); setAiStep('');
+        return;
+      }
+      const game = data.game as {
+        name: string; icon: string; difficulty: number; description: string;
+        bgColor: string; accentColor: string; tileCount: number;
+        nodes: Array<{ kind: string; name?: string; params: Record<string, unknown>; x: number; y: number }>;
+        edges: Array<[number, number]>;
+        ui: Array<Record<string, unknown>>;
+      };
+      setAiModel(String(data.model || ''));
+
+      // 1) Nouveau jeu vierge, puis on vide le gabarit par défaut
+      setAiStep('Création du jeu…');
+      await createGame(game.name, 'blank');
+      const gid = editorRef.current.activeGameId;
+      if (!gid) { setAiError('Création du jeu impossible.'); setAiBusy(false); setAiStep(''); return; }
+      commit((cur) => ({
+        ...cur,
+        games: cur.games.map((g) => (g.id === gid ? { ...g, nodes: [], edges: [], uiLayout: [] } : g)),
+        selectedNodeId: null,
+      }));
+      await sleep(150);
+
+      // 2) Injection des blocs un par un (effet « construction en direct »)
+      const ids: string[] = [];
+      for (let i = 0; i < game.nodes.length; i++) {
+        const n = game.nodes[i];
+        setAiStep(`Bloc ${i + 1}/${game.nodes.length} : ${n.name || n.kind}`);
+        const id = addNodeForGame(
+          gid,
+          n.kind as EditorNodeKind,
+          { x: Number(n.x) || (80 + i * 36), y: Number(n.y) || (80 + (i % 6) * 92) },
+          { name: n.name, params: n.params },
+        );
+        ids.push(id);
+        await sleep(200);
+      }
+
+      // 3) Liens entre blocs
+      setAiStep('Connexion des blocs…');
+      for (const [from, to] of game.edges) {
+        const a = ids[from]; const b = ids[to];
+        if (a && b) { addEdge(a, b); await sleep(90); }
+      }
+
+      // 4) Interface utilisateur
+      if (game.ui.length > 0) {
+        setAiStep('Construction de l’interface…');
+        const mkId = () => `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+        const uiLayout = game.ui.map((c) => ({ id: mkId(), ...c })) as unknown as UILayoutComponent[];
+        commit((cur) => ({ ...cur, games: cur.games.map((g) => (g.id === gid ? { ...g, uiLayout } : g)) }));
+        await sleep(150);
+      }
+
+      // 5) Métadonnées + finalisation
+      updateActiveGameMeta({
+        difficulty: game.difficulty as 1 | 2 | 3 | 4 | 5,
+        description: game.description,
+        bgColor: game.bgColor,
+        accentColor: game.accentColor,
+        tileCount: game.tileCount,
+        ...(game.icon ? { icon: game.icon as GameDoc['icon'] } : {}),
+      });
+      setDirty(true);
+      setAiStep('Terminé ✓');
+      setStatus(`Jeu IA généré : ${game.nodes.length} blocs, ${game.ui.length} éléments UI (${data.model}) — pense à sauvegarder`);
+      await sleep(600);
+      setAiOpen(false);
+    } catch (e: unknown) {
+      setAiError('Erreur réseau ou serveur. ' + (e instanceof Error ? e.message : ''));
+    } finally {
+      setAiBusy(false);
+      setAiStep('');
+    }
+  };
+
   const [dragBaseSnapshot, setDragBaseSnapshot] = useState<EditorSnapshot | null>(null);
   const [dragDidMove, setDragDidMove] = useState<boolean>(false);
 
@@ -3602,6 +3702,57 @@ export default function EditeurPage() {
   return (
     <main className="editeur stage">
       <Coachmarks open={tourOpen} steps={tourSteps} onClose={() => setTourOpen(false)} finishLabel="Commencer" />
+
+      {/* ── Panneau IA : génération de jeu par Gemini ──────────────────────── */}
+      {aiOpen && (
+        <div onClick={() => !aiBusy && setAiOpen(false)}
+          style={{ position: 'fixed', inset: 0, zIndex: 10050, display: 'grid', placeItems: 'center', background: 'rgba(8,10,18,0.55)', backdropFilter: 'blur(10px)' }}>
+          <style>{'@keyframes aiPulse{0%,100%{opacity:.45}50%{opacity:1}}'}</style>
+          <div onClick={(e) => e.stopPropagation()}
+            style={{ width: 'min(560px,92vw)', borderRadius: 20, overflow: 'hidden', background: 'linear-gradient(160deg,#12131d,#0c0d14)', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 30px 80px rgba(0,0,0,0.6)' }}>
+            <div style={{ padding: '18px 20px', display: 'flex', alignItems: 'center', gap: 12, borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+              <div style={{ width: 40, height: 40, borderRadius: 12, display: 'grid', placeItems: 'center', background: 'linear-gradient(135deg,#7c3aed,#ec4899)', flexShrink: 0 }}>
+                <Sparkles size={20} color="#fff" />
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <h2 style={{ margin: 0, fontSize: 17, fontWeight: 800, color: '#fff' }}>Créer un jeu avec l'IA</h2>
+                <p style={{ margin: '2px 0 0', fontSize: 12, color: 'rgba(255,255,255,0.55)' }}>Décris ton jeu — Gemini construit les blocs et l'interface en direct.</p>
+              </div>
+              {!aiBusy && <button onClick={() => setAiOpen(false)} style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.6)', cursor: 'pointer', padding: 4 }}><X size={20} /></button>}
+            </div>
+            <div style={{ padding: 20 }}>
+              <textarea value={aiPrompt} onChange={(e) => setAiPrompt(e.target.value)} disabled={aiBusy} rows={4}
+                placeholder="Ex : Un jeu de rapidité — une dalle s'allume d'une couleur aléatoire, le joueur doit la cliquer avant 2 s, +10 points par réussite, fin après 60 s avec un écran de score."
+                style={{ width: '100%', resize: 'vertical', borderRadius: 12, padding: '12px 14px', fontSize: 13.5, lineHeight: 1.5, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }} />
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 10 }}>
+                {['Jeu de réflexes sur les couleurs', 'Reproduire un blanc avec sliders RGB', 'Snake sur les plaques', 'Quiz couleurs avec score et vies'].map((ex) => (
+                  <button key={ex} disabled={aiBusy} onClick={() => setAiPrompt(ex)}
+                    style={{ fontSize: 11.5, padding: '5px 10px', borderRadius: 999, border: '1px solid rgba(255,255,255,0.14)', background: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.75)', cursor: aiBusy ? 'not-allowed' : 'pointer' }}>{ex}</button>
+                ))}
+              </div>
+
+              {aiError && (
+                <div style={{ marginTop: 14, padding: '10px 12px', borderRadius: 10, background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.3)', color: '#fca5a5', fontSize: 12.5 }}>⚠ {aiError}</div>
+              )}
+
+              {aiBusy && (
+                <div style={{ marginTop: 16, padding: '14px 16px', borderRadius: 12, background: 'rgba(124,58,237,0.12)', border: '1px solid rgba(124,58,237,0.3)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: '#c4b5fd', fontSize: 13, fontWeight: 700 }}>
+                    <Bot size={16} style={{ animation: 'aiPulse 1.1s ease-in-out infinite' }} /> {aiStep || 'Génération…'}
+                  </div>
+                  {aiModel && <div style={{ marginTop: 4, fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>Modèle : {aiModel}</div>}
+                </div>
+              )}
+
+              <button onClick={() => void generateWithAI()} disabled={aiBusy || !aiPrompt.trim()}
+                style={{ marginTop: 18, width: '100%', padding: 14, borderRadius: 12, border: 'none', cursor: aiBusy || !aiPrompt.trim() ? 'not-allowed' : 'pointer', fontWeight: 800, fontSize: 15, color: '#fff', background: aiBusy || !aiPrompt.trim() ? 'rgba(124,58,237,0.4)' : 'linear-gradient(135deg,#7c3aed,#ec4899)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                <Sparkles size={18} /> {aiBusy ? 'Construction en cours…' : 'Générer le jeu'}
+              </button>
+              <p style={{ margin: '10px 0 0', fontSize: 11, color: 'rgba(255,255,255,0.35)', textAlign: 'center' }}>Propulsé par Google Gemini · les blocs apparaissent en direct dans l'éditeur</p>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="ue">
         <aside className="ue__left" style={{ borderRadius: 16, overflow: 'hidden', background: '#fff', border: '1px solid rgba(0,0,0,0.07)', display: 'flex', flexDirection: 'column' }}>
             <div className="panelhead" style={{ background: '#fff', borderBottom: '1px solid rgba(0,0,0,0.07)', padding: '10px 14px', flexShrink: 0 }}>
@@ -3622,6 +3773,16 @@ export default function EditeurPage() {
               >
                 <FolderPlus size={13} />
                 <span>{dbLoading ? '…' : 'Nouveau jeu'}</span>
+              </button>
+              <button
+                className="g-btn g-btn--sm"
+                disabled={dbLoading}
+                onClick={() => { setAiError(''); setAiStep(''); setAiOpen(true); }}
+                title="Créer un jeu complet avec l'IA (Google Gemini)"
+                style={{ flex: 1, background: 'linear-gradient(135deg,#7c3aed,#ec4899)', color: '#fff', border: 'none' }}
+              >
+                <Sparkles size={13} />
+                <span>Créer avec l'IA</span>
               </button>
               <button
                 className="g-btn g-btn--sm"
