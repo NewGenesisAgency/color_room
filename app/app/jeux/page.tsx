@@ -2661,6 +2661,72 @@ export default function JeuxPage() {
         return;
       }
 
+      // ── Multijoueur (s'appuie sur /api/multiplayer : session, joueurs, inputs) ──
+      if (node.kind === 'mp_session') {
+        (async () => {
+          try {
+            const res = await fetch('/api/multiplayer/state', { cache: 'no-store' });
+            const d = await res.json();
+            if (d?.ok) {
+              hudVarsRef.current.mp_code = String(d.roomCode ?? '');
+              hudVarsRef.current.mp_players = Array.isArray(d.players) ? d.players.length : 0;
+              hudVarsRef.current.mp_session = 1;
+            }
+          } catch { /* hors-ligne */ }
+          bumpHudVars();
+          const nextId = g.out.get(node.id)?.[0]; if (nextId && !hudGraphRunRef.current.stop) walk(nextId);
+        })();
+        return;
+      }
+      if (node.kind === 'mp_wait_players') {
+        const minPlayers = Math.max(1, Math.round(getNum(params, 'minPlayers', 2)));
+        const timeoutMs = Math.max(2000, getNum(params, 'timeoutSec', 60) * 1000);
+        const startT = Date.now();
+        const poll = async () => {
+          if (hudGraphRunRef.current.stop) return;
+          let n = 0;
+          try {
+            const res = await fetch('/api/multiplayer/state', { cache: 'no-store' });
+            const d = await res.json();
+            n = d?.ok && Array.isArray(d.players) ? d.players.length : 0;
+            hudVarsRef.current.mp_players = n;
+            if (d?.roomCode) hudVarsRef.current.mp_code = String(d.roomCode);
+            bumpHudVars();
+          } catch { /* hors-ligne */ }
+          if (n >= minPlayers || Date.now() - startT >= timeoutMs) {
+            const nextId = g.out.get(node.id)?.[0]; if (nextId && !hudGraphRunRef.current.stop) walk(nextId);
+            return;
+          }
+          const t = window.setTimeout(poll, 1500); hudGraphRunRef.current.timers.push(t);
+        };
+        poll();
+        return;
+      }
+      if (node.kind === 'mp_broadcast') {
+        const color = getColor(params, 'color', '#00d7ff');
+        const intensity = intensityToMasterPercent(params.intensity, masterIntensity);
+        setMasterIntensity(intensity); setAllPlates(color, intensity > 0);
+        const rgb = hexToRgb255(color);
+        for (let i = 0; i < 42; i++) { const pid = PLATE_ID_BY_INDEX[i]; if (pid) sendRgbToPlate(rgb, intensity, pid); }
+        const nextId = g.out.get(node.id)?.[0]; if (nextId) walk(nextId); return;
+      }
+      if (node.kind === 'mp_player_input') {
+        const seat = Math.max(1, Math.min(8, Math.round(getNum(params, 'seat', 1))));
+        const outVar = String(params.outVar ?? `mp_seat${seat}`);
+        (async () => {
+          try {
+            const res = await fetch('/api/multiplayer/state', { cache: 'no-store' });
+            const d = await res.json();
+            const sub = d?.ok && d.state ? (d.state as Record<string, unknown>).submittedValueBySeat as Record<string, number> | undefined : undefined;
+            const v = sub ? Number(sub[String(seat)] ?? 0) : 0;
+            hudVarsRef.current[outVar] = Number.isFinite(v) ? v : 0;
+          } catch { /* hors-ligne */ }
+          bumpHudVars();
+          const nextId = g.out.get(node.id)?.[0]; if (nextId && !hudGraphRunRef.current.stop) walk(nextId);
+        })();
+        return;
+      }
+
       // ── Animations (fondu / strobe / arc-en-ciel / vague) sur les dalles ──
       // Cadence ~120 ms (comme Snake) pour ne pas saturer le bus série.
       if (node.kind === 'anim_fade' || node.kind === 'anim_strobe' || node.kind === 'anim_rainbow' || node.kind === 'anim_wave') {

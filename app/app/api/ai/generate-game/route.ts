@@ -44,6 +44,8 @@ const NODE_KINDS = [
   'round_start', 'round_end', 'next_round', 'get_round', 'countdown_start', 'countdown_stop',
   // Audio / hardware
   'play_sound', 'hardware_flash', 'hardware_send_color',
+  // Multijoueur
+  'mp_session', 'mp_wait_players', 'mp_broadcast', 'mp_player_input',
   // Mesure CS-160
   'measure_start', 'measure_on_result', 'measure_compare',
   // Jeux pré-faits (boîtes noires paramétrables)
@@ -95,6 +97,7 @@ RÈGLES :
 - Évènements d'entrée: on_key {key}, on_tile_click {tileIndex}, on_timer {intervalMs}, on_tick {intervalMs}.
 - Animations (sur les dalles, durée en ms puis on continue) : anim_fade {color,fromIntensity,toIntensity,durationMs}, anim_strobe {color,hz,durationMs}, anim_rainbow {speed,durationMs}, anim_wave {color,direction('left'|'right'),speed,durationMs}.
 - Boucle : while {varName,op,value,bodyNodeId} répète le corps tant que vrai.
+- Multijoueur : mp_session (cree/rejoint, expose mp_code et mp_players), mp_wait_players {minPlayers,timeoutSec}, mp_broadcast {color,intensity}, mp_player_input {seat,outVar}. Affiche mp_code via un label pour que les joueurs rejoignent.
 - Audio (hors-ligne): play_sound {sound}. Sons: click, select, tick, pop, swoosh, correct, wrong, success, error, alert, win, lose, levelup, coin, powerup, countdown, start, score. Utilise 'correct'/'wrong' pour le feedback pédagogique, 'win'/'lose' en fin de partie, 'coin'/'score' pour les points.
 - L'UI est posée sur un canvas 860×500. Place les composants sans chevauchement.
 - Lie les affichages à des variables via "varBind" (ex: un score_display avec varBind "score").

@@ -6697,6 +6697,28 @@ export default function EditeurPage() {
                         </div>
                       );
                     })()
+                  ) : ['mp_session','mp_wait_players','mp_broadcast','mp_player_input'].includes(selectedNode.kind) ? (
+                    <div style={{ display: 'grid', gap: 12 }}>
+                      <div style={{ padding: 10, borderRadius: 10, background: 'rgba(129,140,248,0.1)', border: '1px solid rgba(129,140,248,0.25)', fontSize: 12, lineHeight: 1.5 }}>
+                        Multijoueur : les joueurs rejoignent via la page Spectre/QR. Variables auto : <code>mp_code</code> (code à afficher), <code>mp_players</code> (nombre de joueurs).
+                      </div>
+                      {selectedNode.kind === 'mp_wait_players' && (
+                        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+                          <label style={{ display:'grid', gap:4 }}><span className="g-label">Joueurs min.</span><input className="g-input" type="number" min={1} max={8} style={{ height:36, fontSize:13 }} value={getNum(selectedNode.params,'minPlayers',2)} onChange={(e)=>updateSelectedParams({ minPlayers: Number(e.target.value) })} /></label>
+                          <label style={{ display:'grid', gap:4 }}><span className="g-label">Délai max (s)</span><input className="g-input" type="number" min={2} style={{ height:36, fontSize:13 }} value={getNum(selectedNode.params,'timeoutSec',60)} onChange={(e)=>updateSelectedParams({ timeoutSec: Number(e.target.value) })} /></label>
+                        </div>
+                      )}
+                      {selectedNode.kind === 'mp_broadcast' && (<>
+                        <label style={{ display:'grid', gap:4 }}><span className="g-label">Couleur diffusée</span><input type="color" value={String(selectedNode.params.color ?? '#00d7ff')} onChange={(e)=>updateSelectedParams({ color: e.target.value })} style={{ width:60, height:32, border:'none', background:'none', cursor:'pointer' }} /></label>
+                        <label style={{ display:'grid', gap:4 }}><span className="g-label">Intensité (0..1)</span><input className="g-input" type="number" step="0.05" min={0} max={1} style={{ height:36, fontSize:13 }} value={getNum(selectedNode.params,'intensity',0.8)} onChange={(e)=>updateSelectedParams({ intensity: Number(e.target.value) })} /></label>
+                      </>)}
+                      {selectedNode.kind === 'mp_player_input' && (
+                        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+                          <label style={{ display:'grid', gap:4 }}><span className="g-label">Siège (1-8)</span><input className="g-input" type="number" min={1} max={8} style={{ height:36, fontSize:13 }} value={getNum(selectedNode.params,'seat',1)} onChange={(e)=>updateSelectedParams({ seat: Number(e.target.value) })} /></label>
+                          <label style={{ display:'grid', gap:4 }}><span className="g-label">Variable résultat</span><input className="g-input" style={{ height:36, fontSize:13 }} value={String(selectedNode.params.outVar ?? '')} placeholder="mp_seat1" onChange={(e)=>updateSelectedParams({ outVar: e.target.value })} /></label>
+                        </div>
+                      )}
+                    </div>
                   ) : ['anim_fade','anim_strobe','anim_rainbow','anim_wave'].includes(selectedNode.kind) ? (
                     <div style={{ display: 'grid', gap: 12 }}>
                       <div style={{ padding: 10, borderRadius: 10, background: 'rgba(34,211,238,0.08)', border: '1px solid rgba(34,211,238,0.2)', fontSize: 12, lineHeight: 1.5 }}>
