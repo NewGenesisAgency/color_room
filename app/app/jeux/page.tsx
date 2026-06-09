@@ -3131,8 +3131,9 @@ export default function JeuxPage() {
     // Spawn first piece
     spawnTetrixPiece();
 
-    // Start game loop
-    const speed = Math.max(800, 2000 - (tetrixLevel * 200));
+    // Start game loop — grille minuscule (6×7) : on laisse beaucoup de temps
+    // pour réagir (chute lente) et la difficulté monte très doucement.
+    const speed = Math.max(1600, 3200 - (tetrixLevel * 150));
     tetrixTimerRef.current = window.setInterval(() => {
       gameLoop();
     }, speed);
