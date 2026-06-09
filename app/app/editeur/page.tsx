@@ -1992,6 +1992,16 @@ export default function EditeurPage() {
           break;
         }
         case 'play_sound': { playSfx(String(node.params.sound ?? 'click')); break; }
+        case 'while': {
+          const wVar = String(node.params.varName ?? '');
+          const wOp = String(node.params.op ?? 'lt');
+          const wVal = getNum(node.params, 'value', 0);
+          const wBody = String(node.params.bodyNodeId ?? '');
+          const evalW = () => { const cur = Number(vars[wVar] ?? 0); switch (wOp) { case 'eq': return cur === wVal; case 'neq': return cur !== wVal; case 'gte': return cur >= wVal; case 'gt': return cur > wVal; case 'lte': return cur <= wVal; default: return cur < wVal; } };
+          let wGuard = 0;
+          while (wBody && wVar && evalW() && wGuard < 1000) { executeNodeSync(wBody, depth + 1); wGuard++; }
+          break;
+        }
         default: break;
       }
 
@@ -7540,6 +7550,35 @@ export default function EditeurPage() {
                       </div>
                     </div>
 
+                  ) : selectedNode.kind === 'while' ? (
+                    <div style={{ display: 'grid', gap: 12 }}>
+                      <div style={{ padding: 10, borderRadius: 10, background: 'rgba(249,115,22,0.08)', border: '1px solid rgba(249,115,22,0.2)', fontSize: 12, lineHeight: 1.5 }}>
+                        Répète le <strong>corps</strong> TANT QUE la condition est vraie (sécurité : 1000 itérations max). Pense à modifier la variable dans le corps pour éviter une boucle infinie.
+                      </div>
+                      <label style={{ display: 'grid', gap: 4 }}>
+                        <span className="g-label">Variable à tester</span>
+                        <input className="g-input" style={{ height: 36, fontSize: 13 }} value={String(selectedNode.params.varName ?? '')} placeholder="i" onChange={(e) => updateSelectedParams({ varName: e.target.value })} />
+                      </label>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                        <label style={{ display: 'grid', gap: 4 }}>
+                          <span className="g-label">Condition</span>
+                          <select className="g-select" style={{ height: 36, fontSize: 13 }} value={String(selectedNode.params.op ?? 'lt')} onChange={(e) => updateSelectedParams({ op: e.target.value })}>
+                            <option value="lt">&lt;</option><option value="lte">&le;</option><option value="gt">&gt;</option><option value="gte">&ge;</option><option value="eq">=</option><option value="neq">&ne;</option>
+                          </select>
+                        </label>
+                        <label style={{ display: 'grid', gap: 4 }}>
+                          <span className="g-label">Valeur</span>
+                          <input className="g-input" type="number" style={{ height: 36, fontSize: 13 }} value={getNum(selectedNode.params, 'value', 0)} onChange={(e) => updateSelectedParams({ value: Number(e.target.value) })} />
+                        </label>
+                      </div>
+                      <label style={{ display: 'grid', gap: 4 }}>
+                        <span className="g-label">Corps de boucle (nœud exécuté à chaque tour)</span>
+                        <select className="g-input" style={{ height: 36, fontSize: 13 }} value={String(selectedNode.params.bodyNodeId ?? '')} onChange={(e) => updateSelectedParams({ bodyNodeId: e.target.value })}>
+                          <option value="">- Aucun -</option>
+                          {activeGame?.nodes.filter(n => n.id !== selectedNode.id).map(n => (<option key={n.id} value={n.id}>{n.name} ({n.kind})</option>))}
+                        </select>
+                      </label>
+                    </div>
                   ) : selectedNode.kind === 'for_range' ? (
                     <div style={{ display: 'grid', gap: 12 }}>
                       <div style={{ padding: 10, borderRadius: 10, background: 'rgba(99,102,241,0.07)', border: '1px solid rgba(99,102,241,0.18)', fontSize: 12, lineHeight: 1.5 }}>

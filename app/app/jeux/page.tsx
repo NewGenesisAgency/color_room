@@ -2340,6 +2340,30 @@ export default function JeuxPage() {
       }
 
       // ── Boucle for_range : exécute le corps N fois ──
+      // ── Tant que (while) : répète le corps tant que la condition est vraie ──
+      if (node.kind === 'while') {
+        const condVar = String(params.varName ?? '');
+        const op = String(params.op ?? 'lt');
+        const cmpVal = getNum(params, 'value', 0);
+        const bodyId = String(params.bodyNodeId ?? '');
+        const evalCond = () => {
+          const cur = Number(hudVarsRef.current[condVar] ?? 0);
+          switch (op) {
+            case 'eq':  return cur === cmpVal;
+            case 'neq': return cur !== cmpVal;
+            case 'gte': return cur >= cmpVal;
+            case 'gt':  return cur >  cmpVal;
+            case 'lte': return cur <= cmpVal;
+            case 'lt':
+            default:    return cur <  cmpVal;
+          }
+        };
+        let guard = 0;
+        while (bodyId && condVar && evalCond() && guard < 1000 && !hudGraphRunRef.current.stop) { walk(bodyId); guard++; }
+        bumpHudVars();
+        const nextId = g.out.get(node.id)?.[0]; if (nextId) walk(nextId); return;
+      }
+
       if (node.kind === 'for_range') {
         const varName = String(params.varName ?? 'i');
         const start = Math.round(getNum(params, 'start', 0));
