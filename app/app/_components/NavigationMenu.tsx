@@ -17,7 +17,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   Menu, X, Home, Gamepad2, Ruler,
-  LogIn, LogOut, Settings, HelpCircle, PenSquare, SlidersHorizontal, Activity,
+  LogIn, LogOut, Settings, HelpCircle, PenSquare, SlidersHorizontal, Activity, Map,
 } from 'lucide-react';
 import { AvatarIcon } from './avatarIcons';
 
@@ -101,6 +101,7 @@ export default function NavigationMenu() {
     { href: '/editeur',      label: 'Éditeur',         icon: PenSquare },
     { href: '/aide',         label: 'Aide',            icon: HelpCircle },
     { href: '/configuration', label: 'Configuration',  icon: SlidersHorizontal },
+    { href: '/salles',       label: 'Plan des salles', icon: Map },
     { href: '/health',       label: 'Santé & Diagnostic', icon: Activity },
     ...(isAdmin || isEnseignant
       ? [{ href: '/gestion', label: 'Tableau de bord', icon: Settings }]

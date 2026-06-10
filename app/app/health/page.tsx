@@ -17,9 +17,10 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 import {
   Activity, RefreshCw, Loader2, CheckCircle2, XCircle, Server, Cpu, Lightbulb,
-  Play, Square, Zap, Moon, Sliders, Wifi,
+  Play, Square, Zap, Moon, Sliders, Wifi, Map,
 } from 'lucide-react';
 import NavigationMenu from '@/app/_components/NavigationMenu';
 
@@ -250,14 +251,18 @@ export default function HealthPage() {
       <NavigationMenu />
       <div style={{ maxWidth: 820, margin: '0 auto', padding: '88px 20px 48px' }}>
         {/* En-tête */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
           <div style={{ width: 44, height: 44, borderRadius: 12, background: 'linear-gradient(135deg,#059669,#10b981)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
             <Activity size={22} color="#fff" />
           </div>
-          <div>
+          <div style={{ flex: 1, minWidth: 0 }}>
             <h1 style={{ margin: 0, fontSize: 24, fontWeight: 900, color: '#1a1a2e' }}>Santé & Diagnostic</h1>
             <p style={{ margin: '2px 0 0', fontSize: 13, color: 'rgba(0,0,0,0.5)' }}>Vérifiez la connexion aux APIs et testez les plaques / canaux</p>
           </div>
+          <Link href="/salles"
+            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 14px', borderRadius: 9, border: '1px solid rgba(67,97,238,0.28)', background: 'rgba(67,97,238,0.08)', color: '#4361ee', fontWeight: 800, fontSize: 13, textDecoration: 'none', flexShrink: 0 }}>
+            <Map size={15} /> Plan des salles
+          </Link>
         </div>
 
         {/* ── État de connexion ─────────────────────────────────────────────── */}
