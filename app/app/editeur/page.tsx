@@ -1759,6 +1759,36 @@ export default function EditeurPage() {
   const [runtimeRound, setRuntimeRound] = useState({ current: 0, total: 5 });
   const [runtimeCountdownValue, setRuntimeCountdownValue] = useState(0);
 
+  // ── Débogage visuel de l'aperçu ─────────────────────────────────────────────
+  /** @brief Horodatage (ms) de la dernière exécution de chaque nœud (nodeId → Date.now()). */
+  const activeNodesRef = useRef<Map<string, number>>(new Map());
+  /** @brief Tick de rafraîchissement du halo « nœud actif » (incrémenté toutes les 150 ms quand l'aperçu tourne). */
+  const [debugTick, setDebugTick] = useState(0);
+  /** @brief Mode ralenti (x0.25) : pause de 180 ms avant chaque nœud asynchrone de l'aperçu. */
+  const [slowMotion, setSlowMotion] = useState(false);
+  /** @brief Miroir de slowMotion lisible depuis le runtime sans closure périmée. */
+  const slowMotionRef = useRef(false);
+  useEffect(() => { slowMotionRef.current = slowMotion; }, [slowMotion]);
+  /** @brief Miroir de centrerSurNoeud (définie plus bas) pour le runtime de l'aperçu. */
+  const centrerSurNoeudRef = useRef<(nodeId: string) => void>(() => {});
+
+  /**
+   * @brief Fait pulser les nœuds récemment exécutés pendant l'aperçu.
+   *
+   * Toutes les 150 ms (uniquement quand isPlaying) : purge les entrées de plus
+   * de 600 ms puis force un re-rendu (debugTick) pour mettre à jour la classe
+   * CSS bp-node--running.
+   */
+  useEffect(() => {
+    if (!isPlaying) { activeNodesRef.current.clear(); return; }
+    const timer = setInterval(() => {
+      const now = Date.now();
+      activeNodesRef.current.forEach((ts, id) => { if (now - ts > 600) activeNodesRef.current.delete(id); });
+      setDebugTick((t) => (t + 1) % 1_000_000);
+    }, 150);
+    return () => clearInterval(timer);
+  }, [isPlaying]);
+
   // Keyboard listener for Python games
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -1900,11 +1930,38 @@ export default function EditeurPage() {
       sendRgbToHardware(rgb, i100, plateIds);
     }
 
+    // ── Garde-fou global : trop d'exécutions de nœuds = boucle probable ──────
+    const gardeExec = { fenetre: Date.now(), compteur: 0, declenche: false };
+    /**
+     * @brief Instrumentation de débogage appelée au début de chaque exécution de nœud.
+     *
+     * 1. Marque le nœud comme actif (halo vert pulsant via activeNodesRef).
+     * 2. Compte les exécutions sur une fenêtre glissante de 1 s : au-delà de
+     *    5000, l'aperçu est stoppé (boucle infinie probable).
+     * @param nodeId Identifiant du nœud sur le point d'être exécuté.
+     * @return true si le garde-fou s'est déclenché (l'exécution doit s'arrêter).
+     */
+    function compterExecution(nodeId: string): boolean {
+      activeNodesRef.current.set(nodeId, Date.now());
+      if (gardeExec.declenche) return true;
+      const now = Date.now();
+      if (now - gardeExec.fenetre > 1000) { gardeExec.fenetre = now; gardeExec.compteur = 0; }
+      if (++gardeExec.compteur > 5000) {
+        gardeExec.declenche = true;
+        abort.abort();
+        setIsPlaying(false);
+        setStatus('⚠ Trop d\'exécutions par seconde — boucle probable. Aperçu arrêté.');
+        return true;
+      }
+      return false;
+    }
+
     // ── Sync executeNode (handles fill/tile/variables/score/etc.) ────────────
     function executeNodeSync(nodeId: string, depth = 0): void {
       if (depth > 50) return;
       const node = game.nodes.find(n => n.id === nodeId);
       if (!node || !node.enabled) return;
+      if (compterExecution(nodeId)) return; // débogage visuel + garde-fou global
 
       const tiles = runtimeTilesRef.current;
       const vars = runtimeVariablesRef.current;
@@ -2302,6 +2359,11 @@ export default function EditeurPage() {
           const evalW = () => { const cur = Number(vars[wVar] ?? 0); switch (wOp) { case 'eq': return cur === wVal; case 'neq': return cur !== wVal; case 'gte': return cur >= wVal; case 'gt': return cur > wVal; case 'lte': return cur <= wVal; default: return cur < wVal; } };
           let wGuard = 0;
           while (wBody && wVar && evalW() && wGuard < 1000) { executeNodeSync(wBody, depth + 1); wGuard++; }
+          // Protection déclenchée : la condition est toujours vraie après 1000 tours.
+          if (wGuard >= 1000 && evalW()) {
+            setStatus('⚠ Boucle infinie détectée dans "Tant que" — vérifie ta condition');
+            centrerSurNoeudRef.current(nodeId);
+          }
           break;
         }
         default: break;
@@ -2317,6 +2379,12 @@ export default function EditeurPage() {
       if (signal.aborted || depth > 100) return;
       const node = game.nodes.find(n => n.id === nodeId);
       if (!node || !node.enabled) return;
+      if (compterExecution(nodeId)) return; // débogage visuel + garde-fou global
+      // Mode ralenti (x0.25) : courte pause avant chaque nœud pour suivre la logique.
+      if (slowMotionRef.current) {
+        await new Promise((r) => setTimeout(r, 180));
+        if (signal.aborted) return;
+      }
 
       try {
         switch (node.kind) {
@@ -2451,6 +2519,11 @@ export default function EditeurPage() {
               runtimeVariablesRef.current[fri] = i;
               if (frb) await executeNodeAsync(frb, depth+1);
               if (signal.aborted) return;
+            }
+            // Protection frMax déclenchée : la boucle n'a pas atteint sa borne de fin.
+            if (frIter > frMax && !signal.aborted) {
+              setStatus('⚠ Boucle infinie détectée dans "Pour i = N à M" — vérifie début/fin/pas');
+              centrerSurNoeudRef.current(nodeId);
             }
             const frOut = game.edges.filter(e=>e.from===nodeId && estExec(e));
             for (const edge of frOut) { await executeNodeAsync(edge.to, depth+1); if(signal.aborted)return; }
@@ -4166,6 +4239,8 @@ export default function EditeurPage() {
     setGraphPan({ x: W / 2 - cx * graphZoom, y: H / 2 - cy * graphZoom });
     commit((cur) => ({ ...cur, selectedNodeId: nodeId }));
   }
+  // Version « toujours fraîche » exposée au runtime de l'aperçu (garde-fous boucle).
+  centrerSurNoeudRef.current = centrerSurNoeud;
 
   function autoLayoutNodes() {
     if (!activeGameId || !activeGame) return;
@@ -5092,6 +5167,23 @@ export default function EditeurPage() {
                       <span>Cadre</span>
                     </button>
                   )}
+                  {/* Mode ralenti (x0.25) : pause avant chaque bloc pour suivre l'exécution */}
+                  {activeGame && (
+                    <button
+                      className="btn btn--mini"
+                      title={slowMotion ? 'Désactiver le mode ralenti (x0.25)' : 'Mode ralenti (x0.25) : suivre l\'exécution bloc par bloc dans l\'aperçu'}
+                      onClick={() => {
+                        setSlowMotion((v) => !v);
+                        setStatus(slowMotion ? 'Mode ralenti désactivé' : 'Mode ralenti activé 🐢 (x0.25)');
+                      }}
+                      style={{
+                        padding: '0 8px', height: 28, fontSize: 12,
+                        ...(slowMotion ? { background: 'rgba(245,158,11,0.18)', border: '1px solid rgba(245,158,11,0.55)', color: '#92400e' } : {}),
+                      }}
+                    >
+                      <span aria-hidden>🐢</span>
+                    </button>
+                  )}
                   {/* Fit all nodes */}
                   {activeGame && (
                     <button
@@ -5602,6 +5694,10 @@ export default function EditeurPage() {
                       const pulseLegacyAmp = clamp01(getNum(n.params, 'amp', 0.7));
                       const pulseFrom = clamp01(getNum(n.params, 'fromIntensity', pulseLegacyBase));
                       const pulseTo = clamp01(getNum(n.params, 'toIntensity', clamp01(pulseLegacyBase + pulseLegacyAmp)));
+                      // Débogage visuel : nœud exécuté il y a moins de 600 ms → halo vert
+                      // pulsant. debugTick (150 ms) force la réévaluation pendant l'aperçu.
+                      const enCours = isPlaying && debugTick >= 0
+                        && Date.now() - (activeNodesRef.current.get(n.id) ?? 0) < 600;
                       return (
                         <div
                           key={n.id}
@@ -5610,6 +5706,7 @@ export default function EditeurPage() {
                             (n.kind === 'event_begin' || n.kind.startsWith('on_')) ? 'bp-node--event' : '',
                             selected ? 'bp-node--active' : '',
                             !n.enabled ? 'bp-node--disabled' : '',
+                            enCours ? 'bp-node--running' : '',
                           ].filter(Boolean).join(' ')}
                           style={{ left: n.pos.x, top: n.pos.y, ...(aiHighlightIds.has(n.id) ? { outline: '2px solid #a855f7', boxShadow: '0 0 18px rgba(168,85,247,0.55)', borderRadius: 14 } : {}) }}
                           data-nodeid={n.id}
