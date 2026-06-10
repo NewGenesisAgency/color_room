@@ -5990,6 +5990,9 @@ export default function EditeurPage() {
                                           setStatus('Noeud ajouté');
                                         }}
                                       >
+                                        <span className="bp-menu__chip" style={{ background: `${catColor}1f`, color: catColor }}>
+                                          <CatIcon size={12} />
+                                        </span>
                                         <span className="bp-menu__title">{n.title}</span>
                                         <span className="bp-menu__meta" style={{ color: catColor, opacity: 0.7, fontSize: 11 }}>{n.kind.startsWith('cs160') ? 'CS160' : ''}</span>
                                       </button>
