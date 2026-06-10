@@ -29,13 +29,25 @@ export const DIFF_LABELS: Record<DifficultyLevel, { label: string; color: string
   expert:    { label: 'Expert',    color: '#ef4444', emoji: '🔴' },
 };
 
-/* ── Difficulty config ───────────────────────────────────────────────── */
+/* ── Difficulty config ───────────────────────────────────────────────────
+   La dalle allumée RESTE allumée tant que la bonne dalle n'est pas touchée.
+   decayMs = vitesse à laquelle les points fondent avec le temps de réaction
+   (plus c'est petit, plus il faut être rapide pour marquer gros). */
 const CSPEED_DIFF = {
-  facile:    { startSpeed: 2500, minSpeed: 600,  duration: 70 },
-  moyen:     { startSpeed: 1800, minSpeed: 380,  duration: 60 },
-  difficile: { startSpeed: 1200, minSpeed: 280,  duration: 55 },
-  expert:    { startSpeed: 900,  minSpeed: 200,  duration: 45 },
-} satisfies Record<DifficultyLevel, { startSpeed: number; minSpeed: number; duration: number }>;
+  facile:    { decayMs: 1400, duration: 90 },
+  moyen:     { decayMs: 1000, duration: 75 },
+  difficile: { decayMs: 700,  duration: 60 },
+  expert:    { decayMs: 450,  duration: 45 },
+} satisfies Record<DifficultyLevel, { decayMs: number; duration: number }>;
+
+/* Points dégressifs : 40 pts si réaction instantanée, puis ça fond avec le
+   temps (demi-vie ≈ decayMs) jusqu'à un plancher de 2 pts. */
+const CSPEED_MAX_PTS = 40;
+const CSPEED_MIN_PTS = 2;
+function degressivePoints(reactionMs: number, decayMs: number): number {
+  const pts = Math.round(CSPEED_MAX_PTS * Math.pow(0.5, reactionMs / decayMs));
+  return Math.max(CSPEED_MIN_PTS, pts);
+}
 
 /* ── Constants ──────────────────────────────────────────────────────── */
 const COLORS: { r: number; g: number; b: number }[] = [
@@ -48,12 +60,12 @@ const COLORS: { r: number; g: number; b: number }[] = [
   { r: 0,   g: 210, b: 220 },   // cyan
 ];
 
-type SpeedTier = { label: string; bonus: number; color: string; glow: string };
+type SpeedTier = { label: string; color: string; glow: string };
 function speedTier(ms: number): SpeedTier {
-  if (ms <  350) return { label: '⚡ ÉCLAIR',  bonus: 30, color: '#fff176', glow: 'rgba(255,241,118,0.55)' };
-  if (ms <  650) return { label: '🔥 RAPIDE',  bonus: 20, color: '#ffa040', glow: 'rgba(255,160,64,0.50)'  };
-  if (ms < 1100) return { label: '✓ BIEN',     bonus: 10, color: '#4ade80', glow: 'rgba(74,222,128,0.45)' };
-  return               { label: '🐢 LENT',     bonus:  0, color: '#94a3b8', glow: 'rgba(148,163,184,0.35)' };
+  if (ms <  350) return { label: '⚡ ÉCLAIR',  color: '#fff176', glow: 'rgba(255,241,118,0.55)' };
+  if (ms <  650) return { label: '🔥 RAPIDE',  color: '#ffa040', glow: 'rgba(255,160,64,0.50)'  };
+  if (ms < 1100) return { label: '✓ BIEN',     color: '#4ade80', glow: 'rgba(74,222,128,0.45)' };
+  return               { label: '🐢 LENT',     color: '#94a3b8', glow: 'rgba(148,163,184,0.35)' };
 }
 
 type Bubble = { id: number; text: string; color: string; glow: string };
@@ -140,10 +152,8 @@ export default function GameColorSpeed({
   const activeTileRef = useRef<number | null>(null);
   const activeColRef  = useRef<{ r: number; g: number; b: number } | null>(null);
   const tileStartRef  = useRef(0);
-  const speedRef      = useRef(cfg.startSpeed);   // miss-window ms
   const comboRef      = useRef(0);
   const lightRef      = useRef(0);
-  const tileTimerRef  = useRef(0);
   const gameTimerRef  = useRef(0);
   const lblTimerRef   = useRef(0);
   const numTiles      = Math.min(tileCount, 42);
@@ -161,33 +171,23 @@ export default function GameColorSpeed({
     lblTimerRef.current = window.setTimeout(() => setSpeedLbl(null), 950);
   }
 
-  /* ── light one tile ───────────────────────────────────────────────── */
+  /* ── light one tile ───────────────────────────────────────────────────
+     La dalle reste allumée tant que le joueur n'a pas touché la BONNE dalle :
+     pas de timeout, mais les points fondent avec le temps de réaction. */
   function lightNextTile() {
     if (phaseRef.current !== 'playing') return;
 
     // Turn off previous
     if (activeTileRef.current !== null) onTurnOff(activeTileRef.current);
 
-    const idx = Math.floor(Math.random() * numTiles);
+    // Jamais deux fois la même dalle d'affilée (sinon on ne voit pas le changement)
+    let idx = Math.floor(Math.random() * numTiles);
+    if (numTiles > 1 && idx === activeTileRef.current) idx = (idx + 1) % numTiles;
     const col = COLORS[Math.floor(Math.random() * COLORS.length)];
     activeTileRef.current = idx;
     activeColRef.current  = col;
     tileStartRef.current  = Date.now();
     onSendColor(idx, col.r, col.g, col.b, 92);
-
-    window.clearTimeout(tileTimerRef.current);
-    tileTimerRef.current = window.setTimeout(() => {
-      if (phaseRef.current !== 'playing') return;
-      // ── Miss ──
-      comboRef.current = 0;
-      setCombo(0);
-      setMissed(m => m + 1);
-      onScoreDelta?.(-10, 'Raté −10');
-      const missIdx = activeTileRef.current!;
-      onTurnOff(missIdx);
-      activeTileRef.current = null;
-      if (phaseRef.current === 'playing') lightNextTile();
-    }, speedRef.current);
   }
 
   /* ── countdown → start ───────────────────────────────────────────── */
@@ -210,19 +210,15 @@ export default function GameColorSpeed({
     setTimeLeft(cfg.duration);
     setScore(0); setMissed(0); setCombo(0); setLightnings(0);
     setBubbles([]); setSpeedLbl(null);
-    comboRef.current = 0; lightRef.current = 0; speedRef.current = cfg.startSpeed;
+    comboRef.current = 0; lightRef.current = 0;
 
     let elapsed = 0;
     window.clearInterval(gameTimerRef.current);
     gameTimerRef.current = window.setInterval(() => {
       elapsed++;
       setTimeLeft(cfg.duration - elapsed);
-      // Accelerate every 8 s, floor at 380 ms
-      if (elapsed % 8 === 0)
-        speedRef.current = Math.max(cfg.minSpeed, Math.round(speedRef.current * 0.84));
       if (elapsed >= cfg.duration) {
         window.clearInterval(gameTimerRef.current);
-        window.clearTimeout(tileTimerRef.current);
         if (activeTileRef.current !== null) { onTurnOff(activeTileRef.current); activeTileRef.current = null; }
         phaseRef.current = 'finished';
         setPhase('finished');
@@ -240,16 +236,16 @@ export default function GameColorSpeed({
     if (phaseRef.current !== 'playing' || activeTileRef.current === null) return;
 
     if (idx === activeTileRef.current) {
-      /* ✅ CORRECT HIT */
+      /* ✅ CORRECT HIT — points dégressifs : plus on met de temps, moins on gagne */
       const reaction = Date.now() - tileStartRef.current;
       const tier = speedTier(reaction);
 
       comboRef.current++;
       setCombo(comboRef.current);
       const comboBonus = Math.min(comboRef.current - 1, 9);
-      const delta = 10 + tier.bonus + comboBonus;
+      const delta = degressivePoints(reaction, cfg.decayMs) + comboBonus;
 
-      if (tier.bonus === 15) { lightRef.current++; setLightnings(lightRef.current); }
+      if (reaction < 350) { lightRef.current++; setLightnings(lightRef.current); }
 
       setScore(s => s + delta);
       onScoreDelta?.(delta, `${tier.label} +${delta}`);
@@ -257,7 +253,6 @@ export default function GameColorSpeed({
       bubble(`+${delta}`, tier);
       showSpeed(tier);
 
-      window.clearTimeout(tileTimerRef.current);
       const hitIdx = activeTileRef.current;
       activeTileRef.current = null;
       onTurnOff(hitIdx);
@@ -280,7 +275,6 @@ export default function GameColorSpeed({
     return () => {
       onRegisterClickHandler?.(null);
       window.clearInterval(gameTimerRef.current);
-      window.clearTimeout(tileTimerRef.current);
       window.clearTimeout(lblTimerRef.current);
       onTurnOffAll();
     };
@@ -308,17 +302,18 @@ export default function GameColorSpeed({
             )}
           </div>
           <p style={P.rules}>
-            Une dalle s'allume dans la salle 3D — cliquez-la <em>le plus vite possible</em>.
-            La vitesse augmente toutes les 8 s. Réagissez vite pour des bonus.
+            Une dalle s'allume dans la salle — touchez-la <em>le plus vite possible</em>.
+            Elle reste allumée tant que vous n'avez pas trouvé la bonne, mais
+            <strong> plus vous attendez, moins vous gagnez de points</strong>.
             Combos = points en plus.
-            <span style={P.aside}>&nbsp;60 secondes</span>
+            <span style={P.aside}>&nbsp;{cfg.duration} secondes</span>
           </p>
           <div style={P.tiers}>
             {([
-              ['⚡ Éclair',  '< 350 ms', '+30', '#fff176'],
-              ['🔥 Rapide',  '< 650 ms', '+20', '#ffa040'],
-              ['✓ Bien',     '< 1.1 s',  '+10', '#4ade80'],
-              ['🐢 Lent',    '≥ 1.1 s',  '+0',  '#94a3b8'],
+              ['⚡ Éclair',  '< 350 ms', `+${degressivePoints(200, cfg.decayMs)}`,  '#fff176'],
+              ['🔥 Rapide',  '< 650 ms', `+${degressivePoints(500, cfg.decayMs)}`,  '#ffa040'],
+              ['✓ Bien',     '< 1.1 s',  `+${degressivePoints(900, cfg.decayMs)}`,  '#4ade80'],
+              ['🐢 Lent',    '≥ 1.1 s',  `+${degressivePoints(2000, cfg.decayMs)}`, '#94a3b8'],
             ] as [string, string, string, string][]).map(([lbl, time, pts, c]) => (
               <div key={lbl} style={{ ...P.tierChip, borderColor: c + '44', color: c }}>
                 <span style={{ fontWeight: 800 }}>{lbl}</span>
@@ -449,7 +444,6 @@ export default function GameColorSpeed({
           )}
           <button onClick={() => {
             window.clearInterval(gameTimerRef.current);
-            window.clearTimeout(tileTimerRef.current);
             if (activeTileRef.current !== null) onTurnOff(activeTileRef.current);
             onTurnOffAll();
             onQuit();

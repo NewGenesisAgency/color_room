@@ -1033,6 +1033,25 @@ export default function JeuxPage() {
 
   // Nouveaux jeux natifs
   const [activeBuiltinGame, setActiveBuiltinGame] = useState<'color-speed' | 'maitre-blanc' | 'puissance4' | 'metamere' | 'chromaticite-jeu' | 'canal-mix' | 'intrus' | 'snake' | null>(null);
+  // Zone de jeu : la Color Room a 2 salles de 21 dalles chacune (1-21 / 22-42).
+  // 'both' = les 42 dalles, 's1' = salle de gauche, 's2' = salle de droite.
+  const [gameRoom, setGameRoom] = useState<'both' | 's1' | 's2'>(() => {
+    try { const v = window.localStorage.getItem('crg_game_room'); return v === 's1' || v === 's2' ? v : 'both'; } catch { return 'both'; }
+  });
+  const gameRoomRef = useRef<'both' | 's1' | 's2'>('both');
+  useEffect(() => {
+    gameRoomRef.current = gameRoom;
+    try { window.localStorage.setItem('crg_game_room', gameRoom); } catch { /* ignore */ }
+  }, [gameRoom]);
+  // Jeux qui exigent la grille 6×7 complète (plateau) : la zone est forcée aux 2 salles.
+  const GRID_GAMES: ReadonlyArray<string> = ['puissance4', 'snake'];
+  const roomLocked = activeBuiltinGame !== null && GRID_GAMES.includes(activeBuiltinGame);
+  const effectiveRoom = roomLocked ? 'both' : gameRoom;
+  const roomOffset = effectiveRoom === 's2' ? 21 : 0;
+  const roomTileCount = effectiveRoom === 'both' ? 42 : 21;
+  const roomOffsetRef = useRef(0);
+  const roomTileCountRef = useRef(42);
+  useEffect(() => { roomOffsetRef.current = roomOffset; roomTileCountRef.current = roomTileCount; }, [roomOffset, roomTileCount]);
   const [activeView, setActiveView] = useState<null | 'spectre' | 'chromaticite'>(null);
   // Spectre Chromatique : jeu multijoueur rendu inline (sous les dalles), comme les autres jeux
   const [spectreActive, setSpectreActive] = useState<boolean>(false);
@@ -3688,45 +3707,23 @@ export default function JeuxPage() {
     });
   }
 
-  // Send color to a specific plate with batch API - OPTIMIZED: only non-zero channels
+  // Envoie une couleur à une dalle. Passe par scheduleSetCanal : déduplication
+  // par canal (on n'envoie QUE ce qui change) + envois sérialisés en un seul
+  // POST batch — supervision.exe ne reçoit jamais de rafale de requêtes stale.
   function sendColorToPlateImmediate(rgb: TargetColor, intensity100: number, plateId: number) {
-    const channels32 = rgbToChannels32(rgb, intensity100);
-    const channels = channels32.map((v, i) => ({ index: i, value: clamp255(v ?? 0) }));
-    fetch('/api/supervision/batch', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ plateId, channels, fast: true }),
-      cache: 'no-store',
-    }).catch(() => {});
+    sendRgbToPlate(rgb, intensity100, plateId);
   }
 
-  // Turn off a specific plate completely using batch API
+  // Éteint une dalle. Grâce à la déduplication, seuls les canaux actuellement
+  // allumés sont remis à 0 (au lieu de 32 requêtes systématiques par dalle).
   function turnOffPlateImmediate(plateId: number) {
-    const channels = Array.from({ length: 32 }, (_, i) => ({
-      index: i,
-      value: 0,
-    }));
-
-    // Fire-and-forget
-    fetch('/api/supervision/batch', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ plateId, channels }),
-      cache: 'no-store',
-    }).catch(() => {});
+    for (let i = 0; i < 32; i++) scheduleSetCanal(plateId, i, 0);
   }
 
-  // Send colors to multiple plates - one request per plate to avoid overloading the server
+  // Envoie des couleurs à plusieurs dalles — regroupées en un seul POST batch.
   function sendColorsToPlates(platesData: { plateId: number; rgb: TargetColor; intensity: number }[]) {
     for (const { plateId, rgb, intensity } of platesData) {
-      const channels32 = rgbToChannels32(rgb, intensity);
-      const channels = channels32.map((v, i) => ({ index: i, value: clamp255(v ?? 0) }));
-      fetch('/api/supervision/batch', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ plateId, channels, fast: true }),
-        cache: 'no-store',
-      }).catch(() => {});
+      sendRgbToPlate(rgb, intensity, plateId);
     }
   }
 
@@ -4752,6 +4749,26 @@ export default function JeuxPage() {
 
                   return (
                     <>
+                      {/* Zone de jeu : choisir la salle où les jeux s'allument */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', letterSpacing: '.03em' }}>ZONE DE JEU</span>
+                        {([['both', 'Les 2 salles'], ['s1', 'Salle 1 (1-21)'], ['s2', 'Salle 2 (22-42)']] as const).map(([val, lbl]) => (
+                          <button
+                            key={val}
+                            onClick={() => setGameRoom(val)}
+                            style={{
+                              padding: '5px 12px', borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+                              border: gameRoom === val ? '1.5px solid var(--accent)' : '1.5px solid rgba(0,0,0,0.10)',
+                              background: gameRoom === val ? 'rgba(67,97,238,0.12)' : 'rgba(255,255,255,0.55)',
+                              color: gameRoom === val ? 'var(--accent)' : 'var(--text-3)',
+                              transition: 'all 140ms',
+                            }}
+                          >{lbl}</button>
+                        ))}
+                        {roomLocked && (
+                          <span style={{ fontSize: 11, color: 'var(--text-3)' }}>⚠ ce jeu utilise le plateau complet (2 salles)</span>
+                        )}
+                      </div>
                       {dbGamesLoading && (
                         <div style={{ padding: '10px 0', textAlign: 'center', fontSize: 12, color: 'var(--text-3)' }}>Chargement des jeux...</div>
                       )}
@@ -5117,7 +5134,9 @@ export default function JeuxPage() {
                     });
                   };
                   const tileActions = {
-                    onSendColor: (idx: number, r: number, g: number, b: number, intensity = 80) => {
+                    onSendColor: (gameIdx: number, r: number, g: number, b: number, intensity = 80) => {
+                      // Index du jeu (0..tileCount-1) → dalle réelle selon la salle choisie
+                      const idx = gameIdx + roomOffsetRef.current;
                       const plateId = PLATE_ID_BY_INDEX[idx];
                       if (!plateId) return;
                       // 1. Mémoriser l'état canonique
@@ -5129,7 +5148,8 @@ export default function JeuxPage() {
                       cancelAnimationFrame(rafRef.current);
                       rafRef.current = requestAnimationFrame(flushVisual);
                     },
-                    onTurnOff: (idx: number) => {
+                    onTurnOff: (gameIdx: number) => {
+                      const idx = gameIdx + roomOffsetRef.current;
                       const plateId = PLATE_ID_BY_INDEX[idx];
                       if (!plateId) return;
                       gameColorStateRef.current[idx] = null;
@@ -5163,7 +5183,8 @@ export default function JeuxPage() {
                       setPlateColors(Array(42).fill('#000000'));
                       setPlateActive(Array(42).fill(false));
                     },
-                    onSendRawChannels: (idx: number, channels: number[]) => {
+                    onSendRawChannels: (gameIdx: number, channels: number[]) => {
+                      const idx = gameIdx + roomOffsetRef.current;
                       const plateId = PLATE_ID_BY_INDEX[idx];
                       if (!plateId) return;
                       // Remappe les canaux si la plaque est de type bleu (channels est en référence rouge)
@@ -5181,8 +5202,17 @@ export default function JeuxPage() {
                       rafRef.current = requestAnimationFrame(flushVisual);
                     },
                     onQuit: () => { setActiveBuiltinGame(null); setGameActive(false); },
-                    tileCount: 42,
-                    onRegisterClickHandler: (fn: ((idx: number) => void) | null) => { gameClickHandlerRef.current = fn; },
+                    tileCount: roomTileCount,
+                    onRegisterClickHandler: (fn: ((idx: number) => void) | null) => {
+                      // Les clics sur les dalles arrivent en index réel (0..41) :
+                      // on les retraduit vers l'index local du jeu selon la salle choisie.
+                      gameClickHandlerRef.current = fn
+                        ? (realIdx: number) => {
+                            const local = realIdx - roomOffsetRef.current;
+                            if (local >= 0 && local < roomTileCountRef.current) fn(local);
+                          }
+                        : null;
+                    },
                     // Score universel + jeux réussis : appelé à la fin de chaque partie
                     onComplete: (points: number) => {
                       const pts = Math.max(0, Math.round(points));
