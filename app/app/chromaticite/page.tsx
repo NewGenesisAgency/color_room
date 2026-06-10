@@ -142,19 +142,15 @@ function rgbToChannels32(r: number, g: number, b: number, intensity: number, til
 }
 
 async function sendColorToAllPlates(r: number, g: number, b: number, intensity = 85, tileType: TileType = 'rouge') {
+  // Anti-flood : 1 seule requête batch pour les 42 dalles (au lieu de 42 POST).
   const channelArray = rgbToChannels32(r, g, b, intensity, tileType).map((v, i) => ({ index: i, value: v }));
-  const sends: Promise<void>[] = [];
-  for (let plateId = 1; plateId <= 42; plateId++) {
-    sends.push(
-      fetch('/api/supervision/batch', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ plateId, channels: channelArray, fast: true }),
-        cache: 'no-store',
-      }).then(() => {}).catch(() => {})
-    );
-  }
-  await Promise.all(sends);
+  const plates = Array.from({ length: 42 }, (_, i) => ({ plateId: i + 1, channels: channelArray }));
+  await fetch('/api/supervision/batch', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ plates, fast: true, force: true }),
+    cache: 'no-store',
+  }).then(() => {}).catch(() => {});
 }
 
 function clearAllPlates() {

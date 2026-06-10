@@ -2053,8 +2053,33 @@ export default function JeuxPage() {
   useEffect(() => {
     if (!gameActive || currentGame !== 'p4-multi' || !p4RoomId) return;
     let alive = true;
-    const COL_R = { r: 255, g: 59, b: 110 };
-    const COL_J = { r: 59, g: 130, b: 246 };
+    // Couleurs classiques Puissance 4 : ROUGE et JAUNE.
+    // Ce sont des primaires qui tombent sur des groupes de canaux dédiés des
+    // dalles → rendu net et fidèle (contrairement au rose/bleu qui bavaient).
+    const COL_R = { r: 255, g: 24, b: 24 };   // rouge
+    const COL_J = { r: 255, g: 196, b: 0 };    // jaune
+    const COLS = 6, ROWS = 7;
+    // Le plateau a l'index 0 EN HAUT, mais la dalle 0 est EN BAS de la salle.
+    // On retourne donc verticalement pour que la gravité aille vers le bas.
+    const displayIndex = (boardIdx: number): number => {
+      const r = Math.floor(boardIdx / COLS), c = boardIdx % COLS;
+      return (ROWS - 1 - r) * COLS + c;
+    };
+    // 4 jetons alignés gagnants (pour les faire briller à fond dans la salle).
+    const winningCells = (board: string[]): Set<number> => {
+      const out = new Set<number>();
+      const at = (r: number, c: number) => (r >= 0 && r < ROWS && c >= 0 && c < COLS ? board[r * COLS + c] : '');
+      const dirs = [[0, 1], [1, 0], [1, 1], [1, -1]] as const;
+      for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
+        const v = at(r, c); if (v !== 'R' && v !== 'J') continue;
+        for (const [dr, dc] of dirs) {
+          if (at(r + dr, c + dc) === v && at(r + 2 * dr, c + 2 * dc) === v && at(r + 3 * dr, c + 3 * dc) === v) {
+            for (let k = 0; k < 4; k++) out.add((r + k * dr) * COLS + (c + k * dc));
+          }
+        }
+      }
+      return out;
+    };
     const poll = async () => {
       try {
         const res = await fetch(`/api/p4/state?roomId=${encodeURIComponent(p4RoomId)}`, { cache: 'no-store' });
@@ -2064,12 +2089,22 @@ export default function JeuxPage() {
           const key = JSON.stringify(d.board) + String(d.winner);
           if (key !== lastP4Ref.current) {
             lastP4Ref.current = key;
+            const win = d.winner === 'R' || d.winner === 'J' ? winningCells(d.board) : null;
             const colors = Array(42).fill('#000000'); const actives = Array(42).fill(false);
             for (let i = 0; i < 42; i++) {
-              const cell = d.board[i]; const pid = PLATE_ID_BY_INDEX[i]; if (!pid) continue;
-              if (cell === 'R') { sendRgbToPlate(COL_R, 88, pid); colors[i] = '#ff3b6e'; actives[i] = true; }
-              else if (cell === 'J') { sendRgbToPlate(COL_J, 88, pid); colors[i] = '#3b82f6'; actives[i] = true; }
-              else { turnOffPlateImmediate(pid); }
+              const cell = d.board[i];
+              const disp = displayIndex(i);
+              const pid = PLATE_ID_BY_INDEX[disp]; if (!pid) continue;
+              if (cell === 'R' || cell === 'J') {
+                const col = cell === 'R' ? COL_R : COL_J;
+                // Jetons gagnants à fond (100), sinon 85 ; si une partie est gagnée,
+                // les jetons non-gagnants sont atténués pour faire ressortir la ligne.
+                const inten = win ? (win.has(i) ? 100 : 35) : 85;
+                sendRgbToPlate(col, inten, pid);
+                colors[disp] = cell === 'R' ? '#ff1818' : '#ffc400'; actives[disp] = true;
+              } else {
+                turnOffPlateImmediate(pid);
+              }
             }
             setPlateColors(colors); setPlateActive(actives);
           }
@@ -4772,12 +4807,12 @@ export default function JeuxPage() {
                     title: 'Puissance 4 — 2 téléphones',
                     desc: 'Vrai multijoueur compétitif : 2 joueurs sur téléphone, plateau sur les dalles',
                     Icon: Users,
-                    iconBg: 'linear-gradient(135deg,#ff3b6e,#3b82f6)',
+                    iconBg: 'linear-gradient(135deg,#ff1818,#ffc400)',
                     iconColor: '#fff',
                     badgeLabel: 'multi',
-                    accent: '#ec4899',
+                    accent: '#f97316',
                     selected: currentGame === 'p4-multi',
-                    howTo: "Lance ce mode sur la tablette : une salle est créée et un QR s'affiche. Les 2 joueurs scannent le QR (page /p4), chacun joue son tour depuis son téléphone ; le plateau s'affiche sur les dalles de la Color Room.",
+                    howTo: "Lance ce mode sur la tablette : une salle est créée et un QR s'affiche. Les 2 joueurs scannent le QR (page /p4), chacun joue son tour (Rouge puis Jaune) depuis son téléphone ; le plateau s'affiche sur les dalles de la Color Room — on regarde la salle, pas l'écran.",
                     launch: async () => {
                       setTetrisStandalone(false); setCustomRun(null); setHudRun(null);
                       setActiveBuiltinGame(null); setSimonActive(false); setSpectreActive(false); setP4Host(null);
@@ -4939,19 +4974,19 @@ export default function JeuxPage() {
                     </div>
                     {(!p4Host || p4Host.status === 'waiting') ? (
                       <>
-                        <p style={{ fontSize: 13, opacity: 0.75, margin: '0 0 14px' }}>Les 2 joueurs scannent ce QR (page <code>/p4</code>) pour rejoindre. 1er = Rose, 2e = Bleu.</p>
+                        <p style={{ fontSize: 13, opacity: 0.75, margin: '0 0 14px' }}>Les 2 joueurs scannent ce QR (page <code>/p4</code>) pour rejoindre. 1er = Rouge, 2e = Jaune.</p>
                         <div style={{ display: 'inline-block', background: '#fff', padding: 10, borderRadius: 14 }}>
                           <QrCode value={(typeof window !== 'undefined' ? window.location.origin : '') + '/p4?room=' + p4RoomId} size={180} />
                         </div>
                         <div style={{ marginTop: 12, fontSize: 14, fontWeight: 700 }}>
-                          {p4Host?.players.r ? '🌹 Rose ✓' : '🌹 Rose…'} {'  ·  '} {p4Host?.players.j ? '🔵 Bleu ✓' : '🔵 Bleu…'}
+                          {p4Host?.players.r ? '🔴 Rouge ✓' : '🔴 Rouge…'} {'  ·  '} {p4Host?.players.j ? '🟡 Jaune ✓' : '🟡 Jaune…'}
                         </div>
                       </>
                     ) : (
                       <div>
                         {p4Host.winner === 'draw' ? <div style={{ fontSize: 18, fontWeight: 900 }}>Match nul !</div>
-                          : p4Host.winner ? <div style={{ fontSize: 18, fontWeight: 900, color: p4Host.winner === 'R' ? '#ff3b6e' : '#3b82f6' }}>{p4Host.winner === 'R' ? 'Rose' : 'Bleu'} gagne ! 🏆</div>
-                          : <div style={{ fontSize: 16, fontWeight: 800 }}>Au tour de <span style={{ color: p4Host.turn === 'R' ? '#ff3b6e' : '#3b82f6' }}>{p4Host.turn === 'R' ? 'Rose' : 'Bleu'}</span></div>}
+                          : p4Host.winner ? <div style={{ fontSize: 18, fontWeight: 900, color: p4Host.winner === 'R' ? '#ff1818' : '#ffc400' }}>{p4Host.winner === 'R' ? 'Rouge' : 'Jaune'} gagne ! 🏆</div>
+                          : <div style={{ fontSize: 16, fontWeight: 800 }}>Au tour de <span style={{ color: p4Host.turn === 'R' ? '#ff1818' : '#ffc400' }}>{p4Host.turn === 'R' ? 'Rouge' : 'Jaune'}</span></div>}
                         <div style={{ marginTop: 6, fontSize: 12, opacity: 0.6 }}>👁️ Le plateau est sur les dalles de la Color Room.</div>
                         {p4Host.winner && (
                           <button onClick={async () => { try { const res = await fetch('/api/p4/create', { method: 'POST' }); const d = await res.json(); if (d?.ok) { setP4Host(null); setP4RoomId(d.roomId); } } catch { /* ignore */ } }}

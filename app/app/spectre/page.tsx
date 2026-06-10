@@ -122,32 +122,36 @@ function rgbToChannels32(r: number, g: number, b: number, intensity: number): nu
   return ch.map((v) => Math.max(0, Math.min(255, v)));
 }
 
+// Anti-flood : on regroupe les 42 dalles en UNE seule requête batch (au lieu de
+// 42 POST séparés qui saturaient supervision.exe). force:true purge la file.
 async function sendColorToAllPlates(r: number, g: number, b: number, intensity = 85) {
   // PLATE_TYPE identifie les dalles bleues — on reméppe les canaux pour chaque type
   const { PLATE_TYPE, remapChannels32 } = await import('@/lib/tileChannels');
   const chRouge = rgbToChannels32(r, g, b, intensity);
   const chBleu  = remapChannels32(chRouge, 'rouge', 'bleu');
+  const plates = [];
   for (let plateId = 1; plateId <= 42; plateId++) {
     const ch = PLATE_TYPE[plateId] === 'bleu' ? chBleu : chRouge;
-    fetch('/api/supervision/batch', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ plateId, channels: ch.map((v, i) => ({ index: i, value: v })) }),
-      cache: 'no-store',
-    }).catch(() => {});
+    plates.push({ plateId, channels: ch.map((v, i) => ({ index: i, value: v })) });
   }
+  fetch('/api/supervision/batch', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ plates, fast: true, force: true }),
+    cache: 'no-store',
+  }).catch(() => {});
 }
 
 async function clearAllPlates() {
   const channels = Array.from({ length: 32 }, (_, i) => ({ index: i, value: 0 }));
-  for (let plateId = 1; plateId <= 42; plateId++) {
-    fetch('/api/supervision/batch', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ plateId, channels }),
-      cache: 'no-store',
-    }).catch(() => {});
-  }
+  const plates = [];
+  for (let plateId = 1; plateId <= 42; plateId++) plates.push({ plateId, channels });
+  fetch('/api/supervision/batch', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ plates, fast: true, force: true }),
+    cache: 'no-store',
+  }).catch(() => {});
 }
 
 // ── Constantes visuelles ──────────────────────────────────────────────────────
