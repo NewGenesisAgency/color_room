@@ -16,6 +16,9 @@ COPY . .
 # Ensure node_modules binaries are executable and on PATH (needed on ARM/Raspberry Pi)
 ENV PATH="/app/node_modules/.bin:${PATH}"
 RUN chmod -R +x node_modules/.bin || true
+# Embarque Pyodide (Python hors-ligne) dans public/ — le build a internet, pas le Pi ensuite.
+# Best-effort : n'interrompt jamais le build (|| true).
+RUN node scripts/fetch-pyodide.mjs || true
 RUN npm run build
 
 FROM --platform=linux/arm64 node:20-slim AS runner

@@ -23,3 +23,6 @@ tsconfig.tsbuildinfo
 .env
 .env.local
 .env.production
+
+# Pyodide embarque au build Docker (Python hors-ligne) - non commite
+/public/pyodide/

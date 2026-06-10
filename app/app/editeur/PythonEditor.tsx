@@ -192,20 +192,34 @@ export default function PythonEditor({ code, onChange, bridge, tileCount }: Prop
     if (pyRef.current || pyLoading) return;
     setPyLoading(true);
     (async () => {
+      // Hors-ligne d'abord : Pyodide est embarqué dans /pyodide/ (téléchargé au
+      // build Docker). En dev local sans ces fichiers, on retombe sur le CDN.
+      const LOCAL = '/pyodide/';
+      const CDN = 'https://cdn.jsdelivr.net/pyodide/v0.27.4/full/';
+      const loadScript = (src: string) => new Promise<void>((res, rej) => {
+        const s = document.createElement('script');
+        s.src = src;
+        s.onload = () => res();
+        s.onerror = () => rej(new Error('script KO: ' + src));
+        document.head.appendChild(s);
+      });
+      // Vérifie la présence de la copie locale (HEAD) avant de tenter le CDN.
+      const hasLocal = async () => {
+        try { const r = await fetch(LOCAL + 'pyodide.js', { method: 'HEAD' }); return r.ok; } catch { return false; }
+      };
       try {
+        const base = (await hasLocal()) ? LOCAL : CDN;
         if (!window.loadPyodide) {
-          await new Promise<void>((res, rej) => {
-            const s = document.createElement('script');
-            s.src = 'https://cdn.jsdelivr.net/pyodide/v0.27.4/full/pyodide.js';
-            s.onload = () => res();
-            s.onerror = () => rej(new Error('CDN inaccessible'));
-            document.head.appendChild(s);
-          });
+          try { await loadScript(base + 'pyodide.js'); }
+          catch { if (base !== CDN) await loadScript(CDN + 'pyodide.js'); else throw new Error('CDN inaccessible'); }
         }
-        const py = await (window as any).loadPyodide({ indexURL: 'https://cdn.jsdelivr.net/pyodide/v0.27.4/full/' });
+        const indexURL = window.location.origin + LOCAL;
+        let py;
+        try { py = await (window as any).loadPyodide({ indexURL: base === LOCAL ? indexURL : CDN }); }
+        catch { py = await (window as any).loadPyodide({ indexURL: CDN }); }
         pyRef.current = py;
         setPyReady(true);
-        addLog('✓ Python prêt (Pyodide 0.27.4)');
+        addLog('✓ Python prêt (Pyodide 0.27.4' + (base === LOCAL ? ', hors-ligne' : ', CDN') + ')');
       } catch (e) {
         setError('Impossible de charger Pyodide: ' + String(e));
       } finally {
