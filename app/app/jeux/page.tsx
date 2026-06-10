@@ -2346,6 +2346,8 @@ export default function JeuxPage() {
 
     const g = buildGraph(run.cfg);
     const start = g.byId.get(String(startNodeId));
+    // Comptes à rebours actifs (countdown_start/stop), par nom de variable
+    const hudCountdowns = new Map<string, number>();
     // Pas de retour anticipé : on construit toujours le walker (pour les événements UI),
     // même si le jeu n'a pas de nœud "Démarrer" connecté.
 
@@ -2430,6 +2432,7 @@ export default function JeuxPage() {
       // ── Pass-through nodes (événements + lectures) ──
       if (node.kind === 'ui_event_click' || node.kind === 'ui_event_change' || node.kind === 'ui_event_hover' || node.kind === 'event_begin'
         || node.kind === 'on_ui_click' || node.kind === 'on_score_reached' || node.kind === 'on_plate_click' || node.kind === 'on_key'
+        || node.kind === 'on_tile_click' || node.kind === 'on_countdown_end' || node.kind === 'on_submit_answer'
         || node.kind === 'variable_get' || node.kind === 'get_score' || node.kind === 'score_get') {
         const nextId = g.out.get(node.id)?.[0];
         if (nextId) walk(nextId);
@@ -2637,6 +2640,44 @@ export default function JeuxPage() {
         const tileIndex = Math.max(0, Math.min(41, Math.round(getNum(params, 'tileIndex', 0))));
         const nextId = g.out.get(node.id)?.[0];
         if (nextId) hudGraphClickHandlersRef.current.set(tileIndex, () => { if (!hudGraphRunRef.current.stop) walk(nextId); });
+        return;
+      }
+
+      // ── countdown_start {seconds, varName} : compte à rebours visible dans
+      // l'UI (varBind) qui déclenche les nœuds on_countdown_end à zéro ──
+      if (node.kind === 'countdown_start') {
+        const totalSec = Math.max(1, getNum(params, 'seconds', 30));
+        const varName = String(params.varName ?? 'countdown');
+        const endTime = Date.now() + totalSec * 1000;
+        hudVarsRef.current[varName] = totalSec; bumpHudVars();
+        const prev = hudCountdowns.get(varName);
+        if (prev) window.clearInterval(prev);
+        const iv = window.setInterval(() => {
+          if (hudGraphRunRef.current.stop) { window.clearInterval(iv); return; }
+          const remaining = Math.max(0, Math.round((endTime - Date.now()) / 100) / 10);
+          hudVarsRef.current[varName] = remaining; bumpHudVars();
+          if (remaining <= 0) {
+            window.clearInterval(iv);
+            hudCountdowns.delete(varName);
+            g.nodes.forEach((n2) => {
+              if (n2.kind !== 'on_countdown_end' || n2.enabled === false) return;
+              if (String((n2.params as any)?.varName ?? 'countdown') !== varName) return;
+              walk(String(n2.id));
+            });
+          }
+        }, 200);
+        hudCountdowns.set(varName, iv);
+        hudGraphRunRef.current.timers.push(iv);
+        const nextId = g.out.get(node.id)?.[0]; if (nextId) walk(nextId);
+        return;
+      }
+      if (node.kind === 'countdown_stop') {
+        // Arrête le compte à rebours SANS déclencher on_countdown_end
+        const varName = String(params.varName ?? 'countdown');
+        const iv = hudCountdowns.get(varName);
+        if (iv) { window.clearInterval(iv); hudCountdowns.delete(varName); }
+        hudVarsRef.current[varName] = 0; bumpHudVars();
+        const nextId = g.out.get(node.id)?.[0]; if (nextId) walk(nextId);
         return;
       }
 
@@ -4211,6 +4252,22 @@ export default function JeuxPage() {
     // Fire on_click graph handlers if registered
     const clickHandler = hudGraphClickHandlersRef.current.get(index);
     if (clickHandler) clickHandler();
+    // Évènements de l'éditeur : on_plate_click (toute dalle) et
+    // on_tile_click (tileIndex -1 = toutes, sinon la dalle précise)
+    if (gameActive && hudRunRef.current?.cfg) {
+      const hudNodes = Array.isArray(hudRunRef.current.cfg.nodes) ? (hudRunRef.current.cfg.nodes as EditorNode[]) : [];
+      // La variable clickedTile est posée AVANT de déclencher pour que les
+      // sous-graphes puissent lire la dalle cliquée.
+      hudVarsRef.current.clickedTile = index;
+      hudNodes.forEach((n) => {
+        if (n.enabled === false) return;
+        if (n.kind === 'on_plate_click') fireHudEvent(String(n.id));
+        else if (n.kind === 'on_tile_click') {
+          const ti = Math.round(Number(n.params?.tileIndex ?? -1));
+          if (!Number.isFinite(ti) || ti < 0 || ti === index) fireHudEvent(String(n.id));
+        }
+      });
+    }
     // Handle Simon game clicks first
     if (simonActive) {
       handleSimonPlateClick(index);

@@ -1450,6 +1450,8 @@ export default function EditeurPage() {
   const runtimeTickTimersRef = useRef<ReturnType<typeof setInterval>[]>([]);
   const tetrisStateRef = useRef<TetrisState | null>(null);
   const fireRuntimeClickRef = useRef<((idx: number) => void) | null>(null);
+  // Déclenche les nœuds on_ui_click {buttonId} depuis les boutons de test de la preview
+  const fireRuntimeUiClickRef = useRef<((buttonId: string) => void) | null>(null);
   const [runtimeTiles, setRuntimeTiles] = useState<TileState[]>(Array.from({ length: 42 }, () => ({ color: '#000000', intensity: 0 })));
   const [runtimeScore, setRuntimeScore] = useState(0);
   const runtimeAbortRef = useRef<AbortController | null>(null);
@@ -1508,8 +1510,9 @@ export default function EditeurPage() {
 
   const hasRuntimeEvents = useMemo(() => {
     if (!activeGame) return false;
-    return activeGame.nodes.some(n => [
-      'on_tick', 'on_tile_click', 'on_submit_answer', 'on_countdown_end',
+    // TOUT nœud événement (on_*) active le runtime, plus quelques nœuds
+    // "moteurs" qui nécessitent l'état d'exécution.
+    return activeGame.nodes.some(n => n.kind.startsWith('on_') || [
       'event_begin', 'round_start', 'gen_target_color', 'countdown_start',
       'wait_event', 'hardware_flash', 'hardware_send_color', 'show_target_on_plates',
       'for_range', 'for_each_array', 'array_create', 'grid_create', 'tiles_from_array', 'grid_sync_tiles',
@@ -2204,21 +2207,55 @@ export default function EditeurPage() {
       }
     }
 
-    // ── Wire click handler ────────────────────────────────────────────────────
-    fireRuntimeClickRef.current = (tileIndex: number) => {
-      runtimeVariablesRef.current['clickedTile'] = tileIndex;
+    // ── Déclenche tous les sous-graphes sortant d'un nœud événement ──────────
+    const fireEventNodes = (kinds: EditorNodeKind[], match?: (n: EditorNode) => boolean) => {
       game.nodes
-        .filter(n => n.kind === 'on_tile_click' && n.enabled)
+        .filter(n => kinds.includes(n.kind) && n.enabled && (!match || match(n)))
         .forEach(node => {
           game.edges.filter(e => e.from === node.id).forEach(e => executeNodeAsync(e.to, 0).catch(() => {}));
         });
     };
 
+    // ── Clic sur une dalle (preview 3D) ───────────────────────────────────────
+    // Déclenche : on_plate_click (n'importe quelle dalle), on_tile_click
+    // (tileIndex -1 = toutes, sinon la dalle précise), on_click (dalle précise).
+    fireRuntimeClickRef.current = (tileIndex: number) => {
+      runtimeVariablesRef.current['clickedTile'] = tileIndex;
+      fireEventNodes(['on_plate_click']);
+      fireEventNodes(['on_tile_click'], n => {
+        const ti = Math.round(getNum(n.params, 'tileIndex', -1));
+        return ti < 0 || ti === tileIndex;
+      });
+      fireEventNodes(['on_click'], n => Math.round(getNum(n.params, 'tileIndex', 0)) === tileIndex);
+    };
+
+    // ── Clavier → nœuds on_key ({key} vide = toutes les touches) ─────────────
+    const onRuntimeKey = (e: KeyboardEvent) => {
+      if (isEditableTarget(e.target)) return;
+      let matched = false;
+      game.nodes.forEach(n => {
+        if (n.kind !== 'on_key' || !n.enabled) return;
+        const key = String(n.params.key ?? '');
+        if (!key || key === e.key || key.toLowerCase() === e.key.toLowerCase()) {
+          matched = true;
+          runtimeVariablesRef.current['pressedKey'] = e.key;
+          game.edges.filter(ed => ed.from === n.id).forEach(ed => executeNodeAsync(ed.to, 0).catch(() => {}));
+        }
+      });
+      if (matched) e.preventDefault();
+    };
+    window.addEventListener('keydown', onRuntimeKey);
+
+    // ── Boutons UI (eventId) → nœuds on_ui_click {buttonId} ───────────────────
+    fireRuntimeUiClickRef.current = (buttonId: string) => {
+      emitEvent('ui_' + buttonId);
+      fireEventNodes(['on_ui_click'], n => String(n.params.buttonId ?? '') === buttonId || !String(n.params.buttonId ?? ''));
+    };
+
     // ── Wire submit handler ────────────────────────────────────────────────────
     (window as any).__colorroom_submit = () => {
       emitEvent('submit');
-      game.nodes.filter(n => n.kind === 'on_submit_answer' && n.enabled)
-        .forEach(n => game.edges.filter(e => e.from === n.id).forEach(e => executeNodeAsync(e.to, 0).catch(() => {})));
+      fireEventNodes(['on_submit_answer']);
     };
 
     // ── Index define_sub nodes ────────────────────────────────────────────────
@@ -2233,8 +2270,8 @@ export default function EditeurPage() {
       game.edges.filter(e => e.from === n.id).forEach(e => executeNodeAsync(e.to, 0).catch(() => {}));
     });
 
-    // ── Set up on_tick timers ──────────────────────────────────────────────────
-    game.nodes.filter(n => n.kind === 'on_tick' && n.enabled).forEach(node => {
+    // ── Timers : on_tick ET on_timer (mêmes sémantiques que /jeux) ───────────
+    game.nodes.filter(n => (n.kind === 'on_tick' || n.kind === 'on_timer') && n.enabled).forEach(node => {
       const intervalMs = Math.max(50, getNum(node.params, 'intervalMs', 1000));
       const timer = setInterval(() => {
         if (signal.aborted) { clearInterval(timer); return; }
@@ -2242,6 +2279,21 @@ export default function EditeurPage() {
       }, intervalMs);
       runtimeTickTimersRef.current.push(timer);
     });
+
+    // ── on_score_reached {target} : surveille le score, tire UNE fois par nœud ─
+    const scoreFired = new Set<string>();
+    const scoreWatcher = setInterval(() => {
+      if (signal.aborted) { clearInterval(scoreWatcher); return; }
+      const sc = runtimeScoreRef.current;
+      game.nodes.forEach(n => {
+        if (n.kind !== 'on_score_reached' || !n.enabled || scoreFired.has(n.id)) return;
+        if (sc >= getNum(n.params, 'target', 100)) {
+          scoreFired.add(n.id);
+          game.edges.filter(e => e.from === n.id).forEach(e => executeNodeAsync(e.to, 0).catch(() => {}));
+        }
+      });
+    }, 150);
+    runtimeTickTimersRef.current.push(scoreWatcher);
 
     return () => {
       abort.abort();
@@ -2251,6 +2303,8 @@ export default function EditeurPage() {
       runtimeCountdownsRef.current.forEach(t => clearInterval(t));
       runtimeCountdownsRef.current.clear();
       fireRuntimeClickRef.current = null;
+      fireRuntimeUiClickRef.current = null;
+      window.removeEventListener('keydown', onRuntimeKey);
       delete (window as any).__colorroom_submit;
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -4356,6 +4410,27 @@ export default function EditeurPage() {
                       </button>
                     </div>
                   )}
+                  {/* Boutons de test : un par nœud "Clic sur bouton UI" — permet de
+                      déclencher les évènements UI sans quitter la preview */}
+                  {hasRuntimeEvents && isPlaying && (() => {
+                    const uiIds = Array.from(new Set(
+                      (activeGame?.nodes ?? [])
+                        .filter(n => n.kind === 'on_ui_click' && n.enabled)
+                        .map(n => String(n.params.buttonId ?? '') || 'btn1'),
+                    ));
+                    if (uiIds.length === 0) return null;
+                    return uiIds.map(id => (
+                      <button
+                        key={id}
+                        className="g-btn g-btn--sm"
+                        title={`Déclencher l'évènement UI « ${id} »`}
+                        style={{ background: 'rgba(67,97,238,0.10)', color: '#4361ee', border: '1px solid rgba(67,97,238,0.3)', fontSize: 12, padding: '4px 10px', borderRadius: 8 }}
+                        onClick={() => fireRuntimeUiClickRef.current?.(id)}
+                      >
+                        ▶ {id}
+                      </button>
+                    ));
+                  })()}
                 </div>
               </div>
               <div className="viewport">
@@ -4736,7 +4811,8 @@ export default function EditeurPage() {
                       })
                       .map((n) => {
                       const selected = n.id === selectedNodeId;
-                      const hasInput = n.kind !== 'event_begin' && n.kind !== 'on_timer' && n.kind !== 'on_click' && n.kind !== 'on_tick' && n.kind !== 'on_tile_click';
+                      // Les évènements (event_begin, on_*) sont des SOURCES : pas de port d'entrée.
+                      const hasInput = n.kind !== 'event_begin' && !n.kind.startsWith('on_');
                       const inLabel = 'Entrée';
                       const outLabel =
                         n.kind === 'event_begin' ? 'Commencer' :
@@ -4778,6 +4854,7 @@ export default function EditeurPage() {
                           key={n.id}
                           className={[
                             'bp-node',
+                            (n.kind === 'event_begin' || n.kind.startsWith('on_')) ? 'bp-node--event' : '',
                             selected ? 'bp-node--active' : '',
                             !n.enabled ? 'bp-node--disabled' : '',
                           ].filter(Boolean).join(' ')}
@@ -5770,9 +5847,11 @@ export default function EditeurPage() {
                                 <span className="bp-pin__label">{inLabel}</span>
                               </div>
                             ) : (
-                              <div className="bp-pin bp-pin--in" style={{ opacity: 0.35 }}>
-                                <span className="bp-dot" />
-                                <span className="bp-pin__label">-</span>
+                              /* Évènement = source : pas de port d'entrée (et la classe
+                                 bp-pin--in est volontairement absente pour qu'un câble
+                                 lâché ici ne crée PAS de liaison invalide). */
+                              <div className="bp-pin" style={{ opacity: 0.45, cursor: 'default' }}>
+                                <span className="bp-pin__label" style={{ fontSize: 10, fontWeight: 700, color: '#f59e0b', letterSpacing: '.05em' }}>⚡ ÉVÈNEMENT</span>
                               </div>
                             )}
                             <div

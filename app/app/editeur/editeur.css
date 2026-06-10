@@ -912,6 +912,29 @@
     0 8px 24px rgba(67,97,238,0.12);
 }
 
+/* Nœuds ÉVÉNEMENTS (event_begin, on_*) : ce sont les points d'entrée du jeu.
+   Coins gauche arrondis "capsule" + liseré ambré → repérables d'un coup d'œil. */
+.bp-node--event {
+  border-radius: 22px 16px 16px 22px;
+  border-left: 4px solid #f59e0b;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.96),
+    0 1px 2px rgba(245,158,11,0.10),
+    0 12px 32px rgba(245,158,11,0.12);
+}
+
+.bp-node--event:hover {
+  border-color: rgba(245,158,11,0.45);
+  border-left-color: #f59e0b;
+}
+
+.bp-node--event.bp-node--active {
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,1),
+    0 0 0 3px rgba(245,158,11,0.16),
+    0 8px 24px rgba(245,158,11,0.16);
+}
+
 .bp-node__header {
   display: flex;
   align-items: center;
@@ -1948,6 +1971,23 @@ input[type='range'].slider-intensity::-moz-range-progress {
   gap: 8px;
   font-size: 12px;
   opacity: 0.92;
+  /* zone de clic généreuse : connecter un câble ne demande plus de viser un point de 10px */
+  padding: 5px 4px;
+  margin: -5px -4px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+
+.bp-pin:hover {
+  background: color-mix(in srgb, var(--c-action) 10%, transparent);
+}
+
+.bp-pin:hover .bp-dot {
+  transform: scale(1.35);
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, var(--c-action) 25%, transparent),
+    0 0 14px color-mix(in srgb, var(--c-action) 45%, transparent);
 }
 
 .bp-pin--out {
@@ -1955,11 +1995,12 @@ input[type='range'].slider-intensity::-moz-range-progress {
 }
 
 .bp-dot {
-  width: 10px;
-  height: 10px;
+  width: 13px;
+  height: 13px;
   border-radius: 999px;
   background: color-mix(in srgb, var(--c-action) 75%, transparent);
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--c-light) 18%, transparent);
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
 }
 
 .bp-dot--active {
