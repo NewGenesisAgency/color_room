@@ -4715,16 +4715,15 @@ export default function EditeurPage() {
                         return;
                       }
 
+                      // Aimantation : on connecte si on lâche n'importe où sur un bloc
+                      // cible (pas besoin de viser pile le port d'entrée). addEdge
+                      // refuse de lui-même les cibles invalides (events, auto-boucle).
                       const el = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null;
-                      const inPin = el?.closest('.bp-pin--in');
-                      if (inPin) {
-                        // Le pointeur est capturé par `.bp`, donc le pointerup de l'entrée
-                        // ne se déclenche pas : on crée la liaison ici, depuis le DOM.
-                        const targetEl = inPin.closest('.bp-node') as HTMLElement | null;
-                        const targetId = targetEl?.getAttribute('data-nodeid');
+                      const targetEl = el?.closest('.bp-node') as HTMLElement | null;
+                      if (targetEl) {
+                        const targetId = targetEl.getAttribute('data-nodeid');
                         if (targetId && targetId !== pendingLink.fromNodeId) {
                           addEdge(pendingLink.fromNodeId, targetId);
-                          setStatus('Connexion créée');
                         }
                         setPendingLink(null);
                         setPendingAutoConnect(null);
