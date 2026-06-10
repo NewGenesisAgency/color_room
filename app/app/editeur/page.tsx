@@ -5069,13 +5069,12 @@ export default function EditeurPage() {
                             }
                           }}
                         >
-                          <div className="bp-node__header" style={{
-                            background: nodeAccent,
-                            borderBottom: `2px solid ${nodeAccent}`,
-                          }}>
+                          <div className="bp-node__header" style={{ borderLeft: `3px solid ${nodeAccent}` }}>
                             <div className="bp-node__header-left">
-                              {(() => { const CatIcon = NODE_CATEGORY_ICONS[categoryOfKind(n.kind)] ?? Boxes; return <CatIcon size={13} style={{ color: '#fff', flexShrink: 0 }} />; })()}
-                              <span className="bp-node__name" style={{ color: '#fff' }}>{n.name}</span>
+                              <span className="bp-node__chip" style={{ background: `${nodeAccent}1f`, color: nodeAccent }}>
+                                {(() => { const CatIcon = NODE_CATEGORY_ICONS[categoryOfKind(n.kind)] ?? Boxes; return <CatIcon size={13} style={{ flexShrink: 0 }} />; })()}
+                              </span>
+                              <span className="bp-node__name">{n.name}</span>
                             </div>
                             <div className="bp-node__header-right">
                               <button
@@ -5091,7 +5090,7 @@ export default function EditeurPage() {
                                     }),
                                   }));
                                 }}
-                                style={{ color: n.enabled ? '#22d3ee' : '#ef4444' }}
+                                style={{ color: n.enabled ? '#059669' : '#dc2626' }}
                               >
                                 {n.enabled ? <Check size={11} /> : <X size={11} />}
                               </button>

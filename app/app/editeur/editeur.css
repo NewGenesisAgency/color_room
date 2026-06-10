@@ -647,11 +647,11 @@
   border-radius: 18px;
   border: 1px solid rgba(255,255,255,0.80);
   background:
-    radial-gradient(circle at 8% 0%, rgba(67,97,238,0.04), transparent 45%),
-    linear-gradient(rgba(67,97,238,0.035) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(67,97,238,0.035) 1px, transparent 1px),
-    #f7f8fc;
-  background-size: auto, 20px 20px, 20px 20px;
+    radial-gradient(circle at 12% -5%, rgba(67,97,238,0.05), transparent 50%),
+    radial-gradient(circle at 90% 105%, rgba(124,58,237,0.04), transparent 50%),
+    radial-gradient(rgba(22,30,60,0.07) 1.1px, transparent 1.1px),
+    #fbfcfe;
+  background-size: auto, auto, 22px 22px;
   background-position: center;
   position: relative;
   overflow: hidden;
@@ -717,10 +717,10 @@
   position: absolute;
   inset: 0;
   background:
-    linear-gradient(rgba(67,97,238,0.04) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(67,97,238,0.04) 1px, transparent 1px);
-  background-size: 120px 120px;
-  opacity: 0.6;
+    linear-gradient(rgba(22,30,60,0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(22,30,60,0.035) 1px, transparent 1px);
+  background-size: 132px 132px;
+  opacity: 0.5;
   pointer-events: none;
 }
 
@@ -874,20 +874,32 @@
 .bp-node {
   position: absolute;
   z-index: 10;
-  width: 300px;
-  border-radius: 16px;
-  border: 1px solid rgba(255,255,255,0.92);
-  background: rgba(255,255,255,0.80);
-  backdrop-filter: blur(30px) saturate(190%);
-  -webkit-backdrop-filter: blur(30px) saturate(190%);
+  width: 290px;
+  border-radius: 18px;
+  border: 1px solid rgba(255,255,255,0.9);
+  /* Liquid glass blanc : voile clair très translucide + reflet doux */
+  background: linear-gradient(180deg, rgba(255,255,255,0.86) 0%, rgba(255,255,255,0.72) 100%);
+  backdrop-filter: blur(34px) saturate(180%);
+  -webkit-backdrop-filter: blur(34px) saturate(180%);
   box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.96),
-    0 1px 2px rgba(22,30,60,0.05),
-    0 12px 32px rgba(22,30,60,0.09);
+    inset 0 1px 0 rgba(255,255,255,0.95),
+    inset 0 0 0 1px rgba(255,255,255,0.35),
+    0 1px 2px rgba(22,30,60,0.04),
+    0 10px 30px rgba(22,30,60,0.08);
   user-select: none;
   padding: 0;
   overflow: hidden;
   transition: transform 0.18s cubic-bezier(.2,.8,.2,1), box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+/* Pastille d'icône colorée (catégorie) — minimaliste */
+.bp-node__chip {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 8px;
+  flex-shrink: 0;
 }
 
 .bp-node:hover {
@@ -940,14 +952,17 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 9px 11px 8px;
-  border-radius: 13px 13px 0 0;
-  /* couleur pleine gérée en inline style, texte toujours blanc */
-  color: #fff;
+  padding: 9px 11px 8px 9px;
+  border-radius: 17px 17px 0 0;
+  /* Header blanc translucide, texte sombre (liquid glass white). Le liseré
+     coloré de catégorie est posé en inline style (borderLeft). */
+  background: rgba(255,255,255,0.5);
+  border-bottom: 1px solid rgba(22,30,60,0.06);
+  color: rgba(16,20,34,0.92);
 }
 
 .bp-node__name {
-  color: #fff;
+  color: rgba(16,20,34,0.92);
   font-weight: 700;
   font-size: 13px;
   letter-spacing: -0.01em;
@@ -974,25 +989,25 @@
 .bp-node__hbtn {
   width: 22px;
   height: 22px;
-  border-radius: 6px;
+  border-radius: 7px;
   border: none;
-  background: rgba(255,255,255,0.18);
+  background: rgba(22,30,60,0.05);
   cursor: pointer;
   display: grid;
   place-items: center;
-  opacity: 0.8;
+  opacity: 0.75;
   transition: all 0.12s;
   padding: 0;
-  color: #fff;
+  color: rgba(16,20,34,0.7);
 }
 
 .bp-node__hbtn:hover {
   opacity: 1;
-  background: rgba(255,255,255,0.28);
+  background: rgba(22,30,60,0.1);
 }
 
 .bp-node__hbtn--del:hover {
-  background: rgba(239,68,68,0.5);
+  background: rgba(220,38,38,0.9);
   color: #fff;
 }
 
