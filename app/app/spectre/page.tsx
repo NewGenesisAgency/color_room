@@ -917,9 +917,14 @@ export function SpectreGame({ embedded = false, initialJoinCode, onExit }: Spect
   return null;
 }
 
-// Export par défaut = route /spectre (page autonome, ouverte par QR code sur
-// téléphone). Aucune prop personnalisée ici pour respecter le typage des pages
-// Next.js ; SpectreGame lit lui-même ?code= dans l'URL en mode non intégré.
+/**
+ * @brief Composant par défaut de la route /spectre (page autonome).
+ *
+ * Page ouverte par QR code sur téléphone. Aucune prop personnalisée (typage
+ * Next.js) ; SpectreGame lit lui-même ?code= dans l'URL en mode non intégré.
+ *
+ * @returns Le jeu Spectre rendu en plein écran.
+ */
 export default function SpectrePage() {
   return <SpectreGame />;
 }

@@ -1,5 +1,24 @@
 'use client';
 
+/**
+ * @file app/chromaticite/page.tsx
+ * @brief Diagramme interactif de chromaticité CIE 1931 avec envoi aux dalles.
+ *
+ * Affiche le diagramme CIE 1931 (fer à cheval coloré dessiné pixel par pixel
+ * sur canvas, triangle du gamut sRGB, locus de Planck et point blanc D65) via
+ * une surcouche SVG interactive. Le survol prévisualise la couleur (x, y, RGB,
+ * longueur d'onde approchée) et le clic la sélectionne. La couleur sélectionnée
+ * peut être convertie en 32 canaux LED (selon le type de dalle rouge/bleu et
+ * l'intensité) puis envoyée aux 42 dalles via /api/supervision/batch ; un mode
+ * « live » envoie en continu la couleur sous le curseur (debounce 40 ms). Au
+ * démontage, les dalles sont éteintes.
+ *
+ * Le fichier regroupe : les données du locus spectral et du locus de Planck,
+ * les conversions géométriques (xy ↔ pixel SVG), le test point-dans-le-locus,
+ * la conversion CIE xy → sRGB, l'encodage RGB → 32 canaux et les appels
+ * matériels, puis le composant principal `ChromaticitePage`.
+ */
+
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { CHANNELS_ROUGE, CHANNELS_BLEU, type TileType } from '@/lib/tileChannels';
 
@@ -53,11 +72,13 @@ const DW = 460, DH = 420;
 const X_MIN = 0, X_MAX = 0.85, Y_MIN = 0, Y_MAX = 0.92;
 const PAD_L = 32, PAD_R = 16, PAD_T = 12, PAD_B = 28;
 
+/** @brief Convertit une chromaticité (x,y) en pixel SVG du diagramme. */
 function xyToSvg(x: number, y: number) {
   const px = PAD_L + (x - X_MIN) / (X_MAX - X_MIN) * (DW - PAD_L - PAD_R);
   const py = (DH - PAD_B) - (y - Y_MIN) / (Y_MAX - Y_MIN) * (DH - PAD_T - PAD_B);
   return { px, py };
 }
+/** @brief Convertit un pixel SVG du diagramme en chromaticité (x,y). */
 function svgToXy(px: number, py: number) {
   return {
     x: (px - PAD_L) / (DW - PAD_L - PAD_R) * (X_MAX - X_MIN) + X_MIN,
@@ -66,6 +87,10 @@ function svgToXy(px: number, py: number) {
 }
 
 // ── Point-in-horseshoe (ray casting) ────────────────────────────────────────
+/**
+ * @brief Indique si la chromaticité (cx,cy) est dans le fer à cheval (ray casting).
+ * @returns true si le point est dans le locus spectral.
+ */
 function inHorseshoe(cx: number, cy: number): boolean {
   let inside = false;
   for (let i = 0, j = HORSESHOE.length - 1; i < HORSESHOE.length; j = i++) {
@@ -76,6 +101,10 @@ function inHorseshoe(cx: number, cy: number): boolean {
 }
 
 // ── CIE XYZ → sRGB ──────────────────────────────────────────────────────────
+/**
+ * @brief Convertit une chromaticité CIE (x,y) en couleur sRGB (Y=1).
+ * @returns Le triplet { r, g, b } (0..255), ou null si hors domaine valide.
+ */
 function xyToRgb255(x: number, y: number): { r: number; g: number; b: number } | null {
   if (y < 1e-8 || x < 0 || x + y > 1) return null;
   const X = x / y, Y = 1.0, Z = (1 - x - y) / y;
