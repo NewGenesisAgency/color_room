@@ -52,7 +52,7 @@ const CS160Panel = dynamic(() => import('@/app/_components/CS160Panel'), { ssr: 
 const PythonEditor = dynamic(() => import('./PythonEditor'), { ssr: false });
 const UIDesigner = dynamic(() => import('./UIDesigner'), { ssr: false });
 
-import { Boxes, Gamepad2, Plus, Play, Pause, RotateCcw, Save, Trash2, FolderPlus, X, Lightbulb, Layers, Zap, Palette, Clock, MousePointer2, LayoutGrid, Maximize2, Minimize2, Eye, Star, Heart, Sun, Moon, Flame, Snowflake, Music, Target, Puzzle, Sparkles, Trophy, Rocket, Ghost, Dice1, Brain, Check, GitBranch, Hash, Settings2, Shuffle, Search, Users, Film, Thermometer, ScanLine, Wifi, WifiOff, Crown, Gem, Bug, Bot, Atom, Bird, Cat, Dog, Fish, Leaf, Cloud, Droplet, Mountain, Anchor, Bell, Bomb, Camera, Egg, Feather, Gift, Hexagon, Key, Lock, Medal, Pizza, Plane, Rainbow, Skull, Smile, Wand2, Waves, Crosshair, Dice5, Joystick, FlaskConical, Swords, ChevronDown, GraduationCap, SlidersHorizontal, RefreshCw, Copy, Scissors, FileCode, type LucideIcon } from 'lucide-react';
+import { Boxes, Gamepad2, Plus, Play, Pause, RotateCcw, Save, Trash2, FolderPlus, X, Lightbulb, Layers, Zap, Palette, Clock, MousePointer2, LayoutGrid, Maximize2, Minimize2, Eye, EyeOff, Frame, Star, Heart, Sun, Moon, Flame, Snowflake, Music, Target, Puzzle, Sparkles, Trophy, Rocket, Ghost, Dice1, Brain, Check, GitBranch, Hash, Settings2, Shuffle, Search, Users, Film, Thermometer, ScanLine, Wifi, WifiOff, Crown, Gem, Bug, Bot, Atom, Bird, Cat, Dog, Fish, Leaf, Cloud, Droplet, Mountain, Anchor, Bell, Bomb, Camera, Egg, Feather, Gift, Hexagon, Key, Lock, Medal, Pizza, Plane, Rainbow, Skull, Smile, Wand2, Waves, Crosshair, Dice5, Joystick, FlaskConical, Swords, ChevronDown, GraduationCap, SlidersHorizontal, RefreshCw, Copy, Scissors, FileCode, type LucideIcon } from 'lucide-react';
 
 type IdFactory = () => string;
 
@@ -307,6 +307,23 @@ type GameUIComponent = {
   value?: number;     // valeur initiale
 };
 
+/**
+ * @brief Cadre de commentaire façon « comment box » UE5.
+ *
+ * Rectangle décoratif dessiné DERRIÈRE les nœuds du graphe : il sert à
+ * regrouper visuellement des blocs. Le déplacer entraîne les nœuds dont le
+ * centre se trouve à l'intérieur. Coordonnées exprimées en repère graphe.
+ */
+type GameComment = {
+  id: string;     /**< Identifiant unique du cadre. */
+  title: string;  /**< Titre affiché (éditable) dans la barre du cadre. */
+  color: string;  /**< Couleur (hex) de la bordure et du fond translucide. */
+  x: number;      /**< Position X (repère graphe). */
+  y: number;      /**< Position Y (repère graphe). */
+  w: number;      /**< Largeur du cadre. */
+  h: number;      /**< Hauteur du cadre. */
+};
+
 type GameDoc = {
   id: string;
   name: string;
@@ -323,6 +340,7 @@ type GameDoc = {
   uiComponents?: GameUIComponent[];
   pythonCode?: string;
   uiLayout?: UILayoutComponent[];
+  comments?: GameComment[];
 };
 
 type GraphEdge = {
@@ -618,6 +636,14 @@ const NODE_CATEGORY_COLORS: Record<string, string> = {
   'Interface': '#ec4899',
   'Mesure Jeu': '#0ea5e9',
 };
+
+/**
+ * @brief Teintes pastel proposées pour les cadres de commentaire.
+ *
+ * Le bouton couleur d'un cadre cycle dans cet ordre (6 teintes douces qui
+ * restent lisibles à ~6 % d'opacité sur le fond clair du canvas).
+ */
+const COMMENT_COLORS: string[] = ['#64748b', '#60a5fa', '#34d399', '#fbbf24', '#f472b6', '#a78bfa'];
 
 function clamp255(v: number): number {
   if (!Number.isFinite(v)) return 0;
@@ -1161,6 +1187,45 @@ export default function EditeurPage() {
   const [graphPan, setGraphPan] = useState<{ x: number; y: number }>({ x: 120, y: 80 });
   const [graphZoom, setGraphZoom] = useState<number>(0.5);
   const bpContentRef = useRef<HTMLDivElement | null>(null);
+
+  // ── Minimap : visibilité (persistée) + taille courante du canvas .bp ───────
+  const bpRef = useRef<HTMLDivElement | null>(null);
+  const [bpSize, setBpSize] = useState<{ w: number; h: number }>({ w: 800, h: 500 });
+  const [minimapVisible, setMinimapVisible] = useState<boolean>(true);
+
+  /** @brief Relit la préférence minimap depuis localStorage (côté client). */
+  useEffect(() => {
+    try {
+      if (window.localStorage.getItem('crg_minimap') === '0') setMinimapVisible(false);
+    } catch { /* ignore */ }
+  }, []);
+
+  /** @brief Suit la taille du canvas .bp (pour la minimap et le centrage caméra). */
+  useEffect(() => {
+    const el = bpRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => {
+      const r = el.getBoundingClientRect();
+      setBpSize({ w: r.width || 800, h: r.height || 500 });
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  /** @brief Affiche/masque la minimap et mémorise le choix dans localStorage. */
+  const basculerMinimap = () => {
+    setMinimapVisible((v) => {
+      try { window.localStorage.setItem('crg_minimap', v ? '0' : '1'); } catch { /* ignore */ }
+      return !v;
+    });
+  };
+
+  // ── Copier/coller de nœud (Ctrl+C / Ctrl+V) : presse-papiers interne ───────
+  const clipboardNodeRef = useRef<EditorNode | null>(null);
+
+  // ── Cadres de commentaire : drag (barre de titre) et redimensionnement ─────
+  const commentDragRef = useRef<{ id: string; nodeIds: string[]; lastX: number; lastY: number } | null>(null);
+  const commentResizeRef = useRef<{ id: string; lastX: number; lastY: number } | null>(null);
   const [pinPositions, setPinPositions] = useState<
     Record<string, { in?: { x: number; y: number }; out?: { x: number; y: number } }>
   >({});
@@ -2469,6 +2534,46 @@ export default function EditeurPage() {
         return;
       }
 
+      // Ctrl+C → copier le nœud sélectionné dans le presse-papiers interne
+      if (ctrl && e.key.toLowerCase() === 'c') {
+        const cur = editorRef.current;
+        const game = cur.games.find((g) => g.id === cur.activeGameId);
+        const node = game?.nodes.find((n) => n.id === cur.selectedNodeId);
+        if (node) {
+          e.preventDefault();
+          clipboardNodeRef.current = { ...node, params: { ...node.params }, pos: { ...node.pos } };
+          setStatus('Nœud copié');
+        }
+        return;
+      }
+
+      // Ctrl+V → coller le nœud copié (décalé de +40,+40, nouvel id, sélectionné)
+      if (ctrl && e.key.toLowerCase() === 'v') {
+        const src = clipboardNodeRef.current;
+        if (src && editorRef.current.activeGameId) {
+          e.preventDefault();
+          const newId = randomId();
+          commit((cur) => ({
+            ...cur,
+            games: cur.games.map((g) => g.id !== cur.activeGameId ? g : {
+              ...g,
+              nodes: [...g.nodes, { ...src, id: newId, params: { ...src.params }, pos: { x: src.pos.x + 40, y: src.pos.y + 40 } }],
+            }),
+            selectedNodeId: newId,
+          }));
+          setStatus('Nœud collé');
+        }
+        return;
+      }
+
+      // Ctrl+D → dupliquer directement le nœud sélectionné
+      if (ctrl && e.key.toLowerCase() === 'd') {
+        e.preventDefault();
+        const sel = editorRef.current.selectedNodeId;
+        if (sel) duplicateNodeById(sel);
+        return;
+      }
+
       if (e.key === 'Escape') {
         setContextMenu((p) => ({ ...p, open: false }));
         setPendingLink(null);
@@ -2708,6 +2813,7 @@ export default function EditeurPage() {
       nodes: g.nodes,
       edges: g.edges,
       uiLayout: g.uiLayout ?? [],
+      comments: g.comments ?? [],
       pythonCode: g.pythonCode ?? '',
     };
   };
@@ -2722,6 +2828,7 @@ export default function EditeurPage() {
     nodes: EditorNode[];
     edges: GraphEdge[];
     uiLayout: UILayoutComponent[];
+    comments: GameComment[];
     pythonCode?: string;
   } | null => {
     if (!config || typeof config !== 'object') return null;
@@ -2736,8 +2843,9 @@ export default function EditeurPage() {
     const bgColor = typeof o.bgColor === 'string' ? o.bgColor : undefined;
     const accentColor = typeof o.accentColor === 'string' ? o.accentColor : undefined;
     const uiLayout = Array.isArray(o.uiLayout) ? (o.uiLayout as UILayoutComponent[]) : [];
+    const comments = Array.isArray(o.comments) ? (o.comments as GameComment[]) : [];
     const pythonCode = typeof o.pythonCode === 'string' ? o.pythonCode : undefined;
-    return { tileCount, icon, difficulty, description, bgColor, accentColor, nodes, edges, uiLayout, pythonCode };
+    return { tileCount, icon, difficulty, description, bgColor, accentColor, nodes, edges, uiLayout, comments, pythonCode };
   };
 
   const createDbGame = async (name: string, initialGame: GameDoc): Promise<string | null> => {
@@ -3259,6 +3367,7 @@ export default function EditeurPage() {
               nodes: cfg.nodes,
               edges: cfg.edges,
               uiLayout: cfg.uiLayout,
+              comments: cfg.comments,
               pythonCode: cfg.pythonCode,
             } satisfies GameDoc;
           })
@@ -3429,6 +3538,98 @@ export default function EditeurPage() {
     }));
     setStatus('Nœud dupliqué');
     return newId;
+  };
+
+  /**
+   * @brief Crée un cadre de commentaire (420×280) centré sur la vue courante.
+   *
+   * Le cadre est ajouté au jeu actif via commit() (annulable). Sa position est
+   * calculée pour que son centre coïncide avec le centre du viewport.
+   */
+  const addCommentBox = () => {
+    if (!activeGameId) { setStatus("Crée un jeu avant d'ajouter un cadre"); return; }
+    const rect = bpRef.current?.getBoundingClientRect();
+    const W = rect?.width || 800;
+    const H = rect?.height || 500;
+    const z = Math.max(0.0001, graphZoom);
+    const cx = (W / 2 - graphPan.x) / z;
+    const cy = (H / 2 - graphPan.y) / z;
+    const id = randomId();
+    commit((cur) => ({
+      ...cur,
+      games: cur.games.map((g) => g.id !== cur.activeGameId ? g : {
+        ...g,
+        comments: [...(g.comments ?? []), { id, title: 'Commentaire', color: COMMENT_COLORS[0], x: cx - 210, y: cy - 140, w: 420, h: 280 }],
+      }),
+    }));
+    setStatus('Cadre ajouté');
+  };
+
+  /**
+   * @brief Liste les nœuds dont le CENTRE se trouve dans le rectangle du cadre.
+   *
+   * Les dimensions réelles des blocs sont mesurées dans le DOM (fallback
+   * 300×130 comme resolveOverlaps). Utilisé au début du drag d'un cadre pour
+   * savoir quels nœuds entraîner avec lui.
+   * @param c Cadre de commentaire concerné.
+   * @return Identifiants des nœuds contenus.
+   */
+  const nodesDansCadre = (c: GameComment): string[] => {
+    const cur = editorRef.current;
+    const g = cur.games.find((gg) => gg.id === cur.activeGameId);
+    if (!g) return [];
+    const sizes = new Map<string, { w: number; h: number }>();
+    bpContentRef.current?.querySelectorAll('.bp-node[data-nodeid]').forEach((el) => {
+      const node = el as HTMLElement;
+      const id = node.getAttribute('data-nodeid');
+      if (id) sizes.set(id, { w: node.offsetWidth || 300, h: node.offsetHeight || 130 });
+    });
+    return g.nodes
+      .filter((n) => {
+        const s = sizes.get(n.id) ?? { w: 300, h: 130 };
+        const ncx = n.pos.x + s.w / 2;
+        const ncy = n.pos.y + s.h / 2;
+        return ncx >= c.x && ncx <= c.x + c.w && ncy >= c.y && ncy <= c.y + c.h;
+      })
+      .map((n) => n.id);
+  };
+
+  /** @brief Passe le cadre à la teinte pastel suivante (cycle de 6 couleurs). */
+  const cycleCommentColor = (commentId: string) => {
+    commit((cur) => ({
+      ...cur,
+      games: cur.games.map((g) => g.id !== cur.activeGameId ? g : {
+        ...g,
+        comments: (g.comments ?? []).map((c) => {
+          if (c.id !== commentId) return c;
+          const idx = COMMENT_COLORS.indexOf(c.color);
+          return { ...c, color: COMMENT_COLORS[(idx + 1) % COMMENT_COLORS.length] };
+        }),
+      }),
+    }));
+  };
+
+  /** @brief Renomme un cadre de commentaire (titre de la barre). */
+  const renameComment = (commentId: string, title: string) => {
+    commit((cur) => ({
+      ...cur,
+      games: cur.games.map((g) => g.id !== cur.activeGameId ? g : {
+        ...g,
+        comments: (g.comments ?? []).map((c) => (c.id === commentId ? { ...c, title } : c)),
+      }),
+    }));
+  };
+
+  /** @brief Supprime un cadre de commentaire (les nœuds qu'il contient restent). */
+  const removeCommentById = (commentId: string) => {
+    commit((cur) => ({
+      ...cur,
+      games: cur.games.map((g) => g.id !== cur.activeGameId ? g : {
+        ...g,
+        comments: (g.comments ?? []).filter((c) => c.id !== commentId),
+      }),
+    }));
+    setStatus('Cadre supprimé');
   };
 
   /** Active ou désactive un nœud (un nœud désactivé est ignoré à l'exécution). */
@@ -4750,6 +4951,18 @@ export default function EditeurPage() {
                       </>
                     );
                   })()}
+                  {/* Cadre de commentaire (comment box UE5) au centre de la vue */}
+                  {activeGame && (
+                    <button
+                      className="btn btn--mini"
+                      title="Ajouter un cadre de commentaire au centre de la vue"
+                      onClick={addCommentBox}
+                      style={{ padding: '0 8px', height: 28, fontSize: 11, gap: 4 }}
+                    >
+                      <Frame size={12} />
+                      <span>Cadre</span>
+                    </button>
+                  )}
                   {/* Fit all nodes */}
                   {activeGame && (
                     <button
@@ -4820,6 +5033,7 @@ export default function EditeurPage() {
               <div className="panelbody" data-tour="editor-blocs" style={{ display: editorTab === 'canvas' ? undefined : 'none' }}>
                 <div
                   className="bp"
+                  ref={bpRef}
                   onDoubleClick={(e) => {
                     if ((e.target as HTMLElement).closest('.bp-node')) return;
                     if ((e.target as HTMLElement).closest('.bp-menu')) return;
@@ -4959,6 +5173,120 @@ export default function EditeurPage() {
                         <div className="bp-empty__hint">Clic droit pour ajouter des noeuds • Double clic = Remplissage</div>
                       </div>
                     ) : null}
+
+                    {/* ── Cadres de commentaire (comment boxes UE5) : rendus DERRIÈRE
+                        les nœuds (z-index < .bp-node). Le drag de la barre de titre
+                        entraîne les nœuds dont le centre est dans le cadre ; la
+                        poignée bas-droite redimensionne. Historique : un seul pas
+                        par geste (beginDrag/endDrag), édition titre/couleur via
+                        commit(). ── */}
+                    {(activeGame?.comments ?? []).map((c) => (
+                      <div
+                        key={c.id}
+                        className="bp-comment"
+                        style={{ left: c.x, top: c.y, width: c.w, height: c.h, borderColor: c.color, background: `${c.color}0f` }}
+                      >
+                        <div
+                          className="bp-comment__bar"
+                          style={{ background: `${c.color}1a` }}
+                          onDoubleClick={(e) => e.stopPropagation()}
+                          onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                          onPointerDown={(e) => {
+                            if (isEditableTarget(e.target)) return; // input du titre
+                            e.stopPropagation();
+                            beginDrag();
+                            commentDragRef.current = { id: c.id, nodeIds: nodesDansCadre(c), lastX: e.clientX, lastY: e.clientY };
+                            (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+                          }}
+                          onPointerMove={(e) => {
+                            const d = commentDragRef.current;
+                            if (!d || d.id !== c.id) return;
+                            const z = Math.max(0.0001, graphZoom);
+                            const dx = (e.clientX - d.lastX) / z;
+                            const dy = (e.clientY - d.lastY) / z;
+                            d.lastX = e.clientX;
+                            d.lastY = e.clientY;
+                            if (dx === 0 && dy === 0) return;
+                            setDragDidMove(true);
+                            // Déplace le cadre ET les nœuds capturés au début du drag
+                            setEditor((cur) => ({
+                              ...cur,
+                              games: cur.games.map((g) => g.id !== cur.activeGameId ? g : {
+                                ...g,
+                                comments: (g.comments ?? []).map((cc) => cc.id === d.id ? { ...cc, x: cc.x + dx, y: cc.y + dy } : cc),
+                                nodes: g.nodes.map((n) => d.nodeIds.includes(n.id) ? { ...n, pos: { x: n.pos.x + dx, y: n.pos.y + dy } } : n),
+                              }),
+                            }));
+                            requestAnimationFrame(() => measurePinsRef.current?.());
+                          }}
+                          onPointerUp={() => {
+                            commentDragRef.current = null;
+                            endDrag();
+                          }}
+                        >
+                          <input
+                            className="bp-comment__title"
+                            value={c.title}
+                            placeholder="Titre du cadre"
+                            onChange={(e) => renameComment(c.id, e.target.value)}
+                            onPointerDown={(e) => e.stopPropagation()}
+                          />
+                          <button
+                            type="button"
+                            className="bp-comment__btn"
+                            title="Changer la couleur du cadre"
+                            style={{ color: c.color }}
+                            onPointerDown={(e) => e.stopPropagation()}
+                            onClick={(e) => { e.stopPropagation(); cycleCommentColor(c.id); }}
+                          >
+                            <Palette size={12} />
+                          </button>
+                          <button
+                            type="button"
+                            className="bp-comment__btn bp-comment__btn--del"
+                            title="Supprimer le cadre (les nœuds sont conservés)"
+                            onPointerDown={(e) => e.stopPropagation()}
+                            onClick={(e) => { e.stopPropagation(); removeCommentById(c.id); }}
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        </div>
+                        <div
+                          className="bp-comment__resize"
+                          title="Redimensionner le cadre"
+                          onPointerDown={(e) => {
+                            e.stopPropagation();
+                            beginDrag();
+                            commentResizeRef.current = { id: c.id, lastX: e.clientX, lastY: e.clientY };
+                            (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+                          }}
+                          onPointerMove={(e) => {
+                            const d = commentResizeRef.current;
+                            if (!d || d.id !== c.id) return;
+                            const z = Math.max(0.0001, graphZoom);
+                            const dx = (e.clientX - d.lastX) / z;
+                            const dy = (e.clientY - d.lastY) / z;
+                            d.lastX = e.clientX;
+                            d.lastY = e.clientY;
+                            if (dx === 0 && dy === 0) return;
+                            setDragDidMove(true);
+                            setEditor((cur) => ({
+                              ...cur,
+                              games: cur.games.map((g) => g.id !== cur.activeGameId ? g : {
+                                ...g,
+                                comments: (g.comments ?? []).map((cc) => cc.id === d.id
+                                  ? { ...cc, w: Math.max(160, cc.w + dx), h: Math.max(100, cc.h + dy) }
+                                  : cc),
+                              }),
+                            }));
+                          }}
+                          onPointerUp={() => {
+                            commentResizeRef.current = null;
+                            endDrag();
+                          }}
+                        />
+                      </div>
+                    ))}
 
                     <svg className="bp__wires" width="2000" height="2000" viewBox="0 0 2000 2000" preserveAspectRatio="none">
                       <defs>
@@ -6357,6 +6685,113 @@ export default function EditeurPage() {
                         )}
                       </div>
                     </div>
+                  ) : null}
+
+                  {/* ── Minimap (style UE5) : aperçu des nœuds + viewport courant.
+                      Enfant direct de .bp (hors transform) ; un clic/drag déplace
+                      la caméra (setGraphPan) pour centrer le point visé. ── */}
+                  {activeGame ? (
+                    minimapVisible ? (() => {
+                      const MM_W = 180;
+                      const MM_H = 120;
+                      // Bounding box de tous les nœuds (convention fitNodesToView : ~300×180 / nœud)
+                      const z = Math.max(0.0001, graphZoom);
+                      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+                      activeGame.nodes.forEach((n) => {
+                        const x = n.pos?.x ?? 0;
+                        const y = n.pos?.y ?? 0;
+                        if (x < minX) minX = x;
+                        if (y < minY) minY = y;
+                        if (x + 300 > maxX) maxX = x + 300;
+                        if (y + 180 > maxY) maxY = y + 180;
+                      });
+                      if (!Number.isFinite(minX)) {
+                        // Aucun nœud : on cadre la minimap sur le viewport courant
+                        minX = -graphPan.x / z;
+                        minY = -graphPan.y / z;
+                        maxX = minX + bpSize.w / z;
+                        maxY = minY + bpSize.h / z;
+                      }
+                      const PAD = 80;
+                      minX -= PAD; minY -= PAD; maxX += PAD; maxY += PAD;
+                      const worldW = Math.max(1, maxX - minX);
+                      const worldH = Math.max(1, maxY - minY);
+                      const scale = Math.min(MM_W / worldW, MM_H / worldH);
+                      const ox = (MM_W - worldW * scale) / 2;
+                      const oy = (MM_H - worldH * scale) / 2;
+                      // Viewport courant exprimé en repère graphe
+                      const vx = -graphPan.x / z;
+                      const vy = -graphPan.y / z;
+                      const vw = bpSize.w / z;
+                      const vh = bpSize.h / z;
+                      /** Centre la caméra sur le point de la minimap visé par le pointeur. */
+                      const centrerCamera = (e: React.PointerEvent<HTMLDivElement>) => {
+                        const r = e.currentTarget.getBoundingClientRect();
+                        const gx = minX + (e.clientX - r.left - ox) / Math.max(0.0001, scale);
+                        const gy = minY + (e.clientY - r.top - oy) / Math.max(0.0001, scale);
+                        setGraphPan({ x: bpSize.w / 2 - gx * graphZoom, y: bpSize.h / 2 - gy * graphZoom });
+                      };
+                      return (
+                        <div
+                          className="bp-minimap"
+                          title="Minimap : cliquer ou glisser pour déplacer la caméra"
+                          onPointerDown={(e) => {
+                            e.stopPropagation();
+                            (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+                            centrerCamera(e);
+                          }}
+                          onPointerMove={(e) => {
+                            if ((e.buttons & 1) !== 0) centrerCamera(e);
+                          }}
+                          onPointerUp={(e) => e.stopPropagation()}
+                          onDoubleClick={(e) => e.stopPropagation()}
+                          onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                          onWheel={(e) => e.stopPropagation()}
+                        >
+                          {activeGame.nodes.map((n) => (
+                            <div
+                              key={n.id}
+                              className="bp-minimap__node"
+                              style={{
+                                left: ox + ((n.pos?.x ?? 0) - minX) * scale,
+                                top: oy + ((n.pos?.y ?? 0) - minY) * scale,
+                                width: Math.max(3, 300 * scale),
+                                height: Math.max(2, 180 * scale),
+                                background: NODE_CATEGORY_COLORS[categoryOfKind(n.kind)] ?? '#4361ee',
+                              }}
+                            />
+                          ))}
+                          <div
+                            className="bp-minimap__view"
+                            style={{
+                              left: ox + (vx - minX) * scale,
+                              top: oy + (vy - minY) * scale,
+                              width: Math.max(6, vw * scale),
+                              height: Math.max(6, vh * scale),
+                            }}
+                          />
+                          <button
+                            type="button"
+                            className="bp-minimap__eye"
+                            title="Masquer la minimap"
+                            onPointerDown={(e) => e.stopPropagation()}
+                            onClick={(e) => { e.stopPropagation(); basculerMinimap(); }}
+                          >
+                            <EyeOff size={12} />
+                          </button>
+                        </div>
+                      );
+                    })() : (
+                      <button
+                        type="button"
+                        className="bp-minimap-toggle"
+                        title="Afficher la minimap"
+                        onPointerDown={(e) => e.stopPropagation()}
+                        onClick={(e) => { e.stopPropagation(); basculerMinimap(); }}
+                      >
+                        <Eye size={14} />
+                      </button>
+                    )
                   ) : null}
                 </div>
               </div>
