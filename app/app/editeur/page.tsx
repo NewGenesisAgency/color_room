@@ -347,6 +347,40 @@ type GraphEdge = {
   id: string;
   from: string;
   to: string;
+  /** Nature du câble : 'exec' (flux d'exécution, défaut) ou 'data' (fil de valeur). */
+  kind?: 'exec' | 'data';
+  /** Pour un fil 'data' : nom de l'opérande cible (ex. 'a', 'b', 't'). */
+  toPort?: string;
+};
+
+/**
+ * @brief Vrai si le câble appartient au flux d'EXÉCUTION (et non un fil de valeur).
+ *
+ * Les fils de valeur (kind === 'data') ne sont que du sucre visuel au-dessus des
+ * params des blocs calcul : les runtimes ne doivent JAMAIS les suivre comme du flux.
+ */
+const estExec = (e: GraphEdge): boolean => e.kind !== 'data';
+
+/**
+ * @brief Couleur du port de SORTIE d'un bloc calcul, selon le TYPE transporté.
+ *
+ * Corail = Vrai/Faux (comparaisons, logique, booléen) ; rose = Couleur ;
+ * turquoise = Nombre (tout le reste).
+ */
+const couleurPortSortie = (kind: string): string => {
+  if (kind.startsWith('compare_') || kind.startsWith('logic_') || kind === 'const_bool') return '#ff6b6b';
+  if (kind === 'const_color') return '#f06ad8';
+  return '#2fe0a8';
+};
+
+/**
+ * @brief Liste des ports d'ENTRÉE (opérandes) d'un bloc calcul selon sa forme.
+ */
+const portsEntreeDe = (shape: ReturnType<typeof logicOpShape>): string[] => {
+  if (shape === 'binary') return ['a', 'b'];
+  if (shape === 'unary') return ['a'];
+  if (shape === 'lerp') return ['a', 'b', 't'];
+  return []; // constantes et nullaires : pas d'entrées
 };
 
 type NodeCatalogItem = {
@@ -1183,6 +1217,9 @@ export default function EditeurPage() {
 
   const [linkDrag, setLinkDrag] = useState<{ active: boolean; x: number; y: number; gx: number; gy: number } | null>(null);
   const [pendingAutoConnect, setPendingAutoConnect] = useState<{ fromNodeId: string } | null>(null);
+  /** Drag d'un FIL DE VALEUR en cours (depuis le port de sortie d'un bloc calcul).
+      Séparé de pendingLink pour ne pas interférer avec les câbles d'exécution. */
+  const [dataLink, setDataLink] = useState<{ fromNodeId: string } | null>(null);
 
   const [graphPan, setGraphPan] = useState<{ x: number; y: number }>({ x: 120, y: 80 });
   const [graphZoom, setGraphZoom] = useState<number>(0.5);
@@ -1228,6 +1265,11 @@ export default function EditeurPage() {
   const commentResizeRef = useRef<{ id: string; lastX: number; lastY: number } | null>(null);
   const [pinPositions, setPinPositions] = useState<
     Record<string, { in?: { x: number; y: number }; out?: { x: number; y: number } }>
+  >({});
+  /** Positions (repère graphe) des PORTS DE VALEUR, mesurées dans le DOM via
+      les attributs data-port : dataPinPositions[nodeId][port] = {x, y}. */
+  const [dataPinPositions, setDataPinPositions] = useState<
+    Record<string, Record<string, { x: number; y: number }>>
   >({});
   const measurePinsRef = useRef<(() => void) | null>(null);
 
@@ -1357,6 +1399,7 @@ export default function EditeurPage() {
     if (!root) return;
     const contentRect = root.getBoundingClientRect();
     const next: Record<string, { in?: { x: number; y: number }; out?: { x: number; y: number } }> = {};
+    const nextData: Record<string, Record<string, { x: number; y: number }>> = {};
 
     const nodes = Array.from(root.querySelectorAll('.bp-node[data-nodeid]')) as HTMLElement[];
     for (const nodeEl of nodes) {
@@ -1388,9 +1431,26 @@ export default function EditeurPage() {
       }
 
       next[nodeId] = entry;
+
+      // Ports de VALEUR (ronds data) : même mécanique que les pins exec,
+      // mais un point par opérande/sortie, repérés par l'attribut data-port.
+      const portEls = Array.from(nodeEl.querySelectorAll('[data-port]')) as HTMLElement[];
+      for (const portEl of portEls) {
+        const port = portEl.dataset.port;
+        if (!port) continue;
+        const r = portEl.getBoundingClientRect();
+        const cx = r.left + r.width / 2;
+        const cy = r.top + r.height / 2;
+        if (!nextData[nodeId]) nextData[nodeId] = {};
+        nextData[nodeId][port] = {
+          x: (cx - contentRect.left) / Math.max(0.0001, graphZoom),
+          y: (cy - contentRect.top) / Math.max(0.0001, graphZoom),
+        };
+      }
     }
 
     setPinPositions(next);
+    setDataPinPositions(nextData);
   };
 
   measurePinsRef.current = measurePins;
@@ -1488,7 +1548,7 @@ export default function EditeurPage() {
     commit((cur) => {
       const nextGames = cur.games.map((g) => {
         if (g.id !== cur.activeGameId) return g;
-        if (g.edges.some((e) => e.from === from && e.to === to)) return g;
+        if (g.edges.some((e) => e.from === from && e.to === to && estExec(e))) return g;
         const id = `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
         return { ...g, edges: [...g.edges, { id, from, to }] };
       });
@@ -1503,6 +1563,75 @@ export default function EditeurPage() {
       games: cur.games.map((g) => g.id === cur.activeGameId ? { ...g, edges: g.edges.filter((e) => e.id !== edgeId) } : g),
     }));
     setStatus('Câble supprimé');
+  };
+
+  /**
+   * @brief Supprime UNIQUEMENT un fil de valeur (edge data).
+   *
+   * Les params des blocs (noms de variables) restent en place : le graphe
+   * continue de fonctionner exactement pareil, seul le sucre visuel disparaît.
+   */
+  const removeDataEdgeById = (edgeId: string) => {
+    if (!activeGameId) return;
+    commit((cur) => ({
+      ...cur,
+      games: cur.games.map((g) => g.id === cur.activeGameId ? { ...g, edges: g.edges.filter((e) => e.id !== edgeId) } : g),
+    }));
+    setStatus('Fil de valeur retiré');
+  };
+
+  /**
+   * @brief Connecte la SORTIE d'un bloc calcul à une ENTRÉE (opérande) d'un autre.
+   *
+   * Sucre au-dessus du système de variables :
+   *  1. si le bloc source n'a pas de variable de sortie, en générer une (v_xxxx) ;
+   *  2. écrire ce nom dans le param de l'opérande cible ;
+   *  3. enregistrer un edge {kind:'data', toPort} pour le rendu du fil.
+   * Une entrée n'accepte qu'un fil : l'edge data existant du même toPort est remplacé.
+   */
+  const connecterFilValeur = (fromNodeId: string, toNodeId: string, toPort: string) => {
+    if (!activeGameId) return;
+    if (fromNodeId === toNodeId) { setStatus('Un bloc ne peut pas se connecter à lui-même.'); return; }
+    const g0 = editorRef.current.games.find((g) => g.id === activeGameId);
+    const src = g0?.nodes.find((n) => n.id === fromNodeId);
+    const dst = g0?.nodes.find((n) => n.id === toNodeId);
+    if (!src || !dst) return;
+    if (!LOGIC_OP_KINDS.has(src.kind) || !LOGIC_OP_KINDS.has(dst.kind)) return;
+    if (toPort === 'out') { setStatus('Relie la sortie vers un rond d’ENTRÉE (à gauche du bloc).'); return; }
+    // Les constantes / blocs nullaires n'ont pas d'entrées.
+    if (!portsEntreeDe(logicOpShape(dst.kind)).includes(toPort)) {
+      setStatus('Ce bloc n’a pas cette entrée.');
+      return;
+    }
+    // Typage : une Couleur ne peut pas alimenter un opérande Nombre (et inversement).
+    if (couleurPortSortie(src.kind) === '#f06ad8') {
+      setStatus('Ce fil transporte une Couleur, mais cette entrée attend un Nombre');
+      return;
+    }
+    // Variable de sortie : réutilisée si présente, sinon nom unique généré.
+    let outName = String(src.params.out ?? '').trim();
+    if (!outName) outName = `v_${Math.random().toString(36).slice(2, 6)}`;
+    const edgeId = `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
+    commit((cur) => ({
+      ...cur,
+      games: cur.games.map((g) => {
+        if (g.id !== cur.activeGameId) return g;
+        return {
+          ...g,
+          nodes: g.nodes.map((n) => {
+            if (n.id === fromNodeId) return { ...n, params: { ...n.params, out: outName } };
+            if (n.id === toNodeId) return { ...n, params: { ...n.params, [toPort]: outName } };
+            return n;
+          }),
+          edges: [
+            // Une entrée = un seul fil : on remplace l'edge data du même port.
+            ...g.edges.filter((e) => !(e.kind === 'data' && e.to === toNodeId && e.toPort === toPort)),
+            { id: edgeId, from: fromNodeId, to: toNodeId, kind: 'data' as const, toPort },
+          ],
+        };
+      }),
+    }));
+    setStatus(`Fil de valeur créé : ${outName} → ${toPort}`);
   };
 
   const beginDrag = () => {
@@ -1788,7 +1917,7 @@ export default function EditeurPage() {
           (n, value) => { vars[n] = value; },
           performance.now() / 1000,
         );
-        for (const edge of game.edges.filter((e) => e.from === nodeId)) executeNodeSync(edge.to, depth + 1);
+        for (const edge of game.edges.filter((e) => e.from === nodeId && estExec(e))) executeNodeSync(edge.to, depth + 1);
         return;
       }
 
@@ -1913,7 +2042,7 @@ export default function EditeurPage() {
           else if (condOp === 'lte') condResult = varVal <= condVal;
           else if (condOp === 'neq') condResult = varVal !== condVal;
           // Branche par les liens : 1re sortie = Alors (vrai), 2e (si présente) = Sinon (faux)
-          const ifOuts = game.edges.filter((e) => e.from === nodeId);
+          const ifOuts = game.edges.filter((e) => e.from === nodeId && estExec(e));
           const ifBranch = condResult ? ifOuts[0] : ifOuts[1];
           if (ifBranch) executeNodeSync(ifBranch.to, depth + 1);
           setRuntimeTiles([...runtimeTilesRef.current]);
@@ -2178,7 +2307,7 @@ export default function EditeurPage() {
         default: break;
       }
 
-      const outgoing = game.edges.filter(e => e.from === nodeId);
+      const outgoing = game.edges.filter(e => e.from === nodeId && estExec(e));
       for (const edge of outgoing) executeNodeSync(edge.to, depth + 1);
       setRuntimeTiles([...runtimeTilesRef.current]);
     }
@@ -2302,7 +2431,7 @@ export default function EditeurPage() {
                 runtimeCountdownsRef.current.delete(varName);
                 emitEvent('countdown_end_' + varName);
                 game.nodes.filter(n => n.kind === 'on_countdown_end' && n.enabled && String(n.params.varName ?? 'countdown') === varName)
-                  .forEach(n => game.edges.filter(e => e.from === n.id).forEach(e => { executeNodeAsync(e.to, 0).catch(() => {}); }));
+                  .forEach(n => game.edges.filter(e => e.from === n.id && estExec(e)).forEach(e => { executeNodeAsync(e.to, 0).catch(() => {}); }));
               }
             }, 200);
             runtimeTickTimersRef.current.push(cdTimer);
@@ -2323,7 +2452,7 @@ export default function EditeurPage() {
               if (frb) await executeNodeAsync(frb, depth+1);
               if (signal.aborted) return;
             }
-            const frOut = game.edges.filter(e=>e.from===nodeId);
+            const frOut = game.edges.filter(e=>e.from===nodeId && estExec(e));
             for (const edge of frOut) { await executeNodeAsync(edge.to, depth+1); if(signal.aborted)return; }
             return;
           }
@@ -2337,7 +2466,7 @@ export default function EditeurPage() {
               if (feaIdx) runtimeVariablesRef.current[feaIdx] = k;
               if (feaBody) await executeNodeAsync(feaBody, depth+1);
             }
-            const feaOut = game.edges.filter(e=>e.from===nodeId);
+            const feaOut = game.edges.filter(e=>e.from===nodeId && estExec(e));
             for (const edge of feaOut) { await executeNodeAsync(edge.to, depth+1); if(signal.aborted)return; }
             return;
           }
@@ -2393,7 +2522,7 @@ export default function EditeurPage() {
       }
 
       if (signal.aborted) return;
-      const outgoing = game.edges.filter(e => e.from === nodeId);
+      const outgoing = game.edges.filter(e => e.from === nodeId && estExec(e));
       for (const edge of outgoing) {
         await executeNodeAsync(edge.to, depth + 1);
         if (signal.aborted) return;
@@ -2405,7 +2534,7 @@ export default function EditeurPage() {
       game.nodes
         .filter(n => kinds.includes(n.kind) && n.enabled && (!match || match(n)))
         .forEach(node => {
-          game.edges.filter(e => e.from === node.id).forEach(e => executeNodeAsync(e.to, 0).catch(() => {}));
+          game.edges.filter(e => e.from === node.id && estExec(e)).forEach(e => executeNodeAsync(e.to, 0).catch(() => {}));
         });
     };
 
@@ -2432,7 +2561,7 @@ export default function EditeurPage() {
         if (!key || key === e.key || key.toLowerCase() === e.key.toLowerCase()) {
           matched = true;
           runtimeVariablesRef.current['pressedKey'] = e.key;
-          game.edges.filter(ed => ed.from === n.id).forEach(ed => executeNodeAsync(ed.to, 0).catch(() => {}));
+          game.edges.filter(ed => ed.from === n.id && estExec(ed)).forEach(ed => executeNodeAsync(ed.to, 0).catch(() => {}));
         }
       });
       if (matched) e.preventDefault();
@@ -2454,13 +2583,13 @@ export default function EditeurPage() {
     // ── Index define_sub nodes ────────────────────────────────────────────────
     game.nodes.filter(n => n.kind === 'define_sub' && n.enabled).forEach(n => {
       const sName = String(n.params.name ?? 'mySub');
-      const fEdge = game.edges.find(e => e.from === n.id);
+      const fEdge = game.edges.find(e => e.from === n.id && estExec(e));
       if (fEdge) runtimeSubsRef.current[sName] = fEdge.to;
     });
 
     // ── Fire event_begin ──────────────────────────────────────────────────────
     game.nodes.filter(n => n.kind === 'event_begin' && n.enabled).forEach(n => {
-      game.edges.filter(e => e.from === n.id).forEach(e => executeNodeAsync(e.to, 0).catch(() => {}));
+      game.edges.filter(e => e.from === n.id && estExec(e)).forEach(e => executeNodeAsync(e.to, 0).catch(() => {}));
     });
 
     // ── Timers : on_tick ET on_timer (mêmes sémantiques que /jeux) ───────────
@@ -2468,7 +2597,7 @@ export default function EditeurPage() {
       const intervalMs = Math.max(50, getNum(node.params, 'intervalMs', 1000));
       const timer = setInterval(() => {
         if (signal.aborted) { clearInterval(timer); return; }
-        game.edges.filter(e => e.from === node.id).forEach(e => executeNodeAsync(e.to, 0).catch(() => {}));
+        game.edges.filter(e => e.from === node.id && estExec(e)).forEach(e => executeNodeAsync(e.to, 0).catch(() => {}));
       }, intervalMs);
       runtimeTickTimersRef.current.push(timer);
     });
@@ -2482,7 +2611,7 @@ export default function EditeurPage() {
         if (n.kind !== 'on_score_reached' || !n.enabled || scoreFired.has(n.id)) return;
         if (sc >= getNum(n.params, 'target', 100)) {
           scoreFired.add(n.id);
-          game.edges.filter(e => e.from === n.id).forEach(e => executeNodeAsync(e.to, 0).catch(() => {}));
+          game.edges.filter(e => e.from === n.id && estExec(e)).forEach(e => executeNodeAsync(e.to, 0).catch(() => {}));
         }
       });
     }, 150);
@@ -5062,6 +5191,7 @@ export default function EditeurPage() {
                     if ((e.target as HTMLElement).closest('.bp-node')) return;
                     if ((e.target as HTMLElement).closest('.bp-menu')) return;
                     setPendingLink(null);
+                    setDataLink(null);
                     setContextMenu((p) => ({ ...p, open: false }));
                     setNodeMenu((p) => ({ ...p, open: false }));
                     setGraphPanning({ active: true, x: e.clientX, y: e.clientY });
@@ -5102,6 +5232,21 @@ export default function EditeurPage() {
                     setGraphDrag(null);
                     endDrag();
                     if (droppedId) requestAnimationFrame(() => resolveOverlaps(droppedId));
+
+                    // ── Fil de VALEUR : lâché sur un rond d'entrée → connexion data,
+                    //    lâché ailleurs → annulation silencieuse. ────────────────────
+                    if (linkDrag?.active && dataLink) {
+                      const el = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null;
+                      const portEl = el?.closest('[data-port]') as HTMLElement | null;
+                      if (portEl) {
+                        const toPort = portEl.getAttribute('data-port') || '';
+                        const toNodeId = portEl.getAttribute('data-nodeid') || '';
+                        if (toNodeId && toPort) connecterFilValeur(dataLink.fromNodeId, toNodeId, toPort);
+                      }
+                      setDataLink(null);
+                      setLinkDrag(null);
+                      return;
+                    }
 
                     if (linkDrag?.active && pendingLink?.fromNodeId) {
                       if (!activeGameId) {
@@ -5303,7 +5448,7 @@ export default function EditeurPage() {
                           <path d="M 0 0 L 6 3 L 0 6 z" fill="var(--c-action)" opacity="0.78" />
                         </marker>
                       </defs>
-                      {(activeGame?.edges ?? []).map((e) => {
+                      {(activeGame?.edges ?? []).filter(estExec).map((e) => {
                         const from = (activeGame?.nodes ?? []).find((n) => n.id === e.from);
                         const to = (activeGame?.nodes ?? []).find((n) => n.id === e.to);
                         if (!from || !to) return null;
@@ -5342,6 +5487,51 @@ export default function EditeurPage() {
                           </g>
                         );
                       })}
+
+                      {/* ── Fils de VALEUR (data) : Bézier fine pointillée, couleur du TYPE.
+                          Clic sur la zone large → supprime le fil SEULEMENT (params conservés). ── */}
+                      {(activeGame?.edges ?? []).filter((e) => e.kind === 'data').map((e) => {
+                        const from = (activeGame?.nodes ?? []).find((n) => n.id === e.from);
+                        const to = (activeGame?.nodes ?? []).find((n) => n.id === e.to);
+                        if (!from || !to) return null;
+
+                        const p1 = dataPinPositions[e.from]?.out;
+                        const p2 = dataPinPositions[e.to]?.[e.toPort ?? 'a'];
+                        // Repli approximatif tant que les ronds ne sont pas mesurés.
+                        const x1 = p1 ? p1.x : from.pos.x + 280;
+                        const y1 = p1 ? p1.y : from.pos.y + 70;
+                        const x2 = p2 ? p2.x : to.pos.x;
+                        const y2 = p2 ? p2.y : to.pos.y + 70;
+                        const dx = Math.max(40, Math.min(180, Math.abs(x2 - x1) * 0.5));
+                        const d = `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`;
+                        const couleur = couleurPortSortie(from.kind);
+                        return (
+                          <g key={e.id}>
+                            <path d={d} className="bp-wire-data" style={{ stroke: couleur }} />
+                            <path
+                              d={d}
+                              className="bp-wire__hit"
+                              onClick={(ev) => { ev.stopPropagation(); removeDataEdgeById(e.id); }}
+                            >
+                              <title>Cliquer pour retirer ce fil de valeur</title>
+                            </path>
+                          </g>
+                        );
+                      })}
+
+                      {/* Aperçu élastique d'un FIL DE VALEUR en cours de drag */}
+                      {dataLink && linkDrag?.active && activeGame ? (() => {
+                        const from = activeGame.nodes.find((n) => n.id === dataLink.fromNodeId);
+                        if (!from) return null;
+                        const p1 = dataPinPositions[dataLink.fromNodeId]?.out;
+                        const x1 = p1 ? p1.x : from.pos.x + 280;
+                        const y1 = p1 ? p1.y : from.pos.y + 70;
+                        const x2 = linkDrag.gx;
+                        const y2 = linkDrag.gy;
+                        const dx = Math.max(40, Math.min(180, Math.abs(x2 - x1) * 0.5));
+                        const d = `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`;
+                        return <path key="__data-preview" d={d} className="bp-wire-data bp-wire-data--preview" style={{ stroke: couleurPortSortie(from.kind) }} />;
+                      })() : null}
 
                       {pendingLink?.fromNodeId && linkDrag?.active && activeGame ? (() => {
                         const from = activeGame.nodes.find((n) => n.id === pendingLink.fromNodeId);
@@ -6396,6 +6586,65 @@ export default function EditeurPage() {
                               </div>
                             </div>
                           ) : null}
+
+                          {/* ── PORTS DE VALEUR (blocs calcul/logique uniquement) :
+                              entrées (opérandes) à gauche, sortie (out) à droite.
+                              Couleur = TYPE transporté (Nombre / Vrai-Faux / Couleur). ── */}
+                          {LOGIC_OP_KINDS.has(n.kind) ? (() => {
+                            const entrees = portsEntreeDe(logicOpShape(n.kind));
+                            const sortieCouleur = couleurPortSortie(n.kind);
+                            return (
+                              <div className="bp-dataports">
+                                <div className="bp-dataports__ins">
+                                  {entrees.map((p) => (
+                                    <div key={p} className="bp-dataport">
+                                      <span
+                                        className="bp-dataport__dot"
+                                        data-port={p}
+                                        data-nodeid={n.id}
+                                        style={{ background: '#2fe0a8' }}
+                                        title={`Entrée « ${p} » (Nombre)`}
+                                        onPointerDown={(e) => e.stopPropagation()}
+                                      />
+                                      <span className="bp-dataport__label">{p} = {String(n.params[p] ?? '') || '…'}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                                <div className="bp-dataport bp-dataport--out">
+                                  <span
+                                    className="bp-dataport__dot"
+                                    data-port="out"
+                                    data-nodeid={n.id}
+                                    style={{ background: sortieCouleur }}
+                                    title="Sortie : tire un fil vers l'entrée d'un autre bloc calcul"
+                                    onPointerDown={(e) => {
+                                      // Démarre un fil de VALEUR élastique (mécanique linkDrag,
+                                      // flag dataLink séparé du flux d'exécution).
+                                      e.stopPropagation();
+                                      setPendingLink(null);
+                                      setPendingAutoConnect(null);
+                                      setDataLink({ fromNodeId: n.id });
+                                      const bpEl = (e.currentTarget as HTMLElement).closest('.bp') as HTMLElement | null;
+                                      const rect = bpEl?.getBoundingClientRect();
+                                      const x = rect ? e.clientX - rect.left : 0;
+                                      const y = rect ? e.clientY - rect.top : 0;
+                                      const contentRect = bpContentRef.current?.getBoundingClientRect();
+                                      const gx = contentRect
+                                        ? (e.clientX - contentRect.left) / Math.max(0.0001, graphZoom)
+                                        : (x - graphPan.x) / Math.max(0.0001, graphZoom);
+                                      const gy = contentRect
+                                        ? (e.clientY - contentRect.top) / Math.max(0.0001, graphZoom)
+                                        : (y - graphPan.y) / Math.max(0.0001, graphZoom);
+                                      setLinkDrag({ active: true, x, y, gx, gy });
+                                      setStatus('Lâche le fil sur un rond d’entrée');
+                                      bpEl?.setPointerCapture(e.pointerId);
+                                    }}
+                                  />
+                                  <span className="bp-dataport__label">out = {String(n.params.out ?? '') || '…'}</span>
+                                </div>
+                              </div>
+                            );
+                          })() : null}
 
                           <div className="bp-node__io">
                             {hasInput ? (

@@ -3145,3 +3145,75 @@ input[type='range'].slider-intensity::-moz-range-progress {
 .bp-comment__resize:hover {
   border-color: rgba(67, 97, 238, 0.6);
 }
+
+/* ── FILS DE VALEUR (edges data) ──────────────────────────────────────────────
+   Sucre visuel au-dessus des params des blocs calcul : Bézier fine POINTILLÉE
+   de la couleur du type (turquoise = Nombre, corail = Vrai/Faux, rose = Couleur),
+   bien distincte des câbles d'exécution animés. */
+.bp-wire-data {
+  fill: none;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-dasharray: 6 5;
+  opacity: 0.9;
+  animation: none;
+  filter: none;
+}
+
+.bp-wire-data--preview {
+  opacity: 1;
+  stroke-width: 2.4;
+  stroke-dasharray: 4 4;
+}
+
+/* ── PORTS DE VALEUR sur les nœuds calcul ───────────────────────────────────
+   Petits ronds 10px : entrées (opérandes) à gauche, sortie (out) à droite. */
+.bp-dataports {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 6px 12px 2px;
+}
+
+.bp-dataports__ins {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.bp-dataport {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+}
+
+.bp-dataport--out {
+  align-items: center;
+}
+
+.bp-dataport__dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  cursor: crosshair;
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.18);
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+.bp-dataport__dot:hover {
+  transform: scale(1.35);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.25), 0 0 10px rgba(255, 255, 255, 0.18);
+}
+
+/* Étiquette « a = score » sous le rond : petite, grise, tronquée si besoin */
+.bp-dataport__label {
+  font-size: 9px;
+  color: #9aa3b2;
+  max-width: 84px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

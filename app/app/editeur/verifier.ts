@@ -7,6 +7,8 @@
  * simple, orientés solution. Aucune exécution : analyse purement statique.
  */
 
+import { LOGIC_OP_KINDS } from '@/lib/game/logicOps';
+
 /**
  * @brief Un problème détecté dans le graphe.
  */
@@ -37,6 +39,10 @@ export type CableVerifiable = {
   id: string;
   from: string;
   to: string;
+  /** Nature du câble : 'exec' (flux d'exécution, défaut) ou 'data' (fil de valeur). */
+  kind?: 'exec' | 'data';
+  /** Pour un fil 'data' : nom de l'opérande cible (ex. 'a', 'b', 't'). */
+  toPort?: string;
 };
 
 /**
@@ -72,12 +78,21 @@ export function verifierGraphe(nodes: NoeudVerifiable[], edges: CableVerifiable[
   const problemes: Probleme[] = [];
 
   // Index des connexions : qui reçoit, qui envoie.
+  // Les FILS DE VALEUR (kind 'data') comptent comme des liens valides (un bloc
+  // const_number relié par un fil data n'est PAS isolé), mais le parcours
+  // d'atteignabilité ne suit que les câbles d'EXÉCUTION.
   const sortants = new Map<string, string[]>();
   const aEntrant = new Set<string>();
   const aSortant = new Set<string>();
+  const aLienData = new Set<string>();
   for (const e of edges) {
     aSortant.add(e.from);
     aEntrant.add(e.to);
+    if (e.kind === 'data') {
+      aLienData.add(e.from);
+      aLienData.add(e.to);
+      continue; // jamais suivi comme flux d'exécution
+    }
     const liste = sortants.get(e.from);
     if (liste) liste.push(e.to);
     else sortants.set(e.from, [e.to]);
@@ -123,8 +138,10 @@ export function verifierGraphe(nodes: NoeudVerifiable[], edges: CableVerifiable[
           niveau: 'avertissement',
           message: "Ce bloc n'est relié à rien : ajoute un câble vers ou depuis un autre bloc.",
         });
-      } else if (!atteignables.has(n.id)) {
+      } else if (!atteignables.has(n.id) && !(LOGIC_OP_KINDS.has(n.kind) && aLienData.has(n.id))) {
         // Règle b : relié, mais aucun évènement ne mène jusqu'à lui.
+        // Exception : un bloc calcul/logique relié par un FIL DE VALEUR est
+        // évalué à la demande — il n'a pas besoin d'être déclenché par un évènement.
         problemes.push({
           nodeId: n.id,
           niveau: 'avertissement',

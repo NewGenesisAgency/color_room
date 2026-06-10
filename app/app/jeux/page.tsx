@@ -393,7 +393,7 @@ function parseUiWidgets(raw: unknown): UiWidget[] {
     .filter(Boolean) as UiWidget[];
 }
 
-type GraphEdge = { id: string; from: string; to: string };
+type GraphEdge = { id: string; from: string; to: string; kind?: 'exec' | 'data'; toPort?: string };
 type EditorNode = { id: string; kind: string; enabled: boolean; name: string; params: Record<string, unknown> };
 
 function buildGraph(cfg: EditorGameConfigV1) {
@@ -402,6 +402,9 @@ function buildGraph(cfg: EditorGameConfigV1) {
   const byId = new Map(nodes.map((n) => [String(n.id), n] as const));
   const out = new Map<string, string[]>();
   for (const e of edges) {
+    /* Les FILS DE VALEUR (kind 'data') ne sont que du sucre visuel au-dessus
+       des params : le walker ne doit JAMAIS les suivre comme du flux d'exécution. */
+    if ((e as any).kind === 'data') continue;
     const from = String((e as any).from ?? '');
     const to = String((e as any).to ?? '');
     if (!from || !to) continue;
