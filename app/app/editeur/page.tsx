@@ -1138,6 +1138,18 @@ export default function EditeurPage() {
   const [onboardingStep, setOnboardingStep] = useState<number | null>(null); // mini-tuto skippable
   const [tourOpen, setTourOpen] = useState(false); // tuto en coachmarks ancrés (blocs + designer)
 
+  // Tuto de bienvenue au TOUT PREMIER passage dans l'éditeur (pas seulement à la
+  // création d'un jeu). Relançable ensuite via le bouton 🎓.
+  useEffect(() => {
+    try {
+      if (!window.localStorage.getItem('crg_editor_tour_seen')) {
+        const t = window.setTimeout(() => setTourOpen(true), 600);
+        window.localStorage.setItem('crg_editor_tour_seen', '1');
+        return () => window.clearTimeout(t);
+      }
+    } catch { /* ignore */ }
+  }, []);
+
   const [contextMenu, setContextMenu] = useState<{
     open: boolean;
     x: number;
@@ -1328,8 +1340,19 @@ export default function EditeurPage() {
     return activeGame.nodes.find((n) => n.kind === 'game_tetris' && n.enabled) ?? null;
   }, [activeGame]);
 
+  const isEventKind = (kind?: string): boolean => !!kind && (kind === 'event_begin' || kind.startsWith('on_'));
+
   const addEdge = (from: string, to: string) => {
     if (!activeGameId) return;
+    if (from === to) { setStatus('Un bloc ne peut pas se connecter à lui-même.'); return; }
+    const g0 = editorRef.current.games.find((g) => g.id === activeGameId);
+    const target = g0?.nodes.find((n) => n.id === to);
+    // Règle Unreal : un ÉVÈNEMENT est une SOURCE (point d'entrée). On ne peut donc
+    // jamais le brancher en entrée — et surtout pas connecter 2 events ensemble.
+    if (isEventKind(target?.kind)) {
+      setStatus('⚡ Un évènement est un point de départ : on ne peut pas le brancher en entrée.');
+      return;
+    }
     commit((cur) => {
       const nextGames = cur.games.map((g) => {
         if (g.id !== cur.activeGameId) return g;
@@ -3873,7 +3896,13 @@ export default function EditeurPage() {
     {
       selector: '[data-tour="editor-blocs"]',
       title: '3. Les blocs (Nœuds)',
-      text: 'Double-cliquez (ou clic droit) sur le canevas pour ajouter un bloc, puis reliez les points pour créer la logique : démarrer → remplir une dalle → attendre → boucler…',
+      text: 'Double-cliquez (ou clic droit) sur le canevas pour ajouter un bloc, puis tirez un câble entre le point de sortie (droite) et l\'entrée (gauche) du bloc suivant : démarrer → remplir une dalle → attendre → boucler…',
+      before: () => setEditorTab('canvas'),
+    },
+    {
+      selector: '[data-tour="editor-blocs"]',
+      title: '4. Les ÉVÈNEMENTS ⚡',
+      text: 'Les blocs ambrés (Démarrer, Clic sur dalle, Touche clavier, Timer…) sont des POINTS DE DÉPART. Ils n\'ont pas d\'entrée : on ne peut pas les brancher entre eux. Chaque évènement lance sa propre chaîne de blocs.',
       before: () => setEditorTab('canvas'),
     },
     {
@@ -3884,8 +3913,8 @@ export default function EditeurPage() {
     },
     {
       selector: '[data-tour="editor-play"]',
-      title: '5. Tester sur les dalles',
-      text: 'Activez l\'aperçu pour envoyer votre jeu sur les 42 dalles LED en temps réel et vérifier le rendu.',
+      title: '6. Tester sur les dalles en temps réel',
+      text: 'Activez l\'aperçu (ON) : votre jeu tourne sur les 42 dalles LED comme dans /jeux. Cliquez les dalles dans la vue 3D pour déclencher vos évènements et vérifier que tout réagit.',
       before: () => setEditorTab('canvas'),
     },
     {
