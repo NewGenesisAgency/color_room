@@ -40,6 +40,7 @@ import type { UILayoutComponent } from './UIDesigner';
 import Coachmarks, { type CoachStep } from '@/app/_components/Coachmarks';
 import { playSfx, SFX_LIST, unlockAudio, vibrate } from '@/lib/audio/sfx';
 import { LOGIC_OP_KINDS, applyLogicOp, logicOpShape } from '@/lib/game/logicOps';
+import { getPyodide } from '@/lib/pyodide';
 
 // Modules lourds (3D Three.js, éditeur Python/Pyodide, designer UI, panneau CS160)
 // chargés à la demande pour alléger le bundle initial de /editeur.
@@ -49,7 +50,7 @@ const CS160Panel = dynamic(() => import('@/app/_components/CS160Panel'), { ssr: 
 const PythonEditor = dynamic(() => import('./PythonEditor'), { ssr: false });
 const UIDesigner = dynamic(() => import('./UIDesigner'), { ssr: false });
 
-import { Boxes, Gamepad2, Plus, Play, Pause, RotateCcw, Save, Trash2, FolderPlus, X, Lightbulb, Layers, Zap, Palette, Clock, MousePointer2, LayoutGrid, Maximize2, Minimize2, Eye, Star, Heart, Sun, Moon, Flame, Snowflake, Music, Target, Puzzle, Sparkles, Trophy, Rocket, Ghost, Dice1, Brain, Check, GitBranch, Hash, Settings2, Shuffle, Search, Users, Film, Thermometer, ScanLine, Wifi, WifiOff, Crown, Gem, Bug, Bot, Atom, Bird, Cat, Dog, Fish, Leaf, Cloud, Droplet, Mountain, Anchor, Bell, Bomb, Camera, Egg, Feather, Gift, Hexagon, Key, Lock, Medal, Pizza, Plane, Rainbow, Skull, Smile, Wand2, Waves, Crosshair, Dice5, Joystick, FlaskConical, Swords, ChevronDown, GraduationCap, SlidersHorizontal, RefreshCw, Copy, Scissors, type LucideIcon } from 'lucide-react';
+import { Boxes, Gamepad2, Plus, Play, Pause, RotateCcw, Save, Trash2, FolderPlus, X, Lightbulb, Layers, Zap, Palette, Clock, MousePointer2, LayoutGrid, Maximize2, Minimize2, Eye, Star, Heart, Sun, Moon, Flame, Snowflake, Music, Target, Puzzle, Sparkles, Trophy, Rocket, Ghost, Dice1, Brain, Check, GitBranch, Hash, Settings2, Shuffle, Search, Users, Film, Thermometer, ScanLine, Wifi, WifiOff, Crown, Gem, Bug, Bot, Atom, Bird, Cat, Dog, Fish, Leaf, Cloud, Droplet, Mountain, Anchor, Bell, Bomb, Camera, Egg, Feather, Gift, Hexagon, Key, Lock, Medal, Pizza, Plane, Rainbow, Skull, Smile, Wand2, Waves, Crosshair, Dice5, Joystick, FlaskConical, Swords, ChevronDown, GraduationCap, SlidersHorizontal, RefreshCw, Copy, Scissors, FileCode, type LucideIcon } from 'lucide-react';
 
 type IdFactory = () => string;
 
@@ -63,6 +64,7 @@ type EditorNodeKind =
   | 'pulse'
   | 'tile'
   | 'event_begin'
+  | 'script_python'
   | 'wait'
   | 'sequence'
   | 'while'
@@ -337,6 +339,7 @@ type NodeCatalogItem = {
 const NODE_CATALOG: NodeCatalogItem[] = [
   { kind: 'event_begin', category: 'Évènements', title: 'Évènement', defaults: {} },
   { kind: 'wait', category: 'Flux', title: 'Attendre', defaults: { seconds: 1 } },
+  { kind: 'script_python', category: 'Script', title: 'Script Python', defaults: { code: 'import colorroom as cr\n# cr.fill(255, 80, 0, 0.8)\n# cr.add_score(10)\n' } },
   { kind: 'sequence', category: 'Flux', title: 'Séquence', defaults: {} },
   { kind: 'while', category: 'Flux', title: 'Tant que', defaults: {} },
   { kind: 'if', category: 'Flux', title: 'Si', defaults: {} },
@@ -560,6 +563,7 @@ function categoryOfKind(kind: EditorNodeKind): string {
 
 const NODE_CATEGORY_ICONS: Record<string, LucideIcon> = {
   'Évènements': Zap,
+  'Script': FileCode,
   'Flux': GitBranch,
   'Rendu': Palette,
   'Jeux': Gamepad2,
@@ -587,6 +591,7 @@ const NODE_CATEGORY_ICONS: Record<string, LucideIcon> = {
 
 const NODE_CATEGORY_COLORS: Record<string, string> = {
   'Évènements': '#f59e0b',
+  'Script': '#10b981',
   'Flux': '#f97316',
   'Rendu': '#22d3ee',
   'Jeux': '#a855f7',
@@ -2265,6 +2270,35 @@ export default function EditeurPage() {
             const varName = String(node.params.varName ?? 'countdown');
             const t = runtimeCountdownsRef.current.get(varName);
             if (t) { clearInterval(t); runtimeCountdownsRef.current.delete(varName); }
+            break;
+          }
+          case 'script_python': {
+            // Exécute le code Python du bloc (Pyodide, hors-ligne) avec l'API
+            // colorroom branchée sur le pont de l'aperçu, puis continue le flux.
+            const code = String(node.params.code ?? '');
+            if (code.trim()) {
+              try {
+                const py = await getPyodide() as any;
+                const b = pyBridge;
+                py.registerJsModule('colorroom', {
+                  send_color: b.sendColor,
+                  set_tile: b.setTile,
+                  fill: (r: number, g: number, bl: number, intensity = 0.85) => { for (let i = 1; i <= 42; i++) b.sendColor(i, r, g, bl, intensity); },
+                  flush: b.flush,
+                  set_variable: b.setVariable,
+                  get_variable: b.getVariable,
+                  add_score: b.addScore,
+                  get_score: b.getScore,
+                  emit_event: b.emitEvent,
+                  play_sound: (s: string) => playSfx(String(s)),
+                  vibrate: (ms: number) => vibrate(Math.max(10, Math.round(Number(ms) || 200))),
+                  log: (m: unknown) => console.log('[py]', m),
+                  tile_count: 42,
+                });
+                await py.runPythonAsync(code);
+                b.flush();
+              } catch (e) { console.warn('[script_python] erreur', e); }
+            }
             break;
           }
           default: {
@@ -5225,7 +5259,22 @@ export default function EditeurPage() {
                             {labelNodeKind(n.kind)}
                           </div>
 
-                          {n.kind === 'wait' ? (
+                          {n.kind === 'script_python' ? (
+                            <div className="bp-node__vars" onPointerDown={(e) => e.stopPropagation()}>
+                              <div className="bp-node__var">
+                                <span className="bp-node__varlabel">🐍 Code Python (exécuté quand le flux atteint ce bloc)</span>
+                                <textarea
+                                  className="bp-node__varinput"
+                                  style={{ height: 110, fontFamily: 'monospace', fontSize: 11, resize: 'vertical', width: '100%', lineHeight: 1.45 }}
+                                  spellCheck={false}
+                                  value={String(n.params.code ?? '')}
+                                  onChange={(e) => updateNodeParamsById(n.id, { code: e.target.value })}
+                                  placeholder={'import colorroom as cr\ncr.fill(255, 80, 0, 0.8)\ncr.add_score(10)'}
+                                />
+                                <span style={{ fontSize: 10, color: '#94a3b8' }}>API : cr.send_color / fill / set_tile / set_variable / get_variable / add_score / emit_event / play_sound / vibrate. Hors-ligne.</span>
+                              </div>
+                            </div>
+                          ) : n.kind === 'wait' ? (
                             <div className="bp-node__vars" onPointerDown={(e) => e.stopPropagation()}>
                               <div className="bp-node__var">
                                 <span className="bp-node__varlabel">Durée</span>

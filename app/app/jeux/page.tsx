@@ -2643,6 +2643,15 @@ export default function JeuxPage() {
         const nextId = g.out.get(node.id)?.[0]; if (nextId) walk(nextId); return;
       }
 
+      // ── Script Python : exécute le code du bloc (hors-ligne via Pyodide) ──
+      // Le code tourne en asynchrone (Pyodide) ; on enchaîne immédiatement sur
+      // le bloc suivant — suffisant pour des effets (allumage, score…).
+      if (node.kind === 'script_python') {
+        const code = String(params.code ?? '');
+        if (code.trim()) void runElementPython(code);
+        const nextId = g.out.get(node.id)?.[0]; if (nextId) walk(nextId); return;
+      }
+
       // ── Variables : écriture dans le store, lu en live par les composants UI ──
       if (node.kind === 'variable_set' || node.kind === 'var_set' || node.kind === 'set_variable') {
         const name = String(params.name ?? params.varName ?? 'x');

@@ -35,6 +35,8 @@ const NODE_KINDS = [
   'grid_create', 'grid_get', 'grid_set', 'grid_clear', 'grid_sync_tiles', 'grid_check_4_in_row',
   // Rendu plaques
   'fill', 'pulse', 'tile', 'tile_set', 'tile_get', 'clear_tiles', 'tile_set_var', 'tiles_from_array',
+  // Script Python (code libre exécuté quand le flux atteint le bloc)
+  'script_python',
   // Animations
   'anim_fade', 'anim_strobe', 'anim_rainbow', 'anim_wave',
   // Couleur / temps / aléatoire
