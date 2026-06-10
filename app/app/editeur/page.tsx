@@ -1159,7 +1159,7 @@ export default function EditeurPage() {
   const [showGrid, setShowGrid] = useState<boolean>(true);
   const [zoomLevel, setZoomLevel] = useState<number>(100);
   const [newProjectName, setNewProjectName] = useState<string>('');
-  const [newProjectTemplate, setNewProjectTemplate] = useState<'blank' | 'tutorial' | 'animation' | 'interactive' | 'fluorescence' | 'color-demo' | 'pulse-advanced' | 'rainbow' | 'tetris' | 'memory' | 'tetris-blueprint' | 'snake' | 'puissance4' | 'color_speed' | 'maitre_blanc' | 'intrus' | 'canal_mix' | 'metamere' | 'chromaticite' | 'spectre' | 'libre_rgb' | 'attrape_lumiere' | 'ambiance' | 'duel_salles' | 'demo_python'>('blank');
+  const [newProjectTemplate, setNewProjectTemplate] = useState<'blank' | 'tutorial' | 'animation' | 'interactive' | 'fluorescence' | 'color-demo' | 'pulse-advanced' | 'rainbow' | 'tetris' | 'memory' | 'tetris-blueprint' | 'snake' | 'puissance4' | 'color_speed' | 'maitre_blanc' | 'intrus' | 'canal_mix' | 'metamere' | 'chromaticite' | 'spectre' | 'libre_rgb' | 'attrape_lumiere' | 'ambiance' | 'duel_salles' | 'demo_python' | 'mesure_cs160'>('blank');
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -3091,7 +3091,7 @@ export default function EditeurPage() {
     }
   };
 
-  const createGame = async (forcedName?: string, template: 'blank' | 'tutorial' | 'animation' | 'interactive' | 'fluorescence' | 'color-demo' | 'pulse-advanced' | 'rainbow' | 'tetris' | 'memory' | 'tetris-blueprint' | 'snake' | 'puissance4' | 'color_speed' | 'maitre_blanc' | 'intrus' | 'canal_mix' | 'metamere' | 'chromaticite' | 'spectre' | 'libre_rgb' | 'attrape_lumiere' | 'ambiance' | 'duel_salles' | 'demo_python' = 'blank') => {
+  const createGame = async (forcedName?: string, template: 'blank' | 'tutorial' | 'animation' | 'interactive' | 'fluorescence' | 'color-demo' | 'pulse-advanced' | 'rainbow' | 'tetris' | 'memory' | 'tetris-blueprint' | 'snake' | 'puissance4' | 'color_speed' | 'maitre_blanc' | 'intrus' | 'canal_mix' | 'metamere' | 'chromaticite' | 'spectre' | 'libre_rgb' | 'attrape_lumiere' | 'ambiance' | 'duel_salles' | 'demo_python' | 'mesure_cs160' = 'blank') => {
     const makeId: IdFactory = () => `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
     const provisionalId = makeId();
     const nextIndex = (editorRef.current.games.length || 0) + 1;
@@ -3698,6 +3698,71 @@ export default function EditeurPage() {
         { id: makeId(), kind: 'title_banner',  x: 40,  y: 16, width: 420, height: 52, text: 'Démo Python' },
         { id: makeId(), kind: 'score_display', x: 40,  y: 84, width: 140, height: 64, text: 'Score', varBind: 'score' },
         { id: makeId(), kind: 'message_box',   x: 40,  y: 164, width: 420, height: 88, text: 'Le bloc Python dessine un dégradé arc-en-ciel au démarrage. Clique une dalle : elle s\'allume en blanc (+1 point). Modifie le code dans l\'inspecteur !', bgColor: '#8b5cf6' },
+      ] as UILayoutComponent[];
+    } else if (template === 'mesure_cs160') {
+      /**
+       * @brief Modèle « Vise la couleur (CS-160) » 100% blocs : la salle
+       * s'allume en orange, le joueur pointe le colorimètre CS-160 vers une
+       * dalle et clique « Mesurer ». La mesure (x, y) est RÉELLE ; le bloc
+       * measure_compare calcule la précision (meas_accuracy 0-100) face à la
+       * cible orange x=0.50 / y=0.41 avec une tolérance large.
+       */
+      const sndStart = makeId();
+      const fillOr   = makeId();
+      const setCX    = makeId();
+      const setCY    = makeId();
+      const clickEv  = makeId();
+      const mesure   = makeId();
+      const siOk     = makeId();
+      const cmp      = makeId();
+      const siBon    = makeId();
+      const addPts   = makeId();
+      const sndWin   = makeId();
+      const sndWrong = makeId();
+      const sndErr   = makeId();
+      initialNodes = [
+        // ── Rangée 1 : démarrage, salle orange + variables de la cible ──
+        { id: eventId,  kind: 'event_begin',     name: 'Démarrer',          enabled: true, params: {},                                                                       pos: { x: 80,   y: 80 } },
+        { id: sndStart, kind: 'play_sound',      name: 'Son départ',        enabled: true, params: { sound: 'start' },                                                       pos: { x: 360,  y: 80 } },
+        { id: fillOr,   kind: 'fill',            name: 'Salle orange',      enabled: true, params: { color: '#ff8800', intensity: 0.8 },                                     pos: { x: 640,  y: 80 } },
+        { id: setCX,    kind: 'variable_set',    name: 'Cible x = 0.50',    enabled: true, params: { name: 'cibleX', value: 0.50, op: 'set' },                               pos: { x: 920,  y: 80 } },
+        { id: setCY,    kind: 'variable_set',    name: 'Cible y = 0.41',    enabled: true, params: { name: 'cibleY', value: 0.41, op: 'set' },                               pos: { x: 1200, y: 80 } },
+        // ── Rangée 2 : clic « Mesurer » → mesure réelle puis comparaison ──
+        { id: clickEv,  kind: 'on_ui_click',     name: 'Bouton Mesurer',    enabled: true, params: { buttonId: 'mesurer' },                                                  pos: { x: 80,   y: 320 } },
+        { id: mesure,   kind: 'measure_start',   name: 'Mesure CS-160',     enabled: true, params: { varX: 'meas_x', varY: 'meas_y', varLv: 'meas_lv', timeoutSec: 25 },     pos: { x: 360,  y: 320 } },
+        { id: siOk,     kind: 'if',              name: 'Si mesure OK',      enabled: true, params: { varName: 'meas_ok', op: 'eq', value: 1 },                               pos: { x: 640,  y: 320 } },
+        // measure_compare lit meas_x/meas_y et écrit la précision dans meas_accuracy
+        // (0-100). maxPoints: 0 → les points sont attribués par le bloc add_score.
+        { id: cmp,      kind: 'measure_compare', name: 'Comparer à la cible', enabled: true, params: { targetX: 0.50, targetY: 0.41, toleranceDeltaE: 8, maxPoints: 0 },     pos: { x: 920,  y: 260 } },
+        { id: siBon,    kind: 'if',              name: 'Si précision > 0',  enabled: true, params: { varName: 'meas_accuracy', op: 'gt', value: 0 },                         pos: { x: 1200, y: 260 } },
+        { id: addPts,   kind: 'add_score',       name: '+100 points',       enabled: true, params: { amount: 100 },                                                          pos: { x: 1480, y: 200 } },
+        { id: sndWin,   kind: 'play_sound',      name: 'Son victoire',      enabled: true, params: { sound: 'win' },                                                         pos: { x: 1760, y: 200 } },
+        { id: sndWrong, kind: 'play_sound',      name: 'Son raté',          enabled: true, params: { sound: 'wrong' },                                                       pos: { x: 1480, y: 380 } },
+        { id: sndErr,   kind: 'play_sound',      name: 'Son erreur mesure', enabled: true, params: { sound: 'error' },                                                       pos: { x: 920,  y: 460 } },
+      ];
+      initialEdges = [
+        { id: makeId(), from: eventId,  to: sndStart },
+        { id: makeId(), from: sndStart, to: fillOr },
+        { id: makeId(), from: fillOr,   to: setCX },
+        { id: makeId(), from: setCX,    to: setCY },
+        { id: makeId(), from: clickEv,  to: mesure },
+        { id: makeId(), from: mesure,   to: siOk },
+        // ATTENTION : l'ordre des arêtes sortantes du « Si » compte
+        // (1re = branche vraie, 2e = branche fausse).
+        { id: makeId(), from: siOk,     to: cmp },
+        { id: makeId(), from: siOk,     to: sndErr },
+        { id: makeId(), from: cmp,      to: siBon },
+        { id: makeId(), from: siBon,    to: addPts },
+        { id: makeId(), from: siBon,    to: sndWrong },
+        { id: makeId(), from: addPts,   to: sndWin },
+      ];
+      templateUiLayout = [
+        { id: makeId(), kind: 'title_banner',  x: 40,  y: 16,  width: 420, height: 52, text: 'Vise la couleur' },
+        { id: makeId(), kind: 'score_display', x: 40,  y: 84,  width: 140, height: 64, text: 'Score', varBind: 'score' },
+        { id: makeId(), kind: 'score_display', x: 196, y: 84,  width: 125, height: 64, text: 'x mesuré', varBind: 'meas_x' },
+        { id: makeId(), kind: 'score_display', x: 336, y: 84,  width: 125, height: 64, text: 'y mesuré', varBind: 'meas_y' },
+        { id: makeId(), kind: 'button',        x: 40,  y: 164, width: 420, height: 48, text: '📷 Mesurer avec le CS-160', eventId: 'mesurer', bgColor: '#ff8800' },
+        { id: makeId(), kind: 'message_box',   x: 40,  y: 228, width: 420, height: 88, text: 'Pointe le CS-160 vers une dalle orange et clique Mesurer. La mesure est RÉELLE (x,y du colorimètre).', bgColor: '#ff8800' },
       ] as UILayoutComponent[];
     }
 
@@ -9685,6 +9750,7 @@ export default function EditeurPage() {
                         { id: 'ambiance',        icon: Waves,    label: 'Ambiance',           desc: 'Animations arc-en-ciel et vague cyan en boucle automatique' },
                         { id: 'duel_salles',     icon: Swords,   label: 'Duel des salles',    desc: 'Salle 1 contre Salle 2 : marque des points pour ton camp' },
                         { id: 'demo_python',     icon: FileCode, label: 'Démo Python',        desc: 'Blocs Python : dégradé arc-en-ciel + score au clic' },
+                        { id: 'mesure_cs160',    icon: Crosshair, label: 'Vise la couleur (CS-160)', desc: 'Mesure RÉELLE au colorimètre : vise la dalle orange et compare x,y à la cible' },
                       ].map((t) => (
                         <button
                           key={t.id}
