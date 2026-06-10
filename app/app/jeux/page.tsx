@@ -2821,6 +2821,34 @@ export default function JeuxPage() {
         return;
       }
 
+      // ── tile_set_var {indexVar, colorVar, defaultColor, intensity} :
+      // allume la dalle dont l'indice est stocké dans une variable (mêmes
+      // paramètres que l'aperçu de l'éditeur) ──
+      if (node.kind === 'tile_set_var') {
+        const tileIndex = Math.max(0, Math.min(41, Math.round(Number(hudVarsRef.current[String(params.indexVar ?? 'i')] ?? 0))));
+        const colorVarName = String(params.colorVar ?? '');
+        const colorVarValue = colorVarName ? hudVarsRef.current[colorVarName] : undefined;
+        const color = (typeof colorVarValue === 'string' && colorVarValue.startsWith('#')) ? colorVarValue : getColor(params, 'defaultColor', '#ffffff');
+        const rawInt = typeof params.intensity === 'number' ? params.intensity : 0.85;
+        const intensity = intensityToMasterPercent(rawInt, masterIntensity);
+        setPlateColor(tileIndex, color, intensity > 0);
+        const pid = PLATE_ID_BY_INDEX[tileIndex];
+        if (pid) sendRgbToPlate(hexToRgb255(color), intensity, pid);
+        const nextId = g.out.get(node.id)?.[0];
+        if (nextId) walk(nextId);
+        return;
+      }
+
+      // ── clear_tiles {} : éteint toutes les dalles d'un coup ──
+      if (node.kind === 'clear_tiles') {
+        setPlateColors(Array(42).fill('#000000'));
+        setPlateActive(Array(42).fill(false));
+        for (let i = 0; i < 42; i++) { const pid = PLATE_ID_BY_INDEX[i]; if (pid) sendRgbToPlate({ r: 0, g: 0, b: 0 }, 0, pid); }
+        const nextId = g.out.get(node.id)?.[0];
+        if (nextId) walk(nextId);
+        return;
+      }
+
       // ── game_tetris: launch Tetrix as black-box node ──
       if (node.kind === 'game_tetris') {
         // Le nœud pilote la vitesse de chute (paramètre éditable, plus de valeur ignorée).

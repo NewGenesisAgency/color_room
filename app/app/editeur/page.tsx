@@ -1159,7 +1159,7 @@ export default function EditeurPage() {
   const [showGrid, setShowGrid] = useState<boolean>(true);
   const [zoomLevel, setZoomLevel] = useState<number>(100);
   const [newProjectName, setNewProjectName] = useState<string>('');
-  const [newProjectTemplate, setNewProjectTemplate] = useState<'blank' | 'tutorial' | 'animation' | 'interactive' | 'fluorescence' | 'color-demo' | 'pulse-advanced' | 'rainbow' | 'tetris' | 'memory' | 'tetris-blueprint' | 'snake' | 'puissance4' | 'color_speed' | 'maitre_blanc' | 'intrus' | 'canal_mix' | 'metamere' | 'chromaticite' | 'spectre' | 'libre_rgb'>('blank');
+  const [newProjectTemplate, setNewProjectTemplate] = useState<'blank' | 'tutorial' | 'animation' | 'interactive' | 'fluorescence' | 'color-demo' | 'pulse-advanced' | 'rainbow' | 'tetris' | 'memory' | 'tetris-blueprint' | 'snake' | 'puissance4' | 'color_speed' | 'maitre_blanc' | 'intrus' | 'canal_mix' | 'metamere' | 'chromaticite' | 'spectre' | 'libre_rgb' | 'attrape_lumiere' | 'ambiance' | 'duel_salles' | 'demo_python'>('blank');
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -3091,7 +3091,7 @@ export default function EditeurPage() {
     }
   };
 
-  const createGame = async (forcedName?: string, template: 'blank' | 'tutorial' | 'animation' | 'interactive' | 'fluorescence' | 'color-demo' | 'pulse-advanced' | 'rainbow' | 'tetris' | 'memory' | 'tetris-blueprint' | 'snake' | 'puissance4' | 'color_speed' | 'maitre_blanc' | 'intrus' | 'canal_mix' | 'metamere' | 'chromaticite' | 'spectre' | 'libre_rgb' = 'blank') => {
+  const createGame = async (forcedName?: string, template: 'blank' | 'tutorial' | 'animation' | 'interactive' | 'fluorescence' | 'color-demo' | 'pulse-advanced' | 'rainbow' | 'tetris' | 'memory' | 'tetris-blueprint' | 'snake' | 'puissance4' | 'color_speed' | 'maitre_blanc' | 'intrus' | 'canal_mix' | 'metamere' | 'chromaticite' | 'spectre' | 'libre_rgb' | 'attrape_lumiere' | 'ambiance' | 'duel_salles' | 'demo_python' = 'blank') => {
     const makeId: IdFactory = () => `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
     const provisionalId = makeId();
     const nextIndex = (editorRef.current.games.length || 0) + 1;
@@ -3498,6 +3498,206 @@ export default function EditeurPage() {
         { id: makeId(), kind: 'color_swatch', x: 40, y: 84,  width: 80,  height: 80  },
         { id: makeId(), kind: 'rgb_sliders',  x: 136, y: 84, width: 310, height: 130 },
         { id: makeId(), kind: 'cie_diagram',  x: 40, y: 232, width: 420, height: 300 },
+      ] as UILayoutComponent[];
+    } else if (template === 'attrape_lumiere') {
+      /**
+       * @brief Modèle « Attrape la lumière » 100% blocs : une dalle verte
+       * s'allume au hasard, le joueur la clique pour marquer 10 points,
+       * le tout sous un compte à rebours de 30 secondes.
+       */
+      const sndStart = makeId();
+      const cdStart  = makeId();
+      const rand1    = makeId();
+      const tile1    = makeId();
+      const clickEv  = makeId();
+      const cmpBon   = makeId();
+      const siBon    = makeId();
+      const addPts   = makeId();
+      const sndCoin  = makeId();
+      const clear1   = makeId();
+      const rand2    = makeId();
+      const tile2    = makeId();
+      const sndWrong = makeId();
+      const endEv    = makeId();
+      const clear2   = makeId();
+      const sndWin   = makeId();
+      const fillEnd  = makeId();
+      initialNodes = [
+        // ── Rangée 1 : démarrage du jeu ──
+        { id: eventId,  kind: 'event_begin',     name: 'Démarrer',          enabled: true, params: {},                                                                      pos: { x: 80,   y: 80 } },
+        { id: sndStart, kind: 'play_sound',      name: 'Son départ',        enabled: true, params: { sound: 'start' },                                                      pos: { x: 360,  y: 80 } },
+        { id: cdStart,  kind: 'countdown_start', name: 'Chrono 30 s',       enabled: true, params: { seconds: 30, varName: 'countdown' },                                   pos: { x: 640,  y: 80 } },
+        { id: rand1,    kind: 'random_int',      name: 'Cible aléatoire',   enabled: true, params: { min: 0, max: 41, varName: 'cible' },                                   pos: { x: 920,  y: 80 } },
+        { id: tile1,    kind: 'tile_set_var',    name: 'Allumer la cible',  enabled: true, params: { indexVar: 'cible', colorVar: '', defaultColor: '#22c55e', intensity: 0.9 }, pos: { x: 1200, y: 80 } },
+        // ── Rangée 2 : clic du joueur (vrai = bonne dalle, faux = raté) ──
+        { id: clickEv,  kind: 'on_plate_click',  name: 'Clic sur dalle',    enabled: true, params: {},                                                                      pos: { x: 80,   y: 320 } },
+        { id: cmpBon,   kind: 'compare_eq',      name: 'Bonne dalle ?',     enabled: true, params: { a: 'clickedTile', b: 'cible', out: 'bon' },                            pos: { x: 360,  y: 320 } },
+        { id: siBon,    kind: 'if',              name: 'Si bon = 1',        enabled: true, params: { varName: 'bon', op: 'eq', value: 1 },                                  pos: { x: 640,  y: 320 } },
+        { id: addPts,   kind: 'add_score',       name: '+10 points',        enabled: true, params: { amount: 10 },                                                          pos: { x: 920,  y: 260 } },
+        { id: sndCoin,  kind: 'play_sound',      name: 'Son pièce',         enabled: true, params: { sound: 'coin' },                                                       pos: { x: 1200, y: 260 } },
+        { id: clear1,   kind: 'clear_tiles',     name: 'Éteindre',          enabled: true, params: {},                                                                      pos: { x: 1480, y: 260 } },
+        { id: rand2,    kind: 'random_int',      name: 'Nouvelle cible',    enabled: true, params: { min: 0, max: 41, varName: 'cible' },                                   pos: { x: 1760, y: 260 } },
+        { id: tile2,    kind: 'tile_set_var',    name: 'Rallumer la cible', enabled: true, params: { indexVar: 'cible', colorVar: '', defaultColor: '#22c55e', intensity: 0.9 }, pos: { x: 2040, y: 260 } },
+        { id: sndWrong, kind: 'play_sound',      name: 'Son raté',          enabled: true, params: { sound: 'wrong' },                                                      pos: { x: 920,  y: 440 } },
+        // ── Rangée 3 : fin du compte à rebours ──
+        { id: endEv,    kind: 'on_countdown_end', name: 'Fin du chrono',    enabled: true, params: { varName: 'countdown' },                                                pos: { x: 80,   y: 600 } },
+        { id: clear2,   kind: 'clear_tiles',     name: 'Tout éteindre',     enabled: true, params: {},                                                                      pos: { x: 360,  y: 600 } },
+        { id: sndWin,   kind: 'play_sound',      name: 'Son victoire',      enabled: true, params: { sound: 'win' },                                                        pos: { x: 640,  y: 600 } },
+        { id: fillEnd,  kind: 'fill',            name: 'Final doré',        enabled: true, params: { color: '#f59e0b', intensity: 0.5, mask: 'all', seconds: 1 },           pos: { x: 920,  y: 600 } },
+      ];
+      initialEdges = [
+        { id: makeId(), from: eventId,  to: sndStart },
+        { id: makeId(), from: sndStart, to: cdStart },
+        { id: makeId(), from: cdStart,  to: rand1 },
+        { id: makeId(), from: rand1,    to: tile1 },
+        { id: makeId(), from: clickEv,  to: cmpBon },
+        { id: makeId(), from: cmpBon,   to: siBon },
+        // ATTENTION : l'ordre des arêtes sortantes du « Si » compte
+        // (1re = branche vraie, 2e = branche fausse).
+        { id: makeId(), from: siBon,    to: addPts },
+        { id: makeId(), from: siBon,    to: sndWrong },
+        { id: makeId(), from: addPts,   to: sndCoin },
+        { id: makeId(), from: sndCoin,  to: clear1 },
+        { id: makeId(), from: clear1,   to: rand2 },
+        { id: makeId(), from: rand2,    to: tile2 },
+        { id: makeId(), from: endEv,    to: clear2 },
+        { id: makeId(), from: clear2,   to: sndWin },
+        { id: makeId(), from: sndWin,   to: fillEnd },
+      ];
+      templateUiLayout = [
+        { id: makeId(), kind: 'title_banner',  x: 40,  y: 16,  width: 420, height: 52, text: 'Attrape la lumière' },
+        { id: makeId(), kind: 'score_display', x: 40,  y: 84,  width: 140, height: 64, text: 'Score', varBind: 'score' },
+        { id: makeId(), kind: 'timer_display', x: 196, y: 84,  width: 140, height: 64, text: 'Temps', varBind: 'countdown' },
+        { id: makeId(), kind: 'message_box',   x: 40,  y: 164, width: 420, height: 72,  text: 'Une dalle verte s\'allume au hasard : clique-la vite ! +10 points par dalle attrapée, 30 secondes au chrono.', bgColor: '#22c55e' },
+      ] as UILayoutComponent[];
+    } else if (template === 'ambiance') {
+      /**
+       * @brief Modèle « Ambiance » 100% blocs : animations automatiques
+       * (arc-en-ciel au démarrage puis alternance vague/arc-en-ciel sur timer).
+       */
+      const rainbow1 = makeId();
+      const timerEv  = makeId();
+      const wave1    = makeId();
+      const rainbow2 = makeId();
+      initialNodes = [
+        // ── Rangée 1 : arc-en-ciel d'accueil ──
+        { id: eventId,  kind: 'event_begin',  name: 'Démarrer',          enabled: true, params: {},                                                                pos: { x: 80,  y: 80 } },
+        { id: rainbow1, kind: 'anim_rainbow', name: 'Arc-en-ciel 8 s',   enabled: true, params: { speed: 0.5, durationMs: 8000 },                                  pos: { x: 360, y: 80 } },
+        // ── Rangée 2 : boucle vague + arc-en-ciel toutes les 9 s ──
+        { id: timerEv,  kind: 'on_timer',     name: 'Toutes les 9 s',    enabled: true, params: { intervalMs: 9000 },                                              pos: { x: 80,  y: 320 } },
+        { id: wave1,    kind: 'anim_wave',    name: 'Vague cyan',        enabled: true, params: { color: '#22d3ee', direction: 'left', speed: 1, durationMs: 4000 }, pos: { x: 360, y: 320 } },
+        { id: rainbow2, kind: 'anim_rainbow', name: 'Arc-en-ciel 4 s',   enabled: true, params: { speed: 0.5, durationMs: 4000 },                                  pos: { x: 640, y: 320 } },
+      ];
+      initialEdges = [
+        { id: makeId(), from: eventId, to: rainbow1 },
+        { id: makeId(), from: timerEv, to: wave1 },
+        { id: makeId(), from: wave1,   to: rainbow2 },
+      ];
+      templateUiLayout = [
+        { id: makeId(), kind: 'title_banner', x: 40, y: 16, width: 420, height: 52, text: 'Ambiance lumineuse' },
+        { id: makeId(), kind: 'message_box',  x: 40, y: 84, width: 420, height: 72, text: 'Animations automatiques : arc-en-ciel au démarrage, puis vague cyan et arc-en-ciel en boucle. Aucune interaction requise.', bgColor: '#22d3ee' },
+      ] as UILayoutComponent[];
+    } else if (template === 'duel_salles') {
+      /**
+       * @brief Modèle « Duel Salle 1 vs Salle 2 » 100% blocs : la moitié
+       * gauche des dalles (0-20) marque pour la salle 1, la moitié droite
+       * (21-41) pour la salle 2. 45 secondes au chrono.
+       */
+      const cdStart  = makeId();
+      const rand1    = makeId();
+      const tile1    = makeId();
+      const clickEv  = makeId();
+      const cmpBon   = makeId();
+      const siBon    = makeId();
+      const siSalle  = makeId();
+      const setA     = makeId();
+      const sndA     = makeId();
+      const setB     = makeId();
+      const sndB     = makeId();
+      const clear1   = makeId();
+      const rand2    = makeId();
+      const tile2    = makeId();
+      const sndWrong = makeId();
+      const endEv    = makeId();
+      const clear2   = makeId();
+      const sndWin   = makeId();
+      initialNodes = [
+        // ── Rangée 1 : démarrage et première cible ──
+        { id: eventId,  kind: 'event_begin',     name: 'Démarrer',          enabled: true, params: {},                                                                      pos: { x: 80,   y: 80 } },
+        { id: cdStart,  kind: 'countdown_start', name: 'Chrono 45 s',       enabled: true, params: { seconds: 45, varName: 'countdown' },                                   pos: { x: 360,  y: 80 } },
+        { id: rand1,    kind: 'random_int',      name: 'Cible aléatoire',   enabled: true, params: { min: 0, max: 41, varName: 'cible' },                                   pos: { x: 640,  y: 80 } },
+        { id: tile1,    kind: 'tile_set_var',    name: 'Allumer la cible',  enabled: true, params: { indexVar: 'cible', colorVar: '', defaultColor: '#22c55e', intensity: 0.9 }, pos: { x: 920,  y: 80 } },
+        // ── Rangée 2 : clic, attribution du point à la bonne salle ──
+        { id: clickEv,  kind: 'on_plate_click',  name: 'Clic sur dalle',    enabled: true, params: {},                                                                      pos: { x: 80,   y: 320 } },
+        { id: cmpBon,   kind: 'compare_eq',      name: 'Bonne dalle ?',     enabled: true, params: { a: 'clickedTile', b: 'cible', out: 'bon' },                            pos: { x: 360,  y: 320 } },
+        { id: siBon,    kind: 'if',              name: 'Si bon = 1',        enabled: true, params: { varName: 'bon', op: 'eq', value: 1 },                                  pos: { x: 640,  y: 320 } },
+        { id: siSalle,  kind: 'if',              name: 'Si dalle < 21',     enabled: true, params: { varName: 'clickedTile', op: 'lt', value: 21 },                         pos: { x: 920,  y: 260 } },
+        { id: setA,     kind: 'variable_set',    name: '+1 Salle 1',        enabled: true, params: { name: 'scoreA', value: 1, op: 'add' },                                 pos: { x: 1200, y: 180 } },
+        { id: sndA,     kind: 'play_sound',      name: 'Son correct (S1)',  enabled: true, params: { sound: 'correct' },                                                    pos: { x: 1480, y: 180 } },
+        { id: setB,     kind: 'variable_set',    name: '+1 Salle 2',        enabled: true, params: { name: 'scoreB', value: 1, op: 'add' },                                 pos: { x: 1200, y: 340 } },
+        { id: sndB,     kind: 'play_sound',      name: 'Son correct (S2)',  enabled: true, params: { sound: 'correct' },                                                    pos: { x: 1480, y: 340 } },
+        { id: clear1,   kind: 'clear_tiles',     name: 'Éteindre',          enabled: true, params: {},                                                                      pos: { x: 1760, y: 260 } },
+        { id: rand2,    kind: 'random_int',      name: 'Nouvelle cible',    enabled: true, params: { min: 0, max: 41, varName: 'cible' },                                   pos: { x: 2040, y: 260 } },
+        { id: tile2,    kind: 'tile_set_var',    name: 'Rallumer la cible', enabled: true, params: { indexVar: 'cible', colorVar: '', defaultColor: '#22c55e', intensity: 0.9 }, pos: { x: 2320, y: 260 } },
+        { id: sndWrong, kind: 'play_sound',      name: 'Son raté',          enabled: true, params: { sound: 'wrong' },                                                      pos: { x: 920,  y: 480 } },
+        // ── Rangée 3 : fin du compte à rebours ──
+        { id: endEv,    kind: 'on_countdown_end', name: 'Fin du chrono',    enabled: true, params: { varName: 'countdown' },                                                pos: { x: 80,   y: 600 } },
+        { id: clear2,   kind: 'clear_tiles',     name: 'Tout éteindre',     enabled: true, params: {},                                                                      pos: { x: 360,  y: 600 } },
+        { id: sndWin,   kind: 'play_sound',      name: 'Son victoire',      enabled: true, params: { sound: 'win' },                                                        pos: { x: 640,  y: 600 } },
+      ];
+      initialEdges = [
+        { id: makeId(), from: eventId, to: cdStart },
+        { id: makeId(), from: cdStart, to: rand1 },
+        { id: makeId(), from: rand1,   to: tile1 },
+        { id: makeId(), from: clickEv, to: cmpBon },
+        { id: makeId(), from: cmpBon,  to: siBon },
+        // ATTENTION : ordre des arêtes du « Si » = 1re vraie, 2e fausse.
+        { id: makeId(), from: siBon,   to: siSalle },
+        { id: makeId(), from: siBon,   to: sndWrong },
+        { id: makeId(), from: siSalle, to: setA },
+        { id: makeId(), from: siSalle, to: setB },
+        { id: makeId(), from: setA,    to: sndA },
+        { id: makeId(), from: setB,    to: sndB },
+        { id: makeId(), from: sndA,    to: clear1 },
+        { id: makeId(), from: sndB,    to: clear1 },
+        { id: makeId(), from: clear1,  to: rand2 },
+        { id: makeId(), from: rand2,   to: tile2 },
+        { id: makeId(), from: endEv,   to: clear2 },
+        { id: makeId(), from: clear2,  to: sndWin },
+      ];
+      templateUiLayout = [
+        { id: makeId(), kind: 'title_banner',  x: 40,  y: 16,  width: 420, height: 52, text: 'Duel des salles' },
+        { id: makeId(), kind: 'score_display', x: 40,  y: 84,  width: 130, height: 64, text: 'Salle 1', varBind: 'scoreA' },
+        { id: makeId(), kind: 'score_display', x: 186, y: 84,  width: 130, height: 64, text: 'Salle 2', varBind: 'scoreB', bgColor: '#3b82f6' },
+        { id: makeId(), kind: 'timer_display', x: 332, y: 84,  width: 120, height: 64, text: 'Temps', varBind: 'countdown' },
+        { id: makeId(), kind: 'message_box',   x: 40,  y: 164, width: 420, height: 88,  text: 'Dalles 0 à 20 = Salle 1, dalles 21 à 41 = Salle 2. Attrape la dalle verte pour marquer un point pour ta salle ! 45 secondes au chrono.', bgColor: '#f59e0b' },
+      ] as UILayoutComponent[];
+    } else if (template === 'demo_python') {
+      /**
+       * @brief Modèle « Démo Python » : mélange blocs + code Python.
+       * Au démarrage, un script dessine un dégradé arc-en-ciel sur les
+       * 42 dalles ; au clic, un script allume la dalle cliquée en blanc
+       * et ajoute un point.
+       */
+      const pyDegrade = makeId();
+      const clickEv   = makeId();
+      const pyClic    = makeId();
+      initialNodes = [
+        // ── Rangée 1 : dégradé arc-en-ciel au démarrage ──
+        { id: eventId,   kind: 'event_begin',    name: 'Démarrer',        enabled: true, params: {}, pos: { x: 80,  y: 80 } },
+        { id: pyDegrade, kind: 'script_python',  name: 'Dégradé Python',  enabled: true, params: { code: 'import colorroom as cr\nimport colorsys\n\n# Dégradé arc-en-ciel sur les 42 dalles (plateId de 1 à 42)\nfor i in range(42):\n    teinte = i / 42.0\n    r, g, b = colorsys.hls_to_rgb(teinte, 0.5, 1.0)\n    cr.send_color(i + 1, int(r * 255), int(g * 255), int(b * 255), 0.85)\n' }, pos: { x: 360, y: 80 } },
+        // ── Rangée 2 : clic → dalle blanche + 1 point (en Python) ──
+        { id: clickEv,   kind: 'on_plate_click', name: 'Clic sur dalle',  enabled: true, params: {}, pos: { x: 80,  y: 320 } },
+        { id: pyClic,    kind: 'script_python',  name: 'Clic Python',     enabled: true, params: { code: 'import colorroom as cr\n\n# Allume la dalle cliquée en blanc et marque un point\nidx = int(cr.get_variable("clickedTile"))\ncr.send_color(idx + 1, 255, 255, 255, 0.9)\ncr.add_score(1)\n' }, pos: { x: 360, y: 320 } },
+      ];
+      initialEdges = [
+        { id: makeId(), from: eventId, to: pyDegrade },
+        { id: makeId(), from: clickEv, to: pyClic },
+      ];
+      templateUiLayout = [
+        { id: makeId(), kind: 'title_banner',  x: 40,  y: 16, width: 420, height: 52, text: 'Démo Python' },
+        { id: makeId(), kind: 'score_display', x: 40,  y: 84, width: 140, height: 64, text: 'Score', varBind: 'score' },
+        { id: makeId(), kind: 'message_box',   x: 40,  y: 164, width: 420, height: 88, text: 'Le bloc Python dessine un dégradé arc-en-ciel au démarrage. Clique une dalle : elle s\'allume en blanc (+1 point). Modifie le code dans l\'inspecteur !', bgColor: '#8b5cf6' },
       ] as UILayoutComponent[];
     }
 
@@ -9476,6 +9676,38 @@ export default function EditeurPage() {
                         <p style={{ margin: 0, fontSize: 12, opacity: 0.7, lineHeight: 1.4 }}>{t.desc}</p>
                       </button>
                     ))}
+                  </div>
+                  <div style={{ borderTop: '1px solid rgba(0,0,0,0.08)', paddingTop: 12, marginBottom: 16 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', opacity: 0.5, marginBottom: 8 }}>Modèles 100% blocs</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
+                      {[
+                        { id: 'attrape_lumiere', icon: Target,   label: 'Attrape la lumière', desc: 'Clique la dalle verte avant la fin du chrono — graphe complet éditable' },
+                        { id: 'ambiance',        icon: Waves,    label: 'Ambiance',           desc: 'Animations arc-en-ciel et vague cyan en boucle automatique' },
+                        { id: 'duel_salles',     icon: Swords,   label: 'Duel des salles',    desc: 'Salle 1 contre Salle 2 : marque des points pour ton camp' },
+                        { id: 'demo_python',     icon: FileCode, label: 'Démo Python',        desc: 'Blocs Python : dégradé arc-en-ciel + score au clic' },
+                      ].map((t) => (
+                        <button
+                          key={t.id}
+                          onClick={() => setNewProjectTemplate(t.id as typeof newProjectTemplate)}
+                          className="g-card"
+                          style={{
+                            padding: 14,
+                            borderRadius: 14,
+                            border: newProjectTemplate === t.id ? '2px solid #22c55e' : '1px solid rgba(255,255,255,0.6)',
+                            background: newProjectTemplate === t.id ? 'rgba(34, 197, 94, 0.06)' : 'linear-gradient(135deg, rgba(255,255,255,0.78), rgba(255,255,255,0.55))',
+                            cursor: 'pointer',
+                            textAlign: 'left',
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+                            <t.icon size={18} color={newProjectTemplate === t.id ? '#22c55e' : '#666'} />
+                            <span style={{ fontWeight: 700, fontSize: 14 }}>{t.label}</span>
+                            <span style={{ marginLeft: 'auto', fontSize: 10, fontWeight: 800, padding: '2px 8px', borderRadius: 999, background: 'rgba(34, 197, 94, 0.15)', color: '#15803d', whiteSpace: 'nowrap' }}>100% blocs</span>
+                          </div>
+                          <p style={{ margin: 0, fontSize: 12, opacity: 0.7, lineHeight: 1.4 }}>{t.desc}</p>
+                        </button>
+                      ))}
+                    </div>
                   </div>
                   <div style={{ borderTop: '1px solid rgba(0,0,0,0.08)', paddingTop: 12, marginBottom: 8 }}>
                     <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', opacity: 0.5, marginBottom: 8 }}>Jeux natifs</div>
