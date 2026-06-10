@@ -40,6 +40,8 @@ export type UILayoutComponent = {
   // button_grid : nb de colonnes ; gauge/leaderboard : valeur indicative
   gridCols?: number;
   value?: number;
+  // Code Python exécuté au clic sur l'élément (combine visuel + code, hors-ligne).
+  pyOnClick?: string;
 };
 
 type Props = {
@@ -330,6 +332,10 @@ export default function UIDesigner({ components, onChange, gameVariables = [] }:
           </label>
           {selComp.kind==='color_swatch' && <label><span style={lbl}>Variable couleur</span><input style={inp} value={selComp.colorBind??''} onChange={e=>upd(selComp.id,{colorBind:e.target.value})} placeholder="ex: target" /></label>}
           {['button','button_grid','sprite','svg_icon','color_swatch'].includes(selComp.kind) && <label><span style={lbl}>Événement (au clic)</span><input style={inp} value={selComp.eventId??''} onChange={e=>upd(selComp.id,{eventId:e.target.value})} placeholder="ex: submit" /></label>}
+          {['button','button_grid','sprite','svg_icon','color_swatch','plate_grid'].includes(selComp.kind) && <label><span style={lbl}>🐍 Action Python (au clic)</span>
+            <textarea style={{ ...inp, height: 84, fontFamily: 'monospace', fontSize: 11, resize: 'vertical' }} value={selComp.pyOnClick??''} onChange={e=>upd(selComp.id,{pyOnClick:e.target.value})} placeholder={'import colorroom as cr\ncr.add_score(10)\ncr.fill(255, 80, 0, 0.8)'} />
+            <span style={{ fontSize: 10, color: '#94a3b8' }}>S&apos;exécute hors-ligne. API : cr.send_color/fill/set_variable/add_score…</span>
+          </label>}
           {selComp.kind==='cie_diagram' && <>
             <label style={{ display:'flex', alignItems:'center', gap:7, cursor:'pointer' }}>
               <input type="checkbox" checked={!!selComp.cieRandom} onChange={e=>upd(selComp.id,{cieRandom:e.target.checked})} />

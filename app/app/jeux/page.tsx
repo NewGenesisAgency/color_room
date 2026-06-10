@@ -10,6 +10,7 @@ import type { TouchKey } from '@/app/_components/TouchControls';
 import NavigationMenu from '@/app/_components/NavigationMenu';
 import LoginScreen from '@/app/_components/LoginScreen';
 import QrCode from '@/app/_components/QrCode';
+import { getPyodide } from '@/lib/pyodide';
 import { PLATE_TYPE, CHANNELS_ROUGE, CHANNELS_BLEU, getPlateType, MAP_ROUGE_TO_BLEU, remapChannels32 } from '@/lib/tileChannels';
 import { playSfx, vibrate } from '@/lib/audio/sfx';
 import { LOGIC_OP_KINDS, applyLogicOp } from '@/lib/game/logicOps';
@@ -802,6 +803,7 @@ type HudPlateActions = {
   onComplete?: (points: number) => void;
   plateColors?: string[];   // couleurs live des 42 dalles (visualisation)
   onEvent?: (eventId: string) => void;  // clic d'un composant -> lance le graphe depuis le noeud event
+  onPy?: (code: string) => void;        // clic d'un composant -> exécute son action Python (hors-ligne)
 };
 
 function renderHudComp(c: UILayoutComponent, plate: HudPlateActions, vars: Record<string, number | string>): React.ReactNode {
@@ -901,7 +903,11 @@ function HudUiOverlay({
     <div ref={wrapRef} style={{ width: '100%', height: usedH * scale, position: 'relative', overflow: 'hidden' }}>
       <div style={{ position: 'absolute', top: 0, left: 0, width: HUD_CANVAS_W, height: usedH, transform: `scale(${scale})`, transformOrigin: 'top left' }}>
         {components.map((c) => (
-          <div key={c.id} style={{ position: 'absolute', left: c.x, top: c.y, width: c.width, height: c.height }}>
+          <div
+            key={c.id}
+            style={{ position: 'absolute', left: c.x, top: c.y, width: c.width, height: c.height, cursor: c.pyOnClick ? 'pointer' : undefined }}
+            onClick={c.pyOnClick ? () => plate.onPy?.(c.pyOnClick!) : undefined}
+          >
             {renderHudComp(c, plate, vars)}
           </div>
         ))}
@@ -2342,6 +2348,50 @@ export default function JeuxPage() {
   const fireHudEvent = (nodeId: string) => { hudWalkRef.current?.(nodeId); };
   // Grilles 2D des jeux éditeur (grid_create / grid_set / grid_sync_tiles)
   const hudGridsRef = useRef<Record<string, (string | null)[][]>>({});
+
+  // ── Action Python attachée à un élément UI (exécutée au clic, hors-ligne) ──
+  // Même API "colorroom" que l'onglet Python de l'éditeur, branchée sur le jeu en cours.
+  const pyBusyRef = useRef(false);
+  const runElementPython = async (code: string) => {
+    if (!code || !code.trim() || pyBusyRef.current) return;
+    pyBusyRef.current = true;
+    try {
+      const py = await getPyodide() as any;
+      const cr = {
+        send_color: (plateId: number, r: number, g: number, b: number, intensity = 0.85) => {
+          const pid = PLATE_ID_BY_INDEX[Math.max(0, Math.round(plateId) - 1)]; if (!pid) return;
+          sendRgbToPlate({ r: clamp255(r), g: clamp255(g), b: clamp255(b) }, Math.round(Math.max(0, Math.min(1, intensity)) * 100), pid);
+        },
+        fill: (r: number, g: number, b: number, intensity = 0.85) => {
+          for (let i = 0; i < 42; i++) { const pid = PLATE_ID_BY_INDEX[i]; if (pid) sendRgbToPlate({ r: clamp255(r), g: clamp255(g), b: clamp255(b) }, Math.round(Math.max(0, Math.min(1, intensity)) * 100), pid); }
+        },
+        set_tile: (idx: number, r: number, g: number, b: number, intensity = 0.85) => {
+          const pid = PLATE_ID_BY_INDEX[Math.max(0, Math.round(idx))]; if (!pid) return;
+          sendRgbToPlate({ r: clamp255(r), g: clamp255(g), b: clamp255(b) }, Math.round(Math.max(0, Math.min(1, intensity)) * 100), pid);
+        },
+        clear: () => { void blackoutHardware(); },
+        set_variable: (name: string, value: number | string) => { hudVarsRef.current[String(name)] = value as number | string; bumpHudVars(); },
+        get_variable: (name: string) => hudVarsRef.current[String(name)] ?? 0,
+        add_score: (points: number) => { const p = Math.round(Number(points) || 0); hudVarsRef.current.score = Number(hudVarsRef.current.score ?? 0) + p; bumpHudVars(); if (p > 0) awardPoints(p, '+' + p); },
+        get_score: () => Number(hudVarsRef.current.score ?? 0),
+        emit_event: (eventId: string) => {
+          const nodes = Array.isArray(hudRunRef.current?.cfg.nodes) ? (hudRunRef.current!.cfg.nodes as EditorNode[]) : [];
+          const ev = nodes.find((n) => (n.kind === 'on_ui_click') && n.enabled !== false && String(n.params?.buttonId ?? '') === String(eventId));
+          if (ev) fireHudEvent(String(ev.id));
+        },
+        play_sound: (s: string) => playSfx(String(s)),
+        vibrate: (ms: number) => vibrate(Math.max(10, Math.round(Number(ms) || 200))),
+        log: (m: unknown) => { try { console.log('[py]', m); } catch { /* ignore */ } },
+        tile_count: 42,
+      };
+      py.registerJsModule('colorroom', cr);
+      await py.runPythonAsync(String(code));
+    } catch (e) {
+      setMessage('Erreur Python : ' + String((e as Error)?.message ?? e));
+    } finally {
+      pyBusyRef.current = false;
+    }
+  };
 
   // Clavier -> nœuds on_key : déclenche le sous-graphe correspondant (input de jeu)
   useEffect(() => {
@@ -5470,6 +5520,7 @@ export default function JeuxPage() {
                           playGameSound('click');
                           if (ev) fireHudEvent(String(ev.id)); // ne coupe PAS la boucle principale
                         },
+                        onPy: (code: string) => { void runElementPython(code); },
                       }}
                     />
                   </div>
