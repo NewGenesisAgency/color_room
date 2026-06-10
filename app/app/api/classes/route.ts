@@ -1,8 +1,26 @@
+/**
+ * @file app/api/classes/route.ts
+ * @brief Liste et création des classes selon le rôle de l'utilisateur.
+ *
+ * GET  : renvoie les classes visibles par l'appelant. Un admin voit toutes les
+ *        classes (avec nom du créateur et nombre de membres) ; un enseignant ne
+ *        voit que celles qu'il a créées (avec nombre de membres) ; un apprenant
+ *        voit les classes auxquelles il a adhéré. Renvoie { ok, classes }.
+ * POST : crée une classe (réservé enseignant/admin). Body JSON { name, niveau? }.
+ *        Génère un code d'adhésion unique à 6 caractères (jusqu'à 10 essais).
+ *        Renvoie { ok, id, code }.
+ * Codes d'erreur : 401 (non connecté), 403 (rôle insuffisant), 400 (nom manquant).
+ * Effets de bord DB : INSERT dans crg_classes.
+ */
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { getSessionUser } from '@/lib/auth';
 import { randomBytes } from 'crypto';
 
+/**
+ * Génère un code d'adhésion aléatoire de 6 caractères (alphabet sans ambiguïté).
+ * @returns Code de classe en majuscules (ex. "AB3CD7").
+ */
 function generateCode(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   let code = '';
@@ -10,6 +28,11 @@ function generateCode(): string {
   return code;
 }
 
+/**
+ * Liste les classes visibles selon le rôle de l'appelant.
+ * @param req Requête HTTP GET (cookie `crg_session`).
+ * @returns 200 { ok, classes } ; 401 si non connecté.
+ */
 export async function GET(req: NextRequest) {
   const token = req.cookies.get('crg_session')?.value;
   if (!token) return NextResponse.json({ error: 'Non autorisé' }, { status: 401 });
@@ -49,6 +72,11 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ ok: true, classes });
 }
 
+/**
+ * Crée une nouvelle classe avec un code d'adhésion unique.
+ * @param req Requête HTTP POST, body { name, niveau? }.
+ * @returns 200 { ok, id, code } ; 401/403/400 selon l'erreur.
+ */
 export async function POST(req: NextRequest) {
   const token = req.cookies.get('crg_session')?.value;
   if (!token) return NextResponse.json({ error: 'Non autorisé' }, { status: 401 });

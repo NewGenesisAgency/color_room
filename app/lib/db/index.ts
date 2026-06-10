@@ -1,3 +1,14 @@
+/**
+ * @file lib/db/index.ts
+ * @brief Accès à la base SQLite (better-sqlite3) : singleton, chemin et migrations.
+ *
+ * Fournit un client SQLite unique (singleton) pour toute l'application. Le
+ * chemin de la base est résolu dans l'ordre : variable COLOR_ROOM_DB_PATH,
+ * puis /data/ColorRoomDB.db (montage Docker), puis un emplacement local. Au
+ * premier accès, migrate() crée les tables manquantes (CREATE TABLE IF NOT
+ * EXISTS) : utilisateurs, sessions, classes, scores, jeux, conversations IA,
+ * sessions multijoueur, parties Puissance 4, etc. better-sqlite3 est synchrone.
+ */
 import Database from 'better-sqlite3';
 import fs from 'node:fs';
 import path from 'node:path';

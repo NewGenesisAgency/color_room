@@ -1,5 +1,18 @@
 'use client';
 
+/**
+ * @file app/_components/CS160Panel.tsx
+ * @brief Panneau de pilotage du colorimètre CS-160 (connexion, mesure, calibration).
+ *
+ * Composant React "dark glass" qui expose toute l'interface utilisateur du
+ * colorimètre CS-160 via le service `cs160Service` : connexion / déconnexion,
+ * mesure One-Shot (affichage Lvxy et XYZ), commande du rétroéclairage, choix du
+ * canal de calibration actif et lancement des calibrations RGB (3 références XYZ)
+ * ou Single Point (référence blanc Lv,x,y). Tous les retours sont affichés dans
+ * une zone de log. La seule prop est `className` pour styliser le conteneur ; le
+ * composant gère lui-même son état (connexion, valeurs de référence, etc.).
+ */
+
 import { useState, useCallback } from 'react';
 import {
   cs160Service,
@@ -81,10 +94,18 @@ const D: Record<string, React.CSSProperties> = {
   },
 };
 
+/** Props du panneau CS-160. */
 interface CS160PanelProps {
+  /** Classe CSS appliquée au conteneur racine (pour positionnement/largeur). */
   className?: string;
 }
 
+/**
+ * Panneau de contrôle complet du colorimètre CS-160.
+ *
+ * @param className Classe CSS optionnelle ajoutée au conteneur racine.
+ * @returns L'interface de connexion, de mesure et de calibration du CS-160.
+ */
 export default function CS160Panel({ className = '' }: CS160PanelProps) {
   const [isConnected, setIsConnected]     = useState(false);
   const [isConnecting, setIsConnecting]   = useState(false);

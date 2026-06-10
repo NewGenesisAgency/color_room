@@ -1,5 +1,18 @@
 'use client';
 
+/**
+ * @file app/_components/GameLibreRGB.tsx
+ * @brief Mode Libre RGB : exploration libre des couleurs sur les dalles (sans score).
+ *
+ * Bac à sable sans manche ni score. Le joueur règle une couleur via 3 sliders
+ * R/G/B (0-255) ou un champ hexadécimal, choisit la zone à éclairer (toutes les
+ * dalles / salle gauche / salle droite) et voit la couleur projetée en temps réel
+ * (debounce) sur les dalles. Le point correspondant se déplace sur le diagramme
+ * {@link CieDiagramCanvas} (CIE 1931) et un historique des 8 dernières couleurs
+ * permet de rappeler ses favoris. Reçoit `onSendColor`, `onTurnOffAll` et `onQuit`
+ * via {@link GameTileProps}.
+ */
+
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { X } from 'lucide-react';
 import type { GameTileProps } from './GameColorSpeed';
@@ -69,6 +82,13 @@ const zonBtnStyle = (active: boolean): React.CSSProperties => ({
 });
 
 // ── Composant ─────────────────────────────────────────────────────────────────
+/**
+ * Composant du Mode Libre RGB.
+ *
+ * @param props Props communes des jeux de dalles (voir {@link GameTileProps}) ;
+ *              seuls `onSendColor`, `onTurnOffAll` et `onQuit` sont utilisés.
+ * @returns L'interface d'exploration libre (sliders, zone, diagramme CIE, historique).
+ */
 export default function GameLibreRGB({ onSendColor, onTurnOffAll, onQuit }: GameTileProps) {
   const [r, setR] = useState(128);
   const [g, setG] = useState(80);

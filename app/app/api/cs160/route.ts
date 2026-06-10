@@ -1,6 +1,25 @@
+/**
+ * @file app/api/cs160/route.ts
+ * @brief Proxy applicatif vers le pont (bridge) du colorimètre CS-160.
+ *
+ * GET  : query `action`. 'status' -> état de connexion du pont
+ *        ({ success, connected, device, port, error }) ; 'samples' -> données
+ *        stockées par le pont. Action inconnue -> 400.
+ * POST : body JSON { action }. 'connect' / 'disconnect' pilotent l'appareil ;
+ *        'measure' lance une mesure et, en cas d'échec, tente une auto-connexion
+ *        puis un nouvel essai, et normalise la réponse en { success, data }.
+ *        Action inconnue -> 400.
+ * Codes d'erreur : 400 (action inconnue), 500 (exception/réseau).
+ * Effets de bord : appels réseau sortants vers le service KonicaBridge CS-160.
+ */
 import { NextRequest, NextResponse } from 'next/server';
 import { cs160Bridge } from './bridge';
 
+/**
+ * Lit l'état ou les échantillons du pont CS-160.
+ * @param req Requête HTTP GET, query `action` ('status' | 'samples').
+ * @returns 200 avec la charge utile selon l'action ; 400/500 sinon.
+ */
 export async function GET(req: NextRequest) {
   const action = new URL(req.url).searchParams.get('action');
   try {
@@ -28,6 +47,12 @@ export async function GET(req: NextRequest) {
   }
 }
 
+/**
+ * Pilote l'appareil CS-160 (connexion, déconnexion, mesure).
+ * @param req Requête HTTP POST, body { action } ('connect'|'disconnect'|'measure').
+ * @returns 200 avec le résultat du pont (mesure normalisée en { success, data }) ;
+ *          400 (action inconnue) / 500 (erreur).
+ */
 export async function POST(req: NextRequest) {
   try {
     const { action } = await req.json();

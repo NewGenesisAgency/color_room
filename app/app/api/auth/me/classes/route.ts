@@ -1,7 +1,20 @@
+/**
+ * @file app/api/auth/me/classes/route.ts
+ * @brief Liste les classes auxquelles appartient l'utilisateur courant.
+ *
+ * GET : lit le cookie `crg_session`. Si connecté, renvoie { classes } où chaque
+ *       entrée est { name, niveau } (jointure crg_class_members/crg_classes,
+ *       triée par nom). Si non connecté ou erreur, renvoie { classes: [] }.
+ */
 import { NextRequest, NextResponse } from 'next/server';
 import { getSessionUser } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 
+/**
+ * Récupère les classes de l'utilisateur courant.
+ * @param req Requête HTTP GET (cookie `crg_session`).
+ * @returns 200 { classes } (vide si non authentifié).
+ */
 export async function GET(req: NextRequest) {
   const token = req.cookies.get('crg_session')?.value;
   if (!token) return NextResponse.json({ classes: [] });

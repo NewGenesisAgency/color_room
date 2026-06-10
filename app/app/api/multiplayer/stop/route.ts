@@ -1,3 +1,12 @@
+/**
+ * @file app/api/multiplayer/stop/route.ts
+ * @brief Arrête la session multijoueur en cours (réservé au siège 1).
+ *
+ * POST : body JSON { token }. Seul le joueur du siège 1 peut arrêter la session.
+ *        Renvoie { ok, sessionId } en cas de succès.
+ * Codes d'erreur : 400 (token manquant), 403 (non siège 1), 500 (erreur).
+ * Effets de bord : passage de la session à l'état arrêté.
+ */
 import { NextResponse } from 'next/server';
 
 import { stopSession } from '@/lib/multiplayer';
@@ -8,6 +17,11 @@ type StopResponse =
   | { ok: true; sessionId: string }
   | { ok: false; error: string };
 
+/**
+ * Arrête la session multijoueur courante.
+ * @param req Requête HTTP POST, body { token } (doit être le siège 1).
+ * @returns 200 { ok, sessionId } ; 400/403/500 selon l'erreur.
+ */
 export async function POST(req: Request) {
   const body = (await req.json().catch(() => ({}))) as StopRequest;
   const token = typeof body.token === 'string' ? body.token : '';

@@ -1,4 +1,15 @@
 'use client';
+/**
+ * @file app/editeur/PythonEditor.tsx
+ * @brief Éditeur de code Python intégré (Pyodide) pour piloter les dalles.
+ *
+ * Onglet « Python » de l'éditeur : zone de code avec coloration légère,
+ * autocomplétion de l'API `colorroom` et exécution via Pyodide (Python
+ * compilé en WebAssembly). Le code communique avec le jeu/les dalles à travers
+ * un pont (PyBridge) : envoi de couleurs, lecture/écriture de variables, score,
+ * émission d'événements. Pyodide est chargé hors-ligne en priorité (fichiers
+ * embarqués au build, cf. lib/pyodide.ts), avec repli CDN en développement.
+ */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BookOpen, ChevronDown, ChevronUp, X, Play, Square, Trash2, FileCode, Lightbulb, Check } from 'lucide-react';
 

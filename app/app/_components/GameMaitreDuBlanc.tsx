@@ -1,5 +1,18 @@
 'use client';
 
+/**
+ * @file app/_components/GameMaitreDuBlanc.tsx
+ * @brief Mini-jeu "Maître du Blanc" : reproduire une teinte de blanc cible aux sliders R/G/B.
+ *
+ * La moitié gauche des dalles affiche un blanc cible (température de couleur tirée
+ * de la liste {@link TARGETS}, ex. 2700K, 6500K…). Le joueur règle ses sliders
+ * R/G/B et la moitié droite des dalles reflète sa proposition en temps réel. Le
+ * score d'une manche est calculé sur la distance dans l'espace XYZ entre les deux
+ * couleurs (seuil de réussite dépendant de la difficulté). Affiche les coordonnées
+ * x, y, Y live vs cible et une jauge de distance. Reçoit les callbacks de pilotage
+ * des dalles et de scoring via {@link GameTileProps}.
+ */
+
 import { useEffect, useRef, useState } from 'react';
 import type { GameTileProps } from './GameColorSpeed';
 import { DIFF_LABELS, type DifficultyLevel } from './GameColorSpeed';
@@ -108,6 +121,12 @@ const P: Record<string, React.CSSProperties> = {
   },
 };
 
+/**
+ * Composant du mini-jeu Maître du Blanc.
+ *
+ * @param props Props communes des jeux de dalles (voir {@link GameTileProps}).
+ * @returns Les écrans ready / en jeu / résultat / fin du jeu de reproduction de blanc.
+ */
 export default function GameMaitreDuBlanc({ onSendColor, onTurnOff, onTurnOffAll, onQuit, tileCount = 42, onComplete, difficulty = 'moyen' }: GameTileProps) {
   const cfg = BLANC_DIFF[difficulty];
   const TOTAL_ROUNDS = cfg.rounds;

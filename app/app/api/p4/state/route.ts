@@ -1,6 +1,20 @@
+/**
+ * @file app/api/p4/state/route.ts
+ * @brief Renvoie l'état courant d'une salle de Puissance 4 (polling client).
+ *
+ * GET : query `roomId` (requis) et `token` (optionnel, pour déduire `you`).
+ *       Renvoie { ok, roomId, status, board, turn, winner, you, players, updatedAt }
+ *       où `players` indique la présence des joueurs R et J.
+ * Codes d'erreur : 400 (roomId manquant), 404 (salle introuvable).
+ */
 import { NextResponse } from 'next/server';
 import { inferPlayer, parseBoard, readRoom } from '../_shared';
 
+/**
+ * Lit l'état d'une salle P4.
+ * @param req Requête HTTP GET, query `roomId` (requis), `token` (optionnel).
+ * @returns 200 { ok, ... } décrit dans l'en-tête ; 400/404 selon l'erreur.
+ */
 export async function GET(req: Request) {
   const url = new URL(req.url);
   const roomId = url.searchParams.get('roomId');

@@ -1,5 +1,17 @@
-// Chargeur Pyodide partagé (éditeur + /jeux). Charge UNE fois, met en cache.
-// Hors-ligne d'abord : /pyodide/ est embarqué au build Docker ; fallback CDN en dev.
+/**
+ * @file lib/pyodide.ts
+ * @brief Chargeur Pyodide partagé (éditeur + /jeux), avec cache et mode hors-ligne.
+ *
+ * Pyodide (Python compilé en WebAssembly) permet d'exécuter du code Python dans
+ * le navigateur. Stratégie de chargement :
+ *   1. HORS-LIGNE d'abord : les fichiers cœur sont embarqués dans /pyodide/
+ *      (téléchargés au build Docker, cf. scripts/fetch-pyodide.mjs) → le Pi
+ *      n'a pas besoin d'internet au runtime.
+ *   2. Repli CDN (jsdelivr) en développement local si la copie locale est absente.
+ *
+ * L'instance est chargée UNE seule fois puis mise en cache (getPyodide est
+ * idempotent et peut être appelé en concurrence).
+ */
 
 const VERSION = '0.27.4';
 const LOCAL = '/pyodide/';

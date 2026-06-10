@@ -1,14 +1,45 @@
 'use client';
 
+/**
+ * @file app/configuration/page.tsx
+ * @brief Page de configuration des APIs et de contrôle direct des canaux LED.
+ *
+ * Permet de modifier « à chaud » (sans redémarrer le serveur) les adresses des
+ * deux APIs externes : la Supervision (pilotage des 42 dalles) et la CS-160
+ * (colorimètre Konica). Les URLs sont chargées et enregistrées via /api/config,
+ * puis testées via /api/health. La page propose aussi un panneau de contrôle
+ * direct des 32 canaux spectraux d'une dalle (ou de toutes) : des sliders
+ * envoient les valeurs (debounce 200 ms) via /api/supervision/batch. Enfin, une
+ * section « Notes » donne les commandes PowerShell pour ouvrir/rediriger les
+ * ports Windows nécessaires à la Supervision.
+ */
+
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { SlidersHorizontal, Save, RotateCcw, Activity, CheckCircle2, XCircle, Loader2, Terminal, Copy, Check, Sliders, Zap, Moon } from 'lucide-react';
 import NavigationMenu from '@/app/_components/NavigationMenu';
 import { CHANNELS_ROUGE, CHANNELS_BLEU, getPlateType, type TileType } from '@/lib/tileChannels';
 
+/**
+ * @brief Convertit une couleur RGB normalisée (0..1) en chaîne hexadécimale.
+ *
+ * @param r Composante rouge (0..1).
+ * @param g Composante verte (0..1).
+ * @param b Composante bleue (0..1).
+ * @returns La couleur au format '#rrggbb'.
+ */
 function rgbToHex(r: number, g: number, b: number): string {
   return '#' + [r, g, b].map(v => Math.round(v * 255).toString(16).padStart(2, '0')).join('');
 }
 
+/**
+ * @brief Construit les métadonnées d'affichage (libellé + couleur) des canaux.
+ *
+ * Préfixe le libellé de la longueur d'onde (nm) si disponible et convertit la
+ * couleur RGB du canal en hexadécimal pour la pastille colorée du slider.
+ *
+ * @param channels Table de canaux (CHANNELS_ROUGE ou CHANNELS_BLEU).
+ * @returns Un tableau d'objets { label, color } parallèle aux canaux.
+ */
 function buildChannelMeta(channels: typeof CHANNELS_ROUGE) {
   return channels.map(ch => ({
     label: ch.nm != null ? `${ch.label} ${ch.nm}nm` : ch.label,
@@ -16,12 +47,24 @@ function buildChannelMeta(channels: typeof CHANNELS_ROUGE) {
   }));
 }
 
+/** @brief Instantané d'une URL d'API : valeur courante, source et valeur par défaut. */
 type ApiSnapshot = { value: string; source: string; default: string };
+/** @brief Instantané de configuration des deux APIs (supervision + cs160). */
 type ConfigSnapshot = { supervision: ApiSnapshot; cs160: ApiSnapshot };
 
+/** @brief Résultat de test de joignabilité d'une API (statut HTTP, latence, erreur). */
 type HealthApi = { url: string; reachable: boolean; httpStatus?: number; ms: number; error?: string };
+/** @brief Résultat global du test /health pour les deux APIs (ou null si non testé). */
 type HealthResult = { supervision: HealthApi; cs160: HealthApi; allReachable: boolean } | null;
 
+/**
+ * @brief Composant de la page de configuration.
+ *
+ * Gère le chargement/enregistrement des URLs d'API (/api/config), le test de
+ * santé (/api/health) et l'envoi des 32 canaux LED (/api/supervision/batch).
+ *
+ * @returns L'arbre JSX de la page de configuration.
+ */
 export default function ConfigurationPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -42,6 +85,7 @@ export default function ConfigurationPage() {
   const [channelMsg, setChannelMsg] = useState('');
   const sendTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  /** @brief Charge la configuration courante des URLs d'API depuis /api/config. */
   const loadConfig = useCallback(async () => {
     setLoading(true);
     try {
@@ -63,6 +107,9 @@ export default function ConfigurationPage() {
 
   useEffect(() => { void loadConfig(); }, [loadConfig]);
 
+  /**
+   * @brief Enregistre les URLs saisies via POST /api/config, puis relance un test.
+   */
   async function handleSave() {
     setSaving(true); setError(''); setSavedMsg('');
     try {
@@ -85,6 +132,7 @@ export default function ConfigurationPage() {
     }
   }
 
+  /** @brief Teste la joignabilité des deux APIs via GET /api/health?full=1. */
   const handleTest = useCallback(async () => {
     setTesting(true); setHealth(null);
     try {
@@ -98,7 +146,15 @@ export default function ConfigurationPage() {
     }
   }, []);
 
-  // Envoie les valeurs des 32 canaux via /api/supervision/batch
+  /**
+   * @brief Envoie les valeurs des 32 canaux via /api/supervision/batch.
+   *
+   * Clampe chaque valeur dans [0,255] puis cible soit toutes les dalles (1..42)
+   * si plate vaut 0, soit la dalle indiquée.
+   *
+   * @param chans Tableau des 32 valeurs de canaux.
+   * @param plate Identifiant de dalle ciblée (0 = toutes).
+   */
   const sendChannels = useCallback(async (chans: number[], plate: number) => {
     setSendingChannels(true); setChannelMsg('');
     const channelArray = chans.map((v, i) => ({ index: i, value: Math.max(0, Math.min(255, Math.round(v))) }));
@@ -118,7 +174,12 @@ export default function ConfigurationPage() {
     finally { setSendingChannels(false); }
   }, []);
 
-  // Envoi auto avec debounce 200 ms quand un slider change
+  /**
+   * @brief Met à jour un canal et planifie un envoi auto (debounce 200 ms).
+   *
+   * @param idx Index du canal (0..31).
+   * @param val Nouvelle valeur du canal (0..255).
+   */
   function setChannel(idx: number, val: number) {
     const next = channels.map((v, i) => i === idx ? val : v);
     setChannels(next);
@@ -126,6 +187,11 @@ export default function ConfigurationPage() {
     sendTimeoutRef.current = setTimeout(() => sendChannels(next, targetPlate), 200);
   }
 
+  /**
+   * @brief Réinitialise un champ d'URL à sa valeur par défaut.
+   *
+   * @param which API concernée ('supervision' ou 'cs160').
+   */
   function resetField(which: 'supervision' | 'cs160') {
     if (!snapshot) return;
     if (which === 'supervision') setSupervisionUrl(snapshot.supervision.default);
@@ -309,6 +375,13 @@ export default function ConfigurationPage() {
   );
 }
 
+/**
+ * @brief Bloc de commande shell copiable (libellé + code + bouton « copier »).
+ *
+ * @param label Description de l'étape affichée au-dessus de la commande.
+ * @param command La commande à afficher et à copier dans le presse-papier.
+ * @returns Le bloc JSX de commande avec retour visuel de copie.
+ */
 function CommandLine({ label, command }: { label: string; command: string }) {
   const [copied, setCopied] = useState(false);
   const copy = async () => {
@@ -334,6 +407,19 @@ function CommandLine({ label, command }: { label: string; command: string }) {
   );
 }
 
+/**
+ * @brief Champ de saisie d'une URL d'API avec libellé, source, reset et état de santé.
+ *
+ * @param title Titre de l'API.
+ * @param hint Indication courte (endpoint de test, etc.).
+ * @param value Valeur courante de l'URL.
+ * @param onChange Callback appelé à chaque modification du champ.
+ * @param source Origine de la valeur (variable d'env, défaut, override…).
+ * @param defVal Valeur par défaut, utilisée comme placeholder.
+ * @param onReset Callback de réinitialisation à la valeur par défaut.
+ * @param health Résultat de test de joignabilité, affiché s'il est présent.
+ * @returns La carte JSX du champ d'API.
+ */
 function ApiField({ title, hint, value, onChange, source, defVal, onReset, health }: {
   title: string; hint: string; value: string; onChange: (v: string) => void;
   source?: string; defVal?: string; onReset: () => void; health?: HealthApi;

@@ -1,7 +1,25 @@
+/**
+ * @file app/api/games/route.ts
+ * @brief Collection des jeux éditables : liste, création et purge globale.
+ *
+ * GET    : liste jusqu'à 100 jeux triés par date de mise à jour décroissante.
+ *          Renvoie { ok, games } où chaque jeu a { id, createdAt, updatedAt,
+ *          name, kind, config }.
+ * POST   : crée un jeu. Body JSON { name, kind, config? }. name et kind sont
+ *          obligatoires (400 sinon). Renvoie { ok, game } ; 500 si la création
+ *          échoue.
+ * DELETE : vide entièrement les tables des jeux et des flows. Renvoie
+ *          { ok, deleted: true }.
+ * Effets de bord DB : INSERT (POST) ; DELETE total sur crg_games et crg_flows.
+ */
 import { NextResponse } from 'next/server';
 
 import { getDb } from '@/lib/db';
 
+/**
+ * Supprime tous les jeux et tous les flows.
+ * @returns 200 { ok, deleted: true }.
+ */
 export async function DELETE() {
   const db = getDb();
   db.prepare('DELETE FROM crg_games;').run();
@@ -18,10 +36,18 @@ type GameRow = {
   config_json: string;
 };
 
+/**
+ * Génère un identifiant de jeu aléatoire (base36 horodaté + suffixe aléatoire).
+ * @returns Une chaîne d'identifiant unique.
+ */
 function randomId(): string {
   return `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
 }
 
+/**
+ * Liste les jeux les plus récemment modifiés.
+ * @returns 200 { ok, games }.
+ */
 export async function GET() {
   const db = getDb();
   const rows = db
@@ -46,6 +72,11 @@ type CreateGameResponse =
   | { ok: true; game: { id: string; createdAt: string; updatedAt: string; name: string; kind: string; config: unknown } }
   | { ok: false; error: string };
 
+/**
+ * Crée un nouveau jeu à partir du corps de requête.
+ * @param req Requête HTTP POST, body { name, kind, config? }.
+ * @returns 200 { ok, game } ; 400 si name/kind manquant ; 500 si l'insertion échoue.
+ */
 export async function POST(req: Request) {
   const body = (await req.json().catch(() => ({}))) as CreateGameRequest;
   const name = String(body.name ?? '').trim();

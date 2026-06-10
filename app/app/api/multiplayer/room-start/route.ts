@@ -1,6 +1,21 @@
+/**
+ * @file app/api/multiplayer/room-start/route.ts
+ * @brief Démarre la partie d'un salon multijoueur (réservé à l'hôte).
+ *
+ * POST : body JSON { token }. Le token doit être celui de l'hôte du salon.
+ *        Lance la partie et renvoie { ok, ...result } (état initial).
+ * Codes d'erreur : 400 (token manquant), 403 (non hôte ou salon introuvable),
+ *        500 (erreur).
+ * Effets de bord : transition du salon vers l'état « en cours ».
+ */
 import { NextResponse } from 'next/server';
 import { startRoomGame } from '@/lib/multiplayer';
 
+/**
+ * Lance la partie pour le salon de l'hôte identifié par son token.
+ * @param req Requête HTTP POST, body { token }.
+ * @returns 200 { ok, ...result } ; 400/403/500 selon l'erreur.
+ */
 export async function POST(req: Request) {
   try {
     const body = await req.json() as { token?: string };

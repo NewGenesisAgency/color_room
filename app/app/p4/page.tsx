@@ -1,5 +1,22 @@
 'use client';
 
+/**
+ * @file app/p4/page.tsx
+ * @brief Manette téléphone pour le jeu multijoueur « Puissance 4 » de la Color Room.
+ *
+ * Page de contrôle côté joueur (smartphone) ouverte via un QR code affiché
+ * dans la salle. Le joueur rejoint une partie identifiée par le paramètre
+ * d'URL `room`, reçoit un jeton et une couleur de jeton (Rouge ou Jaune),
+ * puis joue en choisissant une colonne. Aucun plateau n'est rendu à l'écran :
+ * la grille réelle est affichée sur les dalles de la Color Room.
+ *
+ * États principaux : siège/jeton (token, disc), plateau (board), tour (turn),
+ * vainqueur (winner) et statut de partie (waiting/playing/finished). La page
+ * dialogue avec l'API REST /api/p4/* : `join` (rejoindre), `state` (polling
+ * de l'état toutes les secondes) et `move` (déposer un jeton). Le jeton est
+ * persisté en localStorage pour résister au rafraîchissement.
+ */
+
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 const COLS = 6;
@@ -8,8 +25,20 @@ const ROWS = 7;
 const COLOR_R = '#ff1818';   // rouge
 const COLOR_J = '#ffc400';   // jaune
 
+/**
+ * @brief Contenu d'une case du plateau : vide, jeton Rouge ('R') ou Jaune ('J').
+ */
 type Cell = '' | 'R' | 'J';
 
+/**
+ * @brief Composant de la manette téléphone Puissance 4.
+ *
+ * Gère le cycle complet : lecture de la salle dans l'URL, rejoindre la
+ * partie (ou restaurer le siège au refresh), polling de l'état serveur et
+ * envoi des coups. Affiche une bannière d'état et six boutons de colonnes.
+ *
+ * @returns L'arbre JSX de la manette joueur.
+ */
 export default function P4PhonePage() {
   const [roomId, setRoomId] = useState('');
   const [token, setToken] = useState('');
@@ -58,6 +87,14 @@ export default function P4PhonePage() {
     return () => { alive = false; };
   }, [roomId]);
 
+  /**
+   * @brief Joue un coup en déposant un jeton dans une colonne.
+   *
+   * Ne fait rien si la partie n'est pas en cours ou si ce n'est pas le tour
+   * du joueur. Envoie le coup à /api/p4/move et met à jour l'état local.
+   *
+   * @param col Index (0-based) de la colonne choisie.
+   */
   const play = useCallback(async (col: number) => {
     if (!token || winner || status !== 'playing' || turn !== disc) return;
     try {

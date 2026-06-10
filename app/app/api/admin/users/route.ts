@@ -1,8 +1,27 @@
+/**
+ * @file app/api/admin/users/route.ts
+ * @brief Gestion des comptes utilisateurs réservée aux administrateurs et enseignants.
+ *
+ * GET  : liste les utilisateurs. Query optionnelle `role` pour filtrer par type.
+ *        Un admin voit tout le monde ; un enseignant ne voit que les apprenants
+ *        inscrits dans les classes qu'il a créées. Renvoie { ok, users }.
+ * POST : crée un compte enseignant ou admin (réservé à l'admin). Body JSON
+ *        { username, password (>=4 car.), role ('enseignant'|'admin'), avatarColor? }.
+ *        Renvoie { ok, id } ou une erreur 400/403/409.
+ * Codes d'erreur : 401 (non connecté), 403 (rôle insuffisant), 400 (validation),
+ *        409 (nom déjà pris).
+ * Effets de bord DB : insertion dans crg_users.
+ */
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { hashPassword, getSessionUser } from '@/lib/auth';
 import { randomBytes } from 'crypto';
 
+/**
+ * Vérifie que la requête provient d'un admin ou d'un enseignant authentifié.
+ * @param req Requête entrante (le cookie `crg_session` porte le jeton).
+ * @returns L'utilisateur de session si admin/enseignant, sinon null.
+ */
 function requireAdminOrProf(req: NextRequest) {
   const token = req.cookies.get('crg_session')?.value;
   if (!token) return null;
@@ -11,6 +30,11 @@ function requireAdminOrProf(req: NextRequest) {
   return user;
 }
 
+/**
+ * Liste les utilisateurs visibles par l'appelant.
+ * @param req Requête HTTP GET, query optionnelle `role` pour filtrer par user_type.
+ * @returns 200 { ok, users } ; 401 si non autorisé.
+ */
 export async function GET(req: NextRequest) {
   const me = requireAdminOrProf(req);
   if (!me) return NextResponse.json({ error: 'Non autorisé' }, { status: 401 });
@@ -36,6 +60,11 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ ok: true, users });
 }
 
+/**
+ * Crée un compte enseignant ou admin (réservé à l'admin).
+ * @param req Requête HTTP POST, body { username, password, role, avatarColor? }.
+ * @returns 200 { ok, id } ; 401/403/400/409 selon l'erreur.
+ */
 export async function POST(req: NextRequest) {
   const token = req.cookies.get('crg_session')?.value;
   if (!token) return NextResponse.json({ error: 'Non autorisé' }, { status: 401 });

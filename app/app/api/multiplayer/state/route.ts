@@ -1,3 +1,17 @@
+/**
+ * @file app/api/multiplayer/state/route.ts
+ * @brief Instantané d'état de la dernière session multijoueur (polling client).
+ *
+ * GET : query optionnelle `token` pour identifier l'appelant (siège `you`).
+ *       Récupère la session la plus récente, répare un état corrompu si besoin
+ *       (recrée une session), gère les transitions automatiques : démarrage du
+ *       lobby dès >= 2 joueurs (pose endsAtMs) et passage à 'finished' à
+ *       l'échéance. Renvoie { ok, sessionId, status, gameId, updatedAt, players,
+ *       you, state, readyBySeat, roomCode, roomName, mode, maxPlayers, difficulty }.
+ * Codes d'erreur : 404 (aucune session).
+ * Effets de bord DB : UPDATE de crg_mp_sessions (démarrage/fin automatiques),
+ *       touchPlayer met à jour last_seen_at du joueur.
+ */
 import { NextResponse } from 'next/server';
 
 import { getLatestSession, listPlayers, listPlayersWithReady, getSessionMetadata, startNewSession, touchPlayer, type MpSeat } from '@/lib/multiplayer';
@@ -22,6 +36,11 @@ type StateResponse =
     }
   | { ok: false; error: string };
 
+/**
+ * Renvoie l'état courant de la dernière session multijoueur.
+ * @param req Requête HTTP GET, query optionnelle `token` (identifie `you`).
+ * @returns 200 { ok, ... } décrit dans l'en-tête ; 404 si aucune session.
+ */
 export async function GET(req: Request) {
   const url = new URL(req.url);
   const token = url.searchParams.get('token');

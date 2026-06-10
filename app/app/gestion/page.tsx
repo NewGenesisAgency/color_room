@@ -1,5 +1,22 @@
 'use client';
 
+/**
+ * @file app/gestion/page.tsx
+ * @brief Tableau de bord d'administration / espace enseignant (gestion).
+ *
+ * Page réservée aux rôles « admin » et « enseignant » (vérifiés via
+ * /api/auth/me). Organisée en trois onglets :
+ *  - Utilisateurs : liste des comptes, création de comptes enseignant/admin
+ *    (admin uniquement), réinitialisation de mot de passe, attribution de
+ *    niveau, suppression (admin) — via /api/admin/users.
+ *  - Classes : création/suppression de classes, code de classe copiable et
+ *    QR code de jonction, dépliage des membres et export CSV des scores par
+ *    classe — via /api/classes.
+ *  - Scores : liste filtrable des scores et export CSV global — via /api/scores.
+ * Les enseignants ne voient que leurs propres élèves/classes, les admins voient
+ * tout. La page n'interagit pas avec les dalles : elle gère les données métier.
+ */
+
 import { useEffect, useState } from 'react';
 import {
   Users, BookOpen, Trophy, Settings, Plus, Trash2, RefreshCw,
@@ -11,8 +28,10 @@ import { AvatarIcon } from '@/app/_components/avatarIcons';
 import QrCode from '@/app/_components/QrCode';
 import './gestion.css';
 
+/** @brief Rôle d'un utilisateur dans l'application. */
 type Role = 'admin' | 'enseignant' | 'apprenant';
 
+/** @brief Utilisateur de la session courante (issu de /api/auth/me). */
 type SessionUser = {
   id: string;
   username: string;
@@ -22,6 +41,7 @@ type SessionUser = {
   avatarIcon?: string;
 };
 
+/** @brief Ligne utilisateur telle que renvoyée par l'API d'administration. */
 type UserRow = {
   id: string;
   username: string;
@@ -32,6 +52,7 @@ type UserRow = {
   created_at: string;
 };
 
+/** @brief Ligne de classe (avec code de jonction et nombre de membres). */
 type ClassRow = {
   id: string;
   name: string;
@@ -41,6 +62,7 @@ type ClassRow = {
   member_count?: number;
 };
 
+/** @brief Membre (élève) d'une classe. */
 type Member = {
   id: string;
   username: string;
@@ -48,6 +70,7 @@ type Member = {
   avatar_color: string;
 };
 
+/** @brief Ligne de score d'une partie jouée. */
 type ScoreRow = {
   id: string;
   username: string;
@@ -56,37 +79,69 @@ type ScoreRow = {
   played_at: string;
 };
 
+/** @brief Niveaux scolaires disponibles (clés internes). */
 const NIVEAUX = ['college', 'lycee', 'universite', 'grand-public'];
+/** @brief Libellés affichables des niveaux scolaires. */
 const NIVEAU_LABELS: Record<string, string> = {
   college: 'Collège', lycee: 'Lycée', universite: 'Université', 'grand-public': 'Grand Public',
 };
 
+/**
+ * @brief Renvoie la couleur de fond d'avatar (couleur fournie ou bleu par défaut).
+ * @param color Couleur d'avatar de l'utilisateur.
+ * @returns Une couleur CSS exploitable.
+ */
 function avatarBg(color: string) {
   return color || '#4361ee';
 }
 
+/**
+ * @brief Calcule les initiales (2 lettres majuscules) d'un nom.
+ * @param name Nom d'utilisateur.
+ * @returns Les deux premières lettres en majuscules.
+ */
 function initials(name: string) {
   return name.slice(0, 2).toUpperCase();
 }
 
+/**
+ * @brief Renvoie l'icône Lucide associée à un rôle.
+ * @param role Rôle de l'utilisateur.
+ * @returns L'élément d'icône correspondant.
+ */
 function roleIcon(role: Role) {
   if (role === 'admin') return <Shield size={14} />;
   if (role === 'enseignant') return <GraduationCap size={14} />;
   return <UserCheck size={14} />;
 }
 
+/**
+ * @brief Renvoie la classe CSS du badge correspondant à un rôle.
+ * @param role Rôle de l'utilisateur.
+ * @returns La chaîne de classes CSS du badge.
+ */
 function roleBadgeClass(role: Role) {
   if (role === 'admin') return 'gest-badge gest-badge--admin';
   if (role === 'enseignant') return 'gest-badge gest-badge--prof';
   return 'gest-badge gest-badge--student';
 }
 
+/** @brief Libellés affichables des rôles. */
 const ROLE_LABELS: Record<Role, string> = {
   admin: 'Administrateur',
   enseignant: 'Enseignant',
   apprenant: 'Apprenant',
 };
 
+/**
+ * @brief Composant de la page de gestion (admin / enseignant).
+ *
+ * Vérifie l'identité et le rôle au montage, gère la navigation par onglets
+ * (utilisateurs / classes / scores) et orchestre tous les appels API métier
+ * (utilisateurs, classes, membres, scores) ainsi que les exports CSV.
+ *
+ * @returns L'arbre JSX du tableau de bord (ou un écran d'accès refusé).
+ */
 export default function GestionPage() {
   const [me, setMe] = useState<SessionUser | null>(null);
   const [checking, setChecking] = useState(true);
@@ -154,6 +209,7 @@ export default function GestionPage() {
     if (tab === 'scores') loadScores();
   }, [tab, me]);
 
+  /** @brief Charge la liste des utilisateurs depuis /api/admin/users. */
   async function loadUsers() {
     setUsersLoading(true);
     try {
@@ -163,6 +219,7 @@ export default function GestionPage() {
     } finally { setUsersLoading(false); }
   }
 
+  /** @brief Charge la liste des classes depuis /api/classes. */
   async function loadClasses() {
     setClassesLoading(true);
     try {
@@ -172,6 +229,10 @@ export default function GestionPage() {
     } finally { setClassesLoading(false); }
   }
 
+  /**
+   * @brief Charge (et met en cache) les membres d'une classe.
+   * @param classId Identifiant de la classe.
+   */
   async function loadClassMembers(classId: string) {
     if (classMembers[classId]) return;
     const r = await fetch(`/api/classes/${classId}`);
@@ -179,6 +240,7 @@ export default function GestionPage() {
     if (d.ok) setClassMembers(prev => ({ ...prev, [classId]: d.members ?? [] }));
   }
 
+  /** @brief Charge les scores (200 derniers, tous élèves) depuis /api/scores. */
   async function loadScores() {
     setScoresLoading(true);
     try {
@@ -188,6 +250,7 @@ export default function GestionPage() {
     } finally { setScoresLoading(false); }
   }
 
+  /** @brief Crée un compte (enseignant/admin) via POST /api/admin/users. */
   async function createUser() {
     if (!newUsername.trim() || newPassword.length < 4) return;
     setCreateUserLoading(true);
@@ -207,12 +270,18 @@ export default function GestionPage() {
     } finally { setCreateUserLoading(false); }
   }
 
+  /**
+   * @brief Supprime un compte après confirmation (DELETE /api/admin/users/:id).
+   * @param id Identifiant de l'utilisateur à supprimer.
+   * @param name Nom affiché dans la confirmation.
+   */
   async function deleteUser(id: string, name: string) {
     if (!confirm(`Supprimer le compte "${name}" ? Cette action est irréversible.`)) return;
     await fetch(`/api/admin/users/${id}`, { method: 'DELETE' });
     loadUsers();
   }
 
+  /** @brief Réinitialise le mot de passe de l'utilisateur ciblé (PATCH). */
   async function resetPassword() {
     if (!resetTarget || resetPwd.length < 4) return;
     setResetLoading(true);
@@ -230,6 +299,7 @@ export default function GestionPage() {
     } finally { setResetLoading(false); }
   }
 
+  /** @brief Attribue un niveau scolaire à l'utilisateur ciblé (PATCH). */
   async function assignNiveau() {
     if (!niveauTarget) return;
     setNiveauLoading(true);
@@ -244,6 +314,7 @@ export default function GestionPage() {
     } finally { setNiveauLoading(false); }
   }
 
+  /** @brief Crée une classe via POST /api/classes. */
   async function createClass() {
     if (!newClassName.trim()) return;
     setCreateClassLoading(true);
@@ -262,18 +333,36 @@ export default function GestionPage() {
     } finally { setCreateClassLoading(false); }
   }
 
+  /**
+   * @brief Supprime une classe après confirmation (DELETE /api/classes/:id).
+   * @param id Identifiant de la classe.
+   * @param name Nom affiché dans la confirmation.
+   */
   async function deleteClass(id: string, name: string) {
     if (!confirm(`Supprimer la classe "${name}" ?`)) return;
     await fetch(`/api/classes/${id}`, { method: 'DELETE' });
     loadClasses();
   }
 
+  /**
+   * @brief Copie un code de classe dans le presse-papier avec retour visuel.
+   * @param code Code de la classe à copier.
+   */
   function copyCode(code: string) {
     navigator.clipboard.writeText(code).catch(() => {});
     setCopiedCode(code);
     setTimeout(() => setCopiedCode(null), 2000);
   }
 
+  /**
+   * @brief Exporte en CSV les scores des élèves d'une classe.
+   *
+   * Croise les membres de la classe avec les scores chargés, puis déclenche le
+   * téléchargement d'un fichier CSV (encodé UTF-8 avec BOM).
+   *
+   * @param classId Identifiant de la classe.
+   * @param className Nom de la classe (utilisé pour le nom de fichier).
+   */
   function exportClassCSV(classId: string, className: string) {
     const members = classMembers[classId] ?? [];
     const classScores = scores.filter(s => members.some(m => m.username === s.username));
@@ -294,6 +383,9 @@ export default function GestionPage() {
     URL.revokeObjectURL(url);
   }
 
+  /**
+   * @brief Exporte en CSV l'ensemble des scores affichés et déclenche le téléchargement.
+   */
   function exportAllScoresCSV() {
     const rows = [
       ['Élève', 'Jeu', 'Score', 'Date'],

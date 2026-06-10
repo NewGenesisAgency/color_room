@@ -1,5 +1,18 @@
 'use client';
 
+/**
+ * @file app/_components/GamePuissance4.tsx
+ * @brief Mini-jeu "Puissance 4" joué sur la grille de dalles (2 joueurs ou contre l'IA).
+ *
+ * Implémente un Puissance 4 sur une grille 7×6 mappée sur les dalles physiques :
+ * chaque pion allumé colore une dalle (rouge pour J1, bleu pour J2). Gère le mode
+ * deux joueurs (pvp) ou contre l'ordinateur (cpu) avec une IA minimax dont la
+ * profondeur et le bruit dépendent de la difficulté (voir {@link DIFF_CONFIG}).
+ * Le clic sur une dalle (relayé via `onRegisterClickHandler`) dépose un pion dans
+ * la colonne correspondante. Reçoit les callbacks de pilotage des dalles via
+ * {@link GameTileProps} ; l'affichage du plateau à l'écran dépend de `SHOW_SCREEN_BOARD`.
+ */
+
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Brain, Circle, Cpu, Flame, Minus, Play, RotateCcw, Square, Star, Trophy, Users, Zap } from 'lucide-react';
 import type { GameTileProps } from './GameColorSpeed';
@@ -244,6 +257,13 @@ const DIFF_MAP: Record<string, Difficulty> = {
   facile: 'facile', moyen: 'moyen', difficile: 'difficile', expert: 'legendaire',
 };
 
+/**
+ * Composant du mini-jeu Puissance 4.
+ *
+ * @param props Props communes des jeux de dalles (voir {@link GameTileProps}) ;
+ *              `onRegisterClickHandler` reçoit le gestionnaire de clic sur dalle.
+ * @returns Les écrans ready / en jeu / fin du Puissance 4 sur dalles.
+ */
 export default function GamePuissance4({ onSendColor, onTurnOff, onTurnOffAll, onQuit, onRegisterClickHandler, onComplete, difficulty: externalDiff }: GameTileProps) {
   const [phase, setPhase]           = useState<Phase>('ready');
   const [mode, setMode]             = useState<Mode>('cpu');

@@ -1,5 +1,19 @@
 'use client';
 
+/**
+ * @file app/_components/GameCanalMix.tsx
+ * @brief Mini-jeu "Mix de Canaux" : reconstituer une couleur secrète mesurée au CS-160.
+ *
+ * La salle de dalles DROITE s'allume avec un mélange secret de 3 canaux LED
+ * spectraux. Le joueur vise une dalle avec le colorimètre CS-160, mesure sa
+ * chromaticité (x, y CIE), et la fonction d'inversion `findChannelWeights`
+ * recalcule automatiquement les poids des 3 canaux et positionne les sliders. La
+ * salle GAUCHE affiche en temps réel la reconstitution du joueur. À la validation,
+ * la distance xy entre le mélange du joueur et la cible donne le score. Le rendu
+ * s'appuie sur {@link CieDiagramCanvas} pour le diagramme et reçoit les callbacks
+ * de pilotage des dalles via {@link GameTileProps} (notamment `onSendRawChannels`).
+ */
+
 import { useCallback, useEffect, useRef, useState, useLayoutEffect } from 'react';
 import { Check, Ruler, X, RefreshCw } from 'lucide-react';
 import type { GameTileProps } from './GameColorSpeed';
@@ -199,11 +213,20 @@ const G: Record<string, React.CSSProperties> = {
 };
 
 // ── Props ─────────────────────────────────────────────────────────────────────
+/** Props du jeu Mix de Canaux (étend les props communes {@link GameTileProps}). */
 interface GameCanalMixProps extends GameTileProps {
+  /** Envoi de 32 valeurs de canaux brutes (0-100) à une dalle — requis ici. */
   onSendRawChannels: (tileIdx: number, channels: number[]) => void;
+  /** Type de plaque LED utilisé pour le profil des canaux (rouge ou bleu). */
   plateType?: TileType;
 }
 
+/**
+ * Composant du mini-jeu Mix de Canaux.
+ *
+ * @param props Props du jeu (voir {@link GameCanalMixProps} et {@link GameTileProps}).
+ * @returns Les écrans ready / en jeu / résultats du jeu de reconstitution de mélange.
+ */
 export default function GameCanalMix({
   onSendColor, onTurnOffAll, onQuit, onSendRawChannels, tileCount = 42, onComplete, plateType = 'rouge', difficulty = 'moyen',
 }: GameCanalMixProps) {

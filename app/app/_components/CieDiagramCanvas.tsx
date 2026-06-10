@@ -1,5 +1,20 @@
 'use client';
 
+/**
+ * @file app/_components/CieDiagramCanvas.tsx
+ * @brief Canvas réutilisable du diagramme de chromaticité CIE 1931 coloré.
+ *
+ * Rend le "fer à cheval" CIE 1931 avec son gamut peint pixel par pixel, le locus
+ * spectral, le triangle sRGB, les axes et le point blanc D65. Le rendu est séparé
+ * en deux couches : un fond statique dessiné une seule fois (par taille) et un
+ * overlay redessiné à chaque changement de `markers`/`polylines` — ce qui rend le
+ * déplacement de marqueurs (cible, mesure, point joueur) fluide. Utilisé par le
+ * widget de mesure CIE et par plusieurs jeux de couleur. Les props principales
+ * sont `markers` (points à afficher), `polylines` (tracés type triangle de
+ * canaux), `size` (côté du canvas) et `onPick` (callback de clic renvoyant les
+ * coordonnées x,y du diagramme).
+ */
+
 import { useEffect, useRef } from 'react';
 
 // Diagramme de chromaticité CIE 1931 COLORÉ (gamut peint pixel par pixel),
@@ -55,25 +70,45 @@ function insideLocus(px: number, py: number, poly: { x: number; y: number }[]): 
   return inside;
 }
 
+/** Marqueur ponctuel affiché sur le diagramme (cible, mesure, point joueur…). */
 export type CieMarker = {
+  /** Coordonnée x (chromaticité) du marqueur. */
   x: number;
+  /** Coordonnée y (chromaticité) du marqueur. */
   y: number;
   /** Couleur du remplissage. Par défaut : la couleur sRGB du point xy. */
   color?: string;
   ring?: boolean;        // anneau blanc autour
   crosshair?: boolean;   // viseur en pointillés
+  /** Étiquette texte affichée à côté du marqueur. */
   label?: string;
+  /** Rayon du marqueur en pixels (défaut : 8). */
   radius?: number;
 };
 
+/** Tracé (ligne brisée) optionnel superposé au diagramme, ex. triangle des canaux. */
 export type CiePolyline = {
+  /** Sommets du tracé en coordonnées de chromaticité. */
   points: { x: number; y: number }[];
+  /** Couleur du trait. */
   color?: string;
+  /** Épaisseur du trait. */
   width?: number;
+  /** Trait en pointillés si vrai. */
   dash?: boolean;
+  /** Ferme le tracé (relie le dernier point au premier) si vrai. */
   closed?: boolean;
 };
 
+/**
+ * Diagramme de chromaticité CIE 1931 rendu sur deux canvas superposés.
+ *
+ * @param markers Marqueurs ponctuels à dessiner (cible, mesure, etc.).
+ * @param polylines Tracés optionnels superposés (ex. triangle de canaux).
+ * @param size Côté du canvas carré en pixels (défaut : 360).
+ * @param onPick Callback appelé au clic avec les coordonnées (x, y) du diagramme ; active le curseur viseur.
+ * @returns Le diagramme CIE 1931 interactif.
+ */
 export default function CieDiagramCanvas({
   markers = [], polylines = [], size = 360, onPick,
 }: {

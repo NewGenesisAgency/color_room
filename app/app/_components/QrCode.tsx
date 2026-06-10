@@ -1,5 +1,16 @@
 'use client';
 
+/**
+ * @file app/_components/QrCode.tsx
+ * @brief QR code 100 % offline rendu en SVG côté client.
+ *
+ * Encapsule `QRCodeSVG` (qrcode.react) pour afficher un QR code sans aucune
+ * requête réseau, avec une légende optionnelle. Sert typiquement à encoder une URL
+ * sur le réseau local (Raspberry Pi) afin qu'un téléphone du même Wi-Fi puisse
+ * rejoindre une classe ou une partie. Props : `value` (contenu encodé), `size`,
+ * `caption`, `fgColor`, `bgColor`.
+ */
+
 import { QRCodeSVG } from 'qrcode.react';
 
 interface Props {

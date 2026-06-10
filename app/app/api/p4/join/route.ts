@@ -1,7 +1,23 @@
+/**
+ * @file app/api/p4/join/route.ts
+ * @brief Rejoint une salle de Puissance 4 et attribue une couleur de jeton.
+ *
+ * POST : body JSON { roomId }. Le 1er joueur reçoit le jeton R (rose), le 2e le
+ *        jeton J (bleu) — l'arrivée du 2e fait passer la salle en statut 'playing'.
+ *        Génère un token de joueur. Renvoie { ok, roomId, token, disc }.
+ * Codes d'erreur : 400 (roomId manquant), 404 (salle introuvable), 409 (salle
+ *        pleine ou conflit d'inscription concurrente).
+ * Effets de bord DB : UPDATE de crg_p4_rooms (attribution du token de joueur).
+ */
 import { NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { randomId, readRoom, type P4Disc } from '../_shared';
 
+/**
+ * Inscrit un joueur dans une salle P4 et lui assigne R ou J.
+ * @param req Requête HTTP POST, body { roomId }.
+ * @returns 200 { ok, roomId, token, disc } ; 400/404/409 selon l'erreur.
+ */
 // Un téléphone rejoint : 1er joueur = R (rose), 2e = J (bleu).
 export async function POST(req: Request) {
   const body = (await req.json().catch(() => ({}))) as { roomId?: string };

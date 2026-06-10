@@ -1,10 +1,25 @@
 /**
+ * @file app/_services/cs160.ts
+ * @brief Service client du colorimètre Konica Minolta CS-160.
+ *
+ * Fournit une interface TypeScript au colorimètre CS-160 en dialoguant avec la
+ * route API `/api/cs160` (qui fait le pont vers le SDK .NET / l'appareil). Expose la
+ * classe {@link CS160Service} et son instance singleton {@link cs160Service} :
+ * connexion/déconnexion, statut, mesure One-Shot (lecture XYZ et Lvxy), pilotage du
+ * rétroéclairage, sélection du canal de calibration actif et workflows de
+ * calibration RGB (3 références XYZ) et Single Point (référence blanc Lv,x,y). Définit
+ * aussi les types partagés {@link XYZ}, {@link Lvxy}, {@link CS160Status}, {@link CalibType}, etc.
+ *
+ * @note Toutes les méthodes échouent silencieusement (retournent false/null) si
+ *       l'appareil est indisponible — c'est attendu côté UI.
+ *
  * CS160 Colorimeter Service
- * 
+ *
  * This service provides a TypeScript interface to the Konica Minolta CS160
  * via the .NET SDK bridge or direct API calls.
  */
 
+/** Tristimulus CIE XYZ. */
 export interface XYZ {
   X: number;
   Y: number;
@@ -398,5 +413,6 @@ class CS160Service {
 }
 
 // Export singleton instance
+/** Instance singleton partagée du service CS-160 (à utiliser dans toute l'app). */
 export const cs160Service = new CS160Service();
 export default cs160Service;

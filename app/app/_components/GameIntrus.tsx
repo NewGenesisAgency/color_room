@@ -1,5 +1,18 @@
 'use client';
 
+/**
+ * @file app/_components/GameIntrus.tsx
+ * @brief Mini-jeu "L'Intrus" mode sniper : repérer au CS-160 la dalle légèrement différente.
+ *
+ * Toutes les dalles s'allument dans une couleur identique sauf une, à peine
+ * différente (luminosité ou teinte) — indétectable à l'œil et à l'écran (où tout
+ * est affiché identique). Le joueur sélectionne une dalle, l'analyse avec le
+ * colorimètre CS-160 (lecture x, y, Lv via l'API /api/cs160), compare les écarts
+ * de mesure entre dalles, puis accuse l'intrus. Course contre la montre : à chaque
+ * niveau l'écart devient plus subtil. Reçoit les callbacks de pilotage des dalles
+ * et de scoring via {@link GameTileProps}.
+ */
+
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Crosshair, Ruler, Target, Timer, Trophy, X } from 'lucide-react';
 import type { GameTileProps } from './GameColorSpeed';
@@ -68,6 +81,12 @@ const S: Record<string, React.CSSProperties> = {
   statLbl: { fontSize: 10, color: 'rgba(255,255,255,.4)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 3 },
 };
 
+/**
+ * Composant du mini-jeu L'Intrus.
+ *
+ * @param props Props communes des jeux de dalles (voir {@link GameTileProps}).
+ * @returns Les écrans ready / en jeu / fin du jeu de détection d'intrus.
+ */
 export default function GameIntrus({ onSendColor, onTurnOff, onTurnOffAll, onQuit, onComplete, onScoreDelta, tileCount = 42, difficulty = 'moyen' }: GameTileProps) {
   const cfg = INTRUS_DIFF[difficulty];
   const numTiles = Math.min(tileCount, CELLS);

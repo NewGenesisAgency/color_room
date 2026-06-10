@@ -1,4 +1,16 @@
 'use client';
+/**
+ * @file app/editeur/UIDesigner.tsx
+ * @brief Designer d'interface drag-and-drop des jeux de l'éditeur (façon Wix).
+ *
+ * Canevas 860×500 sur lequel on dépose et positionne des composants d'interface
+ * (UILayoutComponent) : bouton, texte, score, minuteur, diagramme CIE, sliders
+ * RGB, grille de plaques, D-pad, sprites, etc. — les mêmes éléments que /jeux et
+ * /mesure. Chaque composant est déplaçable (snap + anti-chevauchement), liable à
+ * une variable de jeu (varBind) et peut porter une action (eventId ou code
+ * Python `pyOnClick`). La disposition produite est rejouée à l'identique dans
+ * /jeux (HudUiOverlay). Exporte aussi SPRITE_ICONS et renderCustomSvg.
+ */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { MousePointerClick, Type, SlidersHorizontal, Trophy, Timer, Flag, Palette, Gauge, Crosshair, Gamepad2, LayoutGrid, Plus, ZoomIn, ZoomOut, Maximize, Trash2, Layers, Square, Circle, Image as ImageIcon, Minus, Heart, Users, CircleDot, Award, MessageSquare, Smile, Activity, Copy, Star, Check, X as XIcon, Zap, Bell, Crown, Target, Music, Sparkles, ThumbsUp, AlertTriangle, Sun, Moon, Lightbulb, Eye, Rocket, Brain, Puzzle, Shapes, type LucideIcon } from 'lucide-react';
 

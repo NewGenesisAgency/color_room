@@ -1,7 +1,23 @@
+/**
+ * @file app/api/ai/status/route.ts
+ * @brief Indique l'état de disponibilité du fournisseur d'IA (Gemini ou Ollama).
+ *
+ * GET : détermine le fournisseur actif puis vérifie qu'il est prêt. Pour Gemini,
+ *       contrôle la présence d'une clé valide. Pour Ollama, interroge /api/tags
+ *       (timeout 4 s) pour vérifier que le modèle attendu est chargé. Renvoie
+ *       { ok, provider, ready, model, message }. Permet à l'éditeur de démarrer
+ *       sans IA puis d'activer l'assistant dès que le modèle est prêt.
+ * Effets de bord : appel réseau sortant vers le serveur Ollama (mode ollama).
+ */
 import { NextResponse } from 'next/server';
 
 export const runtime = 'nodejs';
 
+/**
+ * Choisit le fournisseur d'IA actif d'après l'environnement.
+ * @returns 'gemini' si AI_PROVIDER l'impose ou si une clé Gemini valide existe,
+ *          sinon 'ollama'.
+ */
 function provider(): 'gemini' | 'ollama' {
   const p = (process.env.AI_PROVIDER || '').toLowerCase();
   if (p === 'ollama' || p === 'gemini') return p;

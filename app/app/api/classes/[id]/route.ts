@@ -1,7 +1,27 @@
+/**
+ * @file app/api/classes/[id]/route.ts
+ * @brief Détail et suppression d'une classe ciblée par son id.
+ *
+ * GET    : renvoie la classe et la liste de ses membres (réservé enseignant/admin).
+ *          Un enseignant ne peut consulter que ses propres classes. Renvoie
+ *          { ok, class, members } où chaque membre a { id, username, niveau,
+ *          avatar_color, joined_at }.
+ * DELETE : supprime la classe et ses adhésions (réservé enseignant/admin ;
+ *          un enseignant seulement pour ses propres classes). Renvoie { ok }.
+ * Codes d'erreur : 401 (non connecté), 403 (rôle/propriété insuffisants),
+ *          404 (classe introuvable).
+ * Effets de bord DB : DELETE sur crg_class_members puis crg_classes.
+ */
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { getSessionUser } from '@/lib/auth';
 
+/**
+ * Récupère une classe et la liste de ses membres.
+ * @param req Requête HTTP GET (cookie `crg_session`).
+ * @param params Promesse résolvant { id } : identifiant de la classe.
+ * @returns 200 { ok, class, members } ; 401/403/404 selon l'erreur.
+ */
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const token = req.cookies.get('crg_session')?.value;
   if (!token) return NextResponse.json({ error: 'Non autorisé' }, { status: 401 });
@@ -26,6 +46,12 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   return NextResponse.json({ ok: true, class: cls, members });
 }
 
+/**
+ * Supprime une classe et toutes ses adhésions.
+ * @param req Requête HTTP DELETE (cookie `crg_session`).
+ * @param params Promesse résolvant { id } : identifiant de la classe à supprimer.
+ * @returns 200 { ok } ; 401/403/404 selon l'erreur.
+ */
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const token = req.cookies.get('crg_session')?.value;
   if (!token) return NextResponse.json({ error: 'Non autorisé' }, { status: 401 });

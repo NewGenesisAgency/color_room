@@ -1,5 +1,18 @@
 'use client';
 
+/**
+ * @file app/jouer/page.tsx
+ * @brief Manette téléphone du mode multijoueur générique « 1 joueur = 1 plaque ».
+ *
+ * Page de contrôle côté joueur : on rejoint la session active, on reçoit un
+ * siège (= sa plaque dans la salle) et un jeton, puis on choisit librement
+ * une couleur qui s'allume en temps réel sur SA plaque. Dialogue avec l'API
+ * /api/multiplayer/* : `join` (rejoindre), `submit` (envoyer la couleur
+ * encodée 0xRRGGBB, avec debounce) et `state` (polling : nombre de joueurs,
+ * détection de fin de session). Le jeton et le siège sont persistés en
+ * localStorage pour restaurer la session après rafraîchissement.
+ */
+
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 /**
@@ -11,9 +24,23 @@ import { useCallback, useEffect, useRef, useState } from 'react';
  * entière soumise (0xRRGGBB) — aucun changement de schéma serveur requis.
  */
 
+/**
+ * @brief Compacte trois composantes RGB en un entier 0xRRGGBB.
+ *
+ * @param r Composante rouge (0–255).
+ * @param g Composante verte (0–255).
+ * @param b Composante bleue (0–255).
+ * @returns L'entier encodant la couleur, transmissible à l'API.
+ */
 function packRgb(r: number, g: number, b: number): number {
   return ((r & 255) << 16) | ((g & 255) << 8) | (b & 255);
 }
+/**
+ * @brief Convertit une couleur hexadécimale (#rrggbb) en composantes RGB.
+ *
+ * @param hex Chaîne hexadécimale, avec ou sans '#'. Retourne du blanc si invalide.
+ * @returns Un objet { r, g, b } avec des composantes 0–255.
+ */
 function hexToRgb(hex: string): { r: number; g: number; b: number } {
   const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
   if (!m) return { r: 255, g: 255, b: 255 };

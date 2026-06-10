@@ -1,5 +1,18 @@
 'use client';
 
+/**
+ * @file app/_components/GameMetamerisme.tsx
+ * @brief Mini-jeu "Métamérisme" : cacher ou révéler un mot coloré en changeant l'illuminant.
+ *
+ * Illustre le métamérisme : un mot de vocabulaire de physique de la lumière est
+ * affiché dans une couleur de premier plan (`fg`). Selon le mode de la manche, le
+ * joueur règle la couleur d'illumination des dalles pour soit CACHER le mot
+ * (rendre le texte indiscernable du fond) soit le RÉVÉLER (maximiser le contraste).
+ * Le score dépend de la distance colorimétrique obtenue par rapport au seuil du
+ * mode ({@link HIDE_WIN_DIST} / {@link REVEAL_WIN_DIST}). Course contre la montre
+ * par manche. Reçoit les callbacks de pilotage des dalles via {@link GameTileProps}.
+ */
+
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { GameTileProps } from './GameColorSpeed';
 import { DIFF_LABELS, type DifficultyLevel } from './GameColorSpeed';
@@ -149,6 +162,12 @@ const S: Record<string, React.CSSProperties> = {
 
 // ── Component ──────────────────────────────────────────────────────────────────
 
+/**
+ * Composant du mini-jeu Métamérisme.
+ *
+ * @param props Props communes des jeux de dalles (voir {@link GameTileProps}).
+ * @returns Les écrans ready / en jeu / fin du jeu cacher/révéler par illumination.
+ */
 export default function GameMetamerisme({
   onSendColor, onTurnOffAll, onQuit, tileCount = 42, onComplete, difficulty = 'moyen',
 }: GameTileProps) {

@@ -1,8 +1,24 @@
+/**
+ * @file app/api/spectre/advance/route.ts
+ * @brief Fait avancer la phase de jeu Spectre (réservé à l'hôte, siège 1).
+ *
+ * POST : body JSON { token, sessionId? }. Seul le joueur du siège 1 (hôte) peut
+ *        déclencher le passage à la phase suivante. Renvoie { ok, state,
+ *        sessionId, status }.
+ * Codes d'erreur : 400 (token manquant / avance impossible), 403 (non hôte),
+ *        500 (erreur).
+ * Effets de bord : transition de phase de la session Spectre.
+ */
 import { NextResponse } from 'next/server';
 import { advanceSpectrePhase, touchSpectrePlayer, getLatestSpectreSession } from '@/lib/spectre';
 
 type Body = { token: string; sessionId?: string };
 
+/**
+ * Avance la phase de la session Spectre de l'hôte.
+ * @param req Requête HTTP POST, body { token, sessionId? }.
+ * @returns 200 { ok, state, sessionId, status } ; 400/403/500 selon l'erreur.
+ */
 export async function POST(req: Request) {
   try {
     const body = (await req.json().catch(() => ({}))) as Body;

@@ -1,7 +1,8 @@
 import { getDb } from '@/lib/db';
 
 /**
- * Réglages applicatifs persistants (table crg_app_config).
+ * @file lib/settings.ts
+ * @brief Réglages applicatifs persistants (table crg_app_config).
  *
  * Priorité de résolution d'une URL d'API :
  *   1. valeur enregistrée en base (modifiable depuis la page Configuration)

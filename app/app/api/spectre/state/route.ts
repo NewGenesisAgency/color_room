@@ -1,6 +1,25 @@
+/**
+ * @file app/api/spectre/state/route.ts
+ * @brief Instantané d'état d'une session Spectre (polling client).
+ *
+ * GET : query optionnelle `token`. La session est résolue en priorité via le
+ *       token du joueur (et non « la dernière session globale ») pour ne pas
+ *       mélanger plusieurs parties. Avance automatiquement la phase si son minuteur
+ *       a expiré. Masque la couleur cible (targetR/G/B = -1) pendant la phase
+ *       'guess' pour empêcher la triche par inspection réseau. Renvoie { ok,
+ *       sessionId, roomCode, status, updatedAt, players, you, state }.
+ * Codes d'erreur : 404 (aucune session), 500 (erreur).
+ * Effets de bord : advanceSpectrePhase si le minuteur de phase est échu ;
+ *       touchSpectrePlayer met à jour la présence du joueur.
+ */
 import { NextResponse } from 'next/server';
 import { getLatestSpectreSession, getSpectreSessionById, listSpectrePlayers, touchSpectrePlayer, advanceSpectrePhase } from '@/lib/spectre';
 
+/**
+ * Renvoie l'état courant de la session Spectre du joueur (ou de la plus récente).
+ * @param req Requête HTTP GET, query optionnelle `token`.
+ * @returns 200 { ok, ... } décrit dans l'en-tête ; 404/500 selon l'erreur.
+ */
 export async function GET(req: Request) {
   try {
     const url = new URL(req.url);

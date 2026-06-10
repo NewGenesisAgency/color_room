@@ -1,5 +1,18 @@
 'use client';
 
+/**
+ * @file app/_components/Room3D.tsx
+ * @brief Rendu 3D (Three.js) ultra-réaliste de l'installation à deux salles de dalles.
+ *
+ * Affiche en WebGL les deux salles (gauche/droite) de dalles lumineuses de
+ * ColorRoom : architecture blanche, shader GLSL personnalisé par dalle (lueur
+ * interne, bords quasi invisibles, halos additifs), environnement HDR. Les couleurs
+ * et l'état allumé/éteint de chaque dalle sont pilotés par les props `plateColors`
+ * et `plateActive` (indexées comme le matériel) ; un clic sur une dalle remonte son
+ * index via `onPlateClick`. Gère plusieurs vues de caméra (vue d'ensemble, salle
+ * gauche, salle droite) animées avec GSAP. Props : voir {@link Room3DProps}.
+ */
+
 import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js';
@@ -149,14 +162,25 @@ function injectPanelShader(mat: THREE.MeshStandardMaterial) {
 
 type RV = 'overview' | 'left' | 'right';
 
+/** Props du rendu 3D de l'installation à deux salles. */
 export interface Room3DProps {
+  /** Couleur CSS de chaque dalle, indexée comme le matériel. */
   plateColors:  string[];
+  /** État allumé (true) / éteint (false) de chaque dalle. */
   plateActive:  boolean[];
+  /** Callback de clic sur une dalle ; reçoit son index. */
   onPlateClick?: (idx: number) => void;
+  /** Hauteur du canvas en pixels (défaut : 420). */
   height?: number;
 }
 
 // ─────────────────────────────────────────────────────────────────
+/**
+ * Rendu 3D des deux salles de dalles lumineuses.
+ *
+ * @param props Voir {@link Room3DProps}.
+ * @returns Le conteneur du rendu WebGL avec les contrôles de vue.
+ */
 export default function Room3D({ plateColors, plateActive, onPlateClick, height = 420 }: Room3DProps) {
   const mountRef = useRef<HTMLDivElement>(null);
   const leftRef  = useRef<HTMLDivElement>(null);

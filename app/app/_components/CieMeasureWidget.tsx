@@ -1,5 +1,18 @@
 'use client';
 
+/**
+ * @file app/_components/CieMeasureWidget.tsx
+ * @brief Widget de jeu de mesure colorimétrique au CS-160 sur diagramme CIE 1931.
+ *
+ * Affiche une cible de chromaticité (fixe ou aléatoire dans le locus) sur un
+ * `CieDiagramCanvas`, puis demande une mesure One-Shot au `cs160Service`. Compare
+ * la mesure à la cible via un ΔE76 (espace Lab), en déduit un score et un état
+ * de réussite selon une `tolerance`, et mémorise le meilleur score. Peut piloter
+ * les dalles via `onSendColor` (illumination de la cible) et générer de nouvelles
+ * cibles. Props principales : `targetX`/`targetY` (cible fixe), `randomTarget`,
+ * `tolerance`, `points` (barème), `onSendColor`/`onTurnOffAll` (interaction dalles).
+ */
+
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Crosshair, RefreshCcw, Ruler } from 'lucide-react';
 import cs160Service from '@/app/_services/cs160';
@@ -77,18 +90,34 @@ function randomTarget(): { x: number; y: number; rgb: { r: number; g: number; b:
   return { x: 0.6400, y: 0.3300, rgb: xyToRgb255(0.64, 0.33)! };
 }
 
+/** Props du widget de mesure CIE 1931. */
 export type CieMeasureWidgetProps = {
+  /** Coordonnée x de la cible (utilisée si `randomTarget` est faux ; défaut D65). */
   targetX?: number;
+  /** Coordonnée y de la cible (utilisée si `randomTarget` est faux ; défaut D65). */
   targetY?: number;
+  /** Seuil de ΔE en dessous duquel la mesure est considérée réussie. */
   tolerance?: number;
+  /** Si vrai, génère une cible aléatoire dans le locus à l'initialisation et à chaque "nouvelle cible". */
   randomTarget?: boolean;
+  /** Barème : nombre de points maximal attribué pour un ΔE nul. */
   points?: number;
+  /** Largeur indicative (réservée). */
   width?: number;
+  /** Hauteur indicative (réservée). */
   height?: number;
+  /** Callback d'envoi de couleur à une dalle (index, r, g, b, intensité). */
   onSendColor?: (idx: number, r: number, g: number, b: number, intensity: number) => void;
+  /** Callback d'extinction de toutes les dalles. */
   onTurnOffAll?: () => void;
 };
 
+/**
+ * Widget interactif de mesure de couleur avec le CS-160.
+ *
+ * @param props Voir {@link CieMeasureWidgetProps}.
+ * @returns Le diagramme CIE, les valeurs cible/mesure/ΔE et les boutons d'action.
+ */
 export default function CieMeasureWidget({
   targetX = 0.3127, targetY = 0.3290, tolerance = 8, randomTarget: rnd = false,
   points = 1000, onSendColor,

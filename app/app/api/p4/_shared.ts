@@ -1,3 +1,13 @@
+/**
+ * @file app/api/p4/_shared.ts
+ * @brief Types, constantes et logique partagée du jeu Puissance 4 (P4).
+ *
+ * Regroupe les helpers communs aux routes p4 : génération d'identifiants, lecture
+ * d'une salle en base, (dé)sérialisation du plateau, mécanique de gravité,
+ * détection de victoire et identification du joueur via son token. Le plateau est
+ * une grille de P4_COLS x P4_ROWS cellules stockée à plat. Aucune route exportée
+ * ici : ce module est importé par create/join/move/state.
+ */
 import { getDb } from '@/lib/db';
 
 export type P4Disc = 'R' | 'J';
@@ -19,10 +29,19 @@ export type P4RoomRow = {
   status: 'waiting' | 'playing' | 'finished';
 };
 
+/**
+ * Génère un identifiant aléatoire (base36 horodaté + suffixe aléatoire).
+ * @returns Une chaîne d'identifiant unique (salle ou token joueur).
+ */
 export function randomId(): string {
   return `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
 }
 
+/**
+ * Lit une salle P4 par son identifiant.
+ * @param roomId Identifiant de la salle.
+ * @returns La ligne de salle, ou null si introuvable.
+ */
 export function readRoom(roomId: string): P4RoomRow | null {
   const db = getDb();
   const row = db
@@ -31,6 +50,11 @@ export function readRoom(roomId: string): P4RoomRow | null {
   return row ?? null;
 }
 
+/**
+ * Désérialise le JSON du plateau en tableau de cellules normalisé.
+ * @param boardJson Représentation JSON du plateau (tableau de 'R'|'J'|'').
+ * @returns Un tableau de P4_CELLS cellules ; vide si le JSON est invalide.
+ */
 export function parseBoard(boardJson: string): P4Cell[] {
   try {
     const raw = JSON.parse(boardJson) as unknown;
@@ -42,7 +66,13 @@ export function parseBoard(boardJson: string): P4Cell[] {
   }
 }
 
-/** Joue dans une colonne (gravité). Retourne l'index posé, ou -1 si colonne pleine. */
+/**
+ * Joue dans une colonne (gravité) : place le jeton sur la première case libre du bas.
+ * @param board Plateau (modifié sur place).
+ * @param col Index de colonne (0..P4_COLS-1).
+ * @param disc Jeton à poser ('R' ou 'J').
+ * @returns L'index de la case posée, ou -1 si colonne pleine ou hors limites.
+ */
 export function dropInColumn(board: P4Cell[], col: number, disc: P4Disc): number {
   if (col < 0 || col >= P4_COLS) return -1;
   for (let row = P4_ROWS - 1; row >= 0; row--) {
@@ -52,7 +82,12 @@ export function dropInColumn(board: P4Cell[], col: number, disc: P4Disc): number
   return -1;
 }
 
-/** 4 alignés (horizontal, vertical, 2 diagonales). */
+/**
+ * Détermine le vainqueur en cherchant 4 jetons alignés (horizontal, vertical,
+ * 2 diagonales).
+ * @param board Plateau à analyser.
+ * @returns 'R' ou 'J' si quelqu'un gagne, 'draw' si plein sans gagnant, sinon null.
+ */
 export function computeWinner(board: P4Cell[]): P4Disc | 'draw' | null {
   const at = (r: number, c: number): P4Cell => (r >= 0 && r < P4_ROWS && c >= 0 && c < P4_COLS ? board[r * P4_COLS + c] : '');
   const dirs = [[0, 1], [1, 0], [1, 1], [1, -1]] as const;
@@ -69,6 +104,12 @@ export function computeWinner(board: P4Cell[]): P4Disc | 'draw' | null {
   return full ? 'draw' : null;
 }
 
+/**
+ * Identifie le jeton du joueur à partir de son token de session.
+ * @param room Salle contenant les tokens des deux joueurs.
+ * @param token Token du joueur (ou null).
+ * @returns 'R' ou 'J' si le token correspond à un joueur, sinon null.
+ */
 export function inferPlayer(room: P4RoomRow, token: string | null): P4Disc | null {
   if (!token) return null;
   if (token === room.player_r_token) return 'R';

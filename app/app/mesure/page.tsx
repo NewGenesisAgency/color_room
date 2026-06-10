@@ -1,8 +1,25 @@
 'use client';
 
+/**
+ * @file app/mesure/page.tsx
+ * @brief Page de mesure colorimétrique avec le CS-160 (Konica Minolta).
+ *
+ * Pilote le colorimètre CS-160 via un bridge réseau (API /api/cs160) :
+ * connexion/déconnexion, lancement d'une mesure (luminance Lv + chromaticité
+ * x,y + tristimulus XYZ) et lecture des samples de l'appareil. Affiche les
+ * résultats (cartes Lv/x/y, XYZ, xyY, pastille sRGB) et trace la mesure ainsi
+ * que l'historique (30 dernières) sur un diagramme de chromaticité CIE 1931
+ * dessiné sur canvas (locus spectral coloré, triangle sRGB, point blanc D65,
+ * trajectoire colorée par la composante z). La page gère aussi une référence
+ * de blanc (refY) et un seuil de bruit pour rendre fidèlement la pastille de
+ * couleur (dalle éteinte → noir). N'interagit pas avec les dalles (lecture
+ * seule via le colorimètre).
+ */
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Activity, Power, Gauge, RefreshCw, CheckCircle, XCircle, AlertCircle, Database } from 'lucide-react';
 
+/** @brief Résultat d'une mesure CS-160 : horodatage, tristimulus XYZ et Lv/x/y. */
 interface MeasureResult {
   timestamp: string;
   xyz: { X: number; Y: number; Z: number };
@@ -57,8 +74,17 @@ const NM_LABELS = [460, 470, 480, 490, 500, 510, 520, 530, 540, 550, 560, 570, 5
 
 // ── Colour maths ───────────────────────────────────────────────────────────
 
-// Conversion XYZ → sRGB normalisée par chromaticité (Y=1 → utilisée uniquement
-// pour le diagramme CIE 1931, jamais pour afficher une mesure absolue).
+/**
+ * @brief Conversion XYZ → sRGB normalisée par chromaticité (Y=1).
+ *
+ * Utilisée uniquement pour colorer le diagramme CIE 1931, jamais pour afficher
+ * une mesure absolue (la normalisation par max efface la luminosité).
+ *
+ * @param X Composante tristimulus X.
+ * @param Y Composante tristimulus Y.
+ * @param Z Composante tristimulus Z.
+ * @returns Composantes sRGB { r, g, b } dans [0..255].
+ */
 function xyzToSrgb(X: number, Y: number, Z: number) {
   let r =  3.2406 * X - 1.5372 * Y - 0.4986 * Z;
   let g = -0.9689 * X + 1.8758 * Y + 0.0415 * Z;
@@ -117,7 +143,12 @@ function xyzToSrgbForSwatch(
   return { r: gc(r) * 255, g: gc(g) * 255, b: gc(b) * 255 };
 }
 
-// xy → XYZ (assume Y=1), then → sRGB pixel [0..255]
+/**
+ * @brief Convertit une chromaticité (x,y) en pixel sRGB [0..255] (en supposant Y=1).
+ * @param x Chromaticité x.
+ * @param y Chromaticité y.
+ * @returns Le triplet [r, g, b] (entiers 0..255).
+ */
 function xyToPixel(x: number, y: number): [number, number, number] {
   if (y < 1e-6) return [0, 0, 0];
   const Y = 1, X = (x / y) * Y, Z = ((1 - x - y) / y) * Y;
@@ -127,7 +158,13 @@ function xyToPixel(x: number, y: number): [number, number, number] {
           Math.round(Math.max(0, Math.min(255, b)))];
 }
 
-// Point-in-polygon (ray casting)
+/**
+ * @brief Teste si un point (px,py) est à l'intérieur du locus (ray casting).
+ * @param px Coordonnée x du point.
+ * @param py Coordonnée y du point.
+ * @param poly Polygone fermé du locus spectral.
+ * @returns true si le point est dans le polygone.
+ */
 function insideLocus(px: number, py: number, poly: {x:number;y:number}[]): boolean {
   let inside = false;
   for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
@@ -140,12 +177,22 @@ function insideLocus(px: number, py: number, poly: {x:number;y:number}[]): boole
 
 // ── Curve helpers (Z-aware) ───────────────────────────────────────────────────
 
-// z chromaticity = 1 − x − y; encodes "blueness" relative to (X+Y+Z)
+/**
+ * @brief Chromaticité z = 1 − x − y (composante « bleue ») bornée à [0,1].
+ * @param x Chromaticité x.
+ * @param y Chromaticité y.
+ * @returns La composante z clampée.
+ */
 function zChrom(x: number, y: number): number {
   return Math.max(0, Math.min(1, 1 - x - y));
 }
 
-// Warm (amber) ↔ Cool (ice-blue) gradient driven by z
+/**
+ * @brief Couleur du dégradé chaud (ambre) ↔ froid (bleu glacé) selon z.
+ * @param zn Valeur z normalisée [0,1].
+ * @param alpha Opacité du trait.
+ * @returns Une chaîne CSS rgba().
+ */
 function zColor(zn: number, alpha: number): string {
   const r = Math.round(255 * (1 - zn) + 30  * zn);
   const g = Math.round(160 * (1 - zn) + 200 * zn);
@@ -153,7 +200,12 @@ function zColor(zn: number, alpha: number): string {
   return `rgba(${r},${g},${b},${alpha})`;
 }
 
-// Catmull-Rom spline points through a list of [cx,cy] canvas coordinates
+/**
+ * @brief Calcule une spline Catmull-Rom passant par une liste de points canvas.
+ * @param pts Points de contrôle [cx, cy].
+ * @param steps Nombre de subdivisions par segment (défaut 20).
+ * @returns La liste des points interpolés de la courbe.
+ */
 function catmullRomPoints(pts: [number, number][], steps = 20): [number, number][] {
   if (pts.length < 2) return pts;
   const out: [number, number][] = [];
@@ -182,13 +234,27 @@ function catmullRomPoints(pts: [number, number][], steps = 20): [number, number]
 
 // ── ChromaticityDiagram component ────────────────────────────────────────────
 
+/** @brief Point de l'historique tracé sur le diagramme (chromaticité + Z + libellé). */
 interface DiagramPoint { x: number; y: number; Z: number; label: string; }
 
+/** @brief Props du diagramme de chromaticité : mesure courante + historique. */
 interface DiagramProps {
   current: { x: number; y: number; Z: number } | null;
   history: DiagramPoint[];
 }
 
+/**
+ * @brief Composant canvas du diagramme de chromaticité CIE 1931.
+ *
+ * Dessine le locus spectral coloré pixel par pixel, le triangle sRGB, le point
+ * blanc D65, les graduations de longueur d'onde, la grille, puis la trajectoire
+ * de l'historique (spline colorée par z, épaisseur par Z) et le point de mesure
+ * courant avec réticule et étiquette de coordonnées.
+ *
+ * @param current Mesure courante à mettre en évidence (ou null).
+ * @param history Points historiques à tracer en trajectoire.
+ * @returns L'élément <canvas> du diagramme.
+ */
 function ChromaticityDiagram({ current, history }: DiagramProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const SIZE = 480;
@@ -455,6 +521,15 @@ function ChromaticityDiagram({ current, history }: DiagramProps) {
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 
+/**
+ * @brief Composant de la page de mesure colorimétrique.
+ *
+ * Gère l'état de connexion au bridge CS-160, les actions (connecter, mesurer,
+ * déconnecter, charger les samples), l'historique des mesures et la référence
+ * de blanc / seuil de bruit pour la pastille de couleur.
+ *
+ * @returns L'arbre JSX de la page de mesure.
+ */
 export default function MesurePage() {
   const [connected, setConnected]     = useState(false);
   const [loading,   setLoading]       = useState(false);
@@ -471,6 +546,7 @@ export default function MesurePage() {
   const [refY,       setRefY]       = useState<number | null>(null);
   const [noiseFloor, setNoiseFloor] = useState<number>(0.1);
 
+  /** @brief Interroge l'état du bridge/CS-160 (/api/cs160?action=status). */
   const checkStatus = useCallback(async () => {
     try {
       const res  = await fetch('/api/cs160?action=status', { cache: 'no-store' });
@@ -489,6 +565,7 @@ export default function MesurePage() {
 
   useEffect(() => { checkStatus(); }, [checkStatus]);
 
+  /** @brief Connecte l'appareil CS-160 via POST /api/cs160 (action 'connect'). */
   const connect = async () => {
     setLoading(true); setError('');
     try {
@@ -500,6 +577,7 @@ export default function MesurePage() {
     setLoading(false);
   };
 
+  /** @brief Déconnecte l'appareil CS-160 (action 'disconnect'). */
   const disconnect = async () => {
     setLoading(true); setError('');
     try {
@@ -509,6 +587,7 @@ export default function MesurePage() {
     setLoading(false);
   };
 
+  /** @brief Lance une mesure (action 'measure') et l'ajoute à l'historique. */
   const measure = async () => {
     setLoading(true); setError(''); setMeasurement(null);
     try {
@@ -529,6 +608,7 @@ export default function MesurePage() {
     setLoading(false);
   };
 
+  /** @brief Récupère les samples stockés dans l'appareil (action 'samples'). */
   const loadSamples = async () => {
     setLoading(true); setError('');
     try {

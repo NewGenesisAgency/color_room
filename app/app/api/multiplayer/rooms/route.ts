@@ -1,6 +1,23 @@
+/**
+ * @file app/api/multiplayer/rooms/route.ts
+ * @brief Création d'un salon multijoueur avec ses réglages.
+ *
+ * POST : body JSON partiel { name?, gameId?, mode?, maxPlayers?, durationSec?,
+ *        difficulty?, hostName? }. Les valeurs sont assainies/bornées : nom <=40
+ *        car., mode dans {versus, coop, solo} (défaut versus), maxPlayers 2..8
+ *        (défaut 4), durationSec 10..600 (défaut 60), difficulty 1|2|3 (défaut 2).
+ *        Crée le salon et renvoie { ok, ...result } (code, token hôte, etc.).
+ * Codes d'erreur : 500 (création impossible / erreur).
+ * Effets de bord : création d'un salon multijoueur.
+ */
 import { NextResponse } from 'next/server';
 import { createRoom, type MpRoomSettings } from '@/lib/multiplayer';
 
+/**
+ * Crée un nouveau salon multijoueur à partir des réglages fournis.
+ * @param req Requête HTTP POST, body décrit ci-dessus.
+ * @returns 200 { ok, ...result } ; 500 si la création échoue.
+ */
 export async function POST(req: Request) {
   try {
     const body = await req.json() as Partial<MpRoomSettings> & { hostName?: string };

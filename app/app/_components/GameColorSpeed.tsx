@@ -1,7 +1,23 @@
 'use client';
 
+/**
+ * @file app/_components/GameColorSpeed.tsx
+ * @brief Jeu de rapidité "Color Speed" + définitions partagées par tous les jeux de dalles.
+ *
+ * Composant de jeu où une dalle s'allume dans une couleur et reste allumée
+ * jusqu'à ce que le joueur touche la bonne dalle ; les points sont dégressifs
+ * selon le temps de réaction (demi-vie `decayMs`). Ce fichier exporte aussi les
+ * types et constantes communs à l'ensemble des mini-jeux : l'interface de props
+ * {@link GameTileProps} (callbacks d'envoi de couleur aux dalles, fin de partie,
+ * delta de score…), le type {@link DifficultyLevel} et la table {@link DIFF_LABELS}.
+ */
+
 import { useEffect, useRef, useState } from 'react';
 
+/**
+ * Props communes à tous les mini-jeux de dalles (Color Speed, Intrus, etc.).
+ * Fournit les callbacks d'interaction avec le matériel (dalles) et le scoring.
+ */
 export interface GameTileProps {
   onSendColor: (tileIdx: number, r: number, g: number, b: number, intensity?: number) => void;
   /** Envoie directement 32 valeurs de canaux (0-100) à une dalle, sans conversion RGB. */
@@ -20,8 +36,10 @@ export interface GameTileProps {
   difficulty?: 'facile' | 'moyen' | 'difficile' | 'expert';
 }
 
+/** Niveaux de difficulté partagés par les mini-jeux. */
 export type DifficultyLevel = 'facile' | 'moyen' | 'difficile' | 'expert';
 
+/** Libellés, couleurs et emojis associés à chaque niveau de difficulté. */
 export const DIFF_LABELS: Record<DifficultyLevel, { label: string; color: string; emoji: string }> = {
   facile:    { label: 'Facile',    color: '#34d399', emoji: '🟢' },
   moyen:     { label: 'Moyen',     color: '#fbbf24', emoji: '🟡' },
@@ -123,6 +141,12 @@ const ANIM = `
 /* ══════════════════════════════════════════════════════════════════════
    COMPONENT
 ══════════════════════════════════════════════════════════════════════ */
+/**
+ * Jeu de rapidité : toucher au plus vite la dalle allumée pour marquer des points dégressifs.
+ *
+ * @param props Voir {@link GameTileProps}.
+ * @returns L'écran de jeu Color Speed (compte à rebours, partie chronométrée, score).
+ */
 export default function GameColorSpeed({
   onSendColor, onTurnOff, onTurnOffAll, onQuit,
   tileCount = 42, onRegisterClickHandler, onComplete, onScoreDelta,

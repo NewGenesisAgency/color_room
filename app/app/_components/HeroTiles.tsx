@@ -1,5 +1,16 @@
 'use client';
 
+/**
+ * @file app/_components/HeroTiles.tsx
+ * @brief Animation Three.js décorative de dalles colorées (visuel "hero" d'accueil).
+ *
+ * Composant purement décoratif (sans prop) qui monte une scène WebGL Three.js dans
+ * un conteneur : une grille de dalles colorées issues d'une palette
+ * ({@link BASE_PALETTE_HEX}) avec de légères variations HSL, un reflet miroir et une
+ * animation continue. La scène est créée dans un effet et nettoyée au démontage.
+ * Sert d'arrière-plan visuel sur l'écran d'accueil de ColorRoom.
+ */
+
 import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 
@@ -31,6 +42,11 @@ function paletteColor(idx: number): THREE.Color {
   return base;
 }
 
+/**
+ * Animation de dalles colorées en Three.js.
+ *
+ * @returns Le conteneur hôte de la scène WebGL (sans prop).
+ */
 export default function HeroTiles() {
   const containerRef = useRef<HTMLDivElement | null>(null);
 

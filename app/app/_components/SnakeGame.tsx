@@ -1,5 +1,19 @@
 'use client';
 
+/**
+ * @file app/_components/SnakeGame.tsx
+ * @brief Mini-jeu "Snake Chromatique" joué sur la grille de 42 dalles (6×7).
+ *
+ * Snake où le serpent traverse les deux salles (gauche + droite) projetées sur la
+ * grille de dalles. Chaque nourriture (voir {@link FOODS}) correspond à une
+ * longueur d'onde spectrale et une couleur LED ; la manger fait évoluer la couleur
+ * du serpent vers cette longueur d'onde et rapporte des points. La vitesse augmente
+ * d'un niveau toutes les 5 nourritures. Le contrôle se fait au clavier ou via le
+ * pavé {@link TouchControls} sur tactile. Reçoit les callbacks de pilotage des
+ * dalles et de scoring via {@link GameTileProps} ; l'affichage écran dépend de
+ * `SHOW_SCREEN_BOARD`.
+ */
+
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, RotateCcw, Trophy, Zap } from 'lucide-react';
 import TouchControls, { type TouchKey } from './TouchControls';
@@ -110,6 +124,12 @@ const TOUCH_KEYS: TouchKey[] = [
   { key: 'ArrowDown',  slot: 'down',  label: <ChevronDown size={22} />, repeat: true },
 ];
 
+/**
+ * Composant du mini-jeu Snake Chromatique.
+ *
+ * @param props Props communes des jeux de dalles (voir {@link GameTileProps}).
+ * @returns Les écrans ready / en jeu / game over du Snake sur dalles.
+ */
 export default function SnakeGame({ onSendColor, onTurnOff, onTurnOffAll, onQuit, onComplete, onScoreDelta, difficulty = 'moyen' }: GameTileProps) {
   const cfg = SNAKE_DIFF[difficulty];
   const gs = useRef<GS>(fresh());

@@ -1,5 +1,18 @@
 'use client';
 
+/**
+ * @file app/_games/chromaticity-diagram/ChromaticityDiagram.tsx
+ * @brief Mini-jeu du diagramme de chromaticité CIE 1931 : repérer une couleur par ses coordonnées x,y.
+ *
+ * Une couleur cible est brièvement montrée sur les dalles, puis le joueur doit la
+ * situer sur le diagramme CIE 1931 en réglant ses coordonnées de chromaticité
+ * (sliders x/y) ou en cliquant dans le locus. Le score d'une manche dépend de la
+ * proximité entre le point proposé et la cible (à l'intérieur du fer à cheval
+ * spectral, voir {@link HORSESHOE}). Affiche l'aperçu via {@link CieDiagramCanvas}
+ * et pilote les dalles. Reçoit les callbacks de pilotage et de scoring via
+ * {@link GameTileProps} ; la difficulté règle la durée d'affichage et le nombre de manches.
+ */
+
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { GameTileProps } from '../../_components/GameColorSpeed';
 import { DIFF_LABELS, type DifficultyLevel } from '../../_components/GameColorSpeed';
@@ -183,6 +196,12 @@ const S: Record<string, React.CSSProperties> = {
 };
 
 // ── Composant principal ────────────────────────────────────────────────────────
+/**
+ * Composant du mini-jeu Diagramme de chromaticité.
+ *
+ * @param props Props communes des jeux de dalles (voir {@link GameTileProps}).
+ * @returns Les écrans ready / en jeu / résultat du jeu de localisation CIE 1931.
+ */
 export default function ChromaticityDiagram({ onSendColor, onTurnOffAll, onQuit, tileCount = 42, onComplete, difficulty = 'moyen' }: GameTileProps) {
   const cfg = CHROMA_DIFF[difficulty];
   const SHOW_DURATION = cfg.showDuration;

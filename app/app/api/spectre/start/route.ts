@@ -1,8 +1,26 @@
+/**
+ * @file app/api/spectre/start/route.ts
+ * @brief Démarre (ou réinitialise) une session Spectre et inscrit l'hôte.
+ *
+ * POST : body JSON { reset?, token?, name?, maxRounds? } (maxRounds défaut 5).
+ *        Si `reset` avec token, seul le siège 1 (hôte) est autorisé (403 sinon).
+ *        Sans token, l'appelant est le créateur et obtient un siège ; si la
+ *        session active réutilisée n'est plus en lobby, une salle neuve est créée
+ *        pour ne jamais bloquer le créateur. Renvoie { ok, sessionId, roomCode,
+ *        state, token?, seat? }.
+ * Codes d'erreur : 403 (reset non autorisé), 500 (création échouée / erreur).
+ * Effets de bord : création/réinitialisation de session Spectre, inscription joueur.
+ */
 import { NextResponse } from 'next/server';
 import { startSpectreSession, joinSpectreSession, touchSpectrePlayer, type SpSeat } from '@/lib/spectre';
 
 type Body = { reset?: boolean; token?: string; name?: string; maxRounds?: number };
 
+/**
+ * Démarre ou réinitialise une session Spectre.
+ * @param req Requête HTTP POST, body { reset?, token?, name?, maxRounds? }.
+ * @returns 200 { ok, sessionId, roomCode, state, token?, seat? } ; 403/500 sinon.
+ */
 export async function POST(req: Request) {
   try {
     const body = (await req.json().catch(() => ({}))) as Body;

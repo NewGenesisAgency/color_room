@@ -1,5 +1,19 @@
 'use client';
 
+/**
+ * @file app/_components/TetrisGame.tsx
+ * @brief Mini-jeu "Tetris" joué sur la grille de dalles (6 colonnes × 7 lignes).
+ *
+ * Implémente un Tetris (7 pièces standard, voir {@link PIECES}) sur une petite
+ * grille adaptée aux dalles : rotation, déplacements, descente accélérée et hard
+ * drop, lignes complétées, combos et niveaux (vitesse croissante selon la
+ * difficulté). Le contrôle se fait au clavier ou via le pavé {@link TouchControls}.
+ * À la différence des autres jeux, ce composant ne reçoit pas {@link GameTileProps}
+ * mais des props dédiées : `params` ({@link TetrisParams} : vitesse/difficulté),
+ * `isPlaying`, et `onSnapshot` qui pousse l'état courant ({@link TetrisSnapshot})
+ * au parent — c'est ce dernier qui projette le plateau sur les dalles physiques.
+ */
+
 import { useEffect, useRef, useState } from 'react';
 import { ChevronDown, ChevronLeft, ChevronRight, ChevronsDown, RotateCw } from 'lucide-react';
 import TouchControls, { type TouchKey } from './TouchControls';
@@ -204,6 +218,14 @@ function lockAndClear(s: GS): void {
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
+/**
+ * Composant du mini-jeu Tetris.
+ *
+ * @param params Paramètres de partie (vitesse, difficulté) — voir {@link TetrisParams}.
+ * @param isPlaying Vrai si la partie doit tourner (boucle de chute active).
+ * @param onSnapshot Callback recevant l'état courant ({@link TetrisSnapshot}) à projeter sur les dalles.
+ * @returns Le plateau de Tetris et ses contrôles.
+ */
 export default function TetrisGame({
   params,
   isPlaying,

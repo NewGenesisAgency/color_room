@@ -1,3 +1,14 @@
+/**
+ * @file app/api/games/[id]/route.ts
+ * @brief Lecture, mise à jour et suppression d'un jeu ciblé par son id.
+ *
+ * GET    : renvoie le jeu d'id donné -> { ok, game } ; 404 s'il n'existe pas.
+ * PATCH  : met à jour partiellement le jeu (name, kind, config — champs omis
+ *          conservés). 400 si name/kind résultant vide ; 404 si introuvable ;
+ *          500 si la relecture échoue. Renvoie { ok, game }.
+ * DELETE : supprime le jeu -> { ok, game } (champs vidés) ; 404 si rien supprimé.
+ * Effets de bord DB : UPDATE (PATCH) / DELETE sur crg_games.
+ */
 import { NextResponse } from 'next/server';
 
 import { getDb } from '@/lib/db';
@@ -17,6 +28,12 @@ type ApiResponse =
   | { ok: true; game: { id: string; createdAt: string; updatedAt: string; name: string; kind: string; config: unknown } }
   | { ok: false; error: string };
 
+/**
+ * Récupère un jeu par son identifiant.
+ * @param _req Requête HTTP GET (non utilisée).
+ * @param ctx Contexte de route ; ctx.params résout { id } du jeu.
+ * @returns 200 { ok, game } ; 404 si introuvable.
+ */
 export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
   const db = getDb();
@@ -39,6 +56,12 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
   } satisfies ApiResponse);
 }
 
+/**
+ * Met à jour partiellement un jeu (champs omis conservés).
+ * @param req Requête HTTP PATCH, body { name?, kind?, config? }.
+ * @param ctx Contexte de route ; ctx.params résout { id } du jeu.
+ * @returns 200 { ok, game } ; 400 (champ requis vide) / 404 / 500 selon l'erreur.
+ */
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
   const body = (await req.json().catch(() => ({}))) as PatchGameRequest;
@@ -87,6 +110,12 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   } satisfies ApiResponse);
 }
 
+/**
+ * Supprime un jeu par son identifiant.
+ * @param _req Requête HTTP DELETE (non utilisée).
+ * @param ctx Contexte de route ; ctx.params résout { id } du jeu.
+ * @returns 200 { ok, game } (champs vidés) ; 404 si aucun jeu supprimé.
+ */
 export async function DELETE(_req: Request, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
   const db = getDb();

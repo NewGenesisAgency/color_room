@@ -1,6 +1,21 @@
+/**
+ * @file app/api/multiplayer/rooms/join/route.ts
+ * @brief Rejoint un salon multijoueur via son code à 6 caractères.
+ *
+ * POST : body JSON { code, name? }. Le code est normalisé (majuscules, sans
+ *        espaces) et doit faire exactement 6 caractères (400 sinon). Ajoute le
+ *        joueur au salon et renvoie { ok, ...result } (token, siège, état).
+ * Codes d'erreur : 400 (code invalide), 404 (salon introuvable), 500 (erreur).
+ * Effets de bord : ajout d'un joueur au salon.
+ */
 import { NextResponse } from 'next/server';
 import { joinByCode } from '@/lib/multiplayer';
 
+/**
+ * Inscrit un joueur dans un salon identifié par son code.
+ * @param req Requête HTTP POST, body { code, name? }.
+ * @returns 200 { ok, ...result } ; 400/404/500 selon l'erreur.
+ */
 export async function POST(req: Request) {
   try {
     const body = await req.json() as { code?: string; name?: string };

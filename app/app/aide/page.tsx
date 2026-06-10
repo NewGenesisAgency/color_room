@@ -1,5 +1,18 @@
 'use client';
 
+/**
+ * @file app/aide/page.tsx
+ * @brief Page d'aide / guide d'utilisation de l'application ColorRoom.
+ *
+ * Page statique côté client présentant un guide pédagogique sous forme de
+ * cartes animées (révélées au défilement). Couvre l'introduction au projet,
+ * la connexion, le déroulé d'une partie, la liste des jeux disponibles
+ * (tableau GAMES), l'éditeur de jeux, le tableau de bord enseignant/admin,
+ * les instruments de mesure (Mesure, Spectre, Chromaticité) et les canaux
+ * LED de la salle. N'interagit pas avec les dalles ni l'API : contenu
+ * purement informatif, animé via IntersectionObserver.
+ */
+
 import { useEffect, useRef } from 'react';
 import {
   LogIn,
@@ -17,6 +30,12 @@ import './aide.css';
 
 // ---- Data ----------------------------------------------------------------
 
+/**
+ * @brief Catalogue des serious games présentés dans le guide.
+ *
+ * Chaque entrée associe le nom du jeu à une courte description affichée dans
+ * le tableau « Jeux disponibles ».
+ */
 const GAMES = [
   { name: 'Tetris Lumière',    desc: 'Jeu de Tetris qui pilote les dalles en temps réel' },
   { name: 'Simon Lumière',     desc: 'Mémorisez et reproduisez les séquences lumineuses' },
@@ -29,6 +48,14 @@ const GAMES = [
 
 // ---- Tile reveal hook ----------------------------------------------------
 
+/**
+ * @brief Hook d'animation : révèle un élément lorsqu'il entre dans le viewport.
+ *
+ * Met en place un IntersectionObserver qui ajoute la classe CSS 'visible' à
+ * l'élément référencé dès qu'il devient visible, puis cesse de l'observer.
+ *
+ * @param ref Référence React vers l'élément HTML à révéler.
+ */
 function useRevealOnScroll(ref: React.RefObject<HTMLElement | null>) {
   useEffect(() => {
     const el = ref.current;
@@ -53,6 +80,18 @@ function useRevealOnScroll(ref: React.RefObject<HTMLElement | null>) {
 
 // ---- Individual card component -------------------------------------------
 
+/**
+ * @brief Carte de section du guide d'aide, avec icône, titre et contenu.
+ *
+ * Utilise useRevealOnScroll pour s'animer à l'apparition. Le délai permet
+ * d'échelonner l'animation de plusieurs cartes.
+ *
+ * @param icon Icône Lucide affichée dans l'en-tête de la carte.
+ * @param title Titre de la section.
+ * @param children Contenu de la carte (paragraphes, listes, tableaux…).
+ * @param delay Délai (ms) appliqué à la transition d'apparition (défaut 0).
+ * @returns La carte JSX de la section.
+ */
 function AideCard({
   icon: Icon,
   title,
@@ -86,6 +125,15 @@ function AideCard({
 
 // ---- Page ----------------------------------------------------------------
 
+/**
+ * @brief Composant de la page d'aide.
+ *
+ * Assemble l'en-tête de marque puis l'ensemble des cartes de sections du
+ * guide (introduction, connexion, jeu, jeux disponibles, éditeur, tableau de
+ * bord, instruments, canaux LED).
+ *
+ * @returns L'arbre JSX complet de la page d'aide.
+ */
 export default function AidePage() {
   return (
     <div className="aide">

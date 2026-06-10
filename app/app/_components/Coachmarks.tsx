@@ -1,8 +1,21 @@
 'use client';
 
+/**
+ * @file app/_components/Coachmarks.tsx
+ * @brief Tour guidé en "coachmarks" : surbrillance d'éléments réels + bulles d'explication.
+ *
+ * Surcouche modale qui met en valeur des éléments existants de l'interface (via
+ * un sélecteur CSS) avec un spotlight, et affiche une bulle de texte positionnée
+ * automatiquement au-dessus/en dessous de la cible. Gère la navigation
+ * Précédent/Suivant/Passer, le clavier (flèches, Entrée, Échap), le défilement
+ * vers la cible et le repositionnement au resize/scroll. Props principales :
+ * `open`, `steps` (liste d'étapes {@link CoachStep}), `onClose`, `finishLabel`.
+ */
+
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { X, ArrowRight, ArrowLeft, Check } from 'lucide-react';
 
+/** Une étape du tour guidé. */
 export interface CoachStep {
   /** Sélecteur CSS de l'élément à mettre en surbrillance (ex. '[data-tour="tabs"]'). Absent = bulle centrée. */
   selector?: string;

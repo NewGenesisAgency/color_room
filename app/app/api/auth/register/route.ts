@@ -1,8 +1,27 @@
+/**
+ * @file app/api/auth/register/route.ts
+ * @brief Inscription d'un nouvel apprenant, avec jonction optionnelle à une classe.
+ *
+ * POST : body JSON { username, password, confirmPassword, avatarColor?,
+ *        avatarIcon?, classCode? }. Valide les champs, vérifie l'unicité du nom
+ *        (insensible à la casse), crée l'utilisateur (type 'apprenant') et, si un
+ *        code de classe valide est fourni, l'inscrit à cette classe — le tout dans
+ *        une transaction tout-ou-rien. Ouvre une session et pose le cookie
+ *        `crg_session`. Renvoie { ok, user }.
+ * Codes d'erreur : 400 (validation), 409 (nom déjà pris), 500 (erreur serveur).
+ * Effets de bord DB : INSERT dans crg_users, éventuellement crg_class_members,
+ *        et création de session.
+ */
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { hashPassword, createSession } from '@/lib/auth';
 import { randomBytes } from 'crypto';
 
+/**
+ * Crée un compte apprenant et l'inscrit éventuellement à une classe.
+ * @param req Requête HTTP POST, body décrit ci-dessus.
+ * @returns 200 { ok, user } + cookie de session ; 400/409/500 selon l'erreur.
+ */
 export async function POST(req: NextRequest) {
   try {
     const { username, password, confirmPassword, avatarColor, avatarIcon, classCode } = (await req.json()) as {

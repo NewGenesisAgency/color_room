@@ -1,7 +1,23 @@
+/**
+ * @file app/api/auth/login/route.ts
+ * @brief Authentifie un utilisateur et ouvre une session par cookie.
+ *
+ * POST : body JSON { username, password }. Vérifie le mot de passe (pbkdf2)
+ *        contre crg_users. En cas de succès, crée une session et pose le cookie
+ *        httpOnly `crg_session` (30 jours). Renvoie { ok, user }.
+ * Codes d'erreur : 400 (nom/mot de passe manquant), 401 (identifiants
+ *        incorrects ou compte sans mot de passe), 500 (erreur serveur).
+ * Effets de bord DB : insertion d'une session via createSession.
+ */
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { verifyPassword, createSession } from '@/lib/auth';
 
+/**
+ * Connecte un utilisateur par nom + mot de passe.
+ * @param req Requête HTTP POST, body { username, password }.
+ * @returns 200 { ok, user } + cookie de session ; 400/401/500 selon l'erreur.
+ */
 export async function POST(req: NextRequest) {
   try {
     const { username, password } = (await req.json()) as { username?: string; password?: string };

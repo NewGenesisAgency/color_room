@@ -1,5 +1,21 @@
 'use client';
 
+/**
+ * @file app/health/page.tsx
+ * @brief Page de santé & diagnostic des APIs et de test physique des plaques.
+ *
+ * Trois sections principales :
+ *  - État de connexion : interroge /api/health?full=1 (manuellement ou en
+ *    auto-refresh 5 s) et affiche l'état du serveur Next.js, de l'API
+ *    Supervision (plaques LED) et de l'API CS-160 (colorimètre), avec latence
+ *    et statut HTTP.
+ *  - Test des plaques : balayage séquentiel des 42 plaques (1 → 42) pour
+ *    vérifier câblage et numérotation, plus « tout allumer / tout éteindre » —
+ *    via /api/supervision/batch.
+ *  - Contrôle des canaux : 32 sliders (regroupés par bande spectrale) qui
+ *    pilotent une plaque (ou toutes) avec envoi auto debouncé (200 ms).
+ */
+
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Activity, RefreshCw, Loader2, CheckCircle2, XCircle, Server, Cpu, Lightbulb,
@@ -46,7 +62,9 @@ const CH_GROUPS = ['Violet/Bleu', 'Vert', 'Jaune', 'Rouge', 'Blanc', 'Réservé'
 
 const PLATE_COUNT = 42;
 
+/** @brief Résultat de test de joignabilité d'une API (URL, statut, latence, erreur). */
 type HealthApi = { url: string; reachable: boolean; httpStatus?: number; ms: number; error?: string };
+/** @brief État global de santé (serveur web + deux APIs + horodatage du test). */
 type HealthState = {
   serverOk: boolean;
   supervision: HealthApi | null;
@@ -55,9 +73,17 @@ type HealthState = {
   checkedAt: number;
 } | null;
 
+/** @brief Promesse résolue après `ms` millisecondes (pause asynchrone). */
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
-// Envoie une même valeur sur tous les canaux d'une plaque (test simple "allumé/éteint").
+/**
+ * @brief Envoie une même valeur sur tous les canaux d'une plaque (test on/off).
+ *
+ * @param plateId Identifiant de la plaque ciblée.
+ * @param value Valeur appliquée à chacun des 32 canaux (0..255).
+ * @param fast Mode rapide d'envoi (défaut true).
+ * @returns true si la requête a réussi, false sinon.
+ */
 async function sendUniform(plateId: number, value: number, fast = true) {
   const channels = Array.from({ length: 32 }, (_, i) => ({ index: i, value }));
   return fetch('/api/supervision/batch', {
@@ -68,12 +94,21 @@ async function sendUniform(plateId: number, value: number, fast = true) {
   }).then((r) => r.ok).catch(() => false);
 }
 
+/**
+ * @brief Composant de la page Santé & Diagnostic.
+ *
+ * Gère le test de santé des APIs (manuel/auto), le balayage et l'allumage
+ * global des plaques, et le contrôle direct des 32 canaux.
+ *
+ * @returns L'arbre JSX de la page de diagnostic.
+ */
 export default function HealthPage() {
   // ── Connexion / santé ───────────────────────────────────────────────────────
   const [health, setHealth] = useState<HealthState>(null);
   const [checking, setChecking] = useState(false);
   const [autoRefresh, setAutoRefresh] = useState(false);
 
+  /** @brief Interroge /api/health?full=1 et met à jour l'état de santé. */
   const runHealth = useCallback(async () => {
     setChecking(true);
     try {
@@ -108,8 +143,15 @@ export default function HealthPage() {
   const [busyMsg, setBusyMsg] = useState('');
   const sweepStop = useRef(false);
 
+  /** @brief Demande l'arrêt du balayage en cours. */
   const stopSweep = useCallback(() => { sweepStop.current = true; }, []);
 
+  /**
+   * @brief Lance le balayage séquentiel des 42 plaques (allume puis éteint chacune).
+   *
+   * Parcourt les plaques de 1 à PLATE_COUNT, attend `sweepDelay` ms par plaque,
+   * et s'interrompt proprement si stopSweep est demandé.
+   */
   const startSweep = useCallback(async () => {
     if (sweepRunning) return;
     sweepStop.current = false;
@@ -131,6 +173,7 @@ export default function HealthPage() {
     }
   }, [sweepRunning, sweepDelay]);
 
+  /** @brief Allume toutes les plaques (valeur 200 sur tous les canaux). */
   const allOn = useCallback(async () => {
     setBusyMsg('Allumage de toutes les plaques…');
     const plates = Array.from({ length: PLATE_COUNT }, (_, i) => ({
@@ -146,6 +189,7 @@ export default function HealthPage() {
     } catch { setBusyMsg('✗ Erreur réseau'); }
   }, []);
 
+  /** @brief Éteint toutes les plaques (valeur 0 sur tous les canaux). */
   const allOff = useCallback(async () => {
     setBusyMsg('Extinction de toutes les plaques…');
     const plates = Array.from({ length: PLATE_COUNT }, (_, i) => ({
@@ -168,6 +212,11 @@ export default function HealthPage() {
   const [channelMsg, setChannelMsg] = useState('');
   const sendTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  /**
+   * @brief Envoie les 32 valeurs de canaux sur une plaque (ou toutes si plate=0).
+   * @param chans Tableau des 32 valeurs de canaux.
+   * @param plate Plaque ciblée (0 = toutes les plaques).
+   */
   const sendChannels = useCallback(async (chans: number[], plate: number) => {
     setSending(true); setChannelMsg('');
     const channelArray = chans.map((v, i) => ({ index: i, value: Math.max(0, Math.min(255, Math.round(v))) }));
@@ -184,6 +233,11 @@ export default function HealthPage() {
     finally { setSending(false); }
   }, []);
 
+  /**
+   * @brief Met à jour un canal et planifie un envoi auto (debounce 200 ms).
+   * @param idx Index du canal (0..31).
+   * @param val Nouvelle valeur (0..255).
+   */
   function setChannel(idx: number, val: number) {
     const next = channels.map((v, i) => (i === idx ? val : v));
     setChannels(next);
@@ -386,6 +440,17 @@ const cardStyle: React.CSSProperties = {
   marginBottom: 20,
 };
 
+/**
+ * @brief Ligne d'état d'un service dans la section « État de connexion ».
+ *
+ * @param icon Icône du service.
+ * @param label Nom du service.
+ * @param ok État : true (ok), false (erreur), null (en cours/inconnu).
+ * @param detail Texte de détail (latence, statut HTTP, message d'erreur).
+ * @param sub Sous-texte facultatif (typiquement l'URL testée).
+ * @param last Si true, supprime la bordure inférieure (dernière ligne).
+ * @returns La ligne JSX d'état avec icône et indicateur.
+ */
 function StatusRow({ icon: Icon, label, ok, detail, sub, last }: {
   icon: React.ElementType;
   label: string; ok: boolean | null; detail: string; sub?: string; last?: boolean;

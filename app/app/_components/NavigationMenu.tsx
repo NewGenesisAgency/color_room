@@ -1,5 +1,17 @@
 'use client';
 
+/**
+ * @file app/_components/NavigationMenu.tsx
+ * @brief Menu de navigation latéral avec état d'authentification de l'utilisateur.
+ *
+ * Bouton hamburger ouvrant un panneau de navigation (liens vers accueil, jeux,
+ * mesure, éditeur, réglages, aide…). Récupère l'utilisateur courant via
+ * `/api/auth/me` et se resynchronise au montage, sur l'événement global
+ * `auth-changed` (login/logout depuis n'importe où) et à chaque changement de
+ * route. Affiche l'avatar et le rôle de l'utilisateur, et gère la déconnexion.
+ * Composant sans prop.
+ */
+
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
@@ -9,6 +21,7 @@ import {
 } from 'lucide-react';
 import { AvatarIcon } from './avatarIcons';
 
+/** Informations d'utilisateur affichées dans le menu. */
 interface UserInfo {
   id: string;
   username: string;
@@ -24,6 +37,11 @@ const ROLE_LABELS: Record<string, string> = {
   apprenant: 'Apprenant',
 };
 
+/**
+ * Menu de navigation latéral.
+ *
+ * @returns Le bouton d'ouverture et le panneau de navigation (sans prop).
+ */
 export default function NavigationMenu() {
   const [isOpen, setIsOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState<UserInfo | null>(null);

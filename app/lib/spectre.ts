@@ -1,6 +1,19 @@
+/**
+ * @file lib/spectre.ts
+ * @brief Logique serveur du jeu multijoueur « Spectre Chromatique ».
+ *
+ * Jeu de mémoire de couleur jusqu'à 8 joueurs, persisté en base. Déroulé par
+ * phases (SpPhase) : lobby → reveal (mémorisation d'une couleur cible) → guess
+ * (chaque joueur reproduit la couleur en RGB) → result (scores selon la
+ * proximité) → finished. Ce module gère la création/jonction de partie, la
+ * soumission des essais, l'avancement des phases et le calcul des scores.
+ * better-sqlite3 étant synchrone, aucune fonction n'est `async`.
+ */
 import { getDb } from '@/lib/db';
 
+/** @brief Siège d'un joueur dans une partie Spectre (1 à 8). */
 export type SpSeat = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
+/** @brief Phase de déroulement d'une partie Spectre. */
 export type SpPhase = 'lobby' | 'reveal' | 'guess' | 'result' | 'finished';
 
 export type SpPlayer = {

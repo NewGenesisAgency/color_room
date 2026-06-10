@@ -1,3 +1,15 @@
+/**
+ * @file app/api/multiplayer/start/route.ts
+ * @brief Démarre (ou réinitialise) la session multijoueur active (legacy).
+ *
+ * POST : body JSON { reset?, token?, name? }. Si `reset`, seul le joueur du siège 1
+ *        (ou un appel sans joueur présent) est autorisé (403 sinon). Crée une
+ *        nouvelle session de 2 minutes. Si aucun token n'est fourni, l'appelant
+ *        est considéré comme l'hôte et rejoint immédiatement le siège 1.
+ *        Renvoie { ok, sessionId, state, token?, seat? }.
+ * Codes d'erreur : 403 (reset non autorisé), 500 (erreur).
+ * Effets de bord : création/réinitialisation de la session multijoueur.
+ */
 import { NextResponse } from 'next/server';
 
 import { getActiveSession, joinGuest, listPlayers, startNewSession, touchPlayer, type MpSeat } from '@/lib/multiplayer';
@@ -8,6 +20,11 @@ type StartResponse =
   | { ok: true; sessionId: string; state: unknown; token?: string; seat?: MpSeat }
   | { ok: false; error: string };
 
+/**
+ * Démarre ou réinitialise la session multijoueur active.
+ * @param req Requête HTTP POST, body { reset?, token?, name? }.
+ * @returns 200 { ok, sessionId, state, token?, seat? } ; 403/500 selon l'erreur.
+ */
 export async function POST(req: Request) {
   try {
     const body = (await req.json().catch(() => ({}))) as StartRequest;

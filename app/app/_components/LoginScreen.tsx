@@ -1,17 +1,35 @@
 'use client';
 
+/**
+ * @file app/_components/LoginScreen.tsx
+ * @brief Écran d'authentification : connexion et inscription multi-étapes.
+ *
+ * Gère les deux vues « login » et « register » (inscription en plusieurs étapes :
+ * identifiants, choix d'avatar couleur/icône, code de classe). Affiche un
+ * indicateur de robustesse du mot de passe, sélectionne un avatar parmi
+ * {@link AVATAR_ICON_NAMES} et une couleur, puis notifie le parent via `onSuccess`
+ * avec l'utilisateur authentifié. Props : `sessionChecked` (la session a-t-elle
+ * été vérifiée), `onSuccess` (callback de réussite), `initialClassCode`
+ * (pré-remplissage du code de classe, ex. depuis un QR code).
+ */
+
 import { useState, useEffect, useRef } from 'react';
 import { LogIn, UserPlus, ArrowLeft, Eye, EyeOff, Check, AlertCircle } from 'lucide-react';
 import { AVATAR_ICON_NAMES, AvatarIcon } from './avatarIcons';
 
+/** Utilisateur authentifié renvoyé par l'écran de connexion. */
 type AuthUser = {
   id: string; username: string; role: string;
   niveau: string | null; avatarColor: string; avatarIcon?: string;
 };
 
+/** Props de l'écran de connexion. */
 interface Props {
+  /** Vrai une fois la vérification de session initiale terminée. */
   sessionChecked: boolean;
+  /** Appelé avec l'utilisateur authentifié après connexion/inscription réussie. */
   onSuccess: (user: AuthUser) => void;
+  /** Code de classe pré-rempli (ex. fourni par un QR code). */
   initialClassCode?: string;
 }
 
@@ -33,6 +51,12 @@ function pwdStrength(p: string) {
 const STR_COLORS = ['', '#ef4444', '#f97316', '#eab308', '#22c55e'];
 const STR_LABELS = ['', 'Faible', 'Correct', 'Bon', 'Fort ✓'];
 
+/**
+ * Écran d'authentification (connexion / inscription).
+ *
+ * @param props Voir {@link Props}.
+ * @returns L'interface de connexion ou d'inscription multi-étapes.
+ */
 export default function LoginScreen({ sessionChecked, onSuccess, initialClassCode }: Props) {
   const [view, setView] = useState<'login' | 'register'>('login');
   const [step, setStep] = useState<1 | 2 | 3>(1);

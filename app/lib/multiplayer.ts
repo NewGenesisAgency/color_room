@@ -1,5 +1,18 @@
+/**
+ * @file lib/multiplayer.ts
+ * @brief Logique serveur du mode multijoueur « écran scindé » (split-screen).
+ *
+ * Gère des sessions multijoueur persistées en base (table `crg_mp_sessions`)
+ * pour jusqu'à 8 joueurs (sièges 1..8). Chaque joueur contrôle un canal/teinte
+ * et soumet une valeur ; l'état partagé (cibles, valeurs soumises, minuteur)
+ * est lu en polling par la tablette hôte et les manettes téléphone. Ce module
+ * fournit la création/jonction de session, la soumission de valeurs, le calcul
+ * de l'état courant et l'arrêt de partie. better-sqlite3 étant synchrone,
+ * aucune fonction n'est `async`.
+ */
 import { getDb } from '@/lib/db';
 
+/** @brief Siège d'un joueur dans une session multijoueur (1 à 8). */
 export type MpSeat = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 
 export type MpSessionState = {

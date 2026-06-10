@@ -1,5 +1,21 @@
+/**
+ * @file lib/tileChannels.ts
+ * @brief Modèle physique des 42 dalles LED : types, spectres de canaux et remappage.
+ *
+ * Chaque dalle possède 32 canaux LED, chacun centré sur une longueur d'onde
+ * (nm) et associé à une couleur RGB approximative. Il existe DEUX câblages
+ * physiques de dalles — « rouge » et « bleu » — dont l'ordre des canaux diffère.
+ * Ce module fournit :
+ *   - PLATE_TYPE : le type physique de chaque dalle (1..42) ;
+ *   - les tables de spectres CHANNELS_ROUGE / CHANNELS_BLEU ;
+ *   - le remappage d'un vecteur de 32 canaux d'un type vers l'autre, afin
+ *     qu'une même couleur s'affiche identiquement quel que soit le câblage.
+ */
+
+/** @brief Type de câblage physique d'une dalle. */
 export type TileType = 'rouge' | 'bleu';
 
+/** @brief Type physique (rouge/bleu) de chacune des 42 dalles, par identifiant. */
 export const PLATE_TYPE: Record<number, TileType> = {
   1: 'rouge', 2: 'rouge', 3: 'rouge',
   4: 'bleu',  5: 'bleu',  6: 'bleu',

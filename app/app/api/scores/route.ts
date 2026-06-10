@@ -1,8 +1,28 @@
+/**
+ * @file app/api/scores/route.ts
+ * @brief Consultation et enregistrement des scores de jeu des utilisateurs.
+ *
+ * GET  : renvoie des scores selon le rôle et la query. `all=1` + admin -> tous les
+ *        scores ; `all=1` + enseignant -> scores des élèves de ses classes ; sinon
+ *        scores de `userId` (défaut: soi-même). Un apprenant ne peut consulter que
+ *        les siens (403 sinon). `limit` borné à 500 (défaut 200). Renvoie { ok, scores }.
+ * POST : enregistre un score. Body JSON { gameName, score }. Validation :
+ *        nom requis et <=100 car., score fini dans [0, 100000]. Anti-spam : un seul
+ *        score par jeu toutes les 5 s (429). Renvoie { ok }.
+ * Codes d'erreur : 401 (non connecté), 403 (consultation interdite),
+ *        400 (validation), 429 (trop de soumissions).
+ * Effets de bord DB : INSERT dans crg_scores (POST).
+ */
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { getSessionUser } from '@/lib/auth';
 import { randomBytes } from 'crypto';
 
+/**
+ * Liste les scores visibles par l'appelant selon son rôle et la query.
+ * @param req Requête HTTP GET, query `all`, `userId`, `limit` (cookie `crg_session`).
+ * @returns 200 { ok, scores } ; 401 (non connecté) / 403 (interdit).
+ */
 export async function GET(req: NextRequest) {
   const token = req.cookies.get('crg_session')?.value;
   if (!token) return NextResponse.json({ error: 'Non autorisé' }, { status: 401 });
@@ -51,6 +71,11 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ ok: true, scores });
 }
 
+/**
+ * Enregistre un score pour l'utilisateur courant (avec anti-spam 5 s).
+ * @param req Requête HTTP POST, body { gameName, score } (cookie `crg_session`).
+ * @returns 200 { ok } ; 401/400/429 selon l'erreur.
+ */
 export async function POST(req: NextRequest) {
   const token = req.cookies.get('crg_session')?.value;
   if (!token) return NextResponse.json({ error: 'Non autorisé' }, { status: 401 });

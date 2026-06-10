@@ -1,5 +1,17 @@
 'use client';
 
+/**
+ * @file app/_components/TouchControls.tsx
+ * @brief Pavé tactile (croix directionnelle + boutons d'action) qui émule le clavier.
+ *
+ * Affiche, sur appareils tactiles (ou si `forceShow`), une croix directionnelle et
+ * jusqu'à 3 boutons d'action. Chaque bouton dispatche un vrai `KeyboardEvent` sur
+ * `window`, si bien que tous les jeux écoutant déjà `keydown`/`keyup` (Snake,
+ * Tetris, Puissance 4…) fonctionnent sans modification. Gère l'auto-répétition au
+ * maintien (déplacements). Exporte aussi le hook {@link useIsTouchDevice} et les
+ * types {@link TouchKey}/{@link TouchSlot}. Prop principale : `keys` (liste des touches).
+ */
+
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 // ── Conversion clavier → contrôles tactiles ───────────────────────────────────
@@ -45,6 +57,14 @@ export function useIsTouchDevice(): boolean {
 
 const DPAD_SLOTS: TouchSlot[] = ['up', 'down', 'left', 'right'];
 
+/**
+ * Pavé de contrôles tactiles émulant le clavier.
+ *
+ * @param keys Touches à afficher ; chaque {@link TouchKey} définit la touche émise et son emplacement.
+ * @param forceShow Affiche le pavé même sur desktop (défaut : false).
+ * @param compact Réduit la taille des boutons (défaut : false).
+ * @returns Le pavé tactile, ou `null` si l'appareil n'est pas tactile et `forceShow` est faux.
+ */
 export default function TouchControls({
   keys,
   forceShow = false,

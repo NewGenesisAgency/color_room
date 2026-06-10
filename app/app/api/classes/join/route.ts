@@ -1,8 +1,24 @@
+/**
+ * @file app/api/classes/join/route.ts
+ * @brief Adhésion de l'utilisateur courant à une classe via son code.
+ *
+ * POST : body JSON { code }. Résout le code (insensible à la casse) en classe,
+ *        puis inscrit l'utilisateur connecté. S'il est déjà membre, renvoie
+ *        { ok, className, alreadyMember: true } sans réinsérer. Sinon crée
+ *        l'adhésion et renvoie { ok, className }.
+ * Codes d'erreur : 401 (non connecté), 400 (code manquant), 404 (code invalide).
+ * Effets de bord DB : INSERT dans crg_class_members.
+ */
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { getSessionUser } from '@/lib/auth';
 import { randomBytes } from 'crypto';
 
+/**
+ * Inscrit l'utilisateur courant à une classe à partir de son code.
+ * @param req Requête HTTP POST, body { code } (cookie `crg_session`).
+ * @returns 200 { ok, className, alreadyMember? } ; 401/400/404 selon l'erreur.
+ */
 export async function POST(req: NextRequest) {
   const token = req.cookies.get('crg_session')?.value;
   if (!token) return NextResponse.json({ error: 'Non autorisé' }, { status: 401 });
