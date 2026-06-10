@@ -193,12 +193,29 @@ export default function UIDesigner({ components, onChange, gameVariables = [] }:
   const selRef = useRef(sel); selRef.current = sel;
   const selComp = components.find(c => c.id === sel) ?? null;
 
-  const add = useCallback((p: typeof PALETTE[0]) => {
-    const c: UILayoutComponent = { id: uid(), kind: p.kind, x: snap(CW/2 - p.w/2), y: snap(CH/2 - p.h/2), width: p.w, height: p.h, text: defaultText(p.kind), bgColor: p.kind === 'button' ? '#4361ee' : undefined, textColor: p.kind === 'button' ? '#ffffff' : '#1a1d2e', fontSize: 14,
+  // Ajoute un composant. Si (atX,atY) est fourni (drag-and-drop), il est posé là ;
+  // sinon au centre du canevas (clic simple).
+  const add = useCallback((p: typeof PALETTE[0], atX?: number, atY?: number) => {
+    const x = atX != null ? snap(Math.max(0, Math.min(CW - p.w, atX - p.w / 2))) : snap(CW/2 - p.w/2);
+    const y = atY != null ? snap(Math.max(0, Math.min(CH - p.h, atY - p.h / 2))) : snap(CH/2 - p.h/2);
+    const c: UILayoutComponent = { id: uid(), kind: p.kind, x, y, width: p.w, height: p.h, text: defaultText(p.kind), bgColor: p.kind === 'button' ? '#4361ee' : undefined, textColor: p.kind === 'button' ? '#ffffff' : '#1a1d2e', fontSize: 14,
       ...(p.kind === 'cie_diagram' ? { cieRandom: true, cieTargetX: 0.3127, cieTargetY: 0.3290, cieTolerance: 8, points: 1000 } : {}),
       ...(p.kind === 'dpad' ? { dpadPreset: 'arrows_space' as UIDpadPreset } : {}) };
     onChange(resolveUiOverlaps([...components, c], c.id)); setSel(c.id);
   }, [components, onChange]);
+
+  // Réf du canevas pour convertir un point écran → coordonnées canevas (zoom compris).
+  const canvasRef = useRef<HTMLDivElement | null>(null);
+  const onCanvasDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    const kind = e.dataTransfer.getData('text/cr-ui-kind');
+    const p = PALETTE.find(pp => pp.kind === kind);
+    const rect = canvasRef.current?.getBoundingClientRect();
+    if (!p || !rect) return;
+    const x = (e.clientX - rect.left) / zoom;
+    const y = (e.clientY - rect.top) / zoom;
+    add(p, x, y);
+  }, [add, zoom]);
 
   const upd = useCallback((id: string, patch: Partial<UILayoutComponent>) => onChange(components.map(c => c.id === id ? { ...c, ...patch } : c)), [components, onChange]);
   const del = useCallback((id: string) => { onChange(components.filter(c => c.id !== id)); if (sel === id) setSel(null); }, [components, onChange, sel]);
@@ -251,9 +268,12 @@ export default function UIDesigner({ components, onChange, gameVariables = [] }:
         </div>
         {PALETTE.map(p => (
           <button key={p.kind} onClick={() => add(p)}
+            draggable
+            onDragStart={e => { e.dataTransfer.setData('text/cr-ui-kind', p.kind); e.dataTransfer.effectAllowed = 'copy'; }}
+            title={`Glisser sur le canevas, ou cliquer pour ajouter — ${p.label}`}
             onMouseEnter={e => { e.currentTarget.style.borderColor = `${p.color}66`; e.currentTarget.style.background = `${p.color}0d`; e.currentTarget.style.transform = 'translateX(2px)'; }}
             onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(0,0,0,0.08)'; e.currentTarget.style.background = 'rgba(255,255,255,0.85)'; e.currentTarget.style.transform = 'none'; }}
-            style={{ padding:'7px 8px', borderRadius:11, border:'1px solid rgba(0,0,0,0.08)', background:'rgba(255,255,255,0.85)', cursor:'pointer', textAlign:'left', fontSize:12, fontWeight:600, fontFamily:'inherit', color:'#3a3f4b', display:'flex', alignItems:'center', gap:8, transition:'all 130ms' }}>
+            style={{ padding:'7px 8px', borderRadius:11, border:'1px solid rgba(0,0,0,0.08)', background:'rgba(255,255,255,0.85)', cursor:'grab', textAlign:'left', fontSize:12, fontWeight:600, fontFamily:'inherit', color:'#3a3f4b', display:'flex', alignItems:'center', gap:8, transition:'all 130ms' }}>
             <span style={{ width:26, height:26, borderRadius:8, flexShrink:0, display:'grid', placeItems:'center', background:`${p.color}1a`, color:p.color }}><p.Icon size={15} /></span>
             {p.label}
           </button>
@@ -261,8 +281,11 @@ export default function UIDesigner({ components, onChange, gameVariables = [] }:
       </div>
 
       {/* Canvas */}
-      <div style={{ flex:1, background:'repeating-linear-gradient(0deg,transparent,transparent 31px,rgba(67,97,238,0.05) 32px),repeating-linear-gradient(90deg,transparent,transparent 31px,rgba(67,97,238,0.05) 32px)', overflow:'hidden', position:'relative', display:'flex', alignItems:'center', justifyContent:'center' }} onClick={() => setSel(null)}>
-        <div style={{ width:CW, height:CH, background:'rgba(255,255,255,0.94)', borderRadius:16, border:'1px solid rgba(0,0,0,0.09)', boxShadow:'0 8px 40px rgba(0,0,0,0.09)', position:'relative', transform:`scale(${zoom})`, transformOrigin:'center', flexShrink:0 }}>
+      <div style={{ flex:1, background:'repeating-linear-gradient(0deg,transparent,transparent 31px,rgba(67,97,238,0.05) 32px),repeating-linear-gradient(90deg,transparent,transparent 31px,rgba(67,97,238,0.05) 32px)', overflow:'hidden', position:'relative', display:'flex', alignItems:'center', justifyContent:'center' }}
+        onClick={() => setSel(null)}
+        onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; }}
+        onDrop={onCanvasDrop}>
+        <div ref={canvasRef} style={{ width:CW, height:CH, background:'rgba(255,255,255,0.94)', borderRadius:16, border:'1px solid rgba(0,0,0,0.09)', boxShadow:'0 8px 40px rgba(0,0,0,0.09)', position:'relative', transform:`scale(${zoom})`, transformOrigin:'center', flexShrink:0 }}>
           {components.map(c => (
             <div key={c.id} style={{ position:'absolute', left:c.x, top:c.y, width:c.width, height:c.height, cursor:'move', outline: sel===c.id ? '2.5px solid #4361ee' : 'none', outlineOffset:2, borderRadius:4, zIndex: sel===c.id ? 10 : 1 }} onMouseDown={e => onDown(e, c.id)} onClick={e => { e.stopPropagation(); setSel(c.id); }}>
               <Preview c={c} />
