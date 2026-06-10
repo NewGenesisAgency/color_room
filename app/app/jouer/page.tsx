@@ -48,6 +48,15 @@ function hexToRgb(hex: string): { r: number; g: number; b: number } {
   return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
 }
 
+/**
+ * @brief Composant de la manette joueur (multijoueur générique).
+ *
+ * Gère la restauration de session (localStorage), l'action de rejoindre, le
+ * choix et l'envoi debouncé de la couleur, ainsi que le polling de l'état
+ * (nombre de joueurs, fin de session).
+ *
+ * @returns L'arbre JSX de la manette joueur.
+ */
 export default function JouerPage() {
   const [name, setName] = useState('');
   const [joined, setJoined] = useState(false);
@@ -67,6 +76,7 @@ export default function JouerPage() {
     } catch { /* ignore */ }
   }, []);
 
+  /** @brief Rejoint la session active (/api/multiplayer/join) et persiste le siège. */
   const join = useCallback(async () => {
     setStatus('Connexion…');
     try {
@@ -81,7 +91,10 @@ export default function JouerPage() {
     } catch { setStatus('Erreur réseau.'); }
   }, [name]);
 
-  // Envoi de la couleur (debounce léger pour le temps réel sans saturer).
+  /**
+   * @brief Envoie la couleur choisie (debounce 90 ms) vers /api/multiplayer/submit.
+   * @param hex Couleur hexadécimale à transmettre (encodée en 0xRRGGBB).
+   */
   const sendColor = useCallback((hex: string) => {
     if (!token) return;
     if (submitTimer.current) clearTimeout(submitTimer.current);
@@ -96,6 +109,10 @@ export default function JouerPage() {
     }, 90);
   }, [token]);
 
+  /**
+   * @brief Met à jour la couleur locale et déclenche son envoi.
+   * @param hex Couleur hexadécimale sélectionnée.
+   */
   function onColor(hex: string) { setColor(hex); sendColor(hex); }
 
   // Garde la session vivante + nombre de joueurs

@@ -837,10 +837,21 @@ export default function MesurePage() {
 
 // ── UI helpers ────────────────────────────────────────────────────────────────
 
+/**
+ * @brief Construit le style inline d'un bouton coloré.
+ * @param bg Couleur de fond du bouton.
+ * @returns L'objet de style CSS.
+ */
 function btnStyle(bg: string): React.CSSProperties {
   return { padding: '7px 14px', borderRadius: 7, border: 'none', background: bg, color: '#fff', fontWeight: 600, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 };
 }
 
+/**
+ * @brief Carte de résultat avec titre et contenu.
+ * @param title Titre de la carte.
+ * @param children Contenu (lignes de valeurs).
+ * @returns La carte JSX.
+ */
 function ResultCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div style={{ padding: 12, borderRadius: 9, background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,.06)' }}>
@@ -850,14 +861,22 @@ function ResultCard({ title, children }: { title: string; children: React.ReactN
   );
 }
 
+/** @brief Affiche une valeur principale en grand. */
 function BigVal({ children }: { children: React.ReactNode }) {
   return <div style={{ fontSize: 22, fontWeight: 700, color: '#1e3a8a', lineHeight: 1 }}>{children}</div>;
 }
 
+/** @brief Affiche une unité de mesure discrète. */
 function Unit({ children }: { children: React.ReactNode }) {
   return <div style={{ fontSize: 10, color: '#94a3b8', marginBottom: 6 }}>{children}</div>;
 }
 
+/**
+ * @brief Ligne « label : valeur » d'une carte de résultat.
+ * @param label Libellé de la grandeur.
+ * @param val Valeur formatée.
+ * @returns La ligne JSX.
+ */
 function Row({ label, val }: { label: string; val: string }) {
   return (
     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '2px 0' }}>
@@ -867,6 +886,18 @@ function Row({ label, val }: { label: string; val: string }) {
   );
 }
 
+/**
+ * @brief Pastille de couleur sRGB calculée à partir d'une mesure XYZ.
+ *
+ * Utilise xyzToSrgbForSwatch (avec référence de blanc et seuil de bruit) pour
+ * afficher la couleur, son code hexadécimal et la luminance Y. Une dalle
+ * éteinte (sous le seuil) s'affiche en noir avec la mention « Noir / éteint ».
+ *
+ * @param xyz Tristimulus mesuré { X, Y, Z }.
+ * @param refY Y de référence d'un blanc (null = mode chromatique).
+ * @param noiseFloor Seuil de luminance sous lequel on rend du noir.
+ * @returns La pastille JSX de couleur.
+ */
 function ColorSwatch({
   xyz,
   refY = null,

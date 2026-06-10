@@ -1,17 +1,45 @@
 'use client';
 
+/**
+ * @file app/spectre/page.tsx
+ * @brief Jeu multijoueur « Spectre Chromatique » (route /spectre).
+ *
+ * Serious game de reproduction de couleur en plusieurs manches. L'hôte crée
+ * une salle (code court + QR code), les joueurs rejoignent (jusqu'à 8 sièges)
+ * via /api/spectre/*. Le déroulé suit cinq phases (lobby → reveal → guess →
+ * result → finished) : la couleur cible est révélée sur les 42 dalles
+ * (sendColorToAllPlates), puis chaque joueur la reproduit sur un diagramme de
+ * chromaticité CIE 1931 interactif (dessiné sur canvas, picking xy), avec
+ * aperçu en direct sur les dalles. Le score par manche dépend de la distance
+ * RGB à la cible.
+ *
+ * Le fichier contient : les types miroir de lib/spectre.ts, des utilitaires de
+ * couleur (CIE xy ↔ RGB, longueur d'onde → RGB, encodage 32 canaux), l'envoi
+ * groupé aux dalles via /api/supervision/batch, le composant principal
+ * `SpectreGame` (état + polling + rendu de chaque phase) et l'export par
+ * défaut `SpectrePage` (page autonome ouverte par QR code).
+ *
+ * Synchronisation matérielle : changements de phase pilotent les dalles ;
+ * l'hôte (siège 1) fait avancer la partie et déclenche l'auto-advance quand
+ * tous les joueurs ont soumis.
+ */
+
 import { useCallback, useEffect, useRef, useState, useMemo } from 'react';
 import { Palette, CheckCircle2, Crown, Trophy, RotateCcw, LogOut } from 'lucide-react';
 import QrCode from '@/app/_components/QrCode';
 
 // ── Types (miroir de lib/spectre.ts) ────────────────────────────────────────
+/** @brief Numéro de siège joueur (1 à 8). */
 type SpSeat = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
+/** @brief Phase courante de la partie Spectre. */
 type SpPhase = 'lobby' | 'reveal' | 'guess' | 'result' | 'finished';
+/** @brief État d'un joueur : siège, nom, couleur devinée, soumission et scores. */
 type SpPlayer = {
   seat: SpSeat; name: string;
   guessR: number; guessG: number; guessB: number;
   submitted: boolean; roundScore: number; totalScore: number;
 };
+/** @brief État complet d'une partie Spectre renvoyé par le serveur. */
 type SpState = {
   gameId: 'spectre'; phase: SpPhase; round: number; maxRounds: number;
   targetR: number; targetG: number; targetB: number;
@@ -30,12 +58,26 @@ const CIE_HS: [number,number][] = [
   [0.8000,0.2000],[0.8210,0.1790],[0.8507,0.1493],
 ];
 const CDW=380,CDH=340,CXN=0,CXX=0.85,CYN=0,CYX=0.92,CPL=26,CPR=12,CPT=8,CPB=20;
+/** @brief Convertit une chromaticité CIE (x,y) en pixel SVG du diagramme. */
 function cXyToSvg(x:number,y:number){return{px:CPL+(x-CXN)/(CXX-CXN)*(CDW-CPL-CPR),py:(CDH-CPB)-(y-CYN)/(CYX-CYN)*(CDH-CPT-CPB)};}
+/** @brief Convertit un pixel SVG du diagramme en chromaticité CIE (x,y). */
 function cSvgToXy(px:number,py:number){return{x:(px-CPL)/(CDW-CPL-CPR)*(CXX-CXN)+CXN,y:((CDH-CPB)-py)/(CDH-CPT-CPB)*(CYX-CYN)+CYN};}
+/** @brief Indique si la chromaticité (cx,cy) est dans le fer à cheval CIE (ray casting). */
 function cInHS(cx:number,cy:number):boolean{let inside=false;for(let i=0,j=CIE_HS.length-1;i<CIE_HS.length;j=i++){const[xi,yi]=CIE_HS[i],[xj,yj]=CIE_HS[j];if((yi>cy)!==(yj>cy)&&cx<(xj-xi)*(cy-yi)/(yj-yi)+xi)inside=!inside;}return inside;}
+/**
+ * @brief Convertit une chromaticité CIE (x,y) en couleur sRGB (Y=1).
+ * @returns Le triplet { r, g, b } (0..255), ou null si hors domaine valide.
+ */
 function cXyToRgb(x:number,y:number):{r:number,g:number,b:number}|null{if(y<1e-8||x<0||x+y>1)return null;const X=x/y,Y=1,Z=(1-x-y)/y;let r=3.2406*X-1.5372*Y-0.4986*Z,g=-0.9689*X+1.8758*Y+0.0415*Z,b=0.0557*X-0.2040*Y+1.0570*Z;const mn=Math.min(r,g,b);if(mn<0){r-=mn;g-=mn;b-=mn;}const mx=Math.max(r,g,b,1e-9);r/=mx;g/=mx;b/=mx;const gm=(c:number)=>c<=0.0031308?12.92*c:1.055*Math.pow(c,1/2.4)-0.055;return{r:Math.round(Math.min(1,Math.max(0,gm(r)))*255),g:Math.round(Math.min(1,Math.max(0,gm(g)))*255),b:Math.round(Math.min(1,Math.max(0,gm(b)))*255)};}
 
 // ── Utilitaires couleur ──────────────────────────────────────────────────────
+/**
+ * @brief Convertit une couleur HSL en composantes RGB (0..255).
+ * @param h Teinte (0..360).
+ * @param s Saturation en pourcentage.
+ * @param l Luminosité en pourcentage.
+ * @returns Les composantes { r, g, b }.
+ */
 function hslToRgb(h: number, s: number, l: number): { r: number; g: number; b: number } {
   const sn = s / 100, ln = l / 100;
   const c = (1 - Math.abs(2 * ln - 1)) * sn;
@@ -55,7 +97,13 @@ function hslToRgb(h: number, s: number, l: number): { r: number; g: number; b: n
   };
 }
 
-// Converts wavelength (nm) + saturation% + lightness% → RGB
+/**
+ * @brief Convertit longueur d'onde (nm) + saturation% + luminosité% en RGB.
+ * @param wl Longueur d'onde en nanomètres.
+ * @param s Saturation en pourcentage.
+ * @param l Luminosité en pourcentage.
+ * @returns Les composantes { r, g, b } (0..255).
+ */
 function wlSLToRgb(wl: number, s: number, l: number): { r: number; g: number; b: number } {
   const [r01, g01, b01] = wavelengthToRgb01(wl);
   const sn = s / 100;
@@ -76,15 +124,27 @@ function wlSLToRgb(wl: number, s: number, l: number): { r: number; g: number; b:
   }
 }
 
+/**
+ * @brief Calcule un score (0..1000) selon la distance RGB entre cible et devinette.
+ * @param tR,tG,tB Couleur cible.
+ * @param gR,gG,gB Couleur devinée.
+ * @returns Le score arrondi (1000 = couleur exacte).
+ */
 function colorScore(tR: number, tG: number, tB: number, gR: number, gG: number, gB: number): number {
   const dr = tR - gR, dg = tG - gG, db = tB - gB;
   return Math.round(Math.max(0, (1 - Math.sqrt(dr * dr + dg * dg + db * db) / Math.sqrt(3 * 255 * 255)) * 1000));
 }
 
+/** @brief Construit une chaîne CSS rgb() à partir de composantes numériques. */
 function rgb(r: number, g: number, b: number): string {
   return `rgb(${Math.round(r)},${Math.round(g)},${Math.round(b)})`;
 }
 
+/**
+ * @brief Approxime la couleur RGB normalisée [0,1] d'une longueur d'onde visible.
+ * @param wl Longueur d'onde en nanomètres (bornée 380..780).
+ * @returns Le triplet [r, g, b] dans [0,1].
+ */
 function wavelengthToRgb01(wl: number): [number, number, number] {
   const w = Math.max(380, Math.min(780, wl));
   let r = 0, g = 0, b = 0;
@@ -100,6 +160,12 @@ function wavelengthToRgb01(wl: number): [number, number, number] {
 }
 
 // ── Envoyer couleur aux plaques lumineuses ──────────────────────────────────
+/**
+ * @brief Décompose une couleur RGB en 32 valeurs de canaux LED (dalle « rouge »).
+ * @param r,g,b Composantes RGB (0..255).
+ * @param intensity Intensité globale en pourcentage.
+ * @returns Le tableau des 32 valeurs de canaux (0..255).
+ */
 function rgbToChannels32(r: number, g: number, b: number, intensity: number): number[] {
   const rn = r / 255, gn = g / 255, bn = b / 255;
   const sc = intensity / 100;
@@ -122,8 +188,16 @@ function rgbToChannels32(r: number, g: number, b: number, intensity: number): nu
   return ch.map((v) => Math.max(0, Math.min(255, v)));
 }
 
-// Anti-flood : on regroupe les 42 dalles en UNE seule requête batch (au lieu de
-// 42 POST séparés qui saturaient supervision.exe). force:true purge la file.
+/**
+ * @brief Envoie une même couleur sur les 42 dalles en une seule requête batch.
+ *
+ * Anti-flood : regroupe les 42 dalles dans un seul POST /api/supervision/batch
+ * (au lieu de 42 requêtes qui saturaient supervision.exe). Reméppe les canaux
+ * pour les dalles de type « bleu ». force:true purge la file.
+ *
+ * @param r,g,b Composantes RGB de la couleur à afficher.
+ * @param intensity Intensité globale en pourcentage (défaut 85).
+ */
 async function sendColorToAllPlates(r: number, g: number, b: number, intensity = 85) {
   // PLATE_TYPE identifie les dalles bleues — on reméppe les canaux pour chaque type
   const { PLATE_TYPE, remapChannels32 } = await import('@/lib/tileChannels');
@@ -142,6 +216,7 @@ async function sendColorToAllPlates(r: number, g: number, b: number, intensity =
   }).catch(() => {});
 }
 
+/** @brief Éteint les 42 dalles (tous canaux à 0) en une requête batch. */
 async function clearAllPlates() {
   const channels = Array.from({ length: 32 }, (_, i) => ({ index: i, value: 0 }));
   const plates = [];
@@ -171,6 +246,19 @@ interface SpectrePageProps {
   onExit?: () => void;
 }
 
+/**
+ * @brief Composant principal du jeu Spectre Chromatique.
+ *
+ * Gère tout le cycle de vie : restauration de session (localStorage),
+ * deep-link/QR, création/jonction de salle, polling de l'état serveur,
+ * synchronisation matérielle des dalles selon la phase, rendu du diagramme CIE
+ * et des écrans de chaque phase (login, lobby, reveal, guess, result, finished).
+ *
+ * @param embedded Si true, rendu intégré dans une carte (page Jeux) plutôt qu'en plein écran.
+ * @param initialJoinCode Code de salle pré-rempli (bascule en mode « Rejoindre »).
+ * @param onExit Callback appelé pour quitter (mode intégré).
+ * @returns L'arbre JSX de l'écran correspondant à la phase courante.
+ */
 export function SpectreGame({ embedded = false, initialJoinCode, onExit }: SpectrePageProps = {}) {
   const [view, setView] = useState<'login' | 'game'>('login');
   const [nameInput, setNameInput] = useState('');
@@ -243,6 +331,7 @@ export function SpectreGame({ embedded = false, initialJoinCode, onExit }: Spect
     : { minHeight: '100vh' };
 
   // ── Polling state ─────────────────────────────────────────────────────────
+  /** @brief Interroge l'état de la partie (/api/spectre/state) et met à jour l'UI. */
   const pollState = useCallback(async () => {
     if (!token) return;
     try {
@@ -358,6 +447,7 @@ export function SpectreGame({ embedded = false, initialJoinCode, onExit }: Spect
   }, [gameState]);
 
   // ── Actions ────────────────────────────────────────────────────
+  /** @brief Crée une nouvelle salle (hôte) via /api/spectre/start. */
   async function handleCreate() {
     if (!nameInput.trim()) { setError('Entrez votre prénom'); return; }
     setLoading(true); setError('');
@@ -378,6 +468,7 @@ export function SpectreGame({ embedded = false, initialJoinCode, onExit }: Spect
     } catch { setError('Erreur réseau'); } finally { setLoading(false); }
   }
 
+  /** @brief Rejoint une salle existante via /api/spectre/join (code requis). */
   async function handleJoin() {
     if (!nameInput.trim()) { setError('Entrez votre prénom'); return; }
     if (!joinCodeInput.trim()) { setError('Entrez le code de la salle'); return; }
@@ -399,6 +490,7 @@ export function SpectreGame({ embedded = false, initialJoinCode, onExit }: Spect
     } catch { setError('Erreur réseau'); } finally { setLoading(false); }
   }
 
+  /** @brief Fait avancer la partie à la phase suivante (hôte) via /api/spectre/advance. */
   async function handleAdvance() {
     await fetch('/api/spectre/advance', {
       method: 'POST',
@@ -408,6 +500,7 @@ export function SpectreGame({ embedded = false, initialJoinCode, onExit }: Spect
     await pollState();
   }
 
+  /** @brief Soumet la couleur devinée du joueur via /api/spectre/guess. */
   async function handleSubmitGuess() {
     if (submitted) return;
     await fetch('/api/spectre/guess', {
@@ -419,6 +512,7 @@ export function SpectreGame({ embedded = false, initialJoinCode, onExit }: Spect
     await pollState();
   }
 
+  /** @brief Arrête la partie en cours (hôte) via /api/spectre/stop. */
   async function handleStop() {
     await fetch('/api/spectre/stop', {
       method: 'POST',
@@ -428,6 +522,7 @@ export function SpectreGame({ embedded = false, initialJoinCode, onExit }: Spect
     await pollState();
   }
 
+  /** @brief Relance une nouvelle partie en réinitialisant la session (hôte). */
   async function handleRestart() {
     setLoading(true);
     const res = await fetch('/api/spectre/start', {

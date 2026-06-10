@@ -1,3 +1,20 @@
+/**
+ * @file app/api/supervision/batch/route.ts
+ * @brief Envoi groupé et préemptible de mises à jour de canaux vers la supervision.
+ *
+ * POST : body JSON soit { plateId, channels: [{ index, value }] }, soit
+ *        { plates: [{ plateId, channels: [...] }] }, plus drapeaux { fast?, force? }.
+ *        Chaque canal est poussé en PUT vers /state/plaque/{plateId}/canal/{i}/{v}
+ *        (repli sur /cursor/ pour l'ancienne API). Un sémaphore à file drainable
+ *        (concurrence HW_CONCURRENCY=2) sérialise les appels vers supervision.exe ;
+ *        `force` purge instantanément la file et annule les requêtes en cours pour
+ *        ne jamais envoyer de commandes obsolètes. La déconnexion client purge
+ *        aussi la file. `fast` réduit le timeout (jeux temps réel).
+ *        Renvoie { ok, updatedChannels, totalChannels, forced }.
+ * Codes d'erreur : 400 (MISSING_PARAMS), 500 (INTERNAL_ERROR).
+ * Effets de bord : nombreuses requêtes réseau sortantes vers la supervision ;
+ *        état de file/concurrence partagé au niveau du module.
+ */
 import { NextResponse } from 'next/server';
 import { getSupervisionBaseUrl as getBaseUrl } from '@/lib/settings';
 
@@ -26,6 +43,10 @@ let hwInFlight = 0;
 const hwWaiters: Waiter[] = [];
 let forceAbortCtrl: AbortController = new AbortController();
 
+/**
+ * Réveille les waiters en attente tant qu'il reste des slots de concurrence.
+ * Chaque waiter résolu avec true incrémente hwInFlight.
+ */
 function drainWaiters() {
   while (hwWaiters.length > 0 && hwInFlight < HW_CONCURRENCY) {
     hwInFlight++;
@@ -33,6 +54,10 @@ function drainWaiters() {
   }
 }
 
+/**
+ * Acquiert un slot de concurrence matériel, ou s'inscrit dans la file d'attente.
+ * @returns Promesse résolue à true s'il faut procéder, false si annulé/évincé.
+ */
 async function acquireHwSlot(): Promise<boolean> {
   if (hwInFlight < HW_CONCURRENCY) {
     hwInFlight++;
@@ -49,6 +74,9 @@ async function acquireHwSlot(): Promise<boolean> {
   });
 }
 
+/**
+ * Libère un slot de concurrence et tente de réveiller les waiters suivants.
+ */
 function releaseHwSlot() {
   hwInFlight = Math.max(0, hwInFlight - 1);
   drainWaiters();
@@ -69,6 +97,11 @@ function forceReset() {
   // hwInFlight reste correct : il ne compte que les fetches réellement en cours
 }
 
+/**
+ * Applique un lot de mises à jour de canaux vers la supervision (préemptible).
+ * @param req Requête HTTP POST, body { plateId, channels } | { plates }, + { fast?, force? }.
+ * @returns 200 { ok, updatedChannels, totalChannels, forced } ; 400 (params manquants) / 500.
+ */
 export async function POST(req: Request) {
   try {
     const body = await req.json();
