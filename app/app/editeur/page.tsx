@@ -1373,6 +1373,15 @@ export default function EditeurPage() {
     });
   };
 
+  const removeEdgeById = (edgeId: string) => {
+    if (!activeGameId) return;
+    commit((cur) => ({
+      ...cur,
+      games: cur.games.map((g) => g.id === cur.activeGameId ? { ...g, edges: g.edges.filter((e) => e.id !== edgeId) } : g),
+    }));
+    setStatus('Câble supprimé');
+  };
+
   const beginDrag = () => {
     if (dragBaseSnapshot) return;
     setDragBaseSnapshot(editorRef.current);
@@ -4809,12 +4818,21 @@ export default function EditeurPage() {
 
                         const active = pendingLink?.fromNodeId && (pendingLink.fromNodeId === e.from || pendingLink.fromNodeId === e.to);
                         return (
-                          <path
-                            key={e.id}
-                            d={d}
-                            markerEnd="url(#bp-arrow)"
-                            className={active ? 'bp-wire bp-wire--active' : 'bp-wire'}
-                          />
+                          <g key={e.id}>
+                            <path
+                              d={d}
+                              markerEnd="url(#bp-arrow)"
+                              className={active ? 'bp-wire bp-wire--active' : 'bp-wire'}
+                            />
+                            {/* Zone de clic large et invisible : clic = supprimer le câble */}
+                            <path
+                              d={d}
+                              className="bp-wire__hit"
+                              onClick={(ev) => { ev.stopPropagation(); removeEdgeById(e.id); }}
+                            >
+                              <title>Cliquer pour supprimer ce câble</title>
+                            </path>
+                          </g>
                         );
                       })}
 

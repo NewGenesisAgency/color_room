@@ -741,6 +741,20 @@
   overflow: visible;
 }
 
+/* Zone de clic large et invisible posée sur chaque câble : permet de cliquer
+   pour le supprimer (seule la zone du trait reçoit les clics, pas le reste). */
+.bp-wire__hit {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 14;
+  pointer-events: stroke;
+  cursor: pointer;
+}
+
+.bp-wire__hit:hover {
+  stroke: rgba(220,38,38,0.22);
+}
+
 .bp-menu {
   position: absolute;
   z-index: 9999;
