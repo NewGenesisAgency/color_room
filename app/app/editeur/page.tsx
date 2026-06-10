@@ -41,6 +41,8 @@ import Coachmarks, { type CoachStep } from '@/app/_components/Coachmarks';
 import { playSfx, SFX_LIST, unlockAudio, vibrate } from '@/lib/audio/sfx';
 import { LOGIC_OP_KINDS, applyLogicOp, logicOpShape } from '@/lib/game/logicOps';
 import { getPyodide } from '@/lib/pyodide';
+import { NODE_META, normaliserRecherche } from './nodeMeta';
+import { verifierGraphe, type Probleme } from './verifier';
 
 // Modules lourds (3D Three.js, éditeur Python/Pyodide, designer UI, panneau CS160)
 // chargés à la demande pour alléger le bundle initial de /editeur.
@@ -1385,6 +1387,19 @@ export default function EditeurPage() {
     if (!activeGame) return null;
     return activeGame.nodes.find((n) => n.id === selectedNodeId) || null;
   }, [activeGame, selectedNodeId]);
+
+  /**
+   * @brief Panneau « À corriger » : ouvert/fermé par le bouton « Vérifier ».
+   */
+  const [verifOuvert, setVerifOuvert] = useState(false);
+
+  /**
+   * @brief Problèmes du graphe actif, recalculés à chaque modification.
+   */
+  const problemesGraphe = useMemo<Probleme[]>(
+    () => (activeGame ? verifierGraphe(activeGame.nodes, activeGame.edges) : []),
+    [activeGame]
+  );
 
 
   const activeTetrisNode = useMemo(() => {
@@ -3800,6 +3815,28 @@ export default function EditeurPage() {
     setStatus(`Fit - ${Math.round(zoom * 100)}%`);
   }
 
+  /**
+   * @brief Sélectionne un nœud et centre la caméra dessus (zoom courant conservé).
+   *
+   * Utilisé par le panneau « À corriger » : un clic sur un problème amène
+   * directement l'utilisateur sur le bloc concerné.
+   * @param nodeId Identifiant du nœud à mettre en avant.
+   */
+  function centrerSurNoeud(nodeId: string) {
+    if (!activeGame) return;
+    const node = activeGame.nodes.find((n) => n.id === nodeId);
+    if (!node) return;
+    const bpEl = document.querySelector('.bp') as HTMLElement | null;
+    const rect = bpEl?.getBoundingClientRect();
+    const W = rect?.width || 800;
+    const H = rect?.height || 500;
+    // Même convention que fitNodesToView : un nœud occupe ~300x180 px en repère graphe.
+    const cx = (node.pos?.x ?? 0) + 150;
+    const cy = (node.pos?.y ?? 0) + 90;
+    setGraphPan({ x: W / 2 - cx * graphZoom, y: H / 2 - cy * graphZoom });
+    commit((cur) => ({ ...cur, selectedNodeId: nodeId }));
+  }
+
   function autoLayoutNodes() {
     if (!activeGameId || !activeGame) return;
     const nodes = activeGame.nodes;
@@ -4684,6 +4721,35 @@ export default function EditeurPage() {
                   <span style={{ fontSize: 11, color: '#888', fontVariantNumeric: 'tabular-nums', minWidth: 38, textAlign: 'right', fontWeight: 600 }}>
                     {Math.round(graphZoom * 100)}%
                   </span>
+                  {/* Vérification du graphe : pastille d'état + bouton « Vérifier » */}
+                  {activeGame && (() => {
+                    const nbErreurs = problemesGraphe.filter((p) => p.niveau === 'erreur').length;
+                    const etat = problemesGraphe.length === 0 ? 'ok' : nbErreurs > 0 ? 'erreur' : 'avert';
+                    const libelle =
+                      etat === 'ok' ? 'Prêt'
+                      : etat === 'erreur' ? `${nbErreurs} à corriger`
+                      : `${problemesGraphe.length} conseil${problemesGraphe.length > 1 ? 's' : ''}`;
+                    return (
+                      <>
+                        <span className={`bp-verif-pill bp-verif-pill--${etat}`} title="État du graphe">
+                          <span className={`bp-verif-dot bp-verif-dot--${etat}`} />
+                          {libelle}
+                        </span>
+                        <button
+                          className="btn btn--mini"
+                          title="Vérifier le graphe et lister les blocs à corriger"
+                          onClick={() => {
+                            setVerifOuvert(true);
+                            setStatus(problemesGraphe.length === 0 ? 'Graphe prêt : aucun problème' : `${problemesGraphe.length} problème(s) trouvé(s)`);
+                          }}
+                          style={{ padding: '0 8px', height: 28, fontSize: 11, gap: 4 }}
+                        >
+                          <Check size={12} />
+                          <span>Vérifier</span>
+                        </button>
+                      </>
+                    );
+                  })()}
                   {/* Fit all nodes */}
                   {activeGame && (
                     <button
@@ -6155,10 +6221,14 @@ export default function EditeurPage() {
                       </div>
                       <div className="bp-menu__list">
                         {(() => {
-                          const q = contextMenu.q.trim().toLowerCase();
+                          // Recherche insensible aux accents et à la casse, sur le titre,
+                          // la catégorie, le kind, la description et les synonymes (NODE_META).
+                          const q = normaliserRecherche(contextMenu.q.trim());
                           const allFiltered = NODE_CATALOG.filter((n) => {
                             if (!q) return true;
-                            return `${n.category} ${n.title} ${n.kind}`.toLowerCase().includes(q);
+                            const meta = NODE_META[n.kind];
+                            const indexable = `${n.category} ${n.title} ${n.kind} ${meta?.desc ?? ''} ${meta?.syn.join(' ') ?? ''}`;
+                            return normaliserRecherche(indexable).includes(q);
                           });
                           const addable = allFiltered.filter((n) => !NATIVE_GAME_KINDS.has(n.kind));
                           const natives = allFiltered.filter((n) => NATIVE_GAME_KINDS.has(n.kind));
@@ -6202,7 +6272,12 @@ export default function EditeurPage() {
                                         <span className="bp-menu__chip" style={{ background: `${catColor}1f`, color: catColor }}>
                                           <CatIcon size={12} />
                                         </span>
-                                        <span className="bp-menu__title">{n.title}</span>
+                                        <span style={{ display: 'flex', flexDirection: 'column', gap: 1, minWidth: 0, flex: 1 }}>
+                                          <span className="bp-menu__title">{n.title}</span>
+                                          {NODE_META[n.kind]?.desc ? (
+                                            <span className="bp-menu__desc">{NODE_META[n.kind].desc}</span>
+                                          ) : null}
+                                        </span>
                                         <span className="bp-menu__meta" style={{ color: catColor, opacity: 0.7, fontSize: 11 }}>{n.kind.startsWith('cs160') ? 'CS160' : ''}</span>
                                       </button>
                                     ))}
@@ -6223,7 +6298,12 @@ export default function EditeurPage() {
                                       style={{ opacity: 0.45, cursor: 'not-allowed', userSelect: 'none' }}
                                       title="Jeu natif - non recréable via l'éditeur"
                                     >
-                                      <span className="bp-menu__title">{n.title}</span>
+                                      <span style={{ display: 'flex', flexDirection: 'column', gap: 1, minWidth: 0, flex: 1 }}>
+                                        <span className="bp-menu__title">{n.title}</span>
+                                        {NODE_META[n.kind]?.desc ? (
+                                          <span className="bp-menu__desc">{NODE_META[n.kind].desc}</span>
+                                        ) : null}
+                                      </span>
                                       <span className="bp-menu__meta" style={{ color: '#a855f7', opacity: 0.7, fontSize: 10 }}>natif</span>
                                     </div>
                                   ))}
@@ -6232,6 +6312,49 @@ export default function EditeurPage() {
                             </>
                           );
                         })()}
+                      </div>
+                    </div>
+                  ) : null}
+                  {/* Panneau « À corriger » : résultats de la vérification du graphe.
+                      Enfant direct de .bp → flotte en bas du canvas, hors transform. */}
+                  {verifOuvert && activeGame ? (
+                    <div className="bp-verif">
+                      <div className="bp-verif__head">
+                        <strong>À corriger</strong>
+                        <span className="bp-verif__count">
+                          {problemesGraphe.length === 0
+                            ? 'Aucun problème'
+                            : `${problemesGraphe.length} problème${problemesGraphe.length > 1 ? 's' : ''}`}
+                        </span>
+                        <button className="bp-verif__close" title="Fermer le panneau" onClick={() => setVerifOuvert(false)}>
+                          <X size={13} />
+                        </button>
+                      </div>
+                      <div className="bp-verif__list">
+                        {problemesGraphe.length === 0 ? (
+                          <div className="bp-verif__empty">Tout est prêt : aucun problème trouvé. Bon jeu !</div>
+                        ) : (
+                          problemesGraphe.map((p, i) => {
+                            const node = p.nodeId ? activeGame.nodes.find((n) => n.id === p.nodeId) : undefined;
+                            return (
+                              <button
+                                key={`${p.nodeId ?? 'global'}-${i}`}
+                                className="bp-verif__item"
+                                title={p.nodeId ? 'Cliquer pour voir le bloc concerné' : undefined}
+                                onClick={() => {
+                                  if (p.nodeId) centrerSurNoeud(p.nodeId);
+                                }}
+                              >
+                                <span className={`bp-verif-dot bp-verif-dot--${p.niveau === 'erreur' ? 'erreur' : 'avert'}`} />
+                                <span className="bp-verif__msg">
+                                  {node ? <strong>{node.name || labelNodeKind(node.kind)}</strong> : null}
+                                  {node ? ' — ' : null}
+                                  {p.message}
+                                </span>
+                              </button>
+                            );
+                          })
+                        )}
                       </div>
                     </div>
                   ) : null}
