@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
-  Menu, X, Home, Gamepad2, Sparkles, Palette, Ruler,
+  Menu, X, Home, Gamepad2, Ruler,
   LogIn, LogOut, Settings, HelpCircle, PenSquare, SlidersHorizontal, Activity,
 } from 'lucide-react';
 import { AvatarIcon } from './avatarIcons';
@@ -76,9 +76,9 @@ export default function NavigationMenu() {
 
   const navItems = [
     { href: '/',             label: 'Accueil',        icon: Home },
+    // Tous les jeux (Spectre, Chromaticité, Puissance 4, multijoueur…) se jouent
+    // dans /jeux : pas d'entrées séparées dans le menu.
     { href: '/jeux',         label: 'Jeux',            icon: Gamepad2 },
-    { href: '/spectre',      label: 'Spectre',         icon: Sparkles },
-    { href: '/chromaticite', label: 'Chromaticité',    icon: Palette },
     { href: '/mesure',       label: 'Mesure',          icon: Ruler },
     { href: '/editeur',      label: 'Éditeur',         icon: PenSquare },
     { href: '/aide',         label: 'Aide',            icon: HelpCircle },

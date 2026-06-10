@@ -23,7 +23,7 @@ export async function GET() {
   }
 
   const base = (process.env.OLLAMA_URL || 'http://ollama:11434').replace(/\/$/, '');
-  const model = process.env.OLLAMA_MODEL || 'qwen2.5:3b';
+  const model = process.env.OLLAMA_MODEL || 'qwen2.5:1.5b';
   try {
     const res = await fetch(`${base}/api/tags`, { cache: 'no-store', signal: AbortSignal.timeout(4000) });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);

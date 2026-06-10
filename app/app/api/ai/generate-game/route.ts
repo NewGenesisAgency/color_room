@@ -227,14 +227,15 @@ EXEMPLE valide:
 // Appel d'un modèle local via Ollama (hors-ligne). format:json force une sortie JSON.
 async function callOllama(sys: string, user: string): Promise<GameJson | null> {
   const base = (process.env.OLLAMA_URL || 'http://ollama:11434').replace(/\/$/, '');
-  const model = process.env.OLLAMA_MODEL || 'qwen2.5:3b';
+  const model = process.env.OLLAMA_MODEL || 'qwen2.5:1.5b';
   const res = await fetch(`${base}/api/generate`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     cache: 'no-store',
     signal: AbortSignal.timeout(240000), // le Raspberry Pi est lent (CPU)
-    // Température basse + assez de tokens : un petit modèle local suit mieux le schéma.
-    body: JSON.stringify({ model, system: sys, prompt: user, format: 'json', stream: false, options: { temperature: 0.35, num_predict: 4096, num_ctx: 8192 } }),
+    // Modèle local léger : on limite les tokens et le contexte pour répondre VITE
+    // (un Pi en CPU génère lentement ; 2048 tokens suffisent pour un jeu).
+    body: JSON.stringify({ model, system: sys, prompt: user, format: 'json', stream: false, options: { temperature: 0.3, num_predict: 2048, num_ctx: 4096 } }),
   });
   if (!res.ok) {
     // Remonte le VRAI message d'Ollama (ex: "model not found, try pulling it first", OOM…)
@@ -278,7 +279,7 @@ export async function POST(req: Request) {
 
   // ── Modèle local (Ollama, hors-ligne) ──────────────────────────────────────
   if (provider === 'ollama') {
-    const model = process.env.OLLAMA_MODEL || 'qwen2.5:3b';
+    const model = process.env.OLLAMA_MODEL || 'qwen2.5:1.5b';
     try {
       // Prompt court : plus fiable + moins de RAM sur un petit modèle local.
       const raw = await callOllama(systemInstructionLite(tileCount), userContent);

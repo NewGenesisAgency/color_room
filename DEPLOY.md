@@ -71,23 +71,23 @@ GEMINI_API_KEY=ta_cle_gemini   # https://aistudio.google.com/apikey
 **Option B — IA locale (Ollama, 100 % hors-ligne)** *(recommandé pour la salle)*
 ```env
 AI_PROVIDER=ollama
-OLLAMA_MODEL=qwen2.5:3b        # ~1.9 Go, tient sur un Pi 4 Go (défaut)
+OLLAMA_MODEL=qwen2.5:1.5b      # ~1 Go, RAPIDE sur un Pi 4 Go (défaut)
 ```
 
 > Si tu mets les deux, `AI_PROVIDER` décide. Vide = auto (Gemini si clé, sinon Ollama).
 
 ---
 
-## 4. Choisir le modèle local (taille vs Pi)
+## 4. Choisir le modèle local (vitesse vs qualité)
 
-Le **fichier** peut aller jusqu'à 64 Go, mais ce qui compte c'est la **RAM** :
+Sur un Pi en CPU, plus le modèle est gros, plus c'est lent. Le défaut privilégie la **vitesse** :
 
-| Modèle | Taille | RAM conseillée | Qualité |
+| Modèle | Taille | Vitesse (Pi 4) | Qualité |
 |---|---|---|---|
-| `qwen2.5:3b` | ~1.9 Go | **Pi 4 Go (défaut)** | **bonne (recommandé)** |
-| `llama3.2:3b` | ~2 Go | Pi 4 Go | correcte (jeux simples) |
-| `qwen2.5:7b` | ~4.7 Go | Pi 8 Go+ | très bonne — ⚠ TUÉ (OOM) sur Pi 4 Go |
-| `qwen2.5:14b` | ~9 Go | Pi 16 Go | excellente mais lent |
+| `qwen2.5:1.5b` | ~1 Go | **rapide (~1 min, défaut)** | correcte |
+| `qwen2.5:3b` | ~1.9 Go | moyenne (~2-3 min) | bonne |
+| `qwen2.5:0.5b` | ~0.4 Go | très rapide | basique |
+| `qwen2.5:7b` | ~4.7 Go | ⚠ TUÉ (OOM) sur Pi 4 Go | — |
 
 Change le modèle via `OLLAMA_MODEL` dans `app/.env` (rien d'autre à modifier).
 
