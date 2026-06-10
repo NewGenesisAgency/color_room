@@ -1159,6 +1159,15 @@ export default function EditeurPage() {
     q: string;
   }>({ open: false, x: 0, y: 0, gx: 0, gy: 0, q: '' });
 
+  // Catégories dépliées dans la palette d'ajout (repli par défaut = moins de
+  // surcharge visuelle ; une recherche force le dépliage de tout).
+  const [openCats, setOpenCats] = useState<Set<string>>(() => new Set(['Évènements', 'Rendu']));
+  const toggleCat = (cat: string) => setOpenCats((prev) => {
+    const next = new Set(prev);
+    if (next.has(cat)) next.delete(cat); else next.add(cat);
+    return next;
+  });
+
   const [editor, setEditor] = useState<EditorSnapshot>(() => ({ games: [], activeGameId: null, selectedNodeId: null }));
   const [history, setHistory] = useState<{ past: EditorSnapshot[]; future: EditorSnapshot[] }>({ past: [], future: [] });
 
@@ -5969,13 +5978,23 @@ export default function EditeurPage() {
                               {categories.map((cat) => {
                                 const CatIcon = NODE_CATEGORY_ICONS[cat] ?? Boxes;
                                 const catColor = NODE_CATEGORY_COLORS[cat] ?? '#999';
+                                const catItems = addable.filter((n) => n.category === cat);
+                                // Déplié si recherche active OU si l'utilisateur a ouvert la catégorie.
+                                const expanded = !!q || openCats.has(cat);
                                 return (
                                   <div key={cat}>
-                                    <div className="bp-menu__cathead" style={{ borderLeft: `3px solid ${catColor}` }}>
+                                    <button
+                                      type="button"
+                                      className="bp-menu__cathead bp-menu__cathead--btn"
+                                      style={{ borderLeft: `3px solid ${catColor}` }}
+                                      onClick={() => toggleCat(cat)}
+                                    >
+                                      <ChevronDown size={12} style={{ flexShrink: 0, transition: 'transform .15s', transform: expanded ? 'none' : 'rotate(-90deg)', opacity: 0.6 }} />
                                       <CatIcon size={11} style={{ color: catColor, flexShrink: 0 }} />
-                                      <span>{cat}</span>
-                                    </div>
-                                    {addable.filter((n) => n.category === cat).map((n) => (
+                                      <span style={{ flex: 1 }}>{cat}</span>
+                                      <span style={{ fontSize: 10, fontWeight: 700, opacity: 0.5 }}>{catItems.length}</span>
+                                    </button>
+                                    {expanded && catItems.map((n) => (
                                       <button
                                         key={n.kind}
                                         className="bp-menu__item"

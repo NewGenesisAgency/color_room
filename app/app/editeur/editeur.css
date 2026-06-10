@@ -842,6 +842,24 @@
   padding-left: 12px;
 }
 
+/* En-tête de catégorie cliquable (repli/dépli) */
+.bp-menu__cathead--btn {
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: none;
+  border-radius: 9px;
+  padding: 8px 10px 8px 9px;
+  margin-top: 2px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.12s;
+}
+
+.bp-menu__cathead--btn:hover {
+  background: rgba(22,30,60,0.05);
+}
+
 .bp-menu__title {
   font-weight: 750;
   font-size: 13px;
