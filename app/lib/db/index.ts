@@ -23,21 +23,10 @@ function migrate(db: Database.Database) {
   db.pragma('busy_timeout = 5000');
   db.pragma('foreign_keys = ON');
 
-  db.exec(
-    "CREATE TABLE IF NOT EXISTS crg_flows (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, flow_json TEXT NOT NULL, updated_at TEXT NOT NULL DEFAULT (datetime('now')));",
-  );
-  db.exec(
-    "CREATE TABLE IF NOT EXISTS crg_runtime_runs (id TEXT PRIMARY KEY, flow_name TEXT NOT NULL, started_at TEXT NOT NULL DEFAULT (datetime('now')), finished_at TEXT, status TEXT NOT NULL);",
-  );
-  db.exec(
-    "CREATE TABLE IF NOT EXISTS crg_runtime_logs (id INTEGER PRIMARY KEY AUTOINCREMENT, run_id TEXT NOT NULL, ts TEXT NOT NULL DEFAULT (datetime('now')), level TEXT NOT NULL, message TEXT NOT NULL, data_json TEXT, FOREIGN KEY(run_id) REFERENCES crg_runtime_runs(id));",
-  );
-  db.exec('CREATE INDEX IF NOT EXISTS idx_crg_runtime_logs_run ON crg_runtime_logs(run_id);');
-
-  db.exec(
-    "CREATE TABLE IF NOT EXISTS crg_morpion_rooms (id TEXT PRIMARY KEY, created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now')), player_x_token TEXT NOT NULL, player_o_token TEXT, board_json TEXT NOT NULL, turn TEXT NOT NULL, winner TEXT, status TEXT NOT NULL DEFAULT 'waiting');",
-  );
-  db.exec('CREATE INDEX IF NOT EXISTS idx_crg_morpion_updated ON crg_morpion_rooms(updated_at);');
+  // Note : les tables crg_flows / crg_runtime_* / crg_morpion_rooms ont été
+  // retirées avec leurs sous-systèmes (ancien éditeur "flow", moteur runtime,
+  // morpion remplacé par le Puissance 4). Aucune migration de suppression n'est
+  // nécessaire : on cesse simplement de les créer.
 
   db.exec(
     "CREATE TABLE IF NOT EXISTS crg_mp_sessions (id TEXT PRIMARY KEY, created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now')), status TEXT NOT NULL, game_id TEXT NOT NULL, state_json TEXT NOT NULL);",
