@@ -1,5 +1,37 @@
 'use client';
 
+/**
+ * @file app/editeur/page.tsx
+ * @brief Éditeur de jeux ColorRoom : blocs blueprint + designer d'UI + chat IA.
+ *
+ * Fichier très volumineux (~8800 lignes) implémentant l'éditeur de serious
+ * games (interface inspirée d'Unreal). Vue d'ensemble des grandes sections :
+ *
+ *  - IMPORTS & MODULES LAZY : chargement dynamique (ssr:false) des modules
+ *    lourds — vue 3D (Room3D / Three.js), aperçu Tetris, éditeur Python
+ *    (PythonEditor / Pyodide), designer d'interface (UIDesigner) et panneau de
+ *    mesure CS-160 (CS160Panel).
+ *  - TYPES & MODÈLES : fabrique d'identifiants, état des dalles, et surtout la
+ *    grande union EditorNodeKind décrivant tous les types de blocs disponibles
+ *    (événements, contrôle de flux, maths/logique, accès aux dalles, jeux
+ *    intégrés, son/vibration, score/variables, aléatoire, etc.), ainsi que les
+ *    structures de nœuds, de liens et de blueprint.
+ *  - GRAPHE BLUEPRINT : création/édition/suppression de nœuds et de connexions,
+ *    sérialisation/chargement des jeux, validation.
+ *  - DESIGNER D'UI : placement de composants d'interface (boutons, sliders,
+ *    D-pad, affichages couleur…) via UIDesigner.
+ *  - CHAT IA : assistant de génération/édition de jeux.
+ *  - APERÇU & MATÉRIEL : prévisualisation du jeu, conversions couleur → canaux,
+ *    envoi aux dalles, intégration sons (lib/audio/sfx) et opérations logiques
+ *    (lib/game/logicOps).
+ *  - COACHMARKS : visite guidée de l'éditeur.
+ *  - RENDU PRINCIPAL : composant page assemblant la palette de blocs, le canvas
+ *    du graphe, les panneaux de propriétés, l'aperçu et le designer d'UI.
+ *
+ * NOTE : en raison de sa taille, ce fichier n'est documenté qu'au niveau de cet
+ * en-tête (pas de JSDoc par fonction).
+ */
+
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import dynamic from 'next/dynamic';

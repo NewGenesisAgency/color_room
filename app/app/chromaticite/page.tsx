@@ -127,14 +127,31 @@ function xyToRgb255(x: number, y: number): { r: number; g: number; b: number } |
 const SRGB_PRIMARIES = [[0.64, 0.33], [0.30, 0.60], [0.15, 0.06]];
 
 // ── Hardware API ─────────────────────────────────────────────────────────────
+/**
+ * @brief Renvoie les profils RGB des 32 canaux selon le type de dalle.
+ * @param tileType Type de dalle ('rouge' ou 'bleu').
+ * @returns Un tableau de profils { rgb, strength } pour chaque canal.
+ */
 function getChannelProfiles(tileType: TileType): { rgb: [number, number, number]; strength: number }[] {
   const src = tileType === 'bleu' ? CHANNELS_BLEU : CHANNELS_ROUGE;
   return src.map(ch => ({ rgb: ch.rgb, strength: 1.0 }));
 }
 
+/** @brief Borne une valeur dans l'intervalle [lo, hi]. */
 function clamp(v: number, lo: number, hi: number) { return Math.max(lo, Math.min(hi, v)); }
 
-// Produit des valeurs 0–100 (cohérent avec jeux/page.tsx et editeur/page.tsx)
+/**
+ * @brief Convertit une couleur RGB en 32 valeurs de canaux LED (échelle 0–100).
+ *
+ * Choisit le canal spectral dont l'orientation RGB est la plus proche de la
+ * couleur cible, lui applique l'énergie, puis ajoute un renfort de blanc.
+ * Échelle 0–100 cohérente avec jeux/page.tsx et editeur/page.tsx.
+ *
+ * @param r,g,b Composantes RGB (0..255).
+ * @param intensity Intensité globale (0..100).
+ * @param tileType Type de dalle (défaut 'rouge').
+ * @returns Le tableau des 32 valeurs de canaux (0..100).
+ */
 function rgbToChannels32(r: number, g: number, b: number, intensity: number, tileType: TileType = 'rouge'): number[] {
   const CHANNEL_PROFILES = getChannelProfiles(tileType);
   const rn = clamp(r, 0, 255) / 255;
@@ -170,6 +187,16 @@ function rgbToChannels32(r: number, g: number, b: number, intensity: number, til
   return channels.map(v => clamp(Math.round(v), 0, 100));
 }
 
+/**
+ * @brief Envoie une couleur (encodée en 32 canaux) sur les 42 dalles.
+ *
+ * Anti-flood : une seule requête batch /api/supervision/batch pour les 42
+ * dalles (au lieu de 42 POST), avec fast et force.
+ *
+ * @param r,g,b Composantes RGB de la couleur.
+ * @param intensity Intensité globale (défaut 85).
+ * @param tileType Type de dalle (défaut 'rouge').
+ */
 async function sendColorToAllPlates(r: number, g: number, b: number, intensity = 85, tileType: TileType = 'rouge') {
   // Anti-flood : 1 seule requête batch pour les 42 dalles (au lieu de 42 POST).
   const channelArray = rgbToChannels32(r, g, b, intensity, tileType).map((v, i) => ({ index: i, value: v }));
@@ -182,6 +209,7 @@ async function sendColorToAllPlates(r: number, g: number, b: number, intensity =
   }).then(() => {}).catch(() => {});
 }
 
+/** @brief Éteint les 42 dalles (tous canaux à 0) via une requête batch. */
 function clearAllPlates() {
   const channels = Array.from({ length: 32 }, (_, i) => ({ index: i, value: 0 }));
   const plates = Array.from({ length: 42 }, (_, i) => ({ plateId: i + 1, channels }));
@@ -194,6 +222,15 @@ function clearAllPlates() {
 }
 
 // ── Component ────────────────────────────────────────────────────────────────
+/**
+ * @brief Composant de la page du diagramme de chromaticité CIE 1931.
+ *
+ * Dessine le diagramme sur canvas, gère le survol/clic via la surcouche SVG,
+ * le type de dalle, l'intensité, le mode live et l'envoi de la couleur
+ * sélectionnée aux dalles.
+ *
+ * @returns L'arbre JSX de la page de chromaticité.
+ */
 export default function ChromaticitePage() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const svgRef = useRef<SVGSVGElement | null>(null);
@@ -238,7 +275,10 @@ export default function ChromaticitePage() {
     ctx.putImageData(img, 0, 0);
   }, []);
 
-  // Send cursor color to plates live (debounced 40ms)
+  /**
+   * @brief Envoie la couleur sous le curseur aux dalles en mode live (debounce 40 ms).
+   * @param x,y Chromaticité du curseur.
+   */
   const sendLiveToPlates = useCallback((x: number, y: number) => {
     if (!liveOnPlates) return;
     window.clearTimeout(hwTimerRef.current);
@@ -249,6 +289,7 @@ export default function ChromaticitePage() {
     }, 40);
   }, [liveOnPlates, intensity, tileType]);
 
+  /** @brief Met à jour le curseur (et l'envoi live) au déplacement de la souris. */
   function handleMouseMove(e: React.MouseEvent<SVGSVGElement>) {
     const rect = svgRef.current?.getBoundingClientRect();
     if (!rect) return;
@@ -261,6 +302,7 @@ export default function ChromaticitePage() {
     if (inHorseshoe(cx, cy)) sendLiveToPlates(cx, cy);
   }
 
+  /** @brief Sélectionne la couleur au point cliqué sur le diagramme. */
   function handleClick(e: React.MouseEvent<SVGSVGElement>) {
     const rect = svgRef.current?.getBoundingClientRect();
     if (!rect) return;
@@ -272,6 +314,7 @@ export default function ChromaticitePage() {
     setSelected({ x: cx, y: cy });
   }
 
+  /** @brief Envoie la couleur sélectionnée aux dalles (avec retour visuel « Envoyé »). */
   async function handleSendToPlates() {
     if (!selected) return;
     const c = xyToRgb255(selected.x, selected.y);
@@ -309,7 +352,11 @@ export default function ChromaticitePage() {
   const curSvg = cursor ? xyToSvg(cursor.x, cursor.y) : null;
   const selSvg = selected ? xyToSvg(selected.x, selected.y) : null;
 
-  // Approximate closest wavelength from selected xy
+  /**
+   * @brief Estime la longueur d'onde dominante la plus proche d'une chromaticité.
+   * @param x,y Chromaticité sélectionnée.
+   * @returns La longueur d'onde (nm) si suffisamment proche du locus, sinon null.
+   */
   function approxWavelength(x: number, y: number): number | null {
     let best = Infinity, bestNm = null;
     for (const { idx, nm } of WL_LABELS) {

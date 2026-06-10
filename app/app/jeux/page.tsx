@@ -1,5 +1,36 @@
 'use client';
 
+/**
+ * @file app/jeux/page.tsx
+ * @brief Page principale des serious games + runtime des jeux de l'éditeur + multijoueur.
+ *
+ * Fichier volumineux (~6300 lignes) regroupant toute l'expérience « Jeux » de
+ * ColorRoom. Vue d'ensemble des grandes sections :
+ *
+ *  - IMPORTS & MODULES LAZY : chargement dynamique (ssr:false) des jeux lourds
+ *    (Tetris, Color Speed, Maître du Blanc, Puissance 4, Métamérisme,
+ *    Chromaticité, Canal Mix, Snake, Intrus, Libre RGB…), de la vue 3D
+ *    (Room3D / Three.js), des contrôles tactiles, du widget de mesure CIE et
+ *    des pages Spectre/Chromaticité réutilisées en intégré.
+ *  - TYPES & MODÈLES : utilisateur/niveau, jeux du catalogue, état des dalles,
+ *    types des blueprints d'éditeur (nœuds/liens) et des layouts d'UI.
+ *  - HELPERS COULEUR & MATÉRIEL : conversions RGB ↔ 32 canaux LED, remapping
+ *    rouge/bleu, envoi groupé aux 42 dalles via /api/supervision/batch.
+ *  - AUTHENTIFICATION & SCORES : connexion (LoginScreen), session courante,
+ *    soumission des scores, intégration des classes.
+ *  - CATALOGUE & SÉLECTION DE JEUX : liste des jeux natifs et des jeux créés
+ *    dans l'éditeur, lancement et arrêt.
+ *  - RUNTIME DES JEUX ÉDITEUR : interprétation des blueprints (graphes de
+ *    nœuds, opérations logiques/maths via lib/game/logicOps), rendu de l'UI
+ *    personnalisée (UIDesigner) et exécution Python via Pyodide.
+ *  - MULTIJOUEUR : sessions, QR codes de jonction, manettes téléphone.
+ *  - RENDU PRINCIPAL : composant page assemblant menu, sélection, plateau de
+ *    dalles (2D/3D), HUD de score et l'écran du jeu actif.
+ *
+ * NOTE : en raison de sa taille, ce fichier n'est documenté qu'au niveau de cet
+ * en-tête (pas de JSDoc par fonction).
+ */
+
 import { useEffect, useMemo, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import type { TetrisSnapshot } from '@/app/_components/TetrisGame';
