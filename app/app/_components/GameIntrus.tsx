@@ -149,6 +149,7 @@ export default function GameIntrus({ onSendColor, onTurnOff, onTurnOffAll, onQui
     if (selected === null || phase !== 'playing' || measuring) return;
     setMeasuring(true);
     let reading: Reading | null = null;
+    let detail = '';
     try {
       const res = await fetch('/api/cs160', {
         method: 'POST',
@@ -161,10 +162,10 @@ export default function GameIntrus({ onSendColor, onTurnOff, onTurnOffAll, onQui
         if (Number.isFinite(x) && Number.isFinite(y) && Number.isFinite(Lv)) {
           reading = { x, y, Lv };
         }
-      }
+      } else if (data?.error) detail = String(data.error);
     } catch { /* appareil indisponible */ }
     if (!reading) {
-      setMsg('CS-160 non connecté — pointez l\'appareil sur une dalle et réessayez.');
+      setMsg(`CS-160 indisponible${detail ? ` (${detail})` : ''} — pointez l'appareil sur une dalle et réessayez.`);
       setMeasuring(false);
       return;
     }

@@ -2884,7 +2884,9 @@ export default function JeuxPage() {
         const varX  = String(params.varX  ?? 'meas_x');
         const varY  = String(params.varY  ?? 'meas_y');
         const varLv = String(params.varLv ?? 'meas_lv');
-        const timeoutSec = Math.max(1, Math.min(30, Number(params.timeoutSec ?? params.timeout ?? 10)));
+        // 25 s par défaut : couvre l'auto-connexion serveur (connect + délai de
+        // stabilisation + 2 tentatives de mesure) quand l'appareil était fermé.
+        const timeoutSec = Math.max(1, Math.min(30, Number(params.timeoutSec ?? params.timeout ?? 25)));
         (async () => {
           try {
             const res = await fetch('/api/cs160', {
@@ -3033,6 +3035,10 @@ export default function JeuxPage() {
         const durationMs = Math.max(200, getNum(params, 'durationMs', 2000));
         const startT = Date.now();
         const c01 = (v: number) => Math.max(0, Math.min(1, v));
+        // Anti-flood : on quantifie les valeurs pour que la déduplication de
+        // scheduleSetCanal supprime les frames identiques (supervision.exe est
+        // lent ; envoyer 42 dalles à haute cadence sature sa file).
+        const lastStrobeOnRef = { on: null as boolean | null };
         const hslToRgb = (h: number, s: number, l: number): TargetColor => {
           s /= 100; l /= 100; const k = (n: number) => (n + h / 30) % 12;
           const a = s * Math.min(l, 1 - l);
@@ -3046,16 +3052,25 @@ export default function JeuxPage() {
           const colorsState = Array(42).fill('#000000'); const activeState = Array(42).fill(false);
           if (node.kind === 'anim_fade') {
             const from = c01(getNum(params, 'fromIntensity', 0)); const to = c01(getNum(params, 'toIntensity', 1));
-            const t = Math.min(1, elapsed / durationMs); const inten = Math.round((from + (to - from) * t) * 90);
+            // Intensité quantifiée par pas de 5 : les frames intermédiaires
+            // identiques sont dédupliquées (zéro requête superflue).
+            const t = Math.min(1, elapsed / durationMs); const inten = Math.round(((from + (to - from) * t) * 90) / 5) * 5;
             const hex = getColor(params, 'color', '#ffffff'); const rgb = hexToRgb255(hex);
             for (let i = 0; i < 42; i++) { const pid = PLATE_ID_BY_INDEX[i]; if (pid) sendRgbToPlate(rgb, inten, pid); colorsState[i] = hex; activeState[i] = inten > 0; }
           } else if (node.kind === 'anim_strobe') {
-            const hz = Math.max(0.5, getNum(params, 'hz', 4)); const on = Math.sin(elapsed / 1000 * hz * 2 * Math.PI) > 0;
+            const hz = Math.max(0.5, Math.min(2, getNum(params, 'hz', 1))); const on = Math.sin(elapsed / 1000 * hz * 2 * Math.PI) > 0;
             const hex = getColor(params, 'color', '#ffffff'); const rgb = on ? hexToRgb255(hex) : { r: 0, g: 0, b: 0 };
-            for (let i = 0; i < 42; i++) { const pid = PLATE_ID_BY_INDEX[i]; if (pid) sendRgbToPlate(rgb, on ? 90 : 0, pid); colorsState[i] = on ? hex : '#000000'; activeState[i] = on; }
+            // N'envoie au matériel QUE quand l'état on/off change réellement.
+            if (lastStrobeOnRef.on !== on) {
+              lastStrobeOnRef.on = on;
+              for (let i = 0; i < 42; i++) { const pid = PLATE_ID_BY_INDEX[i]; if (pid) sendRgbToPlate(rgb, on ? 90 : 0, pid); }
+            }
+            for (let i = 0; i < 42; i++) { colorsState[i] = on ? hex : '#000000'; activeState[i] = on; }
           } else if (node.kind === 'anim_rainbow') {
             const speed = Math.max(0.1, getNum(params, 'speed', 1));
-            for (let i = 0; i < 42; i++) { const pid = PLATE_ID_BY_INDEX[i]; const hue = ((elapsed / 1000 * speed * 60) + (i / 42) * 360) % 360; const rgb = hslToRgb(hue, 90, 55); if (pid) sendRgbToPlate(rgb, 85, pid); colorsState[i] = rgbHex(rgb); activeState[i] = true; }
+            // Teinte quantifiée par pas de 24° : ~15 paliers visibles au lieu
+            // d'un dégradé continu qui re-envoyait 42 dalles à chaque frame.
+            for (let i = 0; i < 42; i++) { const pid = PLATE_ID_BY_INDEX[i]; const hue = (Math.round((((elapsed / 1000 * speed * 60) + (i / 42) * 360) % 360) / 24) * 24) % 360; const rgb = hslToRgb(hue, 90, 55); if (pid) sendRgbToPlate(rgb, 85, pid); colorsState[i] = rgbHex(rgb); activeState[i] = true; }
           } else { // anim_wave
             const speed = Math.max(0.1, getNum(params, 'speed', 1)); const dir = String(params.direction ?? 'left');
             const hex = getColor(params, 'color', '#00d7ff'); const rgb = hexToRgb255(hex);
@@ -3072,7 +3087,7 @@ export default function JeuxPage() {
             return;
           }
           applyFrame();
-        }, 120);
+        }, 400); // cadence matérielle raisonnable : supervision.exe est série et lent
         hudGraphRunRef.current.timers.push(iv);
         return;
       }

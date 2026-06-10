@@ -64,9 +64,14 @@ export async function POST(req: NextRequest) {
         if (!r.success) {
           // Auto-connexion : contrairement à /mesure (bouton « Connecter »), les
           // jeux mesurent directement. Si l'appareil n'est pas ouvert, on le
-          // connecte puis on réessaie une fois.
+          // connecte, on lui laisse un délai de stabilisation, puis on réessaie
+          // (jusqu'à 2 fois) — sur /mesure ce délai est naturellement assuré
+          // par le geste humain entre « Connecter » et « Mesurer ».
           await cs160Bridge.connect();
-          r = await cs160Bridge.measure();
+          for (let tentative = 0; tentative < 2 && !r.success; tentative++) {
+            await new Promise((resolve) => setTimeout(resolve, 800));
+            r = await cs160Bridge.measure();
+          }
         }
         if (!r.success) return NextResponse.json(r);
         // Measure response is direct: { timestamp, xyz, lvxy }

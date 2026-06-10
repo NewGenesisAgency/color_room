@@ -350,6 +350,7 @@ export default function GameCanalMix({
     setMeasuring(true);
     setMsg('Mesure en cours…');
     let result: {x:number;y:number;Lv:number}|null = null;
+    let detail = '';
     try {
       const res = await fetch('/api/cs160', {
         method: 'POST',
@@ -360,11 +361,11 @@ export default function GameCanalMix({
       if (data.success && data.data?.lvxy) {
         const {Lv, x, y} = data.data.lvxy;
         if (Number.isFinite(x) && Number.isFinite(y)) result = {x, y, Lv};
-      }
+      } else if (data?.error) detail = String(data.error);
     } catch { /* appareil absent */ }
 
     if (!result) {
-      setMsg('CS-160 non connecté — pointez l\'appareil sur une dalle de la salle droite et réessayez.');
+      setMsg(`CS-160 indisponible${detail ? ` (${detail})` : ''} — pointez l'appareil sur une dalle de la salle droite et réessayez.`);
       setMeasuring(false);
       return;
     }
