@@ -856,6 +856,19 @@
   padding-left: 12px;
 }
 
+/* Menu contextuel d'un nœud (clic droit) — compact, sans recherche */
+.bp-menu--node { padding: 6px; }
+.bp-menu__nodehead {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #94a3b8;
+  padding: 6px 8px 7px;
+  border-bottom: 1px solid rgba(22,30,60,0.06);
+  margin-bottom: 4px;
+}
+
 /* En-tête de catégorie cliquable (repli/dépli) */
 .bp-menu__cathead--btn {
   width: 100%;

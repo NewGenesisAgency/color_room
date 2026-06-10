@@ -49,7 +49,7 @@ const CS160Panel = dynamic(() => import('@/app/_components/CS160Panel'), { ssr: 
 const PythonEditor = dynamic(() => import('./PythonEditor'), { ssr: false });
 const UIDesigner = dynamic(() => import('./UIDesigner'), { ssr: false });
 
-import { Boxes, Gamepad2, Plus, Play, Pause, RotateCcw, Save, Trash2, FolderPlus, X, Lightbulb, Layers, Zap, Palette, Clock, MousePointer2, LayoutGrid, Maximize2, Minimize2, Eye, Star, Heart, Sun, Moon, Flame, Snowflake, Music, Target, Puzzle, Sparkles, Trophy, Rocket, Ghost, Dice1, Brain, Check, GitBranch, Hash, Settings2, Shuffle, Search, Users, Film, Thermometer, ScanLine, Wifi, WifiOff, Crown, Gem, Bug, Bot, Atom, Bird, Cat, Dog, Fish, Leaf, Cloud, Droplet, Mountain, Anchor, Bell, Bomb, Camera, Egg, Feather, Gift, Hexagon, Key, Lock, Medal, Pizza, Plane, Rainbow, Skull, Smile, Wand2, Waves, Crosshair, Dice5, Joystick, FlaskConical, Swords, ChevronDown, GraduationCap, SlidersHorizontal, RefreshCw, type LucideIcon } from 'lucide-react';
+import { Boxes, Gamepad2, Plus, Play, Pause, RotateCcw, Save, Trash2, FolderPlus, X, Lightbulb, Layers, Zap, Palette, Clock, MousePointer2, LayoutGrid, Maximize2, Minimize2, Eye, Star, Heart, Sun, Moon, Flame, Snowflake, Music, Target, Puzzle, Sparkles, Trophy, Rocket, Ghost, Dice1, Brain, Check, GitBranch, Hash, Settings2, Shuffle, Search, Users, Film, Thermometer, ScanLine, Wifi, WifiOff, Crown, Gem, Bug, Bot, Atom, Bird, Cat, Dog, Fish, Leaf, Cloud, Droplet, Mountain, Anchor, Bell, Bomb, Camera, Egg, Feather, Gift, Hexagon, Key, Lock, Medal, Pizza, Plane, Rainbow, Skull, Smile, Wand2, Waves, Crosshair, Dice5, Joystick, FlaskConical, Swords, ChevronDown, GraduationCap, SlidersHorizontal, RefreshCw, Copy, Scissors, type LucideIcon } from 'lucide-react';
 
 type IdFactory = () => string;
 
@@ -1190,6 +1190,12 @@ export default function EditeurPage() {
     gy: number;
     q: string;
   }>({ open: false, x: 0, y: 0, gx: 0, gy: 0, q: '' });
+
+  // Menu contextuel d'un NŒUD (clic droit sur un bloc) : actions UE5-like
+  // (dupliquer, activer/désactiver, détacher les liens, supprimer).
+  const [nodeMenu, setNodeMenu] = useState<{ open: boolean; x: number; y: number; nodeId: string }>(
+    { open: false, x: 0, y: 0, nodeId: '' },
+  );
 
   // Catégories dépliées dans la palette d'ajout (repli par défaut = moins de
   // surcharge visuelle ; une recherche force le dépliage de tout).
@@ -3358,6 +3364,47 @@ export default function EditeurPage() {
     setStatus('Nœud supprimé');
   };
 
+  /** Duplique un nœud (copie décalée, sans ses liens). Retourne le nouvel id. */
+  const duplicateNodeById = (nodeId: string): string | null => {
+    const g0 = editorRef.current.games.find((g) => g.id === activeGameId);
+    const src = g0?.nodes.find((n) => n.id === nodeId);
+    if (!src) return null;
+    const newId = randomId();
+    commit((cur) => ({
+      ...cur,
+      games: cur.games.map((g) => g.id !== cur.activeGameId ? g : {
+        ...g,
+        nodes: [...g.nodes, { ...src, id: newId, params: { ...src.params }, pos: { x: src.pos.x + 40, y: src.pos.y + 40 } }],
+      }),
+      selectedNodeId: newId,
+    }));
+    setStatus('Nœud dupliqué');
+    return newId;
+  };
+
+  /** Active ou désactive un nœud (un nœud désactivé est ignoré à l'exécution). */
+  const toggleNodeEnabledById = (nodeId: string) => {
+    commit((cur) => ({
+      ...cur,
+      games: cur.games.map((g) => g.id !== cur.activeGameId ? g : {
+        ...g,
+        nodes: g.nodes.map((nd) => nd.id === nodeId ? { ...nd, enabled: nd.enabled === false ? true : false } : nd),
+      }),
+    }));
+  };
+
+  /** Détache un nœud : supprime tous les câbles entrants et sortants (break links). */
+  const detachNodeById = (nodeId: string) => {
+    commit((cur) => ({
+      ...cur,
+      games: cur.games.map((g) => g.id !== cur.activeGameId ? g : {
+        ...g,
+        edges: g.edges.filter((e) => e.from !== nodeId && e.to !== nodeId),
+      }),
+    }));
+    setStatus('Liens détachés');
+  };
+
   const renameActiveGame = (name: string) => {
     if (!activeGameId) return;
     commit((cur) => ({
@@ -4702,6 +4749,7 @@ export default function EditeurPage() {
                     if ((e.target as HTMLElement).closest('.bp-menu')) return;
                     setPendingLink(null);
                     setContextMenu((p) => ({ ...p, open: false }));
+                    setNodeMenu((p) => ({ ...p, open: false }));
                     setGraphPanning({ active: true, x: e.clientX, y: e.clientY });
                   }}
                   onPointerMove={(e) => {
@@ -4947,9 +4995,21 @@ export default function EditeurPage() {
                           ].filter(Boolean).join(' ')}
                           style={{ left: n.pos.x, top: n.pos.y, ...(aiHighlightIds.has(n.id) ? { outline: '2px solid #a855f7', boxShadow: '0 0 18px rgba(168,85,247,0.55)', borderRadius: 14 } : {}) }}
                           data-nodeid={n.id}
+                          onContextMenu={(e) => {
+                            // Clic droit sur un bloc → menu d'actions du nœud (et NON
+                            // le menu d'ajout du canevas) — comportement type UE5.
+                            e.preventDefault();
+                            e.stopPropagation();
+                            const bp = (e.currentTarget as HTMLElement).closest('.bp') as HTMLElement | null;
+                            const rect = bp?.getBoundingClientRect();
+                            setContextMenu((p) => ({ ...p, open: false }));
+                            commit((cur) => ({ ...cur, selectedNodeId: n.id }));
+                            setNodeMenu({ open: true, x: rect ? e.clientX - rect.left : e.clientX, y: rect ? e.clientY - rect.top : e.clientY, nodeId: n.id });
+                          }}
                           onPointerDown={(e) => {
                             e.stopPropagation();
                             setContextMenu((p) => ({ ...p, open: false }));
+                            setNodeMenu((p) => ({ ...p, open: false }));
                             commit((cur) => ({ ...cur, selectedNodeId: n.id }));
                             beginDrag();
                             setGraphDrag({ nodeId: n.id, x: e.clientX, y: e.clientY });
@@ -5996,6 +6056,38 @@ export default function EditeurPage() {
                       );
                     })}
                   </div>
+                  {/* Menu contextuel d'un NŒUD (clic droit sur un bloc) — actions UE5 */}
+                  {nodeMenu.open ? (() => {
+                    const g = editor.games.find((gg) => gg.id === editor.activeGameId);
+                    const node = g?.nodes.find((n) => n.id === nodeMenu.nodeId);
+                    if (!node) return null;
+                    const close = () => setNodeMenu((p) => ({ ...p, open: false }));
+                    const items: { label: string; icon: React.ReactNode; danger?: boolean; run: () => void }[] = [
+                      { label: 'Dupliquer', icon: <Copy size={14} />, run: () => { duplicateNodeById(node.id); } },
+                      { label: node.enabled === false ? 'Activer' : 'Désactiver', icon: node.enabled === false ? <Check size={14} /> : <X size={14} />, run: () => toggleNodeEnabledById(node.id) },
+                      { label: 'Détacher les liens', icon: <Scissors size={14} />, run: () => detachNodeById(node.id) },
+                      { label: 'Supprimer', icon: <Trash2 size={14} />, danger: true, run: () => removeNodeById(node.id) },
+                    ];
+                    return (
+                      <div className="bp-menu bp-menu--node" style={{ left: nodeMenu.x, top: nodeMenu.y, width: 200 }}>
+                        <div className="bp-menu__nodehead">{labelNodeKind(node.kind)}</div>
+                        <div className="bp-menu__list">
+                          {items.map((it) => (
+                            <button
+                              key={it.label}
+                              className="bp-menu__item"
+                              style={it.danger ? { color: '#dc2626' } : undefined}
+                              onClick={() => { it.run(); close(); }}
+                            >
+                              <span className="bp-menu__chip" style={{ background: it.danger ? 'rgba(220,38,38,0.1)' : 'rgba(22,30,60,0.06)', color: it.danger ? '#dc2626' : '#475569' }}>{it.icon}</span>
+                              <span className="bp-menu__title">{it.label}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })() : null}
+
                   {/* Menu clic-droit : enfant DIRECT de .bp (hors du .bp__content transformé)
                       → non affecté par translate/scale → placé exactement sous le curseur */}
                   {contextMenu.open ? (
