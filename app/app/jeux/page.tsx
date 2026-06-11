@@ -45,7 +45,6 @@ import { getPyodide } from '@/lib/pyodide';
 import { PLATE_TYPE, CHANNELS_ROUGE, CHANNELS_BLEU, getPlateType, MAP_ROUGE_TO_BLEU, remapChannels32 } from '@/lib/tileChannels';
 import { playSfx, vibrate } from '@/lib/audio/sfx';
 import { LOGIC_OP_KINDS, applyLogicOp } from '@/lib/game/logicOps';
-import { SHOW_SCREEN_BOARD } from '@/lib/game/displayMode';
 
 // Modules lourds (3D Three.js, jeux, pages spectre/chromaticité) chargés à la
 // demande : ils n'alourdissent plus le bundle initial de /jeux, ce qui accélère
@@ -243,10 +242,6 @@ function plateIdForIndex(i: number): number {
 const PLATE_ID_BY_INDEX: number[] = Array.from({ length: 42 }, (_, i) => plateIdForIndex(i));
 const INSTRUMENT_PLATE_ID = 1;
 const SPECTRUM_GRAPH_MAX = 100;
-// Pendant une partie, la vue 3D ne doit RIEN révéler (couleurs/dalle allumée) :
-// le joueur regarde la vraie Color Room. La vue reste cliquable, mais neutre.
-const HIDDEN_PLATE_COLORS: string[] = Array(42).fill('#11151f');
-const HIDDEN_PLATE_ACTIVE: boolean[] = Array(42).fill(false);
 
 // Les jeux sont maintenant créés dans l'éditeur et chargés depuis la base de données
 
@@ -1098,6 +1093,7 @@ export default function JeuxPage() {
   const [simonPlayerInput, setSimonPlayerInput] = useState<number[]>([]);
   const [simonLevel, setSimonLevel] = useState<number>(1);
   const simonLevelRef = useRef<number>(1); // Track current level for timing calculations
+  const scoreSubmitLastRef = useRef<Record<string, number>>({});
   const [simonPhase, setSimonPhase] = useState<'showing' | 'input' | 'gameover'>('showing');
   const [simonLitPlate, setSimonLitPlate] = useState<number | null>(null);
   const simonTimerRef = useRef<number>(0);
@@ -3386,13 +3382,18 @@ export default function JeuxPage() {
     if (safePoints > 0) {
       setScorePlusValue(safePoints);
       setScorePlusAnimKey((k) => k + 1);
-      // Persister le delta de score en DB (best-effort, silencieux)
+      // Persister le delta de score en DB — debounce client 6s pour éviter le 429
       const gameName = (hudRun?.name ?? currentGame ?? 'Jeu').slice(0, 100);
-      fetch('/api/scores', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ gameName, score: safePoints }),
-      }).catch(() => {});
+      const now = Date.now();
+      const last = scoreSubmitLastRef.current[gameName] ?? 0;
+      if (now - last >= 6000) {
+        scoreSubmitLastRef.current[gameName] = now;
+        fetch('/api/scores', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ gameName, score: safePoints }),
+        }).catch(() => {});
+      }
     }
   }
 
@@ -4995,8 +4996,8 @@ export default function JeuxPage() {
               </h3>
 
               <Room3D
-                plateColors={gameActive && !SHOW_SCREEN_BOARD ? HIDDEN_PLATE_COLORS : plateColors}
-                plateActive={gameActive && !SHOW_SCREEN_BOARD ? HIDDEN_PLATE_ACTIVE : plateActive}
+                plateColors={plateColors}
+                plateActive={plateActive}
                 onPlateClick={handlePlateClick}
                 height={420}
               />
