@@ -1286,6 +1286,13 @@ export default function EditeurPage() {
     y: 0,
   });
   const [graphDrag, setGraphDrag] = useState<{ nodeId: string; x: number; y: number } | null>(null);
+  /**
+   * Drag DIRECT-DOM : pendant le déplacement d'un bloc, on écrit style.left/top
+   * sur l'élément sans passer par React (un re-render complet de l'éditeur par
+   * pointermove = 100-250 ms → drag injouable). Le déplacement cumulé est
+   * commité dans l'état UNE fois au relâchement (pointerup).
+   */
+  const dragDomRef = useRef<{ el: HTMLElement; startX: number; startY: number; lastX: number; lastY: number; accX: number; accY: number } | null>(null);
   const [pendingLink, setPendingLink] = useState<{ fromNodeId: string } | null>(null);
   const [iconPickerOpen, setIconPickerOpen] = useState(false);
   const [onboardingStep, setOnboardingStep] = useState<number | null>(null); // mini-tuto skippable
@@ -1512,18 +1519,20 @@ export default function EditeurPage() {
     const nodes = editorRef.current.games.find((g) => g.id === activeGameId)?.nodes ?? [];
     if (nodes.length < 2) return;
 
-    // Calcule l'étendue des positions existantes
-    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-    nodes.forEach((n) => {
-      if (n.pos.x < minX) minX = n.pos.x;
-      if (n.pos.x > maxX) maxX = n.pos.x;
-      if (n.pos.y < minY) minY = n.pos.y;
-      if (n.pos.y > maxY) maxY = n.pos.y;
-    });
-    const spread = Math.max(maxX - minX, maxY - minY);
+    // Détection de CHEVAUCHEMENT réel : un bloc fait ~290px de large et
+    // ~160px de haut minimum. Si deux blocs se recouvrent, le jeu a été créé
+    // avec des positions trop serrées (IA, vieux jeu) → réorganisation auto.
+    const NODE_W_MIN = 290, NODE_H_MIN = 150;
+    let overlapping = false;
+    for (let i = 0; i < nodes.length && !overlapping; i++) {
+      for (let j = i + 1; j < nodes.length; j++) {
+        const dx = Math.abs(nodes[i].pos.x - nodes[j].pos.x);
+        const dy = Math.abs(nodes[i].pos.y - nodes[j].pos.y);
+        if (dx < NODE_W_MIN && dy < NODE_H_MIN) { overlapping = true; break; }
+      }
+    }
 
-    // Si les nœuds sont trop serrés (< 200px d'écart), on les réorganise
-    if (spread < 200) {
+    if (overlapping) {
       // Petit délai pour laisser l'état se stabiliser
       const t = setTimeout(() => {
         autoLayoutNodesRef.current?.();
@@ -1681,11 +1690,23 @@ export default function EditeurPage() {
   };
 
   const [t, setT] = useState<number>(0);
+  const lastPreviewJsonRef = useRef<string>('');
   useEffect(() => {
     const start = performance.now();
     const id = window.setInterval(() => {
-      setT((performance.now() - start) / 1000);
-    }, 100); // 10 fps - suffisant pour l'aperçu des tuiles, évite le flood de re-renders
+      const now = (performance.now() - start) / 1000;
+      // PERFORMANCE : re-rendre tout l'éditeur 10 fois/s pour l'aperçu des
+      // tuiles saturait le main thread (Room3D + 10 000 lignes de JSX) même
+      // sur un jeu statique. On calcule l'aperçu ici (pur JS, < 1 ms) et on
+      // ne déclenche le re-render QUE si le rendu des tuiles a changé
+      // (jeu animé : pulse, timeline de fills…). Jeu statique → 0 re-render.
+      const cur = editorRef.current;
+      const g = cur.games.find((x) => x.id === cur.activeGameId);
+      const json = g ? JSON.stringify(computeTiles(g, now)) : '';
+      if (json === lastPreviewJsonRef.current) return;
+      lastPreviewJsonRef.current = json;
+      setT(now);
+    }, 100); // 10 fps quand ça bouge, 0 re-render quand c'est statique
     return () => window.clearInterval(id);
   }, []);
 
@@ -1810,12 +1831,20 @@ export default function EditeurPage() {
    * de 600 ms puis force un re-rendu (debugTick) pour mettre à jour la classe
    * CSS bp-node--running.
    */
+  const debugHadActiveRef = useRef(false);
   useEffect(() => {
     if (!isPlaying) { activeNodesRef.current.clear(); return; }
     const timer = setInterval(() => {
       const now = Date.now();
       activeNodesRef.current.forEach((ts, id) => { if (now - ts > 600) activeNodesRef.current.delete(id); });
-      setDebugTick((t) => (t + 1) % 1_000_000);
+      // PERFORMANCE : ne force un re-rendu QUE si un halo est affiché ou vient
+      // de s'éteindre. Avant, l'éditeur entier (10 000 lignes + Room3D) se
+      // re-rendait 6,7 fois/s en continu, même sans aucun bloc en exécution.
+      const hasActive = activeNodesRef.current.size > 0;
+      if (hasActive || debugHadActiveRef.current) {
+        debugHadActiveRef.current = hasActive;
+        setDebugTick((t) => (t + 1) % 1_000_000);
+      }
     }, 150);
     return () => clearInterval(timer);
   }, [isPlaying]);
@@ -4398,7 +4427,9 @@ export default function EditeurPage() {
   // ── Physique anti-superposition : espace les blocs avec un padding minimal ──
   // Résout les collisions AABB par séparation itérative. Le nœud "ancré" (qu'on
   // vient de poser/déplacer) reste en place, ses voisins s'écartent pour faire place.
-  const NODE_GAP = 28;
+  // Espace minimal laissé entre deux blocs par la physique anti-superposition.
+  // 28px donnait des blocs visuellement « collés » après chaque drop.
+  const NODE_GAP = 60;
   const resolveOverlaps = (anchorId?: string) => {
     const root = bpContentRef.current;
     if (!root) return;
@@ -5709,11 +5740,17 @@ export default function EditeurPage() {
                     }
                     if (graphDrag) {
                       setDragDidMove(true);
-                      const dx = (e.clientX - graphDrag.x) / graphZoom;
-                      const dy = (e.clientY - graphDrag.y) / graphZoom;
-                      setGraphDrag({ nodeId: graphDrag.nodeId, x: e.clientX, y: e.clientY });
-                      moveNode(graphDrag.nodeId, dx, dy);
-                      requestAnimationFrame(() => requestAnimationFrame(() => measurePinsRef.current?.()));
+                      // PERFORMANCE : déplacement DIRECT-DOM, aucun setState ici.
+                      // Le bloc suit le pointeur à 60 fps ; l'état React (et les
+                      // câbles) sont synchronisés une seule fois au pointerup.
+                      const d = dragDomRef.current;
+                      if (d) {
+                        d.accX += (e.clientX - d.lastX) / graphZoom;
+                        d.accY += (e.clientY - d.lastY) / graphZoom;
+                        d.lastX = e.clientX; d.lastY = e.clientY;
+                        d.el.style.left = `${d.startX + d.accX}px`;
+                        d.el.style.top = `${d.startY + d.accY}px`;
+                      }
                       return;
                     }
                     if (!graphPanning.active) return;
@@ -5725,6 +5762,13 @@ export default function EditeurPage() {
                   onPointerUp={(e) => {
                     setGraphPanning({ active: false, x: 0, y: 0 });
                     const droppedId = graphDrag?.nodeId;
+                    // Commit UNIQUE du déplacement accumulé pendant le drag direct-DOM
+                    // (l'état React + les câbles se synchronisent en un seul render).
+                    const d = dragDomRef.current;
+                    if (droppedId && d && (d.accX !== 0 || d.accY !== 0)) {
+                      moveNode(droppedId, d.accX, d.accY);
+                    }
+                    dragDomRef.current = null;
                     setGraphDrag(null);
                     endDrag();
                     if (droppedId) requestAnimationFrame(() => resolveOverlaps(droppedId));
@@ -6112,7 +6156,14 @@ export default function EditeurPage() {
                             !n.enabled ? 'bp-node--disabled' : '',
                             enCours ? 'bp-node--running' : '',
                           ].filter(Boolean).join(' ')}
-                          style={{ left: n.pos.x, top: n.pos.y, ...(aiHighlightIds.has(n.id) ? { outline: '2px solid #a855f7', boxShadow: '0 0 18px rgba(168,85,247,0.55)', borderRadius: 14 } : {}) }}
+                          style={{
+                            // Pendant un drag direct-DOM, les re-renders (tick aperçu 10 fps)
+                            // doivent lire la position LIVE du ref, sinon le bloc saute en
+                            // arrière vers sa position d'état toutes les 100 ms.
+                            left: graphDrag?.nodeId === n.id && dragDomRef.current ? dragDomRef.current.startX + dragDomRef.current.accX : n.pos.x,
+                            top: graphDrag?.nodeId === n.id && dragDomRef.current ? dragDomRef.current.startY + dragDomRef.current.accY : n.pos.y,
+                            ...(aiHighlightIds.has(n.id) ? { outline: '2px solid #a855f7', boxShadow: '0 0 18px rgba(168,85,247,0.55)', borderRadius: 14 } : {}),
+                          }}
                           data-nodeid={n.id}
                           onContextMenu={(e) => {
                             // Clic droit sur un bloc → menu d'actions du nœud (et NON
@@ -6132,6 +6183,14 @@ export default function EditeurPage() {
                             commit((cur) => ({ ...cur, selectedNodeId: n.id }));
                             beginDrag();
                             setGraphDrag({ nodeId: n.id, x: e.clientX, y: e.clientY });
+                            // Drag direct-DOM : on mémorise l'élément et la position
+                            // de départ ; pointermove écrira style.left/top sans React.
+                            dragDomRef.current = {
+                              el: e.currentTarget as HTMLElement,
+                              startX: n.pos.x, startY: n.pos.y,
+                              lastX: e.clientX, lastY: e.clientY,
+                              accX: 0, accY: 0,
+                            };
                           }}
                           onDoubleClick={(e) => {
                             e.stopPropagation();

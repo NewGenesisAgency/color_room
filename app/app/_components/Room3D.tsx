@@ -193,6 +193,20 @@ export default function Room3D({ plateColors, plateActive, onPlateClick, height 
   activeRef.current = plateActive;
   clickRef.current  = onPlateClick;
 
+  /**
+   * Rendu WebGL À LA DEMANDE : la boucle rAF ne dessine que si quelque chose a
+   * changé (couleurs des dalles, tween caméra en cours, resize). Avant, la
+   * scène était re-rendue à CHAQUE frame (~30-40 ms/frame en continu), ce qui
+   * saturait le main thread de l'éditeur même au repos.
+   */
+  const dirtyRef = useRef(true);
+  const lastPropsKeyRef = useRef('');
+  const propsKey = plateColors.join('|') + '#' + plateActive.join('|');
+  if (propsKey !== lastPropsKeyRef.current) {
+    lastPropsKeyRef.current = propsKey;
+    dirtyRef.current = true;
+  }
+
   const [view, setView] = useState<RV>('overview');
   const viewRef  = useRef<RV>('overview');
   const pivotRef = useRef<THREE.Group | null>(null);
@@ -449,10 +463,15 @@ export default function Room3D({ plateColors, plateActive, onPlateClick, height 
       el.style.display = ok && !tweening.current && viewRef.current === 'overview' ? 'block' : 'none';
     }
 
-    // ── Render loop ───────────────────────────────────────────────
+    // ── Render loop (à la demande : skip si rien n'a changé) ──────
     let raf = 0;
     const loop = () => {
       raf = requestAnimationFrame(loop);
+      const animating = tweening.current
+        || gsap.isTweening(pivot.rotation)
+        || gsap.isTweening(pivot.position);
+      if (!animating && !dirtyRef.current) return;
+      dirtyRef.current = false;
       camera.lookAt(CAM_TGT);
 
       plateMats.forEach((pm, i) => {
@@ -493,6 +512,7 @@ export default function Room3D({ plateColors, plateActive, onPlateClick, height 
       camera.aspect = nw / H;
       camera.updateProjectionMatrix();
       renderer.setSize(nw, H);
+      dirtyRef.current = true;
     });
     ro.observe(mount);
 

@@ -746,13 +746,13 @@
 .bp-wire__hit {
   fill: none;
   stroke: transparent;
-  stroke-width: 14;
+  stroke-width: 10;
   pointer-events: stroke;
   cursor: pointer;
 }
 
 .bp-wire__hit:hover {
-  stroke: rgba(220,38,38,0.22);
+  stroke: rgba(220,38,38,0.14);
 }
 
 .bp-menu {
@@ -897,39 +897,34 @@
   opacity: 0.7;
 }
 
-/* ── Liaisons façon Unreal Engine : pointillés qui défilent le long du fil ── */
+/* ── Liaisons : trait fin minimaliste, STATIQUE au repos ──────────────────────
+   PERFORMANCE : pas de drop-shadow SVG ni d'animation infinie sur les câbles
+   au repos (chaque câble animé + filtré repeint le canvas en continu → lag).
+   L'animation de flux n'existe que pendant la création d'un lien (--preview)
+   et pendant l'exécution (--active). */
 .bp-wire {
   fill: none;
-  stroke: color-mix(in srgb, var(--c-action) 78%, transparent);
-  stroke-width: 2.4;
-  opacity: 0.85;
+  stroke: rgba(67,97,238,0.45);
+  stroke-width: 2;
   stroke-linecap: round;
-  filter: drop-shadow(0 0 5px color-mix(in srgb, var(--c-action) 50%, transparent));
-  stroke-dasharray: 5 11;          /* dash court + gros gap → flux de données */
-  animation: bp-wire-flow 0.65s linear infinite;
 }
 
-/* L'offset négatif fait avancer les pointillés du départ vers l'arrivée.
-   La période (5+11=16) = amplitude de l'offset → boucle sans saccade. */
 @keyframes bp-wire-flow {
   to { stroke-dashoffset: -16; }
 }
 
 .bp-wire--preview {
-  opacity: 1;
-  stroke: color-mix(in srgb, var(--c-action) 88%, white 22%);
-  stroke-width: 2.6;
-  stroke-dasharray: 5 9;
-  filter: drop-shadow(0 0 8px color-mix(in srgb, var(--c-action) 65%, transparent));
+  stroke: rgba(67,97,238,0.75);
+  stroke-width: 2.2;
+  stroke-dasharray: 5 11;
   animation: bp-wire-flow 0.5s linear infinite;
 }
 
 .bp-wire--active {
-  stroke: color-mix(in srgb, var(--c-action) 92%, white 12%);
-  opacity: 1;
-  stroke-width: 2.8;
-  filter: drop-shadow(0 0 10px color-mix(in srgb, var(--c-action) 70%, transparent));
-  animation-duration: 0.45s;
+  stroke: rgba(67,97,238,0.85);
+  stroke-width: 2.4;
+  stroke-dasharray: 5 11;
+  animation: bp-wire-flow 0.45s linear infinite;
 }
 
 .bp-node {
@@ -938,19 +933,19 @@
   width: 290px;
   border-radius: 18px;
   border: 1px solid rgba(255,255,255,0.9);
-  /* Liquid glass blanc : voile clair très translucide + reflet doux */
-  background: linear-gradient(180deg, rgba(255,255,255,0.86) 0%, rgba(255,255,255,0.72) 100%);
-  backdrop-filter: blur(34px) saturate(180%);
-  -webkit-backdrop-filter: blur(34px) saturate(180%);
+  /* Liquid glass blanc PERFORMANT : dégradé quasi-opaque + reflet doux.
+     PAS de backdrop-filter ici — un blur par bloc force le GPU à recomposer
+     tout le canvas à chaque frame (drag impossible, lag massif). Le rendu
+     reste identique car le fond du canvas est uni et clair. */
+  background: linear-gradient(180deg, rgba(255,255,255,0.97) 0%, rgba(250,251,254,0.93) 100%);
   box-shadow:
     inset 0 1px 0 rgba(255,255,255,0.95),
-    inset 0 0 0 1px rgba(255,255,255,0.35),
-    0 1px 2px rgba(22,30,60,0.04),
-    0 10px 30px rgba(22,30,60,0.08);
+    0 1px 2px rgba(22,30,60,0.05),
+    0 8px 24px rgba(22,30,60,0.08);
   user-select: none;
   padding: 0;
   overflow: hidden;
-  transition: transform 0.18s cubic-bezier(.2,.8,.2,1), box-shadow 0.18s ease, border-color 0.18s ease;
+  transition: box-shadow 0.15s ease, border-color 0.15s ease;
 }
 
 /* Pastille d'icône colorée (catégorie) — minimaliste */
@@ -969,8 +964,7 @@
   box-shadow:
     inset 0 1px 0 rgba(255,255,255,1),
     0 6px 18px rgba(67,97,238,0.12),
-    0 14px 36px rgba(22,30,60,0.10);
-  transform: translateY(-2px);
+    0 12px 30px rgba(22,30,60,0.10);
 }
 
 .bp-node:active {
@@ -1090,10 +1084,8 @@
   opacity: 0.8;
   padding: 6px 8px;
   border-radius: 14px;
-  border: 1px solid color-mix(in srgb, var(--c-light) 14%, transparent);
-  background: color-mix(in srgb, var(--c-glass) 10%, transparent);
-  backdrop-filter: blur(14px) saturate(var(--saturation));
-  -webkit-backdrop-filter: blur(14px) saturate(var(--saturation));
+  border: 1px solid rgba(22,30,60,0.08);
+  background: rgba(255,255,255,0.6);
 }
 
 .bp-node__vars {
@@ -1134,13 +1126,9 @@
   gap: 6px;
   padding: 6px;
   border-radius: 14px;
-  border: 1px solid color-mix(in srgb, var(--c-light) 16%, transparent);
-  background:
-    radial-gradient(circle at 20% 0%, color-mix(in srgb, var(--c-light) 60%, transparent), transparent 58%),
-    color-mix(in srgb, var(--c-glass) 10%, transparent);
-  backdrop-filter: blur(14px) saturate(var(--saturation));
-  -webkit-backdrop-filter: blur(14px) saturate(var(--saturation));
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c-light) 12%, transparent);
+  border: 1px solid rgba(22,30,60,0.08);
+  background: rgba(246,248,252,0.9);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.9);
 }
 
 .bp-node__segbtn {
@@ -1234,15 +1222,9 @@
   align-items: center;
   padding: 8px;
   border-radius: 14px;
-  border: 1px solid color-mix(in srgb, var(--c-light) 18%, transparent);
-  background:
-    radial-gradient(circle at 18% 0%, rgba(255, 255, 255, 0.46), rgba(255, 255, 255, 0.08) 52%, transparent 78%),
-    linear-gradient(180deg, color-mix(in srgb, var(--c-glass) 16%, transparent), color-mix(in srgb, var(--c-glass) 8%, transparent));
-  backdrop-filter: blur(18px) saturate(var(--saturation));
-  -webkit-backdrop-filter: blur(18px) saturate(var(--saturation));
-  box-shadow:
-    inset 0 0 0 1px color-mix(in srgb, var(--c-light) 16%, transparent),
-    0 10px 18px color-mix(in srgb, var(--c-dark) 12%, transparent);
+  border: 1px solid rgba(22,30,60,0.08);
+  background: rgba(246,248,252,0.9);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.9);
 }
 
 .bp-node__colorpreview {
@@ -1529,21 +1511,9 @@ input[type='checkbox']:focus-visible {
   50% { box-shadow: 0 0 0 8px rgba(67, 97, 238, 0); }
 }
 
-.bp-node--active {
-  animation: pulse-glow 2s ease-in-out infinite;
-}
-
-/* Améliorations des nœuds */
-.bp-node {
-  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
-}
-
-.bp-node:hover {
-  transform: translateY(-2px);
-  box-shadow:
-    0px 14px 28px color-mix(in srgb, var(--c-dark) 12%, transparent),
-    inset 0 0 0 1px color-mix(in srgb, var(--c-light) 30%, transparent);
-}
+/* PERFORMANCE : pas d'animation infinie de box-shadow sur le nœud sélectionné
+   (repaint en continu) ; pas de translateY au hover (repaint pendant le drag).
+   La sélection est marquée par la bordure + l'anneau bleu statiques. */
 
 /* Amélioration du menu contextuel */
 .bp-menu {
