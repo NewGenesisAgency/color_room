@@ -4987,54 +4987,58 @@ export default function EditeurPage() {
               </div>
             </div>
 
-            {/* Actions toolbar */}
-            <div style={{ padding: '8px 10px', borderBottom: '1px solid rgba(0,0,0,0.06)', display: 'flex', gap: 4, flexWrap: 'wrap', flexShrink: 0 }}>
-              <button
-                className="g-btn g-btn--sm g-btn--accent"
-                data-tour="editor-new"
-                disabled={dbLoading}
-                onClick={() => setModal({ type: 'create-project' })}
-                style={{ flex: 1 }}
-              >
-                <FolderPlus size={13} />
-                <span>{dbLoading ? '…' : 'Nouveau jeu'}</span>
-              </button>
-              <button
-                className="g-btn g-btn--sm"
-                disabled={dbLoading}
-                onClick={() => { setAiError(''); setAiStep(''); setAiOpen(true); }}
-                title="Créer un jeu complet avec l'IA (Google Gemini)"
-                style={{ flex: 1, background: 'linear-gradient(135deg,#7c3aed,#ec4899)', color: '#fff', border: 'none' }}
-              >
-                <Sparkles size={13} />
-                <span>Créer avec l'IA</span>
-              </button>
-              <button
-                className="g-btn g-btn--sm"
-                disabled={!activeGame || dbLoading}
-                onClick={() => void saveActiveGame()}
-                title="Sauvegarder le jeu actif"
-                style={{ width: 32, padding: 0 }}
-              >
-                {dirty ? <Save size={13} color="#f97316" /> : <Check size={13} color="#059669" />}
-              </button>
-              <button
-                className="g-btn g-btn--sm g-btn--danger"
-                disabled={!activeGame || dbLoading}
-                onClick={() => activeGame && setModal({ type: 'confirm-delete', gameId: activeGame.id, gameName: activeGame.name })}
-                title="Supprimer le jeu actif"
-                style={{ width: 32, padding: 0 }}
-              >
-                <Trash2 size={13} />
-              </button>
-              <button
-                className="g-btn g-btn--sm"
-                onClick={() => setTourOpen(true)}
-                title="Lancer le tutoriel : comment créer un jeu"
-                style={{ width: 32, padding: 0 }}
-              >
-                <GraduationCap size={13} color="#7c3aed" />
-              </button>
+            {/* Actions toolbar : 2 grandes actions, puis les 3 petits boutons dessous */}
+            <div style={{ padding: '10px 12px 12px', borderBottom: '1px solid rgba(0,0,0,0.06)', display: 'flex', flexDirection: 'column', gap: 8, flexShrink: 0 }}>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  className="g-btn g-btn--accent"
+                  data-tour="editor-new"
+                  disabled={dbLoading}
+                  onClick={() => setModal({ type: 'create-project' })}
+                  style={{ flex: 1, padding: '10px 14px', fontSize: 13 }}
+                >
+                  <FolderPlus size={15} />
+                  <span>{dbLoading ? '…' : 'Nouveau jeu'}</span>
+                </button>
+                <button
+                  className="g-btn"
+                  disabled={dbLoading}
+                  onClick={() => { setAiError(''); setAiStep(''); setAiOpen(true); }}
+                  title="Créer un jeu complet avec l'IA (Google Gemini)"
+                  style={{ flex: 1, padding: '10px 14px', fontSize: 13, background: 'linear-gradient(135deg,#7c3aed,#ec4899)', color: '#fff', border: 'none' }}
+                >
+                  <Sparkles size={15} />
+                  <span>Créer avec l'IA</span>
+                </button>
+              </div>
+              <div style={{ display: 'flex', gap: 8, justifyContent: 'space-around' }}>
+                <button
+                  className="g-btn g-btn--sm"
+                  disabled={!activeGame || dbLoading}
+                  onClick={() => void saveActiveGame()}
+                  title="Sauvegarder le jeu actif"
+                  style={{ flex: 1, height: 32, padding: 0 }}
+                >
+                  {dirty ? <Save size={14} color="#f97316" /> : <Check size={14} color="#059669" />}
+                </button>
+                <button
+                  className="g-btn g-btn--sm g-btn--danger"
+                  disabled={!activeGame || dbLoading}
+                  onClick={() => activeGame && setModal({ type: 'confirm-delete', gameId: activeGame.id, gameName: activeGame.name })}
+                  title="Supprimer le jeu actif"
+                  style={{ flex: 1, height: 32, padding: 0 }}
+                >
+                  <Trash2 size={14} />
+                </button>
+                <button
+                  className="g-btn g-btn--sm"
+                  onClick={() => setTourOpen(true)}
+                  title="Lancer le tutoriel : comment créer un jeu"
+                  style={{ flex: 1, height: 32, padding: 0 }}
+                >
+                  <GraduationCap size={14} color="#7c3aed" />
+                </button>
+              </div>
             </div>
 
             {/* Liste des jeux - scrollable */}
@@ -5568,14 +5572,20 @@ export default function EditeurPage() {
                       title={slowMotion ? 'Désactiver le mode ralenti (x0.25)' : 'Mode ralenti (x0.25) : suivre l\'exécution bloc par bloc dans l\'aperçu'}
                       onClick={() => {
                         setSlowMotion((v) => !v);
-                        setStatus(slowMotion ? 'Mode ralenti désactivé' : 'Mode ralenti activé 🐢 (x0.25)');
+                        setStatus(slowMotion ? 'Mode ralenti désactivé' : 'Mode ralenti activé (x0.25)');
                       }}
                       style={{
                         padding: '0 8px', height: 28, fontSize: 12,
                         ...(slowMotion ? { background: 'rgba(245,158,11,0.18)', border: '1px solid rgba(245,158,11,0.55)', color: '#92400e' } : {}),
                       }}
                     >
-                      <span aria-hidden>🐢</span>
+                      {/* Tortue Lucide (icône absente du paquet lucide-react installé → SVG inline officiel) */}
+                      <svg aria-hidden width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="m12 10 2 4v3a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1v-3a8 8 0 1 0-16 0v3a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1v-3l2-4h4Z" />
+                        <path d="M4.82 7.9 8 10" />
+                        <path d="M15.18 7.9 12 10" />
+                        <path d="M16.93 10H20a2 2 0 0 1 0 4H2" />
+                      </svg>
                     </button>
                   )}
                   {/* Fit all nodes */}
