@@ -159,6 +159,8 @@ function migrate(db: Database.Database) {
   // ─── Jeux seed ───────────────────────────────────────────────────────────────
   seedChromatectGame(db);
   seedLibreRGBGame(db);
+  seedSimpleClickGame(db);
+  seedColorSpeedGame(db);
 }
 
 function seedChromatectGame(db: Database.Database) {
@@ -328,6 +330,118 @@ function seedLibreRGBGame(db: Database.Database) {
   const existing = db.prepare("SELECT id FROM crg_games WHERE id LIKE 'libre_rgb_%';").get();
   if (!existing) {
     const id = `libre_rgb_${Date.now().toString(36)}`;
+    db.prepare("INSERT INTO crg_games(id, name, kind, config_json, updated_at) VALUES(?, ?, 'editor', ?, datetime('now'));")
+      .run(id, GAME_NAME, JSON.stringify(config));
+  }
+}
+
+function seedSimpleClickGame(db: Database.Database) {
+  const GAME_NAME = 'Test Simple - Clic Dalle';
+  const config = {
+    version: 1,
+    tileCount: 42,
+    bgColor: '#0a0e1a',
+    accentColor: '#f97316',
+    icon: 'Zap',
+    difficulty: 1,
+    description: 'Clic sur la dalle 1 si elle s\'allume. Écoute ton intuition !',
+    nodes: [
+      { id: 'n_begin',  kind: 'event_begin',     name: 'Démarrer',           enabled: true, params: {}, pos: { x: 60, y: 80 } },
+      { id: 'n_score',  kind: 'score_reset',     name: 'Score 0',            enabled: true, params: {}, pos: { x: 300, y: 80 } },
+      { id: 'n_rand',   kind: 'random_int',      name: 'Aléa 0 ou 1',        enabled: true, params: { min: 0, max: 1, varName: 'light_on' }, pos: { x: 540, y: 80 } },
+      { id: 'n_ifon',   kind: 'if',              name: 'Si allumée ?',       enabled: true, params: { varName: 'light_on', op: 'eq', value: 1 }, pos: { x: 780, y: 80 } },
+      { id: 'n_on',     kind: 'fill',            name: 'Allumer #f97316',    enabled: true, params: { color: '#f97316', intensity: 0.85, mask: 'all' }, pos: { x: 780, y: 280 } },
+      { id: 'n_off',    kind: 'clear_tiles',     name: 'Éteindre',           enabled: true, params: {}, pos: { x: 780, y: 480 } },
+      { id: 'n_click',  kind: 'on_plate_click',  name: 'Clic dalle',         enabled: true, params: {}, pos: { x: 60, y: 380 } },
+      { id: 'n_ifcor',  kind: 'if',              name: 'Correct ?',          enabled: true, params: { varName: 'light_on', op: 'eq', value: 1 }, pos: { x: 300, y: 380 } },
+      { id: 'n_snd_ok', kind: 'play_sound',      name: 'Son correct',        enabled: true, params: { sound: 'correct' }, pos: { x: 540, y: 280 } },
+      { id: 'n_add',    kind: 'add_score',       name: 'Plus 10 pts',        enabled: true, params: { amount: 10 }, pos: { x: 780, y: 280 } },
+      { id: 'n_snd_ko', kind: 'play_sound',      name: 'Son erreur',         enabled: true, params: { sound: 'wrong' }, pos: { x: 540, y: 480 } },
+    ],
+    edges: [
+      { id: 'e1', from: 'n_begin', to: 'n_score' },
+      { id: 'e2', from: 'n_score', to: 'n_rand' },
+      { id: 'e3', from: 'n_rand', to: 'n_ifon' },
+      { id: 'e4', from: 'n_ifon', to: 'n_on' },
+      { id: 'e5', from: 'n_ifon', to: 'n_off' },
+      { id: 'e6', from: 'n_click', to: 'n_ifcor' },
+      { id: 'e7', from: 'n_ifcor', to: 'n_snd_ok' },
+      { id: 'e8', from: 'n_snd_ok', to: 'n_add' },
+      { id: 'e9', from: 'n_ifcor', to: 'n_snd_ko' },
+    ],
+    uiLayout: [
+      { id: 'u_title', kind: 'title_banner', x: 20, y: 10, width: 400, height: 50, text: 'Test Simple - Clic Dalle', bgColor: '#0a0e1a', textColor: '#f97316', fontSize: 18 },
+      { id: 'u_score', kind: 'score_display', x: 20, y: 80, width: 180, height: 80, text: 'Score', varBind: 'score' },
+      { id: 'u_msg', kind: 'message_box', x: 220, y: 80, width: 260, height: 80, bgColor: 'rgba(249,115,22,0.2)', text: 'Clic sur la dalle 1 SEULEMENT si elle s\'allume en orange !' },
+      { id: 'u_grid', kind: 'plate_grid', x: 20, y: 180, width: 460, height: 290 },
+    ],
+  };
+  const existing = db.prepare("SELECT id FROM crg_games WHERE id LIKE 'test_simple_%';").get();
+  if (!existing) {
+    const id = `test_simple_${Date.now().toString(36)}`;
+    db.prepare("INSERT INTO crg_games(id, name, kind, config_json, updated_at) VALUES(?, ?, 'editor', ?, datetime('now'));")
+      .run(id, GAME_NAME, JSON.stringify(config));
+  }
+}
+
+function seedColorSpeedGame(db: Database.Database) {
+  const GAME_NAME = 'Color Speed - Réflexes';
+  const config = {
+    version: 1,
+    tileCount: 42,
+    bgColor: '#0f0a15',
+    accentColor: '#8b5cf6',
+    icon: 'Zap',
+    difficulty: 3,
+    description: '30 secondes pour identifier et cliquer sur les couleurs aléatoires. Plus rapide = plus de points !',
+    nodes: [
+      { id: 'n_begin',   kind: 'event_begin',     name: 'Démarrer',          enabled: true, params: {}, pos: { x: 60, y: 60 } },
+      { id: 'n_score',   kind: 'score_reset',     name: 'Score 0',           enabled: true, params: {}, pos: { x: 300, y: 60 } },
+      { id: 'n_sound',   kind: 'play_sound',      name: 'Son départ',        enabled: true, params: { sound: 'start' }, pos: { x: 540, y: 60 } },
+      { id: 'n_count',   kind: 'countdown_start', name: 'Timer 30s',         enabled: true, params: { varCountdown: 'timer', durationMs: 30000 }, pos: { x: 780, y: 60 } },
+      { id: 'n_loopst',  kind: 'loop_count',      name: 'Boucle',            enabled: true, params: { count: 100 }, pos: { x: 60, y: 280 } },
+      { id: 'n_randcol', kind: 'random_int',      name: 'Couleur 0-2',       enabled: true, params: { min: 0, max: 2, varName: 'target_color' }, pos: { x: 300, y: 280 } },
+      { id: 'n_ifcol0',  kind: 'if',              name: 'Couleur 0 ?',       enabled: true, params: { varName: 'target_color', op: 'eq', value: 0 }, pos: { x: 540, y: 280 } },
+      { id: 'n_fil_r',   kind: 'fill',            name: 'Allumer ROUGE',     enabled: true, params: { color: '#ef4444', intensity: 0.9, mask: 'all' }, pos: { x: 780, y: 180 } },
+      { id: 'n_ifcol1',  kind: 'if',              name: 'Couleur 1 ?',       enabled: true, params: { varName: 'target_color', op: 'eq', value: 1 }, pos: { x: 540, y: 480 } },
+      { id: 'n_fil_g',   kind: 'fill',            name: 'Allumer VERT',      enabled: true, params: { color: '#22c55e', intensity: 0.9, mask: 'all' }, pos: { x: 780, y: 380 } },
+      { id: 'n_fil_b',   kind: 'fill',            name: 'Allumer BLEU',      enabled: true, params: { color: '#3b82f6', intensity: 0.9, mask: 'all' }, pos: { x: 780, y: 580 } },
+      { id: 'n_wait',    kind: 'wait',            name: 'Attendre 1s',       enabled: true, params: { durationMs: 1000 }, pos: { x: 1020, y: 380 } },
+      { id: 'n_click',   kind: 'on_plate_click',  name: 'Clic joueur',       enabled: true, params: {}, pos: { x: 60, y: 600 } },
+      { id: 'n_good',    kind: 'add_score',       name: 'Score +25',         enabled: true, params: { amount: 25 }, pos: { x: 300, y: 600 } },
+      { id: 'n_snd_ok',  kind: 'play_sound',      name: 'Son bon',           enabled: true, params: { sound: 'correct' }, pos: { x: 540, y: 600 } },
+      { id: 'n_end',     kind: 'on_countdown_end', name: 'Fin timer',        enabled: true, params: {}, pos: { x: 60, y: 800 } },
+      { id: 'n_final',   kind: 'play_sound',      name: 'Son fin',           enabled: true, params: { sound: 'win' }, pos: { x: 300, y: 800 } },
+    ],
+    edges: [
+      { id: 'e1', from: 'n_begin', to: 'n_score' },
+      { id: 'e2', from: 'n_score', to: 'n_sound' },
+      { id: 'e3', from: 'n_sound', to: 'n_count' },
+      { id: 'e4', from: 'n_count', to: 'n_loopst' },
+      { id: 'e5', from: 'n_loopst', to: 'n_randcol' },
+      { id: 'e6', from: 'n_randcol', to: 'n_ifcol0' },
+      { id: 'e7', from: 'n_ifcol0', to: 'n_fil_r' },
+      { id: 'e8', from: 'n_ifcol0', to: 'n_ifcol1' },
+      { id: 'e9', from: 'n_ifcol1', to: 'n_fil_g' },
+      { id: 'e10', from: 'n_ifcol1', to: 'n_fil_b' },
+      { id: 'e11', from: 'n_fil_r', to: 'n_wait' },
+      { id: 'e12', from: 'n_fil_g', to: 'n_wait' },
+      { id: 'e13', from: 'n_fil_b', to: 'n_wait' },
+      { id: 'e14', from: 'n_click', to: 'n_good' },
+      { id: 'e15', from: 'n_good', to: 'n_snd_ok' },
+      { id: 'e16', from: 'n_end', to: 'n_final' },
+    ],
+    uiLayout: [
+      { id: 'u_title', kind: 'title_banner', x: 20, y: 10, width: 800, height: 50, text: 'Color Speed - Réflexes', bgColor: '#0f0a15', textColor: '#8b5cf6', fontSize: 18 },
+      { id: 'u_timer', kind: 'timer_display', x: 20, y: 75, width: 150, height: 80, varBind: 'timer', text: 'Temps' },
+      { id: 'u_score', kind: 'score_display', x: 190, y: 75, width: 150, height: 80, text: 'Score', varBind: 'score' },
+      { id: 'u_msg', kind: 'message_box', x: 370, y: 75, width: 450, height: 80, bgColor: 'rgba(139,92,246,0.15)', text: 'Clique sur la dalle correspondant à la couleur ! Rouge, Vert, ou Bleu ?' },
+      { id: 'u_grid', kind: 'plate_grid', x: 20, y: 175, width: 800, height: 300 },
+    ],
+  };
+  const existing = db.prepare("SELECT id FROM crg_games WHERE id LIKE 'color_speed_%';").get();
+  if (!existing) {
+    const id = `color_speed_${Date.now().toString(36)}`;
     db.prepare("INSERT INTO crg_games(id, name, kind, config_json, updated_at) VALUES(?, ?, 'editor', ?, datetime('now'));")
       .run(id, GAME_NAME, JSON.stringify(config));
   }
