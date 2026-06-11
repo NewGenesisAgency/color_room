@@ -55,6 +55,10 @@ services:
       - "11434:11434"
 
   # Conteneur jetable qui télécharge le modèle puis s'arrête (non bloquant).
+  # Auto-pull du modèle défini par OLLAMA_MODEL (défaut qwen2.5:1.5b), puis purge
+  # les anciens modèles différents pour libérer la carte SD du Pi quand on change
+  # de modèle dans .env. Tourne à chaque `docker compose up` mais ne retélécharge
+  # rien si le modèle est déjà présent.
   ollama-pull:
     image: ollama/ollama:latest
     container_name: color-room-ollama-pull
@@ -66,7 +70,26 @@ services:
         required: false
     environment:
       - OLLAMA_HOST=http://ollama:11434
-    entrypoint: ["/bin/sh", "-c", "until ollama list >/dev/null 2>&1; do echo 'attente du serveur ollama…'; sleep 2; done; ollama pull \"$${OLLAMA_MODEL:-qwen2.5:1.5b}\"; echo 'Modèle IA prêt'"]
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        MODEL="$${OLLAMA_MODEL:-qwen2.5:1.5b}"
+        echo "[ollama-pull] modèle voulu : $$MODEL"
+        until ollama list >/dev/null 2>&1; do
+          echo "[ollama-pull] attente du serveur ollama..."
+          sleep 2
+        done
+        echo "[ollama-pull] téléchargement de $$MODEL (no-op si déjà présent)"
+        ollama pull "$$MODEL"
+        echo "[ollama-pull] purge des modèles inutiles :"
+        ollama list | tail -n +2 | awk '{print $$1}' | while read m; do
+          if [ -n "$$m" ] && [ "$$m" != "$$MODEL" ]; then
+            echo "[ollama-pull]   suppression de $$m"
+            ollama rm "$$m" || true
+          fi
+        done
+        echo "[ollama-pull] Modèle IA prêt : $$MODEL"
 
 volumes:
   portainer_data:
