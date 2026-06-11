@@ -1509,6 +1509,58 @@ input[type='checkbox']:focus-visible {
 .g-btn--ai:hover:not(:disabled)::before { transform: translateX(120%); }
 .g-btn--ai:active:not(:disabled) { transform: translateY(0) scale(0.98); }
 
+/* ──────────────────────────────────────────────────────────────────────────
+   Tooltip custom pour les boutons icônes de la barre d'outils éditeur.
+   Utilise data-tip="..." → apparaît en dessous au survol, lisible et propre.
+   ────────────────────────────────────────────────────────────────────────── */
+.tipbtn { position: relative; }
+
+.tipbtn::after {
+  content: attr(data-tip);
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%) translateY(-4px);
+  padding: 7px 11px;
+  background: rgba(15,23,42,0.95);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  border-radius: 8px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 160ms ease, transform 160ms ease;
+  box-shadow: 0 6px 18px rgba(15,23,42,0.25);
+  z-index: 9999;
+}
+
+.tipbtn::before {
+  content: '';
+  position: absolute;
+  top: calc(100% + 2px);
+  left: 50%;
+  transform: translateX(-50%) translateY(-4px);
+  width: 0; height: 0;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-bottom: 6px solid rgba(15,23,42,0.95);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 160ms ease, transform 160ms ease;
+  z-index: 9999;
+}
+
+/* Le bouton AI a déjà un ::before pour le reflet glace : on dévalide la flèche
+   sur lui pour ne pas casser son animation. */
+.g-btn--ai.tipbtn::before { content: none; }
+
+.tipbtn:hover:not(:disabled)::after,
+.tipbtn:hover:not(:disabled)::before {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
 .g-btn--success {
   background: rgba(5,150,105,0.09);
   color: #059669;

@@ -1419,6 +1419,8 @@ export default function EditeurPage() {
   const [aiHighlightIds, setAiHighlightIds] = useState<Set<string>>(new Set()); // blocs ajoutes par l'IA (diff visuel)
   const aiBeforeRef = useRef<Record<string, EditorSnapshot>>({}); // snapshot avant chaque réponse IA (pour annuler)
   const aiScrollRef = useRef<HTMLDivElement | null>(null);
+  // Référence + hauteur auto pour la textarea de prompt (style Claude.ai)
+  const aiTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   // Largeur redimensionnable du panneau IA (persistée en localStorage)
   const [aiPanelWidth, setAiPanelWidth] = useState(440);
   const aiResizeRef = useRef<{ startX: number; startW: number } | null>(null);
@@ -1464,6 +1466,18 @@ export default function EditeurPage() {
     document.addEventListener('mousedown', h);
     return () => document.removeEventListener('mousedown', h);
   }, [aiModelPickerOpen]);
+
+  // Textarea du prompt IA : auto-grow style Claude.ai (de 1 ligne à ~12 lignes).
+  // Mesure scrollHeight puis applique la hauteur ; clamp pour éviter qu'elle ne
+  // pousse l'envoi hors écran sur les longs prompts.
+  useEffect(() => {
+    const el = aiTextareaRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    const min = 44; // ~1 ligne + padding
+    const max = 260; // ~12 lignes
+    el.style.height = Math.max(min, Math.min(max, el.scrollHeight)) + 'px';
+  }, [aiPrompt, aiOpen]);
 
   // Charge les modèles à l'ouverture du panel IA
   useEffect(() => {
@@ -5183,12 +5197,13 @@ export default function EditeurPage() {
           {aiError && <div style={{ margin: '0 16px', padding: '8px 10px', borderRadius: 8, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.3)', color: '#b91c1c', fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}><AlertTriangle size={13} style={{ flexShrink: 0 }} /> {aiError}</div>}
 
           <div style={{ padding: '12px 14px 14px', flexShrink: 0 }}>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', padding: 6, borderRadius: 18, background: 'rgba(255,255,255,0.7)', border: '1px solid rgba(255,255,255,0.9)', boxShadow: '0 6px 20px rgba(15,23,42,0.08), inset 0 1px 0 rgba(255,255,255,0.9)' }}>
-              <textarea value={aiPrompt} onChange={(e) => setAiPrompt(e.target.value)}
+            <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', padding: 8, borderRadius: 18, background: 'rgba(255,255,255,0.7)', border: '1px solid rgba(255,255,255,0.9)', boxShadow: '0 6px 20px rgba(15,23,42,0.08), inset 0 1px 0 rgba(255,255,255,0.9)' }}>
+              <textarea ref={aiTextareaRef}
+                value={aiPrompt} onChange={(e) => setAiPrompt(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void sendAiMessage(); } }}
-                disabled={aiBusy} rows={2}
+                disabled={aiBusy} rows={1}
                 placeholder={activeGame ? 'Demande une modification…  (Entrée = envoyer · Maj+Entrée = nouvelle ligne)' : 'Décris le jeu à créer…  (Entrée pour envoyer)'}
-                style={{ flex: 1, resize: 'none', borderRadius: 12, padding: '8px 10px', fontSize: 13, lineHeight: 1.45, background: 'transparent', border: 'none', color: '#0f172a', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }} />
+                style={{ flex: 1, resize: 'none', borderRadius: 12, padding: '10px 12px', fontSize: 13.5, lineHeight: 1.5, background: 'transparent', border: 'none', color: '#0f172a', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box', overflow: 'auto', minHeight: 44, maxHeight: 260 }} />
               <button onClick={() => void sendAiMessage()} disabled={aiBusy || !aiPrompt.trim()}
                 style={{ width: 40, height: 40, flexShrink: 0, borderRadius: 13, border: 'none', cursor: aiBusy || !aiPrompt.trim() ? 'not-allowed' : 'pointer', color: '#fff', background: aiBusy || !aiPrompt.trim() ? 'rgba(124,58,237,0.3)' : 'linear-gradient(135deg,#7c3aed,#ec4899)', display: 'grid', placeItems: 'center', boxShadow: aiBusy || !aiPrompt.trim() ? 'none' : '0 4px 14px rgba(124,58,237,0.4), inset 0 1px 0 rgba(255,255,255,0.4)', transition: 'transform .12s' }}>
                 <Sparkles size={17} />
@@ -5207,56 +5222,53 @@ export default function EditeurPage() {
               </div>
             </div>
 
-            {/* Actions toolbar : 2 grandes actions, puis les 3 petits boutons dessous */}
-            <div style={{ padding: '10px 12px 12px', borderBottom: '1px solid rgba(0,0,0,0.06)', display: 'flex', flexDirection: 'column', gap: 8, flexShrink: 0 }}>
-              <div style={{ display: 'flex', gap: 8 }}>
+            {/* Barre d'outils : 5 boutons icônes sur UNE seule ligne avec tooltip clair */}
+            <div style={{ padding: '10px 12px 12px', borderBottom: '1px solid rgba(0,0,0,0.06)', flexShrink: 0 }}>
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                 <button
-                  className="g-btn"
+                  className="g-btn tipbtn"
                   data-tour="editor-new"
+                  data-tip="Nouveau jeu"
                   disabled={dbLoading}
                   onClick={() => setModal({ type: 'create-project' })}
-                  style={{ flex: 1, height: 40, padding: '0 16px', fontSize: 13, borderRadius: 14 }}
+                  style={{ flex: 1, height: 42, padding: 0, borderRadius: 13, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
                 >
-                  <FolderPlus size={15} />
-                  <span>{dbLoading ? '…' : 'Nouveau jeu'}</span>
+                  <FolderPlus size={17} />
                 </button>
                 <button
-                  className="g-btn--ai"
+                  className="g-btn--ai tipbtn"
+                  data-tip="Créer un jeu avec l'IA"
                   disabled={dbLoading}
                   onClick={() => { setAiError(''); setAiStep(''); setAiOpen(true); }}
-                  title="Créer un jeu complet avec l'IA (Google Gemini)"
-                  style={{ flex: 1.2, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 7, fontSize: 12.5, cursor: dbLoading ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap', minWidth: 0 }}
+                  style={{ flex: 1, height: 42, padding: 0, borderRadius: 13, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: dbLoading ? 'not-allowed' : 'pointer' }}
                 >
-                  <Wand2 size={14} style={{ flexShrink: 0 }} />
-                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>Créer avec l&apos;IA</span>
+                  <Wand2 size={17} />
                 </button>
-              </div>
-              <div style={{ display: 'flex', gap: 8, justifyContent: 'space-around' }}>
                 <button
-                  className="g-btn g-btn--sm"
+                  className="g-btn g-btn--sm tipbtn"
+                  data-tip={dirty ? 'Modifications non sauvegardées · Cliquer pour sauvegarder' : 'Jeu sauvegardé'}
                   disabled={!activeGame || dbLoading}
                   onClick={() => void saveActiveGame()}
-                  title="Sauvegarder le jeu actif"
-                  style={{ flex: 1, height: 32, padding: 0 }}
+                  style={{ flex: 1, height: 42, padding: 0, borderRadius: 13, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
                 >
-                  {dirty ? <Save size={14} color="#f97316" /> : <Check size={14} color="#059669" />}
+                  {dirty ? <Save size={17} color="#f97316" /> : <Check size={17} color="#059669" />}
                 </button>
                 <button
-                  className="g-btn g-btn--sm g-btn--danger"
+                  className="g-btn g-btn--sm g-btn--danger tipbtn"
+                  data-tip="Supprimer le jeu actif"
                   disabled={!activeGame || dbLoading}
                   onClick={() => activeGame && setModal({ type: 'confirm-delete', gameId: activeGame.id, gameName: activeGame.name })}
-                  title="Supprimer le jeu actif"
-                  style={{ flex: 1, height: 32, padding: 0 }}
+                  style={{ flex: 1, height: 42, padding: 0, borderRadius: 13, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
                 >
-                  <Trash2 size={14} />
+                  <Trash2 size={17} />
                 </button>
                 <button
-                  className="g-btn g-btn--sm"
+                  className="g-btn g-btn--sm tipbtn"
+                  data-tip="Lancer le tutoriel"
                   onClick={() => setTourOpen(true)}
-                  title="Lancer le tutoriel : comment créer un jeu"
-                  style={{ flex: 1, height: 32, padding: 0 }}
+                  style={{ flex: 1, height: 42, padding: 0, borderRadius: 13, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
                 >
-                  <GraduationCap size={14} color="#7c3aed" />
+                  <GraduationCap size={17} color="#7c3aed" />
                 </button>
               </div>
             </div>
@@ -5453,10 +5465,10 @@ export default function EditeurPage() {
                       </div>
                     </div>
 
-                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 2, fontSize: 11 }}>
-                      <span className="g-badge" style={{ fontSize: 10 }}>{activeGame.nodes.length} nœuds</span>
-                      <span className="g-badge" style={{ fontSize: 10, background: 'rgba(6,214,160,0.1)', color: '#06d6a0', borderColor: 'rgba(6,214,160,0.15)' }}>{activeGame.edges.length} connexions</span>
-                      <span className="g-badge" style={{ fontSize: 10, background: 'rgba(255,165,0,0.1)', color: '#e88a1a', borderColor: 'rgba(255,165,0,0.15)' }}>{activeGame.tileCount ?? 42} dalles</span>
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 4 }}>
+                      <span className="g-badge" style={{ padding: '6px 12px' }}>{activeGame.nodes.length} nœuds</span>
+                      <span className="g-badge" style={{ padding: '6px 12px', background: 'rgba(6,214,160,0.10)', color: '#06d6a0', borderColor: 'rgba(6,214,160,0.20)' }}>{activeGame.edges.length} connexions</span>
+                      <span className="g-badge" style={{ padding: '6px 12px', background: 'rgba(255,165,0,0.10)', color: '#e88a1a', borderColor: 'rgba(255,165,0,0.20)' }}>{activeGame.tileCount ?? 42} dalles</span>
                     </div>
 
                     <p style={{ fontSize: 10, color: '#aaa', margin: '4px 0 0', lineHeight: 1.4 }}>
