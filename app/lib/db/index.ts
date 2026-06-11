@@ -12,6 +12,7 @@
 import Database from 'better-sqlite3';
 import fs from 'node:fs';
 import path from 'node:path';
+import { pbkdf2Sync, randomBytes } from 'node:crypto';
 
 let dbSingleton: Database.Database | null = null;
 
@@ -166,11 +167,48 @@ function migrate(db: Database.Database) {
   try { db.exec("ALTER TABLE crg_users ADD COLUMN avatar_color TEXT DEFAULT '#4361ee';"); } catch { /* already exists */ }
   try { db.exec("ALTER TABLE crg_users ADD COLUMN avatar_icon TEXT DEFAULT 'User';"); } catch { /* already exists */ }
 
+  // ─── Compte admin/enseignant via .env (optionnel) ───────────────────────────
+  seedAdminFromEnv(db);
+
   // ─── Jeux seed ───────────────────────────────────────────────────────────────
   seedChromatectGame(db);
   seedLibreRGBGame(db);
   seedSimpleClickGame(db);
   seedColorSpeedGame(db);
+}
+
+/**
+ * Crée (ou met à jour) un compte enseignant/administrateur d'après les
+ * variables d'environnement ADMIN_USERNAME (défaut 'admin') et ADMIN_PASSWORD.
+ *
+ * - Si ADMIN_PASSWORD est vide/absent : ne fait rien (setup manuel via /jeux).
+ * - Sinon : garantit qu'un compte enseignant porte ce nom et ce mot de passe.
+ *   Le mot de passe est REPOSÉ à chaque démarrage sur la valeur du .env, ce qui
+ *   sert aussi de récupération « mot de passe oublié » (il suffit d'éditer .env
+ *   et de relancer le conteneur). Le hash est pbkdf2 (sel aléatoire, sha512).
+ */
+function seedAdminFromEnv(db: Database.Database) {
+  const password = (process.env.ADMIN_PASSWORD ?? '').trim();
+  if (!password) return; // pas de compte admin auto demandé
+
+  const username = (process.env.ADMIN_USERNAME ?? 'admin').trim() || 'admin';
+  const salt = randomBytes(16).toString('hex');
+  const hash = pbkdf2Sync(password, salt, 100_000, 64, 'sha512').toString('hex');
+  const passwordHash = `${salt}:${hash}`;
+
+  try {
+    const existing = db.prepare('SELECT id FROM crg_users WHERE name = ? COLLATE NOCASE').get(username) as { id: string } | undefined;
+    if (existing) {
+      // Repose le mot de passe et garantit le rôle enseignant.
+      db.prepare("UPDATE crg_users SET password_hash = ?, user_type = 'enseignant' WHERE id = ?").run(passwordHash, existing.id);
+    } else {
+      const id = randomBytes(16).toString('hex');
+      db.prepare("INSERT INTO crg_users (id, name, user_type, password_hash, avatar_color, avatar_icon) VALUES (?, ?, 'enseignant', ?, '#7c3aed', 'Crown')")
+        .run(id, username, passwordHash);
+    }
+  } catch (e) {
+    console.warn('[seedAdminFromEnv] impossible de seeder le compte admin :', e instanceof Error ? e.message : e);
+  }
 }
 
 function seedChromatectGame(db: Database.Database) {
