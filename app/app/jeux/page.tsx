@@ -1060,6 +1060,8 @@ export default function JeuxPage() {
   const [scorePlusAnimKey, setScorePlusAnimKey] = useState<number>(0);
   const [scorePlusValue, setScorePlusValue] = useState<number>(0);
   const [scoreFlashKey, setScoreFlashKey] = useState(0);
+  const [displayScore, setDisplayScore] = useState(0);
+  const displayScoreRef = useRef(0);
 
   // Simon game states
   const [simonActive, setSimonActive] = useState<boolean>(false);
@@ -3400,6 +3402,28 @@ export default function JeuxPage() {
   // Flash animation on score change
   useEffect(() => { setScoreFlashKey(k => k + 1); }, [score]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Count-up animation : le chiffre monte progressivement vers la cible
+  useEffect(() => {
+    const target = score;
+    const start = displayScoreRef.current;
+    if (start === target) return;
+    const diff = target - start;
+    const duration = Math.min(700, 120 + Math.abs(diff) * 4);
+    const t0 = performance.now();
+    let raf: number;
+    const tick = (now: number) => {
+      const p = Math.min(1, (now - t0) / duration);
+      const eased = 1 - Math.pow(1 - p, 3);
+      const cur = Math.round(start + diff * eased);
+      displayScoreRef.current = cur;
+      setDisplayScore(cur);
+      if (p < 1) raf = requestAnimationFrame(tick);
+      else { displayScoreRef.current = target; setDisplayScore(target); }
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [score]); // eslint-disable-line react-hooks/exhaustive-deps
+
   function award(points: number, text: string) {
     awardPoints(points, text);
     setGamesCompleted((v) => v + 1);
@@ -4668,8 +4692,8 @@ export default function JeuxPage() {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                   <div style={{ padding: '12px 14px', borderRadius: 14, background: 'rgba(255,255,255,0.65)', border: '1px solid rgba(255,255,255,0.85)', backdropFilter: 'blur(16px)', boxShadow: 'inset 0 1px 0 #fff' }}>
                     <div style={{ fontSize: 10, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.07em', color: 'var(--text-3)', marginBottom: 5 }}>Score</div>
-                    <div key={scoreFlashKey} style={{ fontSize: 24, fontWeight: 900, color: 'var(--accent)', letterSpacing: '-0.02em', position: 'relative', animation: scoreFlashKey > 0 ? 'scoreFlash .35s ease' : 'none' }}>
-                      {score}
+                    <div key={scoreFlashKey} style={{ fontSize: 24, fontWeight: 900, color: 'var(--accent)', letterSpacing: '-0.02em', position: 'relative', animation: scoreFlashKey > 0 ? 'scoreFlash .45s cubic-bezier(.17,.67,.35,1.4)' : 'none' }}>
+                      {displayScore}
                       {scorePlusValue > 0 ? <span key={scorePlusAnimKey} className="mp-plusone">+{scorePlusValue}</span> : null}
                       {scorePlusValue < 0 ? <span key={scorePlusAnimKey} className="mp-minusone">{scorePlusValue}</span> : null}
                     </div>
