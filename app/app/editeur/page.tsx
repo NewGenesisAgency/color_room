@@ -53,7 +53,7 @@ const CS160Panel = dynamic(() => import('@/app/_components/CS160Panel'), { ssr: 
 const PythonEditor = dynamic(() => import('./PythonEditor'), { ssr: false });
 const UIDesigner = dynamic(() => import('./UIDesigner'), { ssr: false });
 
-import { Boxes, Gamepad2, Plus, Play, Pause, RotateCcw, Save, Trash2, FolderPlus, X, Lightbulb, Layers, Zap, Palette, Clock, MousePointer2, LayoutGrid, Maximize2, Minimize2, Eye, EyeOff, Frame, Star, Heart, Sun, Moon, Flame, Snowflake, Music, Target, Puzzle, Sparkles, Trophy, Rocket, Ghost, Dice1, Brain, Check, GitBranch, Hash, Settings2, Shuffle, Search, Users, Film, Thermometer, ScanLine, Wifi, WifiOff, Crown, Gem, Bug, Bot, Atom, Bird, Cat, Dog, Fish, Leaf, Cloud, Droplet, Mountain, Anchor, Bell, Bomb, Camera, Egg, Feather, Gift, Hexagon, Key, Lock, Medal, Pizza, Plane, Rainbow, Skull, Smile, Wand2, Waves, Crosshair, Dice5, Joystick, FlaskConical, Swords, ChevronDown, GraduationCap, SlidersHorizontal, RefreshCw, Copy, Scissors, FileCode, AlertTriangle, Laptop, type LucideIcon } from 'lucide-react';
+import { Boxes, Gamepad2, Plus, Play, Pause, RotateCcw, Save, Trash2, FolderPlus, X, Lightbulb, Layers, Zap, Palette, Clock, MousePointer2, LayoutGrid, Maximize2, Minimize2, Eye, EyeOff, Frame, Star, Heart, Sun, Moon, Flame, Snowflake, Music, Target, Puzzle, Sparkles, Trophy, Rocket, Ghost, Dice1, Brain, Check, GitBranch, Hash, Settings2, Shuffle, Search, Users, Film, Thermometer, ScanLine, Wifi, WifiOff, Crown, Gem, Bug, Bot, Atom, Bird, Cat, Dog, Fish, Leaf, Cloud, Droplet, Mountain, Anchor, Bell, Bomb, Camera, Egg, Feather, Gift, Hexagon, Key, Lock, Medal, Pizza, Plane, Rainbow, Skull, Smile, Wand2, Waves, Crosshair, Dice5, Joystick, FlaskConical, Swords, ChevronDown, GraduationCap, SlidersHorizontal, RefreshCw, Copy, Scissors, FileCode, AlertTriangle, Laptop, ArrowRight, type LucideIcon } from 'lucide-react';
 
 type IdFactory = () => string;
 
@@ -5188,8 +5188,8 @@ export default function EditeurPage() {
         </div>
       )}
       <div className="ue">
-        <aside className="ue__left" style={{ borderRadius: 16, overflow: 'hidden', background: '#fff', border: '1px solid rgba(0,0,0,0.07)', display: 'flex', flexDirection: 'column' }}>
-            <div className="panelhead" style={{ background: '#fff', borderBottom: '1px solid rgba(0,0,0,0.07)', padding: '10px 14px', flexShrink: 0 }}>
+        <aside className="ue__left" style={{ borderRadius: 16, overflow: 'hidden', background: 'linear-gradient(180deg, rgba(255,255,255,0.96), rgba(248,250,253,0.9))', backdropFilter: 'blur(18px) saturate(170%)', WebkitBackdropFilter: 'blur(18px) saturate(170%)', border: '1px solid rgba(255,255,255,0.85)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.95), 0 8px 30px rgba(22,30,60,0.06)', display: 'flex', flexDirection: 'column' }}>
+            <div className="panelhead" style={{ background: 'linear-gradient(180deg, rgba(255,255,255,0.7), rgba(255,255,255,0))', borderBottom: '1px solid rgba(15,23,42,0.06)', padding: '12px 14px', flexShrink: 0 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <Gamepad2 size={14} color="#4361ee" />
                 <strong style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'rgba(10,12,18,0.55)' }}>Explorateur</strong>
@@ -5200,24 +5200,25 @@ export default function EditeurPage() {
             <div style={{ padding: '10px 12px 12px', borderBottom: '1px solid rgba(0,0,0,0.06)', display: 'flex', flexDirection: 'column', gap: 8, flexShrink: 0 }}>
               <div style={{ display: 'flex', gap: 8 }}>
                 <button
-                  className="g-btn g-btn--accent"
+                  className="g-btn"
                   data-tour="editor-new"
                   disabled={dbLoading}
                   onClick={() => setModal({ type: 'create-project' })}
-                  style={{ flex: 1, padding: '10px 14px', fontSize: 13 }}
+                  style={{ flex: 1, height: 40, padding: '0 16px', fontSize: 13, borderRadius: 14 }}
                 >
                   <FolderPlus size={15} />
                   <span>{dbLoading ? '…' : 'Nouveau jeu'}</span>
                 </button>
                 <button
-                  className="g-btn"
+                  className="g-btn--ai"
                   disabled={dbLoading}
                   onClick={() => { setAiError(''); setAiStep(''); setAiOpen(true); }}
                   title="Créer un jeu complet avec l'IA (Google Gemini)"
-                  style={{ flex: 1, padding: '10px 14px', fontSize: 13, background: 'linear-gradient(135deg,#7c3aed,#ec4899)', color: '#fff', border: 'none' }}
+                  style={{ flex: 1.3, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, fontSize: 13, cursor: dbLoading ? 'not-allowed' : 'pointer' }}
                 >
-                  <Sparkles size={15} />
+                  <Sparkles size={15} style={{ flexShrink: 0 }} />
                   <span>Créer avec l'IA</span>
+                  <ArrowRight size={15} className="g-btn__arrow" style={{ flexShrink: 0 }} />
                 </button>
               </div>
               <div style={{ display: 'flex', gap: 8, justifyContent: 'space-around' }}>
@@ -5545,7 +5546,7 @@ export default function EditeurPage() {
             }}
           >
             <div className="ue__viewport" style={{ height: viewportHeight, background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(20px)', border: '1px solid rgba(0,0,0,0.06)' }}>
-              <div className="panelhead" style={{ background: '#fff', borderBottom: '1px solid rgba(0,0,0,0.06)', padding: '14px 20px' }}>
+              <div className="panelhead" style={{ background: 'linear-gradient(180deg, rgba(255,255,255,0.7), rgba(255,255,255,0))', borderBottom: '1px solid rgba(15,23,42,0.06)', padding: '14px 20px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <Eye size={16} color="#1a1a1a" />
                   <strong style={{ fontSize: 14, fontWeight: 800, letterSpacing: '-0.02em', color: '#1a1a1a' }}>Aperçu</strong>
@@ -7854,7 +7855,7 @@ export default function EditeurPage() {
           </section>
 
           <aside className="ue__right" style={{ borderRadius: 16, overflow: 'hidden', background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(20px)', border: '1px solid rgba(0,0,0,0.06)' }}>
-            <div className="panelhead" style={{ background: '#fff', borderBottom: '1px solid rgba(0,0,0,0.06)', padding: '18px 20px' }}>
+            <div className="panelhead" style={{ background: 'linear-gradient(180deg, rgba(255,255,255,0.7), rgba(255,255,255,0))', borderBottom: '1px solid rgba(15,23,42,0.06)', padding: '18px 20px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <Settings2 size={16} color="#1a1a1a" />
                 <strong style={{ fontSize: 14, fontWeight: 800, letterSpacing: '-0.02em', color: '#1a1a1a' }}>Paramètres</strong>

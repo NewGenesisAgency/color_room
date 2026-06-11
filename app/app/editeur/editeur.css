@@ -7,12 +7,12 @@
 }
 
 .editeur {
-  --c-glass: #e8e9ed;
+  --c-glass: #eef1f7;
   --c-light: #ffffff;
   --c-dark: #1a1d2e;
   --c-content: #1e2133;
   --c-action: #4361ee;
-  --c-bg: #f2f4f8;
+  --c-bg: #eef2f9;
   --c-success: #059669;
   --c-warning: #d97706;
   --c-danger: #dc2626;
@@ -27,10 +27,12 @@
     "Segoe UI Emoji";
   font-optical-sizing: auto;
   -webkit-font-smoothing: antialiased;
+  /* Fond "frost glace" : blanc bleute lumineux avec halos diffus froids. */
   background:
-    radial-gradient(ellipse 80% 50% at 15% 0%, rgba(67,97,238,0.06) 0%, transparent 60%),
-    radial-gradient(ellipse 60% 40% at 85% 100%, rgba(124,58,237,0.05) 0%, transparent 55%),
-    var(--c-bg);
+    radial-gradient(ellipse 70% 45% at 12% -5%, rgba(99,142,255,0.10) 0%, transparent 60%),
+    radial-gradient(ellipse 55% 38% at 88% 105%, rgba(124,58,237,0.07) 0%, transparent 55%),
+    radial-gradient(ellipse 40% 30% at 50% 50%, rgba(255,255,255,0.6) 0%, transparent 70%),
+    linear-gradient(180deg, #f4f7fc 0%, var(--c-bg) 100%);
   color: var(--c-content);
 }
 
@@ -559,8 +561,11 @@
  .viewport__pane {
   position: relative;
   border-radius: 16px;
-  border: 1px solid color-mix(in srgb, var(--c-dark) 10%, transparent);
-  background: #f4f6fa;
+  border: 1px solid rgba(255,255,255,0.8);
+  background:
+    radial-gradient(circle at 15% 0%, rgba(99,142,255,0.06), transparent 55%),
+    linear-gradient(180deg, rgba(255,255,255,0.92), rgba(244,247,252,0.86));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.9);
   overflow: hidden;
   min-height: 380px;
  }
@@ -1461,6 +1466,56 @@ input[type='checkbox']:focus-visible {
   border-color: transparent;
   box-shadow: 0 5px 18px rgba(67,97,238,0.40), inset 0 1px 0 rgba(255,255,255,0.24);
 }
+
+/* ── Bouton "Créer avec l'IA" facon barre de booking (pilule premium) ──────────
+   Pilule gradient avec lueur diffuse, leger relief verre, et hover qui souleve
+   le bouton (-translate-y) en intensifiant l'ombre projetee colore. */
+.g-btn--ai {
+  position: relative;
+  border: none;
+  border-radius: 14px;
+  padding: 0 18px;
+  height: 40px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: #fff;
+  background: linear-gradient(135deg, #7c3aed 0%, #a855f7 45%, #ec4899 100%);
+  background-size: 160% 160%;
+  box-shadow:
+    0 6px 20px rgba(124,58,237,0.38),
+    0 2px 6px rgba(236,72,153,0.22),
+    inset 0 1px 0 rgba(255,255,255,0.45);
+  transition: transform 220ms cubic-bezier(0.34,1.56,0.64,1), box-shadow 220ms ease, background-position 600ms ease;
+  overflow: hidden;
+}
+
+/* Reflet glace qui balaie le bouton au survol */
+.g-btn--ai::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 30%, rgba(255,255,255,0.35) 48%, transparent 62%);
+  transform: translateX(-120%);
+  transition: transform 650ms ease;
+  pointer-events: none;
+}
+
+.g-btn--ai .g-btn__arrow {
+  transition: transform 220ms ease;
+}
+
+.g-btn--ai:hover:not(:disabled) {
+  transform: translateY(-2px);
+  background-position: 100% 50%;
+  box-shadow:
+    0 12px 30px rgba(124,58,237,0.48),
+    0 4px 12px rgba(236,72,153,0.30),
+    inset 0 1px 0 rgba(255,255,255,0.55);
+}
+
+.g-btn--ai:hover:not(:disabled)::before { transform: translateX(120%); }
+.g-btn--ai:hover:not(:disabled) .g-btn__arrow { transform: translateX(3px); }
+.g-btn--ai:active:not(:disabled) { transform: translateY(0) scale(0.98); }
 
 .g-btn--success {
   background: rgba(5,150,105,0.09);
