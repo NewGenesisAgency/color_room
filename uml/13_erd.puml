@@ -1,0 +1,99 @@
+@startuml ColorRoom_ERD
+skinparam classAttributeIconSize 0
+skinparam classBackgroundColor #FDF4FF
+skinparam classBorderColor #9333EA
+skinparam classArrowColor #7E22CE
+hide methods
+hide circle
+
+title ColorRoom - Schéma de base de données (SQLite)
+
+entity crg_users {
+  * id : TEXT <<PK>>
+  --
+  name : TEXT (unique)
+  user_type : TEXT
+  password_hash : TEXT
+  niveau : TEXT
+}
+
+entity crg_sessions {
+  * id : TEXT <<PK>>
+  --
+  user_id : TEXT <<FK>>
+  token : TEXT (unique)
+  expires_at : TEXT
+}
+
+entity crg_classes {
+  * id : TEXT <<PK>>
+  --
+  name : TEXT
+  code : TEXT (unique)
+  created_by : TEXT
+}
+
+entity crg_class_members {
+  * id : TEXT <<PK>>
+  --
+  class_id : TEXT <<FK>>
+  user_id : TEXT <<FK>>
+}
+
+entity crg_scores {
+  * id : TEXT <<PK>>
+  --
+  user_id : TEXT <<FK>>
+  game_name : TEXT
+  score : INTEGER
+}
+
+entity crg_games {
+  * id : TEXT <<PK>>
+  --
+  name : TEXT
+  kind : TEXT
+  config_json : TEXT
+}
+
+entity crg_ai_chats {
+  * id : TEXT <<PK>>
+  --
+  game_id : TEXT <<FK>>
+  messages_json : TEXT
+}
+
+entity crg_mp_sessions {
+  * id : TEXT <<PK>>
+  --
+  game_id : TEXT
+  room_code : TEXT
+  status : TEXT
+  state_json : TEXT
+}
+
+entity crg_mp_players {
+  * id : TEXT <<PK>>
+  --
+  session_id : TEXT <<FK>>
+  token : TEXT
+  seat : INTEGER
+}
+
+entity crg_p4_rooms {
+  * id : TEXT <<PK>>
+  --
+  board_json : TEXT
+  turn : TEXT
+  winner : TEXT
+}
+
+crg_users ||--o{ crg_sessions
+crg_users ||--o{ crg_scores
+crg_users ||--o{ crg_class_members
+crg_classes ||--o{ crg_class_members
+crg_games ||--o{ crg_ai_chats
+crg_mp_sessions ||--o{ crg_mp_players
+crg_mp_sessions }o--|| crg_games
+
+@enduml

@@ -1,0 +1,26 @@
+@startuml ColorRoom_Seq_Auth
+skinparam sequenceArrowColor #16A34A
+skinparam sequenceParticipantBackgroundColor #F0FDF4
+skinparam sequenceParticipantBorderColor #16A34A
+
+title ColorRoom - Authentification (login)
+
+actor Utilisateur
+participant "Navigateur" as WEB
+participant "API /auth/login" as API
+database "SQLite" as DB
+
+Utilisateur -> WEB : nom + mot de passe
+WEB -> API : POST { username, password }
+API -> DB : SELECT user WHERE name = ?
+DB --> API : password_hash
+API -> API : verifyPassword (pbkdf2 sha512)
+alt mot de passe correct
+  API -> DB : INSERT session (token, +30j)
+  API --> WEB : cookie crg_session (httpOnly)
+  WEB --> Utilisateur : connecté
+else incorrect
+  API --> WEB : 401 Identifiants incorrects
+end
+
+@enduml

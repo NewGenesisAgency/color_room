@@ -1,0 +1,44 @@
+@startuml ColorRoom_Structure
+skinparam packageBackgroundColor #EFF6FF
+skinparam packageBorderColor #2563EB
+skinparam packageFontStyle bold
+skinparam rectangleBackgroundColor #F8FAFC
+skinparam rectangleBorderColor #94A3B8
+
+title ColorRoom - Structure du projet
+
+package "app/" {
+  package "app/ (pages)" as PAGES {
+    rectangle "jeux/" as P1
+    rectangle "editeur/" as P2
+    rectangle "salles/" as P3
+    rectangle "p4/" as P4
+  }
+  package "app/api/ (backend)" as API {
+    rectangle "auth/" as A1
+    rectangle "ai/" as A2
+    rectangle "cs160/" as A3
+    rectangle "supervision/" as A4
+    rectangle "games/  scores/" as A5
+  }
+  package "_components/" as COMP {
+    rectangle "GameIntrus\nGameCanalMix" as C1
+  }
+  package "lib/" as LIB {
+    rectangle "db/  auth.ts" as L1
+    rectangle "tileChannels.ts" as L2
+    rectangle "supervision.ts\ncs160Bridge.ts" as L3
+    rectangle "pyodide.ts" as L4
+  }
+}
+
+package "racine" as ROOT {
+  rectangle "Dockerfile\ndocker-compose.yml" as R1
+  rectangle ".env / .env.example" as R2
+}
+
+PAGES --> API : fetch
+API --> LIB
+COMP --> API
+
+@enduml
