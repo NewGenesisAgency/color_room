@@ -24,7 +24,7 @@
 import { useCallback, useRef, useState } from 'react';
 import { Map, Moon, Play, Square, Lightbulb, Info } from 'lucide-react';
 import NavigationMenu from '@/app/_components/NavigationMenu';
-import { PLATE_TYPE, type TileType } from '@/lib/tileChannels';
+import { PLATE_TYPE, remapChannels32, type TileType } from '@/lib/tileChannels';
 
 // ─── Disposition physique (NE PAS MODIFIER — calibrée sur place) ─────────────
 // Reproduit exactement plateIdForIndex de app/jeux/page.tsx :
@@ -71,26 +71,33 @@ function wallRows(room: 0 | 1): number[][] {
 
 /** @brief Valeur envoyée sur les canaux blancs lors d'un test (≈ 80/255). */
 const TEST_WHITE_VALUE = 80;
-/** @brief Index des canaux « blancs » utilisés pour le flash de test. */
+/**
+ * @brief Index des canaux « blancs » EN RÉFÉRENCE ROUGE pour le flash de test.
+ *
+ * Les dalles « bleu » n'ont pas les mêmes longueurs d'onde aux mêmes index :
+ * ces canaux sont donc remappés par type via remapChannels32 dans sendWhite().
+ */
 const TEST_WHITE_CHANNELS = [24, 25, 26, 27, 31];
 
 /** @brief Promesse résolue après `ms` millisecondes (pause asynchrone). */
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 /**
- * @brief Allume une dalle en blanc (canaux blancs à TEST_WHITE_VALUE).
+ * @brief Allume une dalle en blanc, en tenant compte de son câblage (rouge/bleu).
  *
- * Une seule requête : les 32 canaux sont envoyés (blancs à 80, le reste à 0),
- * ce qui fixe l'état complet de la dalle.
+ * Le vecteur de canaux blancs est défini en référence « rouge » puis remappé
+ * vers le câblage réel de la dalle (les dalles bleu ont leurs canaux blancs à
+ * d'autres index/longueurs d'onde). Une seule requête fixe l'état complet.
  *
  * @param plateId Identifiant physique de la dalle (1..42).
  * @returns true si la requête a réussi, false sinon.
  */
 async function sendWhite(plateId: number): Promise<boolean> {
-  const channels = Array.from({ length: 32 }, (_, i) => ({
-    index: i,
-    value: TEST_WHITE_CHANNELS.includes(i) ? TEST_WHITE_VALUE : 0,
-  }));
+  // Vecteur blanc en référence rouge, puis remappage selon le type de la dalle.
+  const refRouge = Array.from({ length: 32 }, (_, i) => (TEST_WHITE_CHANNELS.includes(i) ? TEST_WHITE_VALUE : 0));
+  const type = PLATE_TYPE[plateId] ?? 'rouge';
+  const mapped = type === 'rouge' ? refRouge : remapChannels32(refRouge, 'rouge', 'bleu');
+  const channels = mapped.map((value, index) => ({ index, value }));
   return fetch('/api/supervision/batch', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },

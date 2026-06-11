@@ -41,6 +41,7 @@ import Coachmarks, { type CoachStep } from '@/app/_components/Coachmarks';
 import { playSfx, SFX_LIST, unlockAudio, vibrate } from '@/lib/audio/sfx';
 import { LOGIC_OP_KINDS, applyLogicOp, logicOpShape } from '@/lib/game/logicOps';
 import { getPyodide } from '@/lib/pyodide';
+import { PLATE_TYPE, remapChannels32 } from '@/lib/tileChannels';
 import { NODE_META, normaliserRecherche } from './nodeMeta';
 import { verifierGraphe, type Probleme } from './verifier';
 
@@ -1126,10 +1127,16 @@ type HwPlateUpdate = { plateId: number; channels: { index: number; value: number
 let _scheduleSetCanal: (plaqueId: number, canalIndex: number, intensity: number) => void = () => {};
 
 function sendChannelsToHardware(channels32: number[], plateIds: number[]) {
+  // channels32 est exprimé en référence « rouge ». Les dalles « bleu » n'ont
+  // pas les mêmes longueurs d'onde aux mêmes index : on remappe avant d'envoyer
+  // (même logique que sendRgbToPlate dans /jeux) sinon une dalle bleu affiche
+  // une couleur fausse pendant l'aperçu.
   for (const plaqueId of plateIds) {
+    const ch = (PLATE_TYPE[plaqueId] ?? 'rouge') === 'rouge'
+      ? channels32
+      : remapChannels32(channels32, 'rouge', 'bleu');
     for (let i = 0; i < 32; i++) {
-      const v = clamp255(channels32[i] ?? 0);
-      _scheduleSetCanal(plaqueId, i, v);
+      _scheduleSetCanal(plaqueId, i, clamp255(ch[i] ?? 0));
     }
   }
 }
