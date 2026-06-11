@@ -1362,6 +1362,36 @@ export default function EditeurPage() {
   const [aiHighlightIds, setAiHighlightIds] = useState<Set<string>>(new Set()); // blocs ajoutes par l'IA (diff visuel)
   const aiBeforeRef = useRef<Record<string, EditorSnapshot>>({}); // snapshot avant chaque réponse IA (pour annuler)
   const aiScrollRef = useRef<HTMLDivElement | null>(null);
+  // Largeur redimensionnable du panneau IA (persistée en localStorage)
+  const [aiPanelWidth, setAiPanelWidth] = useState(440);
+  const aiResizeRef = useRef<{ startX: number; startW: number } | null>(null);
+  useEffect(() => {
+    const saved = Number(localStorage.getItem('cr_ai_panel_width'));
+    if (Number.isFinite(saved) && saved >= 320 && saved <= 900) setAiPanelWidth(saved);
+  }, []);
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => {
+      const st = aiResizeRef.current;
+      if (!st) return;
+      // Le panneau est ancré à DROITE : tirer vers la gauche élargit.
+      const delta = st.startX - e.clientX;
+      const next = Math.max(320, Math.min(900, st.startW + delta));
+      setAiPanelWidth(next);
+    };
+    const onUp = () => {
+      if (aiResizeRef.current) {
+        aiResizeRef.current = null;
+        document.body.style.userSelect = '';
+        document.body.style.cursor = '';
+        localStorage.setItem('cr_ai_panel_width', String(Math.round(aiPanelWidthRef.current)));
+      }
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    return () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
+  }, []);
+  const aiPanelWidthRef = useRef(aiPanelWidth);
+  useEffect(() => { aiPanelWidthRef.current = aiPanelWidth; }, [aiPanelWidth]);
 
   // Sélecteur de modèle IA
   type AiModelMeta = { id: string; provider: 'gemini' | 'ollama'; label: string; speed: string; quality: number; effort: number; size?: string; available: boolean; unavailableReason?: string };
@@ -4855,30 +4885,40 @@ export default function EditeurPage() {
 
       {/* ── Chat IA (style outil, docké à droite : l'éditeur reste visible) ──── */}
       {aiOpen && (
-        <div style={{ position: 'fixed', top: 0, right: 0, bottom: 0, width: 'min(clamp(280px, 50vw, 600px), 96vw)', zIndex: 10050, display: 'flex', flexDirection: 'column', background: 'rgba(18,19,29,0.75)', backdropFilter: 'blur(12px)', borderLeft: '1px solid rgba(255,255,255,0.15)', boxShadow: '-20px 0 60px rgba(0,0,0,0.5)' }}>
-          {/* Resize handle */}
-          <div style={{ position: 'absolute', top: 16, left: 16, width: 24, height: 24, cursor: 'ew-resize', zIndex: 10051 }} title="Redimensionner" draggable={true} />
-          <style>{'@keyframes aiPulse{0%,100%{opacity:.45}50%{opacity:1}}'}</style>
-          <div style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 10, borderBottom: '1px solid rgba(255,255,255,0.08)', flexShrink: 0 }}>
-            <div style={{ width: 34, height: 34, borderRadius: 10, display: 'grid', placeItems: 'center', background: 'linear-gradient(135deg,#7c3aed,#ec4899)', flexShrink: 0 }}><Sparkles size={18} color="#fff" /></div>
+        <div style={{ position: 'fixed', top: 0, right: 0, bottom: 0, width: `min(${aiPanelWidth}px, 98vw)`, zIndex: 10050, display: 'flex', flexDirection: 'column', background: 'rgba(255,255,255,0.72)', backdropFilter: 'blur(28px) saturate(180%)', WebkitBackdropFilter: 'blur(28px) saturate(180%)', borderLeft: '1px solid rgba(255,255,255,0.8)', boxShadow: '-24px 0 70px rgba(15,23,42,0.18)', color: '#0f172a' }}>
+          {/* Poignée de redimensionnement (bord gauche, drag réel) */}
+          <div
+            onMouseDown={(e) => {
+              aiResizeRef.current = { startX: e.clientX, startW: aiPanelWidth };
+              document.body.style.userSelect = 'none';
+              document.body.style.cursor = 'ew-resize';
+            }}
+            title="Glisser pour redimensionner"
+            style={{ position: 'absolute', top: 0, left: -3, bottom: 0, width: 10, cursor: 'ew-resize', zIndex: 10052, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          >
+            <div style={{ width: 4, height: 46, borderRadius: 4, background: 'rgba(124,58,237,0.45)', boxShadow: '0 0 8px rgba(124,58,237,0.4)' }} />
+          </div>
+          <style>{'@keyframes aiPulse{0%,100%{opacity:.45}50%{opacity:1}}@keyframes aiShimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}'}</style>
+          <div style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 10, borderBottom: '1px solid rgba(15,23,42,0.08)', flexShrink: 0, background: 'linear-gradient(180deg,rgba(255,255,255,0.55),rgba(255,255,255,0))' }}>
+            <div style={{ width: 34, height: 34, borderRadius: 10, display: 'grid', placeItems: 'center', background: 'linear-gradient(135deg,#7c3aed,#ec4899)', flexShrink: 0, boxShadow: '0 4px 14px rgba(124,58,237,0.35)' }}><Sparkles size={18} color="#fff" /></div>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <h2 style={{ margin: 0, fontSize: 15, fontWeight: 800, color: '#fff' }}>Assistant IA</h2>
-              <p style={{ margin: 0, fontSize: 11, color: 'rgba(255,255,255,0.5)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{activeGame ? `Jeu : ${activeGame.name}` : 'Aucun jeu — il en créera un'}</p>
-              {aiStatus && !aiStatus.ready && <p style={{ margin: '2px 0 0', fontSize: 10.5, color: '#fbbf24', display: 'flex', alignItems: 'center', gap: 5 }}><span style={{ width: 7, height: 7, borderRadius: '50%', background: '#fbbf24', animation: 'aiPulse 1.1s ease-in-out infinite' }} />{aiStatus.message}</p>}
+              <h2 style={{ margin: 0, fontSize: 15, fontWeight: 800, color: '#0f172a' }}>Assistant IA</h2>
+              <p style={{ margin: 0, fontSize: 11, color: 'rgba(15,23,42,0.5)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{activeGame ? `Jeu : ${activeGame.name}` : 'Aucun jeu — il en créera un'}</p>
+              {aiStatus && !aiStatus.ready && <p style={{ margin: '2px 0 0', fontSize: 10.5, color: '#b45309', display: 'flex', alignItems: 'center', gap: 5 }}><span style={{ width: 7, height: 7, borderRadius: '50%', background: '#f59e0b', animation: 'aiPulse 1.1s ease-in-out infinite' }} />{aiStatus.message}</p>}
             </div>
-            <button onClick={() => { const n = !aiShowList; setAiShowList(n); if (n) void loadAiConvList(); }} title="Conversations enregistrées" style={{ background: aiShowList ? 'rgba(124,58,237,0.25)' : 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.7)', borderRadius: 8, padding: '6px 8px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}><Clock size={13} /></button>
-            <button onClick={newAiConversation} title="Nouvelle conversation" style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.7)', borderRadius: 8, padding: '6px 8px', cursor: 'pointer', fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}><Plus size={13} /> Nouveau</button>
-            <button onClick={() => setAiOpen(false)} style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.6)', cursor: 'pointer', padding: 4 }}><X size={18} /></button>
+            <button onClick={() => { const n = !aiShowList; setAiShowList(n); if (n) void loadAiConvList(); }} title="Conversations enregistrées" style={{ background: aiShowList ? 'rgba(124,58,237,0.16)' : 'rgba(15,23,42,0.04)', border: '1px solid rgba(15,23,42,0.1)', color: aiShowList ? '#7c3aed' : 'rgba(15,23,42,0.6)', borderRadius: 8, padding: '6px 8px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}><Clock size={13} /></button>
+            <button onClick={newAiConversation} title="Nouvelle conversation" style={{ background: 'rgba(15,23,42,0.04)', border: '1px solid rgba(15,23,42,0.1)', color: 'rgba(15,23,42,0.6)', borderRadius: 8, padding: '6px 8px', cursor: 'pointer', fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}><Plus size={13} /> Nouveau</button>
+            <button onClick={() => setAiOpen(false)} style={{ background: 'transparent', border: 'none', color: 'rgba(15,23,42,0.5)', cursor: 'pointer', padding: 4 }}><X size={18} /></button>
           </div>
 
           {aiShowList && (
-            <div style={{ borderBottom: '1px solid rgba(255,255,255,0.08)', maxHeight: 200, overflowY: 'auto', background: 'rgba(0,0,0,0.25)', flexShrink: 0 }}>
+            <div style={{ borderBottom: '1px solid rgba(15,23,42,0.08)', maxHeight: 200, overflowY: 'auto', background: 'rgba(255,255,255,0.4)', flexShrink: 0 }}>
               {aiConvList.length === 0 ? (
-                <div style={{ padding: 12, fontSize: 12, color: 'rgba(255,255,255,0.4)', textAlign: 'center' }}>Aucune conversation enregistrée pour ce jeu.</div>
+                <div style={{ padding: 12, fontSize: 12, color: 'rgba(15,23,42,0.45)', textAlign: 'center' }}>Aucune conversation enregistrée pour ce jeu.</div>
               ) : aiConvList.map((c) => (
-                <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                  <button onClick={() => openAiConversation(c)} style={{ flex: 1, textAlign: 'left', background: 'transparent', border: 'none', color: c.id === aiConvId ? '#c4b5fd' : '#e2e8f0', cursor: 'pointer', fontSize: 12.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {c.title || 'Conversation'} <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)' }}>· {new Date(c.updatedAt).toLocaleDateString()}</span>
+                <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderBottom: '1px solid rgba(15,23,42,0.05)' }}>
+                  <button onClick={() => openAiConversation(c)} style={{ flex: 1, textAlign: 'left', background: 'transparent', border: 'none', color: c.id === aiConvId ? '#7c3aed' : '#1e293b', fontWeight: c.id === aiConvId ? 700 : 500, cursor: 'pointer', fontSize: 12.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {c.title || 'Conversation'} <span style={{ fontSize: 10, color: 'rgba(15,23,42,0.4)' }}>· {new Date(c.updatedAt).toLocaleDateString()}</span>
                   </button>
                   <button onClick={() => void deleteAiConversation(c.id)} title="Supprimer" style={{ background: 'transparent', border: 'none', color: 'rgba(239,68,68,0.7)', cursor: 'pointer', padding: 2, display: 'flex' }}><Trash2 size={13} /></button>
                 </div>
@@ -4888,23 +4928,23 @@ export default function EditeurPage() {
 
           {/* ── Sélecteur de modèle ── */}
           {aiModels.length > 0 && (
-            <div ref={aiModelPickerRef} style={{ position: 'relative', padding: '8px 12px', borderBottom: '1px solid rgba(255,255,255,0.07)', flexShrink: 0 }}>
+            <div ref={aiModelPickerRef} style={{ position: 'relative', padding: '8px 12px', borderBottom: '1px solid rgba(15,23,42,0.07)', flexShrink: 0 }}>
               <button
                 onClick={() => setAiModelPickerOpen((v) => !v)}
-                style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.05)', color: '#e2e8f0', cursor: 'pointer', fontSize: 12.5 }}
+                style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderRadius: 10, border: '1px solid rgba(15,23,42,0.12)', background: 'rgba(255,255,255,0.7)', color: '#1e293b', cursor: 'pointer', fontSize: 12.5 }}
               >
                 {(() => {
                   const m = aiModels.find((x) => x.id === aiSelectedModel);
                   return m ? (
                     <>
-                      <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 5, background: m.provider === 'gemini' ? 'rgba(6,182,212,0.2)' : 'rgba(124,58,237,0.2)', color: m.provider === 'gemini' ? '#67e8f9' : '#c4b5fd', fontWeight: 700 }}>{m.provider === 'gemini' ? 'Cloud' : 'Local'}</span>
-                      <span style={{ flex: 1 }}>{m.label}</span>
-                      <span style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.4)' }}>{m.speed}</span>
+                      <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 5, background: m.provider === 'gemini' ? 'rgba(8,145,178,0.14)' : 'rgba(124,58,237,0.14)', color: m.provider === 'gemini' ? '#0e7490' : '#6d28d9', fontWeight: 700 }}>{m.provider === 'gemini' ? 'Cloud' : 'Local'}</span>
+                      <span style={{ flex: 1, fontWeight: 600 }}>{m.label}</span>
+                      <span style={{ fontSize: 10.5, color: 'rgba(15,23,42,0.45)' }}>{m.speed}</span>
                     </>
                   ) : (
                     <>
-                      <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 5, background: 'rgba(6,182,212,0.2)', color: '#67e8f9', fontWeight: 700 }}>Auto</span>
-                      <span style={{ flex: 1 }}>Gemini → Ollama (cascade)</span>
+                      <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 5, background: 'rgba(8,145,178,0.14)', color: '#0e7490', fontWeight: 700 }}>Auto</span>
+                      <span style={{ flex: 1, fontWeight: 600 }}>Gemini → Ollama (cascade)</span>
                     </>
                   );
                 })()}
@@ -4912,15 +4952,15 @@ export default function EditeurPage() {
               </button>
 
               {aiModelPickerOpen && (
-                <div style={{ position: 'absolute', top: '100%', left: 12, right: 12, zIndex: 100, background: '#1a1d2e', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 12, boxShadow: '0 12px 40px rgba(0,0,0,0.6)', overflow: 'hidden', maxHeight: 340, overflowY: 'auto' }}>
+                <div style={{ position: 'absolute', top: '100%', left: 12, right: 12, zIndex: 100, background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(20px)', border: '1px solid rgba(15,23,42,0.1)', borderRadius: 12, boxShadow: '0 18px 50px rgba(15,23,42,0.22)', overflow: 'hidden', maxHeight: 340, overflowY: 'auto' }}>
                   {/* Option Auto */}
                   <button
                     onClick={() => { setAiSelectedModel(''); setAiModelPickerOpen(false); }}
-                    style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '9px 12px', background: !aiSelectedModel ? 'rgba(6,182,212,0.12)' : 'transparent', border: 'none', borderBottom: '1px solid rgba(255,255,255,0.06)', color: '#e2e8f0', cursor: 'pointer', textAlign: 'left' }}
+                    style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '9px 12px', background: !aiSelectedModel ? 'rgba(8,145,178,0.1)' : 'transparent', border: 'none', borderBottom: '1px solid rgba(15,23,42,0.06)', color: '#1e293b', cursor: 'pointer', textAlign: 'left' }}
                   >
-                    <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 5, background: 'rgba(6,182,212,0.2)', color: '#67e8f9', fontWeight: 700, flexShrink: 0 }}>Auto</span>
-                    <span style={{ flex: 1, fontSize: 12.5 }}>Cascade automatique</span>
-                    <span style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.35)' }}>Gemini → Ollama</span>
+                    <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 5, background: 'rgba(8,145,178,0.14)', color: '#0e7490', fontWeight: 700, flexShrink: 0 }}>Auto</span>
+                    <span style={{ flex: 1, fontSize: 12.5, fontWeight: 600 }}>Cascade automatique</span>
+                    <span style={{ fontSize: 10.5, color: 'rgba(15,23,42,0.4)' }}>Gemini → Ollama</span>
                   </button>
 
                   {/* Séparateurs par provider */}
@@ -4929,7 +4969,7 @@ export default function EditeurPage() {
                     if (group.length === 0) return null;
                     return (
                       <div key={prov}>
-                        <div style={{ padding: '6px 12px 4px', fontSize: 10, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: prov === 'gemini' ? '#67e8f9' : '#c4b5fd', background: 'rgba(0,0,0,0.2)' }}>
+                        <div style={{ padding: '6px 12px 4px', fontSize: 10, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: prov === 'gemini' ? '#0e7490' : '#6d28d9', background: 'rgba(15,23,42,0.04)' }}>
                           {prov === 'gemini' ? '☁ Google Gemini (cloud)' : '💻 Ollama (local, hors-ligne)'}
                         </div>
                         {group.map((m) => (
@@ -4938,16 +4978,16 @@ export default function EditeurPage() {
                             disabled={!m.available}
                             onClick={() => { if (m.available) { setAiSelectedModel(m.id); setAiModelPickerOpen(false); } }}
                             title={m.unavailableReason}
-                            style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: m.id === aiSelectedModel ? (prov === 'gemini' ? 'rgba(6,182,212,0.1)' : 'rgba(124,58,237,0.1)') : 'transparent', border: 'none', borderBottom: '1px solid rgba(255,255,255,0.04)', color: m.available ? '#e2e8f0' : 'rgba(255,255,255,0.3)', cursor: m.available ? 'pointer' : 'not-allowed', textAlign: 'left', opacity: m.available ? 1 : 0.6 }}
+                            style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: m.id === aiSelectedModel ? (prov === 'gemini' ? 'rgba(8,145,178,0.1)' : 'rgba(124,58,237,0.1)') : 'transparent', border: 'none', borderBottom: '1px solid rgba(15,23,42,0.04)', color: m.available ? '#1e293b' : 'rgba(15,23,42,0.35)', cursor: m.available ? 'pointer' : 'not-allowed', textAlign: 'left', opacity: m.available ? 1 : 0.6 }}
                           >
-                            <span style={{ flex: 1, fontSize: 12.5 }}>{m.label}{m.size ? <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginLeft: 5 }}>{m.size}</span> : null}</span>
-                            <span style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.45)', flexShrink: 0 }}>{m.speed}</span>
+                            <span style={{ flex: 1, fontSize: 12.5, fontWeight: 600 }}>{m.label}{m.size ? <span style={{ fontSize: 10, color: 'rgba(15,23,42,0.4)', marginLeft: 5, fontWeight: 400 }}>{m.size}</span> : null}</span>
+                            <span style={{ fontSize: 10.5, color: 'rgba(15,23,42,0.45)', flexShrink: 0 }}>{m.speed}</span>
                             <span title={`Qualité : ${m.quality}/5`} style={{ display: 'flex', gap: 1, flexShrink: 0 }}>
                               {Array.from({ length: 5 }, (_, i) => (
-                                <span key={i} style={{ width: 5, height: 5, borderRadius: '50%', background: i < m.quality ? (prov === 'gemini' ? '#06d6a0' : '#a78bfa') : 'rgba(255,255,255,0.12)' }} />
+                                <span key={i} style={{ width: 5, height: 5, borderRadius: '50%', background: i < m.quality ? (prov === 'gemini' ? '#059669' : '#7c3aed') : 'rgba(15,23,42,0.12)' }} />
                               ))}
                             </span>
-                            {!m.available && <span style={{ fontSize: 9, color: '#f87171', flexShrink: 0 }}>✗</span>}
+                            {!m.available && <span style={{ fontSize: 9, color: '#dc2626', flexShrink: 0 }}>✗</span>}
                           </button>
                         ))}
                       </div>
@@ -4960,12 +5000,17 @@ export default function EditeurPage() {
 
           <div ref={aiScrollRef} style={{ flex: 1, overflowY: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
             {aiMessages.length === 0 && !aiBusy && (
-              <div style={{ margin: 'auto', textAlign: 'center', color: 'rgba(255,255,255,0.45)', fontSize: 13, maxWidth: 300 }}>
-                <Bot size={32} color="rgba(255,255,255,0.25)" />
-                <p style={{ marginTop: 10 }}>Décris le jeu à créer, ou demande une modification. L'IA construit les blocs et l'interface en direct.</p>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 12 }}>
-                  {['Crée un jeu de réflexes sur les couleurs', 'Ajoute un timer de 60 secondes', 'Joue un son « bonne réponse » quand on réussit'].map((ex) => (
-                    <button key={ex} onClick={() => setAiPrompt(ex)} style={{ fontSize: 12, padding: '8px 10px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.7)', cursor: 'pointer', textAlign: 'left' }}>{ex}</button>
+              <div style={{ margin: 'auto', textAlign: 'center', color: 'rgba(15,23,42,0.55)', fontSize: 13, maxWidth: 340 }}>
+                <Bot size={32} color="rgba(124,58,237,0.5)" />
+                <p style={{ marginTop: 10, fontWeight: 500 }}>Décris le jeu à créer, ou demande une modification. L'IA construit les blocs et l'interface en direct.</p>
+                <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'rgba(15,23,42,0.4)', marginTop: 14, marginBottom: 6 }}>Exemples qui marchent</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {[
+                    { t: 'Réflexes couleur (comme Color Speed)', p: 'Crée un jeu de réflexes : une dalle aléatoire s\'allume en couleur vive, le joueur clique dessus le plus vite possible. Ajoute un timer de 30 secondes, un score, joue le son "correct" à chaque réussite et "win" à la fin.' },
+                    { t: 'Dalle 1 allumée → succès', p: 'Crée un jeu simple : la dalle 1 s\'allume en vert. Si on clique sur la dalle 1, joue le son "success" et ajoute 1 point. Sinon, joue le son "error". On peut cliquer la dalle 1 pour interagir.' },
+                    { t: 'Ajoute un timer + son de victoire', p: 'Ajoute au jeu actuel un timer de 60 secondes affiché, et joue le son "win" quand le temps est écoulé.' },
+                  ].map((ex) => (
+                    <button key={ex.t} onClick={() => setAiPrompt(ex.p)} style={{ fontSize: 12, padding: '9px 11px', borderRadius: 10, border: '1px solid rgba(15,23,42,0.1)', background: 'rgba(255,255,255,0.6)', color: '#334155', cursor: 'pointer', textAlign: 'left', fontWeight: 600, boxShadow: '0 1px 3px rgba(15,23,42,0.05)' }}>{ex.t}</button>
                   ))}
                 </div>
               </div>
@@ -4973,41 +5018,43 @@ export default function EditeurPage() {
             {aiMessages.map((m) => (
               <div key={m.id} style={{ alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start', maxWidth: '90%' }}>
                 <div style={{ padding: '10px 13px', borderRadius: 14, fontSize: 13, lineHeight: 1.5, whiteSpace: 'pre-wrap',
-                  background: m.role === 'user' ? 'linear-gradient(135deg,#4361ee,#7c3aed)' : (m.error ? 'rgba(239,68,68,0.14)' : 'rgba(255,255,255,0.07)'),
-                  color: m.error ? '#fca5a5' : '#fff', border: m.role === 'assistant' && !m.error ? '1px solid rgba(255,255,255,0.1)' : 'none' }}>
+                  background: m.role === 'user' ? 'linear-gradient(135deg,#4361ee,#7c3aed)' : (m.error ? 'rgba(239,68,68,0.1)' : 'rgba(255,255,255,0.85)'),
+                  color: m.role === 'user' ? '#fff' : (m.error ? '#b91c1c' : '#1e293b'),
+                  border: m.role === 'assistant' && !m.error ? '1px solid rgba(15,23,42,0.08)' : (m.error ? '1px solid rgba(239,68,68,0.3)' : 'none'),
+                  boxShadow: m.role === 'assistant' && !m.error ? '0 2px 8px rgba(15,23,42,0.06)' : 'none' }}>
                   {m.content}
-                  {m.summary && <div style={{ marginTop: 6, fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>🧩 {m.summary}{m.model ? ` · ${m.model}` : ''}</div>}
+                  {m.summary && <div style={{ marginTop: 6, fontSize: 11, color: m.role === 'user' ? 'rgba(255,255,255,0.75)' : 'rgba(15,23,42,0.5)' }}>🧩 {m.summary}{m.model ? ` · ${m.model}` : ''}</div>}
                 </div>
                 {m.role === 'assistant' && !m.error && aiBeforeRef.current[m.id] && (
                   <div style={{ display: 'flex', gap: 6, marginTop: 5 }}>
-                    <button onClick={() => revertAiMessage(m.id)} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, padding: '4px 8px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.14)', background: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.7)', cursor: 'pointer' }}><RotateCcw size={12} /> Annuler</button>
-                    <button onClick={retryAi} disabled={aiBusy} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, padding: '4px 8px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.14)', background: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.7)', cursor: aiBusy ? 'not-allowed' : 'pointer' }}><RefreshCw size={12} /> Réessayer</button>
+                    <button onClick={() => revertAiMessage(m.id)} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, padding: '4px 8px', borderRadius: 8, border: '1px solid rgba(15,23,42,0.12)', background: 'rgba(255,255,255,0.7)', color: 'rgba(15,23,42,0.65)', cursor: 'pointer' }}><RotateCcw size={12} /> Annuler</button>
+                    <button onClick={retryAi} disabled={aiBusy} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, padding: '4px 8px', borderRadius: 8, border: '1px solid rgba(15,23,42,0.12)', background: 'rgba(255,255,255,0.7)', color: 'rgba(15,23,42,0.65)', cursor: aiBusy ? 'not-allowed' : 'pointer' }}><RefreshCw size={12} /> Réessayer</button>
                   </div>
                 )}
               </div>
             ))}
             {aiBusy && (
-              <div style={{ alignSelf: 'flex-start', padding: '10px 13px', borderRadius: 14, background: 'rgba(124,58,237,0.14)', border: '1px solid rgba(124,58,237,0.3)', color: '#c4b5fd', fontSize: 12.5, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ alignSelf: 'flex-start', padding: '10px 13px', borderRadius: 14, background: 'rgba(124,58,237,0.1)', border: '1px solid rgba(124,58,237,0.25)', color: '#6d28d9', fontSize: 12.5, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8 }}>
                 <Bot size={15} style={{ animation: 'aiPulse 1.1s ease-in-out infinite' }} /> {aiStep || 'Génération…'}
               </div>
             )}
           </div>
 
-          {aiError && <div style={{ margin: '0 16px', padding: '8px 10px', borderRadius: 8, background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.3)', color: '#fca5a5', fontSize: 12 }}>⚠ {aiError}</div>}
+          {aiError && <div style={{ margin: '0 16px', padding: '8px 10px', borderRadius: 8, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.3)', color: '#b91c1c', fontSize: 12 }}>⚠ {aiError}</div>}
 
-          <div style={{ padding: 12, borderTop: '1px solid rgba(255,255,255,0.08)', flexShrink: 0 }}>
+          <div style={{ padding: 12, borderTop: '1px solid rgba(15,23,42,0.08)', flexShrink: 0, background: 'linear-gradient(0deg,rgba(255,255,255,0.5),rgba(255,255,255,0))' }}>
             <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
               <textarea value={aiPrompt} onChange={(e) => setAiPrompt(e.target.value)}
-                onKeyDown={(e) => { if ((e.key === 'Enter' && !e.shiftKey) || (e.ctrlKey && e.code === 'Space')) { e.preventDefault(); void sendAiMessage(); } }}
+                onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void sendAiMessage(); } }}
                 disabled={aiBusy} rows={2}
-                placeholder={activeGame ? 'Demande une modification… (Entrée pour envoyer)' : 'Décris le jeu à créer…'}
-                style={{ flex: 1, resize: 'none', borderRadius: 12, padding: '10px 12px', fontSize: 13, lineHeight: 1.4, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }} />
+                placeholder={activeGame ? 'Demande une modification…  (Entrée = envoyer · Maj+Entrée = nouvelle ligne)' : 'Décris le jeu à créer…  (Entrée pour envoyer)'}
+                style={{ flex: 1, resize: 'none', borderRadius: 12, padding: '10px 12px', fontSize: 13, lineHeight: 1.4, background: 'rgba(255,255,255,0.9)', border: '1px solid rgba(15,23,42,0.14)', color: '#0f172a', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box', boxShadow: 'inset 0 1px 3px rgba(15,23,42,0.05)' }} />
               <button onClick={() => void sendAiMessage()} disabled={aiBusy || !aiPrompt.trim()}
-                style={{ width: 42, height: 42, flexShrink: 0, borderRadius: 12, border: 'none', cursor: aiBusy || !aiPrompt.trim() ? 'not-allowed' : 'pointer', color: '#fff', background: aiBusy || !aiPrompt.trim() ? 'rgba(124,58,237,0.4)' : 'linear-gradient(135deg,#7c3aed,#ec4899)', display: 'grid', placeItems: 'center' }}>
+                style={{ width: 42, height: 42, flexShrink: 0, borderRadius: 12, border: 'none', cursor: aiBusy || !aiPrompt.trim() ? 'not-allowed' : 'pointer', color: '#fff', background: aiBusy || !aiPrompt.trim() ? 'rgba(124,58,237,0.35)' : 'linear-gradient(135deg,#7c3aed,#ec4899)', display: 'grid', placeItems: 'center', boxShadow: aiBusy || !aiPrompt.trim() ? 'none' : '0 4px 14px rgba(124,58,237,0.35)' }}>
                 <Sparkles size={18} />
               </button>
             </div>
-            <p style={{ margin: '6px 2px 0', fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>{aiSelectedModel ? aiModels.find((m) => m.id === aiSelectedModel)?.label ?? aiSelectedModel : 'Auto (Gemini → Ollama)'} · modifs en direct · « Annuler » disponible · sauvegarde auto</p>
+            <p style={{ margin: '6px 2px 0', fontSize: 10, color: 'rgba(15,23,42,0.4)' }}>{aiSelectedModel ? aiModels.find((m) => m.id === aiSelectedModel)?.label ?? aiSelectedModel : 'Auto (Gemini → Ollama)'} · modifs en direct · « Annuler » disponible · sauvegarde auto</p>
           </div>
         </div>
       )}
