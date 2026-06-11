@@ -206,12 +206,32 @@ function sanitize(raw: GameJson, tileCount: number) {
   };
 }
 
-// Choix du fournisseur d'IA : explicite (AI_PROVIDER) sinon auto (Gemini si clé, sinon Ollama local).
-function aiProvider(): 'gemini' | 'ollama' {
-  const p = (process.env.AI_PROVIDER || '').toLowerCase();
-  if (p === 'ollama' || p === 'gemini') return p;
-  const key = process.env.GEMINI_API_KEY;
-  return key && key !== 'XXX' ? 'gemini' : 'ollama';
+// Vérifie si un id de modèle appartient à Gemini.
+function isGeminiModel(id: string) { return id.startsWith('gemini'); }
+
+/**
+ * Sonde Gemini avec un timeout court pour décider si on peut l'utiliser.
+ * Renvoie true si la clé est acceptée et répond dans le délai.
+ */
+async function geminiReachable(key: string, timeoutMs = 5000): Promise<boolean> {
+  try {
+    const model = 'gemini-2.5-flash';
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(key)}`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      cache: 'no-store',
+      signal: AbortSignal.timeout(timeoutMs),
+      body: JSON.stringify({
+        contents: [{ role: 'user', parts: [{ text: 'ping' }] }],
+        generationConfig: { maxOutputTokens: 1 },
+      }),
+    });
+    // 200 ou 400 (prompt trop court) = clé valide + serveur joignable
+    return res.status === 200 || res.status === 400;
+  } catch {
+    return false;
+  }
 }
 
 // Prompt COURT pour les petits modèles locaux (moins de contexte/RAM, plus fiable).
@@ -252,6 +272,20 @@ async function callOllama(sys: string, user: string): Promise<GameJson | null> {
   try { return JSON.parse(cleaned) as GameJson; } catch { return null; }
 }
 
+// ── Helpers Ollama ────────────────────────────────────────────────────────────
+async function runOllama(model: string, tileCount: number, userContent: string) {
+  const sys = systemInstructionLite(tileCount);
+  // Surcharge le modèle env si un modèle précis est demandé
+  const orig = process.env.OLLAMA_MODEL;
+  if (model) process.env.OLLAMA_MODEL = model;
+  try {
+    return await callOllama(sys, userContent);
+  } finally {
+    if (orig !== undefined) process.env.OLLAMA_MODEL = orig;
+    else delete process.env.OLLAMA_MODEL;
+  }
+}
+
 export async function POST(req: Request) {
   let body: any;
   try { body = await req.json(); } catch { body = {}; }
@@ -260,6 +294,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: 'NO_PROMPT', message: 'Décris le jeu à créer.' }, { status: 400 });
   }
   const tileCount = Math.max(1, Math.min(42, Math.round(Number(body?.tileCount) || 42)));
+
+  // Modèle explicitement choisi par l'utilisateur (depuis le sélecteur UI).
+  const chosenModel: string = typeof body?.model === 'string' ? body.model.trim() : '';
 
   // Multi-tours : jeu actuel à modifier + historique de conversation (optionnels).
   const currentGame = body?.currentGame && typeof body.currentGame === 'object' ? body.currentGame : null;
@@ -277,55 +314,89 @@ export async function POST(req: Request) {
   userContent += 'DEMANDE :\n' + prompt;
 
   const sys = systemInstruction(tileCount);
-  const provider = aiProvider();
+  const key = process.env.GEMINI_API_KEY ?? '';
+  const hasKey = !!key && key !== 'XXX' && key.length > 10;
 
-  // ── Modèle local (Ollama, hors-ligne) ──────────────────────────────────────
-  if (provider === 'ollama') {
-    const model = process.env.OLLAMA_MODEL || 'qwen2.5:1.5b';
+  // ── Modèle Ollama explicitement choisi ──────────────────────────────────────
+  if (chosenModel && !isGeminiModel(chosenModel)) {
+    const model = chosenModel;
     try {
-      // Prompt court : plus fiable + moins de RAM sur un petit modèle local.
-      const raw = await callOllama(systemInstructionLite(tileCount), userContent);
-      if (!raw) return NextResponse.json({ ok: false, error: 'OLLAMA_EMPTY', message: `Le modèle local ${model} a renvoyé une réponse vide ou non-JSON. Réessaie avec une demande plus simple.` }, { status: 502 });
+      const raw = await runOllama(model, tileCount, userContent);
+      if (!raw) return NextResponse.json({ ok: false, error: 'OLLAMA_EMPTY', message: `Le modèle ${model} a renvoyé une réponse vide. Réessaie avec une demande plus simple.` }, { status: 502 });
       const game = sanitize(raw, tileCount);
-      if (game.nodes.length === 0) return NextResponse.json({ ok: false, error: 'OLLAMA_INVALID', message: 'Le modèle local n\'a produit aucun bloc valide. Réessaie ou utilise un modèle plus capable.' }, { status: 502 });
+      if (game.nodes.length === 0) return NextResponse.json({ ok: false, error: 'OLLAMA_INVALID', message: `${model} n'a produit aucun bloc valide. Essaie un modèle plus capable.` }, { status: 502 });
       return NextResponse.json({ ok: true, model: `ollama/${model}`, game });
     } catch (e: any) {
       const msg = String(e?.message ?? '');
-      let hint: string;
-      if (/not found|try pulling/i.test(msg)) hint = `Le modèle "${model}" n'est pas encore téléchargé. Attends la fin du téléchargement (docker logs -f color-room-ollama-pull), ou lance: docker exec color-room-ollama ollama pull ${model}.`;
-      else if (/memory|oom|resource|allocat|cuda|out of/i.test(msg)) hint = `Mémoire insuffisante pour "${model}" sur ce matériel. Essaie un modèle plus léger : mets OLLAMA_MODEL=llama3.2:3b dans app/.env puis redémarre.`;
-      else hint = `Le serveur Ollama a renvoyé une erreur. Vérifie qu'il tourne et que "${model}" est téléchargé.`;
-      return NextResponse.json(
-        { ok: false, error: 'OLLAMA_NOT_READY', message: `${hint} (détail: ${msg || 'inconnu'})` },
-        { status: 503 },
-      );
+      let hint = `Erreur Ollama avec "${model}".`;
+      if (/not found|try pulling/i.test(msg)) hint = `Modèle "${model}" non installé. Lance : ollama pull ${model}`;
+      else if (/memory|oom|out of/i.test(msg)) hint = `RAM insuffisante pour "${model}". Choisis un modèle plus léger.`;
+      return NextResponse.json({ ok: false, error: 'OLLAMA_NOT_READY', message: `${hint} (${msg.slice(0, 200)})` }, { status: 503 });
     }
   }
 
-  // ── Gemini (cloud) ─────────────────────────────────────────────────────────
-  const key = process.env.GEMINI_API_KEY;
-  if (!key || key === 'XXX') {
-    return NextResponse.json(
-      { ok: false, error: 'NO_API_KEY', message: 'Aucune IA configurée : ni GEMINI_API_KEY, ni modèle local (AI_PROVIDER=ollama).' },
-      { status: 503 },
-    );
-  }
-  const models = (process.env.GEMINI_MODELS?.split(',').map((s) => s.trim()).filter(Boolean)) || DEFAULT_MODELS;
-  const errors: string[] = [];
-  for (const model of models) {
+  // ── Gemini (cloud) — modèle choisi ou cascade automatique ──────────────────
+  if (hasKey && (!chosenModel || isGeminiModel(chosenModel))) {
+    // Si modèle spécifique demandé, essaie-le en premier ; sinon cascade complète.
+    const models = chosenModel
+      ? [chosenModel, ...DEFAULT_MODELS.filter((m) => m !== chosenModel)]
+      : (process.env.GEMINI_MODELS?.split(',').map((s) => s.trim()).filter(Boolean) ?? DEFAULT_MODELS);
+
+    // Vérification rapide de joignabilité (5 s max) avant d'engager la cascade.
+    const reachable = await geminiReachable(key, 5000);
+    if (!reachable) {
+      // Fallback Ollama automatique
+      const fallbackModel = process.env.OLLAMA_MODEL || 'qwen2.5:1.5b';
+      try {
+        const raw = await callOllama(systemInstructionLite(tileCount), userContent);
+        if (raw) {
+          const game = sanitize(raw, tileCount);
+          if (game.nodes.length > 0) return NextResponse.json({ ok: true, model: `ollama/${fallbackModel}`, fallback: true, fallbackReason: 'Gemini non joignable (>5s) — bascule locale', game });
+        }
+      } catch { /* ignore — on renvoie l'erreur Gemini */ }
+      return NextResponse.json({ ok: false, error: 'GEMINI_UNREACHABLE', message: 'Gemini n\'a pas répondu dans les 5 secondes et le modèle local est indisponible. Vérifie ta connexion ou installe Ollama.' }, { status: 503 });
+    }
+
+    const errors: string[] = [];
+    for (const model of models) {
+      try {
+        const raw = await callGemini(model, key, sys, userContent);
+        if (!raw) { errors.push(`${model}: réponse vide/illisible`); continue; }
+        const game = sanitize(raw, tileCount);
+        if (game.nodes.length === 0) { errors.push(`${model}: aucun bloc valide`); continue; }
+        return NextResponse.json({ ok: true, model, game });
+      } catch (e: any) {
+        errors.push(`${model}: ${e?.message ?? 'erreur'}`);
+      }
+    }
+
+    // Tous les modèles Gemini ont échoué → fallback Ollama si possible
     try {
-      const raw = await callGemini(model, key, sys, userContent);
-      if (!raw) { errors.push(`${model}: réponse vide/illisible`); continue; }
-      const game = sanitize(raw, tileCount);
-      if (game.nodes.length === 0) { errors.push(`${model}: aucun bloc valide`); continue; }
-      return NextResponse.json({ ok: true, model, game });
-    } catch (e: any) {
-      errors.push(`${model}: ${e?.message ?? 'erreur'}`);
-    }
+      const fallbackModel = process.env.OLLAMA_MODEL || 'qwen2.5:1.5b';
+      const raw = await callOllama(systemInstructionLite(tileCount), userContent);
+      if (raw) {
+        const game = sanitize(raw, tileCount);
+        if (game.nodes.length > 0) return NextResponse.json({ ok: true, model: `ollama/${fallbackModel}`, fallback: true, fallbackReason: 'Gemini a échoué — bascule locale', game });
+      }
+    } catch { /* ignore */ }
+
+    return NextResponse.json({ ok: false, error: 'ALL_MODELS_FAILED', message: 'Aucun modèle Gemini n\'a répondu et le modèle local est indisponible.', details: errors }, { status: 502 });
   }
 
-  return NextResponse.json(
-    { ok: false, error: 'ALL_MODELS_FAILED', message: 'Aucun modèle Gemini n\'a répondu.', details: errors },
-    { status: 502 },
-  );
+  // ── Ollama (pas de clé Gemini) ─────────────────────────────────────────────
+  const model = process.env.OLLAMA_MODEL || 'qwen2.5:1.5b';
+  try {
+    const raw = await callOllama(systemInstructionLite(tileCount), userContent);
+    if (!raw) return NextResponse.json({ ok: false, error: 'OLLAMA_EMPTY', message: `Le modèle local ${model} a renvoyé une réponse vide. Réessaie avec une demande plus simple.` }, { status: 502 });
+    const game = sanitize(raw, tileCount);
+    if (game.nodes.length === 0) return NextResponse.json({ ok: false, error: 'OLLAMA_INVALID', message: 'Le modèle local n\'a produit aucun bloc valide. Réessaie ou utilise un modèle plus capable.' }, { status: 502 });
+    return NextResponse.json({ ok: true, model: `ollama/${model}`, game });
+  } catch (e: any) {
+    const msg = String(e?.message ?? '');
+    let hint: string;
+    if (/not found|try pulling/i.test(msg)) hint = `Le modèle "${model}" n'est pas encore téléchargé.`;
+    else if (/memory|oom|out of/i.test(msg)) hint = `RAM insuffisante pour "${model}". Choisis un modèle plus léger.`;
+    else hint = `Le serveur Ollama a renvoyé une erreur.`;
+    return NextResponse.json({ ok: false, error: 'OLLAMA_NOT_READY', message: `${hint} (${msg.slice(0, 200)})` }, { status: 503 });
+  }
 }

@@ -1356,6 +1356,30 @@ export default function EditeurPage() {
   const aiBeforeRef = useRef<Record<string, EditorSnapshot>>({}); // snapshot avant chaque réponse IA (pour annuler)
   const aiScrollRef = useRef<HTMLDivElement | null>(null);
 
+  // Sélecteur de modèle IA
+  type AiModelMeta = { id: string; provider: 'gemini' | 'ollama'; label: string; speed: string; quality: number; effort: number; size?: string; available: boolean; unavailableReason?: string };
+  const [aiModels, setAiModels] = useState<AiModelMeta[]>([]);
+  const [aiSelectedModel, setAiSelectedModel] = useState<string>('');
+  const [aiModelPickerOpen, setAiModelPickerOpen] = useState(false);
+  const aiModelPickerRef = useRef<HTMLDivElement | null>(null);
+
+  // Ferme le picker si clic hors
+  useEffect(() => {
+    if (!aiModelPickerOpen) return;
+    const h = (e: MouseEvent) => { if (aiModelPickerRef.current && !aiModelPickerRef.current.contains(e.target as Node)) setAiModelPickerOpen(false); };
+    document.addEventListener('mousedown', h);
+    return () => document.removeEventListener('mousedown', h);
+  }, [aiModelPickerOpen]);
+
+  // Charge les modèles à l'ouverture du panel IA
+  useEffect(() => {
+    if (!aiOpen) return;
+    fetch('/api/ai/models', { cache: 'no-store' })
+      .then((r) => r.json())
+      .then((d) => { if (Array.isArray(d?.models)) setAiModels(d.models); })
+      .catch(() => { /* ignore */ });
+  }, [aiOpen]);
+
   const commit = (recipe: (cur: EditorSnapshot) => EditorSnapshot) => {
     setEditor((cur) => {
       const next = recipe(cur);
@@ -4227,7 +4251,11 @@ export default function EditeurPage() {
     if (!text || aiBusy) return;
     const baseMsgs: AiMsg[] = override ? aiMessages : [...aiMessages, { id: aiMkId(), role: 'user', content: text, ts: Date.now() }];
     if (!override) { setAiMessages(baseMsgs); setAiPrompt(''); }
-    setAiBusy(true); setAiError(''); setAiStep('Génération en cours… (modèle local : ça peut prendre un moment)'); setAiModel('');
+    const chosenMeta = aiModels.find((m) => m.id === aiSelectedModel);
+    const stepLabel = chosenMeta
+      ? `Génération avec ${chosenMeta.label} (${chosenMeta.speed})…`
+      : 'Génération en cours…';
+    setAiBusy(true); setAiError(''); setAiStep(stepLabel); setAiModel('');
     try {
       const curGame = activeGame ? serializeGameForAi(activeGame) : null;
       const res = await fetch('/api/ai/generate-game', {
@@ -4236,6 +4264,7 @@ export default function EditeurPage() {
           prompt: text, currentGame: curGame,
           history: baseMsgs.filter((m) => !m.error).map((m) => ({ role: m.role, content: m.content })),
           tileCount: activeGame?.tileCount ?? 42,
+          model: aiSelectedModel || undefined,
         }),
       });
       const data = await res.json();
@@ -4803,6 +4832,78 @@ export default function EditeurPage() {
             </div>
           )}
 
+          {/* ── Sélecteur de modèle ── */}
+          {aiModels.length > 0 && (
+            <div ref={aiModelPickerRef} style={{ position: 'relative', padding: '8px 12px', borderBottom: '1px solid rgba(255,255,255,0.07)', flexShrink: 0 }}>
+              <button
+                onClick={() => setAiModelPickerOpen((v) => !v)}
+                style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.05)', color: '#e2e8f0', cursor: 'pointer', fontSize: 12.5 }}
+              >
+                {(() => {
+                  const m = aiModels.find((x) => x.id === aiSelectedModel);
+                  return m ? (
+                    <>
+                      <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 5, background: m.provider === 'gemini' ? 'rgba(6,182,212,0.2)' : 'rgba(124,58,237,0.2)', color: m.provider === 'gemini' ? '#67e8f9' : '#c4b5fd', fontWeight: 700 }}>{m.provider === 'gemini' ? 'Cloud' : 'Local'}</span>
+                      <span style={{ flex: 1 }}>{m.label}</span>
+                      <span style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.4)' }}>{m.speed}</span>
+                    </>
+                  ) : (
+                    <>
+                      <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 5, background: 'rgba(6,182,212,0.2)', color: '#67e8f9', fontWeight: 700 }}>Auto</span>
+                      <span style={{ flex: 1 }}>Gemini → Ollama (cascade)</span>
+                    </>
+                  );
+                })()}
+                <ChevronDown size={13} style={{ flexShrink: 0, opacity: 0.5, transform: aiModelPickerOpen ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }} />
+              </button>
+
+              {aiModelPickerOpen && (
+                <div style={{ position: 'absolute', top: '100%', left: 12, right: 12, zIndex: 100, background: '#1a1d2e', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 12, boxShadow: '0 12px 40px rgba(0,0,0,0.6)', overflow: 'hidden', maxHeight: 340, overflowY: 'auto' }}>
+                  {/* Option Auto */}
+                  <button
+                    onClick={() => { setAiSelectedModel(''); setAiModelPickerOpen(false); }}
+                    style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '9px 12px', background: !aiSelectedModel ? 'rgba(6,182,212,0.12)' : 'transparent', border: 'none', borderBottom: '1px solid rgba(255,255,255,0.06)', color: '#e2e8f0', cursor: 'pointer', textAlign: 'left' }}
+                  >
+                    <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 5, background: 'rgba(6,182,212,0.2)', color: '#67e8f9', fontWeight: 700, flexShrink: 0 }}>Auto</span>
+                    <span style={{ flex: 1, fontSize: 12.5 }}>Cascade automatique</span>
+                    <span style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.35)' }}>Gemini → Ollama</span>
+                  </button>
+
+                  {/* Séparateurs par provider */}
+                  {(['gemini', 'ollama'] as const).map((prov) => {
+                    const group = aiModels.filter((m) => m.provider === prov);
+                    if (group.length === 0) return null;
+                    return (
+                      <div key={prov}>
+                        <div style={{ padding: '6px 12px 4px', fontSize: 10, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: prov === 'gemini' ? '#67e8f9' : '#c4b5fd', background: 'rgba(0,0,0,0.2)' }}>
+                          {prov === 'gemini' ? '☁ Google Gemini (cloud)' : '💻 Ollama (local, hors-ligne)'}
+                        </div>
+                        {group.map((m) => (
+                          <button
+                            key={m.id}
+                            disabled={!m.available}
+                            onClick={() => { if (m.available) { setAiSelectedModel(m.id); setAiModelPickerOpen(false); } }}
+                            title={m.unavailableReason}
+                            style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: m.id === aiSelectedModel ? (prov === 'gemini' ? 'rgba(6,182,212,0.1)' : 'rgba(124,58,237,0.1)') : 'transparent', border: 'none', borderBottom: '1px solid rgba(255,255,255,0.04)', color: m.available ? '#e2e8f0' : 'rgba(255,255,255,0.3)', cursor: m.available ? 'pointer' : 'not-allowed', textAlign: 'left', opacity: m.available ? 1 : 0.6 }}
+                          >
+                            <span style={{ flex: 1, fontSize: 12.5 }}>{m.label}{m.size ? <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginLeft: 5 }}>{m.size}</span> : null}</span>
+                            <span style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.45)', flexShrink: 0 }}>{m.speed}</span>
+                            <span title={`Qualité : ${m.quality}/5`} style={{ display: 'flex', gap: 1, flexShrink: 0 }}>
+                              {Array.from({ length: 5 }, (_, i) => (
+                                <span key={i} style={{ width: 5, height: 5, borderRadius: '50%', background: i < m.quality ? (prov === 'gemini' ? '#06d6a0' : '#a78bfa') : 'rgba(255,255,255,0.12)' }} />
+                              ))}
+                            </span>
+                            {!m.available && <span style={{ fontSize: 9, color: '#f87171', flexShrink: 0 }}>✗</span>}
+                          </button>
+                        ))}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
           <div ref={aiScrollRef} style={{ flex: 1, overflowY: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
             {aiMessages.length === 0 && !aiBusy && (
               <div style={{ margin: 'auto', textAlign: 'center', color: 'rgba(255,255,255,0.45)', fontSize: 13, maxWidth: 300 }}>
@@ -4852,7 +4953,7 @@ export default function EditeurPage() {
                 <Sparkles size={18} />
               </button>
             </div>
-            <p style={{ margin: '6px 2px 0', fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>Gemini · modifs en direct · « Annuler » sur chaque réponse · sauvegarde auto de la conversation</p>
+            <p style={{ margin: '6px 2px 0', fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>{aiSelectedModel ? aiModels.find((m) => m.id === aiSelectedModel)?.label ?? aiSelectedModel : 'Auto (Gemini → Ollama)'} · modifs en direct · « Annuler » disponible · sauvegarde auto</p>
           </div>
         </div>
       )}
