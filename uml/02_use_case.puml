@@ -1,0 +1,151 @@
+@startuml ColorRoom_UseCaseDiagram
+
+skinparam actorStyle awesome
+skinparam usecaseFontSize 12
+skinparam usecaseBackgroundColor #EFF6FF
+skinparam usecaseBorderColor #3B82F6
+skinparam actorBackgroundColor #DBEAFE
+skinparam actorBorderColor #1D4ED8
+skinparam arrowColor #475569
+skinparam packageBackgroundColor #F8FAFC
+skinparam packageBorderColor #94A3B8
+skinparam noteBackgroundColor #FFFBEB
+skinparam noteBorderColor #D97706
+
+title ColorRoom — Diagramme de cas d'utilisation
+
+left to right direction
+
+actor "Enseignant" as ENS
+actor "Apprenant" as APP
+actor "Administrateur" as ADM
+actor "IA (Ollama/Gemini)" as IA
+actor "Colorimètre CS-160" as CS160
+actor "API Supervision" as SUPERV
+actor "Raspberry Pi" as RPI
+
+rectangle "ColorRoom Application" {
+
+  rectangle "Gestion des jeux" {
+    usecase "Créer un jeu (éditeur)" as UC_CREATE
+    usecase "Éditer graphe Blueprint" as UC_EDIT_GRAPH
+    usecase "Générer jeu par IA" as UC_AI_GEN
+    usecase "Tester jeu en prévisualisation" as UC_PREVIEW
+    usecase "Valider le graphe" as UC_VALIDATE
+    usecase "Dupliquer un jeu" as UC_DUPE
+    usecase "Supprimer un jeu" as UC_DELETE
+    usecase "Exécuter script Python" as UC_PYTHON
+  }
+
+  rectangle "Expérience de jeu" {
+    usecase "Lancer un jeu solo" as UC_SOLO
+    usecase "Lancer un jeu multijoueur" as UC_MULTI
+    usecase "Rejoindre une session" as UC_JOIN
+    usecase "Jouer Puissance 4 (P4)" as UC_P4
+    usecase "Jouer Canal Mix" as UC_CANALM
+    usecase "Jouer Intrus Colorimétrique" as UC_INTRUS
+    usecase "Afficher score & leaderboard" as UC_SCORE
+  }
+
+  rectangle "Mesure colorimétrique" {
+    usecase "Connecter colorimètre" as UC_CONN_CS
+    usecase "Mesurer couleur" as UC_MEASURE
+    usecase "Afficher diagramme CIE" as UC_CIE
+    usecase "Calibrer plaque" as UC_CALIB
+    usecase "Comparer couleurs" as UC_COMPARE
+  }
+
+  rectangle "Contrôle des dalles" {
+    usecase "Allumer dalles (couleur)" as UC_LIGHT
+    usecase "Éteindre toutes les dalles" as UC_OFF
+    usecase "Tester chenillard" as UC_CHENILLARD
+    usecase "Visualiser plan des salles" as UC_PLAN
+    usecase "Envoyer canaux raw (R/B)" as UC_RAW
+  }
+
+  rectangle "Administration" {
+    usecase "Gérer utilisateurs" as UC_USERS
+    usecase "Gérer classes" as UC_CLASSES
+    usecase "Consulter logs" as UC_LOGS
+    usecase "Configurer application" as UC_CONFIG
+    usecase "Vérifier santé système" as UC_HEALTH
+  }
+}
+
+' ─── Associations acteurs → cas ───────────────────────────
+ENS --> UC_CREATE
+ENS --> UC_EDIT_GRAPH
+ENS --> UC_AI_GEN
+ENS --> UC_PREVIEW
+ENS --> UC_VALIDATE
+ENS --> UC_DUPE
+ENS --> UC_DELETE
+ENS --> UC_PYTHON
+ENS --> UC_SOLO
+ENS --> UC_MULTI
+ENS --> UC_PLAN
+ENS --> UC_CHENILLARD
+ENS --> UC_MEASURE
+ENS --> UC_CIE
+ENS --> UC_CALIB
+ENS --> UC_CONN_CS
+ENS --> UC_CLASSES
+ENS --> UC_HEALTH
+
+APP --> UC_SOLO
+APP --> UC_MULTI
+APP --> UC_JOIN
+APP --> UC_P4
+APP --> UC_CANALM
+APP --> UC_INTRUS
+APP --> UC_SCORE
+
+ADM --> UC_USERS
+ADM --> UC_CLASSES
+ADM --> UC_LOGS
+ADM --> UC_CONFIG
+ADM --> UC_HEALTH
+ADM --> UC_CREATE
+ADM --> UC_DUPE
+ADM --> UC_DELETE
+
+IA --> UC_AI_GEN : répond
+
+CS160 --> UC_MEASURE : fournit données
+CS160 --> UC_CALIB : étalonne
+CS160 --> UC_CONN_CS : s'identifie
+
+SUPERV --> UC_LIGHT : reçoit commandes
+SUPERV --> UC_OFF : reçoit commandes
+SUPERV --> UC_RAW : reçoit canaux
+
+RPI --> SUPERV : héberge
+RPI --> UC_PYTHON : exécute Pyodide
+
+' ─── Relations entre cas ───────────────────────────────────
+UC_AI_GEN ..> UC_CREATE : <<include>>
+UC_EDIT_GRAPH ..> UC_VALIDATE : <<include>>
+UC_MULTI ..> UC_JOIN : <<include>>
+UC_P4 ..> UC_MULTI : <<extends>>
+UC_CANALM ..> UC_MEASURE : <<include>>
+UC_INTRUS ..> UC_MEASURE : <<include>>
+UC_COMPARE ..> UC_MEASURE : <<include>>
+UC_CIE ..> UC_MEASURE : <<include>>
+UC_LIGHT ..> UC_RAW : <<include>>
+UC_CHENILLARD ..> UC_LIGHT : <<include>>
+UC_PLAN ..> UC_LIGHT : <<extends>>
+UC_PYTHON ..> UC_LIGHT : <<extends>>
+
+note right of UC_AI_GEN
+  Ollama (local, qwen2.5:1.5b)
+  ou Gemini (cloud)
+  génère un GraphDoc JSON
+end note
+
+note right of UC_RAW
+  remapChannels32() appliqué
+  automatiquement selon
+  PLATE_TYPE[id] (rouge|bleu)
+end note
+
+@enduml

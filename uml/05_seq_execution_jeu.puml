@@ -1,0 +1,123 @@
+@startuml ColorRoom_Sequence_ExecutionJeu
+
+skinparam sequenceArrowThickness 2
+skinparam sequenceArrowColor #2563EB
+skinparam sequenceLifeLineBorderColor #64748B
+skinparam sequenceParticipantBackgroundColor #EFF6FF
+skinparam sequenceParticipantBorderColor #2563EB
+skinparam sequenceActorBackgroundColor #DBEAFE
+skinparam sequenceActorBorderColor #1D4ED8
+skinparam noteBackgroundColor #FFFBEB
+skinparam noteBorderColor #D97706
+
+title ColorRoom — Diagramme de séquence : Exécution d'un jeu éditeur
+
+actor "Joueur" as USER
+participant "Page /jeux\n(Runtime Walker)" as WALKER
+participant "buildGraph()\n(Analyseur)" as BUILDER
+participant "executeNodeAsync()\n(Interpréteur)" as EXEC
+participant "API Supervision\n/api/supervision/batch" as BATCH
+participant "supervision.exe\n(:8080)" as SUPERV
+participant "Dalles LED\n(42 plates)" as DALLES
+participant "Pyodide WASM\n(Python runtime)" as PY
+
+== Initialisation ==
+
+USER -> WALKER : Sélectionne jeu & clique "Jouer"
+activate WALKER
+
+WALKER -> BUILDER : buildGraph(nodes, edges)
+activate BUILDER
+note right of BUILDER
+  Construit adjacences
+  Exclut edges kind==='data'
+  des chemins d'exécution
+end note
+BUILDER --> WALKER : graphe {out: Map<id, id[]>}
+deactivate BUILDER
+
+WALKER -> WALKER : Trouve nœuds [event_begin]\net [on_*] (points d'entrée)
+WALKER -> WALKER : setIsPlaying(true)
+
+== Boucle d'exécution ==
+
+loop Pour chaque nœud dans le chemin d'exécution
+
+  WALKER -> WALKER : compterExecution()\n[guard: > 5000/s → abort]
+
+  WALKER -> EXEC : executeNodeAsync(node, hudVarsRef)
+  activate EXEC
+
+  alt kind === "fill" | "tile"
+    EXEC -> EXEC : calcule RGB
+    EXEC -> BATCH : scheduleSetCanal(plateId, channels)
+    activate BATCH
+    BATCH -> BATCH : remapChannels32()\nsi PLATE_TYPE[id] === 'bleu'
+    note right : Conversion canaux\nR→B ou B→R
+    BATCH -> SUPERV : POST /api/supervision/batch\n[{plateId, channels}]
+    SUPERV -> DALLES : DMX / réseau → allumer
+    DALLES --> SUPERV : ACK
+    SUPERV --> BATCH : 200 OK
+    deactivate BATCH
+
+  else kind === "wait"
+    EXEC -> EXEC : setTimeout(ms)
+    note right : Durée minimale 0 ms\n(validée par verifier.ts)
+
+  else kind === "script_python"
+    EXEC -> PY : getPyodide().runPythonAsync(code)
+    activate PY
+    PY -> PY : Exécute avec API colorroom\n(send_color, fill, set_tile,\nadd_score, emit_event,\nplay_sound, vibrate)
+    PY --> EXEC : résultat / exception
+    deactivate PY
+
+  else kind === "anim_rainbow" | "anim_wave" | "anim_fade" | "anim_strobe"
+    EXEC -> EXEC : setInterval(400 ms)
+    note right : Cadence 400 ms\n(anti-flood Supervision)
+    loop chaque tick animation
+      EXEC -> BATCH : scheduleSetCanal(...)
+    end
+
+  else kind === "measure_start"
+    EXEC -> EXEC : Lance séquence\nCS-160 (voir diag. 04)
+
+  else kind === "if"
+    EXEC -> EXEC : Évalue condition\nSuit branche true/false
+
+  else kind === "while"
+    EXEC -> EXEC : Boucle via bodyNodeId\nMax 5000 iter/s guard
+
+  else kind === "for_range"
+    EXEC -> EXEC : Itère [start..end step]\nMet à jour indexVar
+
+  else kind === "call_sub"
+    EXEC -> WALKER : walk(define_sub[name])
+    note right : Appel récursif de sous-graphe
+
+  end
+
+  EXEC --> WALKER : {nextNodeId | null}
+  deactivate EXEC
+
+  WALKER -> WALKER : Suit arête exec\nvers prochain nœud
+
+end
+
+== Fin de partie ==
+
+WALKER -> WALKER : setIsPlaying(false)
+WALKER -> DALLES : blackoutHardware()\n(éteint tout)
+WALKER -> USER : Affiche score final
+
+deactivate WALKER
+
+note over WALKER, DALLES
+  <b>Mécanismes de protection :</b>
+  • compterExecution() : garde > 5000 exec/s
+  • slowMotion : pause 180 ms entre nœuds (mode debug)
+  • Animation : cadence 400 ms (anti-flood)
+  • Strobe : envoie uniquement sur changement d'état
+  • fade/rainbow : valeurs quantifiées (5% / 24°)
+end note
+
+@enduml

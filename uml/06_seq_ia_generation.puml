@@ -1,0 +1,102 @@
+@startuml ColorRoom_Sequence_IA_Generation
+
+skinparam sequenceArrowThickness 2
+skinparam sequenceArrowColor #7C3AED
+skinparam sequenceLifeLineBorderColor #64748B
+skinparam sequenceParticipantBackgroundColor #F5F3FF
+skinparam sequenceParticipantBorderColor #7C3AED
+skinparam sequenceActorBackgroundColor #EDE9FE
+skinparam sequenceActorBorderColor #5B21B6
+skinparam noteBackgroundColor #FFFBEB
+skinparam noteBorderColor #D97706
+
+title ColorRoom — Diagramme de séquence : Génération IA d'un jeu
+
+actor "Enseignant" as ENS
+participant "Page /editeur\n(Blueprint Editor)" as EDIT
+participant "API Route\n/api/ai/generate-game" as API_AI
+participant "Ollama\n(qwen2.5:1.5b\n:11434)" as OLLAMA
+participant "Google Gemini\n(cloud fallback)" as GEMINI
+participant "verifier.ts\n(Validateur graphe)" as VERIF
+participant "Base de données\n(crg_games)" as DB
+
+== Saisie utilisateur ==
+
+ENS -> EDIT : Ouvre panneau "Générer avec IA"
+ENS -> EDIT : Saisit prompt\n(ex: "jeu de découverte des couleurs\nprimaires pour collège")
+EDIT -> EDIT : Affiche spinner\n"Génération en cours..."
+
+== Appel IA ==
+
+EDIT -> API_AI : POST /api/ai/generate-game\n{prompt, model: "qwen2.5:1.5b",\n temperature: 0.3,\n num_predict: 2048,\n num_ctx: 4096}
+activate API_AI
+
+API_AI -> API_AI : Construit prompt système\n(liste des 171 EditorNodeKind,\nformat GameDoc JSON,\nexemple de graphe)
+
+API_AI -> OLLAMA : POST http://ollama:11434/api/generate\n{model, prompt, stream: false}
+activate OLLAMA
+
+note right of OLLAMA
+  <b>Paramètres LLM :</b>
+  temperature: 0.3 (déterministe)
+  num_predict: 2048 tokens max
+  num_ctx: 4096 context window
+  ~5–30 s sur Pi 4 (4 GB RAM)
+end note
+
+alt Ollama disponible & réponse valide
+  OLLAMA --> API_AI : {response: "```json\n{GameDoc...}\n```"}
+  deactivate OLLAMA
+
+  API_AI -> API_AI : Extrait JSON du markdown
+  API_AI -> API_AI : Valide structure GameDoc\n(nodes, edges obligatoires)
+
+else Ollama indisponible / timeout
+  API_AI -> GEMINI : POST generateContent\n(même prompt, modèle gemini-pro)
+  activate GEMINI
+  GEMINI --> API_AI : {candidates[0].content...}
+  deactivate GEMINI
+
+  API_AI -> API_AI : Extrait & valide JSON
+
+else Génération invalide
+  API_AI --> EDIT : {error: "JSON invalide", raw: "..."}
+  EDIT -> ENS : Affiche erreur + texte brut
+  note right : L'enseignant peut\ncorriger manuellement
+end
+
+== Validation & intégration ==
+
+API_AI -> VERIF : verifierGraphe(nodes, edges)
+activate VERIF
+VERIF --> API_AI : Probleme[] (erreurs/avertissements)
+deactivate VERIF
+
+API_AI -> DB : INSERT INTO crg_games\n{name, kind:'editor', config_json}
+DB --> API_AI : {id: "new-game-id"}
+
+API_AI --> EDIT : {gameDoc, problemes, id}
+deactivate API_AI
+
+== Affichage résultat ==
+
+EDIT -> EDIT : Charge le nouveau jeu\ndans l'éditeur Blueprint
+
+alt Problèmes détectés
+  EDIT -> ENS : Affiche panneau vérification\n(liste des erreurs/avertissements)
+  ENS -> EDIT : Corrige manuellement\nles nœuds signalés
+else Aucun problème
+  EDIT -> ENS : Jeu prêt à être testé
+end
+
+ENS -> EDIT : Clique "Tester"
+EDIT -> EDIT : executeNodeSync/Async\n(preview rapide)
+
+note over ENS, DB
+  <b>Conversation continue :</b>
+  L'enseignant peut itérer (crg_ai_chats)
+  "Ajoute un compte à rebours de 30s"
+  → nouveau prompt enrichi du contexte
+end note
+
+@enduml
