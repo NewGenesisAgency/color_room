@@ -1950,9 +1950,13 @@ export default function EditeurPage() {
     return () => clearInterval(timer);
   }, [isPlaying]);
 
-  // Keyboard listener for Python games
+  // Keyboard listener for Python games — actif UNIQUEMENT pendant la lecture
+  // (sinon il intercepterait z/q/s/d/espace dans tous les inputs : nom de jeu,
+  // recherche de nœuds, description, etc.).
   useEffect(() => {
+    if (!isPlaying) return;
     const handler = (e: KeyboardEvent) => {
+      if (isEditableTarget(e.target)) return;
       const map: Record<string, string> = {
         ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down',
         ' ': 'space', q: 'left', d: 'right', z: 'up', s: 'down',
@@ -1962,7 +1966,7 @@ export default function EditeurPage() {
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, []);
+  }, [isPlaying]);
 
   const pyBridge = useMemo(() => ({
     sendColor: (plateId: number, r: number, g: number, b: number, intensity: number) => {
