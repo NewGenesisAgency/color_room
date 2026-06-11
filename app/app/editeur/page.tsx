@@ -2756,6 +2756,39 @@ export default function EditeurPage() {
             }
             break;
           }
+          case 'measure_start':
+          case 'cs160_measure': {
+            // Mesure RÉELLE au CS-160 dans l'aperçu de l'éditeur : MÊME requête
+            // que /mesure, GameIntrus, GameCanalMix et le runtime /jeux
+            // (POST /api/cs160 {action:'measure'} -> data.data.lvxy {Lv, x, y}).
+            const p = node.params as Record<string, unknown>;
+            const varX  = String(p.varX  ?? 'meas_x');
+            const varY  = String(p.varY  ?? 'meas_y');
+            const varLv = String(p.varLv ?? 'meas_lv');
+            const timeoutSec = Math.max(1, Math.min(30, Number(p.timeoutSec ?? p.timeout ?? 25)));
+            const vars = runtimeVariablesRef.current;
+            try {
+              const res = await fetch('/api/cs160', {
+                method: 'POST',
+                headers: { 'content-type': 'application/json' },
+                body: JSON.stringify({ action: 'measure' }),
+                signal: AbortSignal.timeout(timeoutSec * 1000),
+                cache: 'no-store',
+              });
+              const data = await res.json();
+              if (data.success && data.data) {
+                const d = data.data.data ?? data.data;
+                const lvxy = d.lvxy ?? d;
+                vars[varX]  = Number(lvxy.x  ?? 0);
+                vars[varY]  = Number(lvxy.y  ?? 0);
+                vars[varLv] = Number(lvxy.Lv ?? lvxy.lv ?? 0);
+                vars.meas_ok = 1;
+              } else {
+                vars.meas_ok = 0;
+              }
+            } catch { vars.meas_ok = 0; }
+            break;
+          }
           default: {
             executeNodeSync(nodeId, 0);
             return;
