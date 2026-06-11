@@ -167,25 +167,72 @@ function wavelengthToRgb01(wl: number): [number, number, number] {
  * @returns Le tableau des 32 valeurs de canaux (0..255).
  */
 function rgbToChannels32(r: number, g: number, b: number, intensity: number): number[] {
-  const rn = r / 255, gn = g / 255, bn = b / 255;
-  const sc = intensity / 100;
-  const y = Math.min(rn, gn), w = (rn + gn + bn) / 3;
+  const R = Math.max(0, Math.min(255, Math.round(r)));
+  const G = Math.max(0, Math.min(255, Math.round(g)));
+  const B = Math.max(0, Math.min(255, Math.round(b)));
+  const scale = intensity / 100;
   const ch = Array(32).fill(0);
-  ch[0] = Math.round(bn * 255 * 1.0 * sc);
-  ch[1] = Math.round(bn * 255 * 0.85 * sc);
-  ch[4] = Math.round(bn * 255 * 0.8 * sc);
-  ch[5] = Math.round(gn * 255 * 1.0 * sc);
-  ch[6] = Math.round(gn * 255 * 0.75 * sc);
-  ch[7] = Math.round(y * 255 * 1.0 * sc);
-  ch[8] = Math.round(y * 255 * 0.85 * sc);
-  ch[10] = Math.round(rn * 255 * 0.7 * sc);
-  ch[11] = Math.round(rn * 255 * 1.0 * sc);
-  ch[12] = Math.round(rn * 255 * 0.9 * sc);
-  ch[18] = Math.round(y * 255 * 0.9 * sc);
-  ch[19] = Math.round(y * 255 * 0.75 * sc);
-  ch[25] = Math.round(w * 255 * 1.0 * sc);
-  ch[26] = Math.round(w * 255 * 0.85 * sc);
-  return ch.map((v) => Math.max(0, Math.min(255, v)));
+  if (scale <= 1e-6 || Math.max(R, G, B) === 0) return ch;
+
+  // Décomposition achromatique + chromatique (alignée avec jeux/page.tsx)
+  const W  = Math.min(R, G, B);           // composante blanche pure
+  const Rc = R - W;                        // rouge chromatique
+  const Gc = G - W;                        // vert chromatique
+  const Bc = B - W;                        // bleu chromatique
+  const Y  = Math.min(Rc, Gc);            // jaune (overlap R+G)
+  const Ro = Rc - Y;                       // rouge résiduel pur
+  const Go = Gc - Y;                       // vert résiduel pur
+
+  const v = (x: number) => Math.min(255, Math.round(x * scale));
+
+  // Canaux blancs / gris (24-27, 31)
+  if (W > 0) {
+    const wv = v(W);
+    ch[25] = wv;
+    ch[24] = Math.round(wv * 0.70);
+    ch[26] = Math.round(wv * 0.55);
+    ch[27] = Math.round(wv * 0.35);
+    ch[31] = Math.round(wv * 0.45);
+  }
+
+  // Canaux rouges (10-14) — ch[11] = 642nm primaire
+  if (Ro > 0) {
+    const rv = v(Ro);
+    ch[11] = Math.max(ch[11], rv);
+    ch[12] = Math.max(ch[12], Math.round(rv * 0.90));
+    ch[13] = Math.max(ch[13], Math.round(rv * 0.85));
+    ch[10] = Math.max(ch[10], Math.round(rv * 0.70));
+    ch[14] = Math.max(ch[14], Math.round(rv * 0.55));
+  }
+
+  // Canaux verts (5-6) — ch[5] = 513nm primaire
+  if (Go > 0) {
+    const gv = v(Go);
+    ch[5] = Math.max(ch[5], gv);
+    ch[6] = Math.max(ch[6], Math.round(gv * 0.75));
+  }
+
+  // Canaux bleus / violets (0-4) — ch[4] = 479nm primaire (cyan-bleu)
+  if (Bc > 0) {
+    const bv = v(Bc);
+    ch[4] = Math.max(ch[4], bv);
+    ch[2] = Math.max(ch[2], Math.round(bv * 0.80));
+    ch[3] = Math.max(ch[3], Math.round(bv * 0.65));
+    ch[1] = Math.max(ch[1], Math.round(bv * 0.60));
+    ch[0] = Math.max(ch[0], Math.round(bv * 0.40));
+  }
+
+  // Canaux jaune / orange (7-9, 18-19) — ch[7] = 541nm primaire
+  if (Y > 0) {
+    const yv = v(Y);
+    ch[7]  = Math.max(ch[7],  yv);
+    ch[8]  = Math.max(ch[8],  Math.round(yv * 0.85));
+    ch[18] = Math.max(ch[18], Math.round(yv * 0.90));
+    ch[19] = Math.max(ch[19], Math.round(yv * 0.75));
+    ch[9]  = Math.max(ch[9],  Math.round(yv * 0.70));
+  }
+
+  return ch;
 }
 
 /**
