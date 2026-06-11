@@ -4479,7 +4479,14 @@ export default function EditeurPage() {
       void persistConversation(gid, allMsgs);
       setStatus(`IA : ${summary} (${data.model}) - pense à sauvegarder`);
     } catch (e: unknown) {
-      setAiError('Erreur réseau ou serveur. ' + (e instanceof Error ? e.message : ''));
+      const raw = e instanceof Error ? e.message : String(e);
+      // "Failed to fetch" / TypeError = navigateur n'a pas pu joindre le serveur.
+      // Conteneur Docker arrêté, dev server pas lancé, ou onglet ouvert sans réseau.
+      const networkError = /failed to fetch|networkerror|load failed|abort/i.test(raw);
+      const friendly = networkError
+        ? 'Le serveur ne répond pas. Vérifie que le conteneur color-room est démarré (docker compose ps) et que tu peux accéder à http://localhost:8080. Si tu es sur le Raspberry Pi, relance docker compose up -d.'
+        : 'Erreur serveur lors de la génération.';
+      setAiError(friendly + (raw ? ` (${raw})` : ''));
     } finally {
       setAiBusy(false); setAiStep('');
       requestAnimationFrame(() => aiScrollRef.current?.scrollTo({ top: aiScrollRef.current.scrollHeight, behavior: 'smooth' }));
@@ -5214,11 +5221,10 @@ export default function EditeurPage() {
                   disabled={dbLoading}
                   onClick={() => { setAiError(''); setAiStep(''); setAiOpen(true); }}
                   title="Créer un jeu complet avec l'IA (Google Gemini)"
-                  style={{ flex: 1.3, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, fontSize: 13, cursor: dbLoading ? 'not-allowed' : 'pointer' }}
+                  style={{ flex: 1.2, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 7, fontSize: 12.5, cursor: dbLoading ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap', minWidth: 0 }}
                 >
-                  <Sparkles size={15} style={{ flexShrink: 0 }} />
-                  <span>Créer avec l'IA</span>
-                  <ArrowRight size={15} className="g-btn__arrow" style={{ flexShrink: 0 }} />
+                  <Wand2 size={14} style={{ flexShrink: 0 }} />
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>Créer avec l&apos;IA</span>
                 </button>
               </div>
               <div style={{ display: 'flex', gap: 8, justifyContent: 'space-around' }}>
