@@ -14,10 +14,11 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Brain, Circle, Cpu, Flame, Minus, Play, RotateCcw, Square, Star, Trophy, Users, Zap } from 'lucide-react';
+import { Brain, Circle, Cpu, Flame, Minus, Play, RotateCcw, Smartphone, Square, Star, Trophy, Users, Zap } from 'lucide-react';
 import type { GameTileProps } from './GameColorSpeed';
 import { SHOW_SCREEN_BOARD } from '@/lib/game/displayMode';
 import { playSfx, vibrate } from '@/lib/audio/sfx';
+import QrCode from '@/app/_components/QrCode';
 
 // ── Board constants ───────────────────────────────────────────────────────────
 const ROWS = 7;
@@ -27,8 +28,10 @@ const P2 = 2 as const;
 
 type Cell = 0 | 1 | 2;
 type Grid = Cell[][];
-type Mode = 'pvp' | 'cpu';
-type Phase = 'ready' | 'playing' | 'finished';
+type Mode = 'pvp' | 'cpu' | 'online';
+type Phase = 'ready' | 'playing' | 'finished' | 'online';
+/** État de la salle online (poll /api/p4/state) — board de 42 cases '', 'R' ou 'J'. */
+type OnlineState = { board: string[]; turn: string; winner: string | null; status: string; players: { r: boolean; j: boolean } };
 type Difficulty = 'novice' | 'facile' | 'moyen' | 'difficile' | 'legendaire';
 
 const PLAYER_COLORS: Record<number, { css: string; r: number; g: number; b: number; glow: string; label: string }> = {
@@ -292,6 +295,75 @@ export default function GamePuissance4({ onSendColor, onTurnOff, onTurnOffAll, o
   const diffRef          = useRef<Difficulty>('moyen');
   const moveCountRef     = useRef(0);
 
+  // ── Mode online (1vs1, 2 téléphones via /api/p4) ───────────────────────────
+  const [onlineRoomId, setOnlineRoomId] = useState<string>('');
+  const [onlineState, setOnlineState]   = useState<OnlineState | null>(null);
+  const [onlineError, setOnlineError]   = useState<string>('');
+  const lastOnlineRef = useRef<string>('');
+
+  /** Crée une salle online et passe à l'écran d'attente (QR). */
+  const startOnline = async () => {
+    setOnlineError(''); setOnlineState(null); lastOnlineRef.current = '';
+    try {
+      const res = await fetch('/api/p4/create', { method: 'POST' });
+      const d = await res.json();
+      if (d?.ok && d.roomId) {
+        setOnlineRoomId(d.roomId);
+        phaseRef.current = 'online'; setPhase('online');
+        onTurnOffAll();
+      } else setOnlineError('Création de la partie impossible.');
+    } catch { setOnlineError('Erreur réseau - vérifie la connexion.'); }
+  };
+
+  // Poll de l'état + rendu du plateau sur les dalles (rouge/jaune, ligne
+  // gagnante à fond). Le plateau API a l'index 0 EN HAUT ; la dalle 0 est EN
+  // BAS de la salle → flip vertical pour que la gravité aille vers le bas.
+  useEffect(() => {
+    if (phase !== 'online' || !onlineRoomId) return;
+    let alive = true;
+    const flip = (i: number) => { const r = Math.floor(i / COLS), c = i % COLS; return (ROWS - 1 - r) * COLS + c; };
+    const winningCells = (board: string[]): Set<number> => {
+      const out = new Set<number>();
+      const at = (r: number, c: number) => (r >= 0 && r < ROWS && c >= 0 && c < COLS ? board[r * COLS + c] : '');
+      for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
+        const v = at(r, c); if (v !== 'R' && v !== 'J') continue;
+        for (const [dr, dc] of [[0, 1], [1, 0], [1, 1], [1, -1]] as const) {
+          if (at(r + dr, c + dc) === v && at(r + 2 * dr, c + 2 * dc) === v && at(r + 3 * dr, c + 3 * dc) === v) {
+            for (let k = 0; k < 4; k++) out.add((r + k * dr) * COLS + (c + k * dc));
+          }
+        }
+      }
+      return out;
+    };
+    const poll = async () => {
+      try {
+        const res = await fetch(`/api/p4/state?roomId=${encodeURIComponent(onlineRoomId)}`, { cache: 'no-store' });
+        const d = await res.json();
+        if (alive && d?.ok) {
+          setOnlineState({ board: d.board, turn: d.turn, winner: d.winner, status: d.status, players: d.players });
+          const key = JSON.stringify(d.board) + String(d.winner);
+          if (key !== lastOnlineRef.current) {
+            lastOnlineRef.current = key;
+            if (d.winner === 'R' || d.winner === 'J') { playSfx('win'); vibrate([100, 50, 100]); }
+            const win = d.winner === 'R' || d.winner === 'J' ? winningCells(d.board) : null;
+            for (let i = 0; i < 42; i++) {
+              const cell = d.board[i];
+              const disp = flip(i);
+              if (cell === 'R' || cell === 'J') {
+                const col = cell === 'R' ? { r: 255, g: 24, b: 24 } : { r: 255, g: 196, b: 0 };
+                const inten = win ? (win.has(i) ? 100 : 35) : 85;
+                onSendColor(disp, col.r, col.g, col.b, inten);
+              } else onTurnOff(disp);
+            }
+          }
+        }
+      } catch { /* réseau : on réessaie au tick suivant */ }
+      if (alive) setTimeout(poll, 900);
+    };
+    void poll();
+    return () => { alive = false; };
+  }, [phase, onlineRoomId]); // eslint-disable-line react-hooks/exhaustive-deps
+
   function syncHardware(g: Grid) {
     for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
       const cell = g[r][c]; const idx = tileIdx(r, c);
@@ -425,23 +497,34 @@ export default function GamePuissance4({ onSendColor, onTurnOff, onTurnOffAll, o
       {/* Mode selector */}
       <div>
         <div style={labelStyle}>Mode de jeu</div>
-        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
-          {(['pvp','cpu'] as Mode[]).map(m => {
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8 }}>
+          {(['cpu','pvp','online'] as Mode[]).map(m => {
             const active = mode===m;
             return (
               <button key={m} onClick={() => setMode(m)} style={{
-                padding:'13px 14px', borderRadius:13, cursor:'pointer', fontFamily:'inherit',
+                padding:'13px 10px', borderRadius:13, cursor:'pointer', fontFamily:'inherit',
                 border: active ? '1px solid rgba(129,140,248,0.55)' : `1px solid ${C.line}`,
                 background: active ? 'rgba(129,140,248,0.14)' : C.raised,
                 color: active ? '#c7d0fb' : C.textDim,
-                fontWeight:700, fontSize:14, transition:'all 130ms',
-                display:'flex', alignItems:'center', justifyContent:'center', gap:7,
+                fontWeight:700, fontSize:12.5, transition:'all 130ms',
+                display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:5,
               }}>
-                {m==='pvp' ? <><Users size={15} /> 2 Joueurs</> : <><Cpu size={15} /> Contre l&apos;IA</>}
+                {m==='cpu' ? <><Cpu size={16} /> Contre l&apos;IA</>
+                  : m==='pvp' ? <><Users size={16} /> 2 Joueurs<span style={{ fontSize:9.5, fontWeight:600, color:C.textFaint }}>même appareil</span></>
+                  : <><Smartphone size={16} /> 1 vs 1<span style={{ fontSize:9.5, fontWeight:600, color:C.textFaint }}>2 téléphones</span></>}
               </button>
             );
           })}
         </div>
+        {mode === 'online' && (
+          <div style={{ display:'flex', alignItems:'center', gap:9, padding:'9px 12px', borderRadius:11, background:'rgba(249,115,22,0.1)', border:'1px solid rgba(249,115,22,0.25)', marginTop:9 }}>
+            <span style={{ width:7, height:7, borderRadius:'50%', background:'#f97316', flexShrink:0 }} />
+            <span style={{ fontSize:12, color:C.textDim, fontWeight:600 }}>2 joueurs scannent le QR avec leur téléphone, le plateau s&apos;affiche sur les dalles</span>
+          </div>
+        )}
+        {onlineError && (
+          <div style={{ padding:'9px 12px', borderRadius:11, background:'rgba(239,68,68,0.12)', border:'1px solid rgba(239,68,68,0.3)', color:'#fca5a5', fontSize:12, marginTop:9 }}>⚠ {onlineError}</div>
+        )}
       </div>
 
       {/* AI difficulty */}
@@ -475,7 +558,7 @@ export default function GamePuissance4({ onSendColor, onTurnOff, onTurnOffAll, o
 
       {/* Action buttons */}
       <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:8, marginTop:2 }}>
-        <button onClick={startGame} style={{
+        <button onClick={() => { if (mode === 'online') void startOnline(); else startGame(); }} style={{
           padding:'14px 20px', borderRadius:14, border:'none', cursor:'pointer', fontFamily:'inherit',
           background:'linear-gradient(135deg,#ff3b6e 0%,#3b82f6 100%)',
           color:'#fff', fontWeight:800, fontSize:15.5, letterSpacing:'-0.01em',
@@ -493,6 +576,72 @@ export default function GamePuissance4({ onSendColor, onTurnOff, onTurnOffAll, o
       </div>
     </div>
   );
+
+  // ── ONLINE SCREEN (1vs1, 2 téléphones) ─────────────────────────────────────
+  if (phase === 'online') {
+    const st = onlineState;
+    const waiting = !st || st.status === 'waiting';
+    const joinUrl = (typeof window !== 'undefined' ? window.location.origin : '') + '/p4?room=' + onlineRoomId;
+    const backToMenu = () => { onTurnOffAll(); setOnlineRoomId(''); setOnlineState(null); phaseRef.current = 'ready'; setPhase('ready'); };
+    return (
+      <div style={shellStyle}>
+        <div style={{ textAlign:'center', paddingTop:4 }}>
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:7, marginBottom:11 }}>
+            <span style={{ width:12, height:12, borderRadius:'50%', background:'#ff1818' }} />
+            <span style={{ width:12, height:12, borderRadius:'50%', background:'#ffc400' }} />
+          </div>
+          <div style={{ fontSize:22, fontWeight:800, letterSpacing:'-0.03em' }}>Puissance&nbsp;4 · 1 vs 1</div>
+          <div style={{ fontSize:12.5, color:C.textDim, marginTop:5 }}>
+            {waiting ? 'Les 2 joueurs scannent le QR avec leur téléphone' : 'Plateau affiché sur les dalles de la Color Room'}
+          </div>
+        </div>
+
+        {waiting ? (
+          <>
+            <div style={{ display:'flex', justifyContent:'center', padding:'6px 0' }}>
+              <div style={{ background:'#fff', padding:12, borderRadius:16 }}>
+                <QrCode value={joinUrl} size={180} />
+              </div>
+            </div>
+            <div style={{ display:'flex', justifyContent:'center', gap:14, fontSize:13.5, fontWeight:700 }}>
+              <span style={{ color: st?.players.r ? '#ff5252' : C.textFaint }}>🔴 Rouge {st?.players.r ? '✓' : '…'}</span>
+              <span style={{ color: st?.players.j ? '#ffc400' : C.textFaint }}>🟡 Jaune {st?.players.j ? '✓' : '…'}</span>
+            </div>
+            <div style={{ textAlign:'center', fontSize:11, color:C.textFaint, wordBreak:'break-all', padding:'0 10px' }}>{joinUrl}</div>
+          </>
+        ) : (
+          <>
+            {/* Statut de partie */}
+            <div style={{ textAlign:'center', padding:'10px 0 2px' }}>
+              {st.winner === 'draw' ? <div style={{ fontSize:19, fontWeight:900 }}>Match nul !</div>
+                : st.winner ? <div style={{ fontSize:19, fontWeight:900, color: st.winner === 'R' ? '#ff5252' : '#ffc400' }}>{st.winner === 'R' ? '🔴 Rouge' : '🟡 Jaune'} gagne ! 🏆</div>
+                : <div style={{ fontSize:15.5, fontWeight:800 }}>Au tour de <span style={{ color: st.turn === 'R' ? '#ff5252' : '#ffc400' }}>{st.turn === 'R' ? '🔴 Rouge' : '🟡 Jaune'}</span></div>}
+            </div>
+            {/* Mini-plateau miroir (l'affichage principal est sur les dalles) */}
+            <div style={{ borderRadius:16, padding:9, background:C.board, border:`1px solid ${C.line}` }}>
+              <div style={{ display:'grid', gridTemplateColumns:`repeat(${COLS},1fr)`, gridTemplateRows:`repeat(${ROWS},1fr)`, gap:5 }}>
+                {Array.from({ length: ROWS * COLS }, (_, i) => {
+                  const cell = st.board[i];
+                  return <div key={i} style={{ aspectRatio:'1', borderRadius:'50%', background: cell === 'R' ? '#ff1818' : cell === 'J' ? '#ffc400' : 'rgba(255,255,255,0.05)' }} />;
+                })}
+              </div>
+            </div>
+          </>
+        )}
+
+        <div style={{ display:'grid', gridTemplateColumns: st?.winner ? '1fr auto' : '1fr', gap:8, marginTop:2 }}>
+          {st?.winner && (
+            <button onClick={() => void startOnline()} style={{ padding:'12px', borderRadius:13, border:'none', cursor:'pointer', fontFamily:'inherit', background:'linear-gradient(135deg,#ff1818,#ffc400)', color:'#fff', fontWeight:800, fontSize:14, display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}>
+              <RotateCcw size={14} /> Nouvelle partie
+            </button>
+          )}
+          <button onClick={backToMenu} style={{ padding:'12px 16px', borderRadius:13, cursor:'pointer', fontFamily:'inherit', border:`1px solid ${C.line}`, background:C.raised, color:C.textDim, fontWeight:700, fontSize:13 }}>
+            Menu
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   // ── FINISHED SCREEN ────────────────────────────────────────────────────────
   if (phase === 'finished') {

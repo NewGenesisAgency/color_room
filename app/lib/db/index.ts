@@ -162,30 +162,101 @@ function migrate(db: Database.Database) {
 }
 
 function seedChromatectGame(db: Database.Database) {
-  const GAME_NAME = 'ChromaDetect – Load Test CS-160';
+  const GAME_NAME = 'ChromaDetect - CS-160';
+  // Gameplay limpide en 2 boutons, 100% blocs implémentés par le runtime /jeux :
+  //   🎨 « Nouvelle couleur mystère » → salle orange/verte/bleue (aléatoire)
+  //   📷 « Mesurer avec le CS-160 »  → mesure RÉELLE, comparaison à la couleur
+  //                                    affichée, points proportionnels à la précision.
+  const ORANGE = { color: '#ff8800', x: 0.50, y: 0.41 };
+  const VERT   = { color: '#00cc44', x: 0.30, y: 0.60 };
+  const BLEU   = { color: '#2244ff', x: 0.15, y: 0.06 };
+  const TOL = 10, PTS = 300;
   const config = {
     version: 1,
     tileCount: 42,
-    bgColor: '#0a0f1a',
+    bgColor: '#0d1117',
     accentColor: '#06d6a0',
-    icon: 'Crosshair',
+    icon: 'Target',
+    difficulty: 2,
     description: 'Mesurez la couleur spectrale affichée sur les dalles avec le CS-160 et comparez au spectre cible. Plus vous êtes précis, plus vous marquez.',
     nodes: [
-      { id: 'n_start', kind: 'event_begin', name: 'Démarrer', enabled: true, params: {}, pos: { x: 80, y: 120 } },
+      // ─ Démarrage : la salle s'allume direct en orange (couleur n°1) ─
+      { id: 'n_begin',  kind: 'event_begin',  name: '▶ Démarrer',           enabled: true, params: {},                                           pos: { x: 60,   y: 60 } },
+      { id: 'n_snd0',   kind: 'play_sound',   name: '🔊 Son départ',         enabled: true, params: { sound: 'start' },                           pos: { x: 320,  y: 60 } },
+      { id: 'n_reset',  kind: 'score_reset',  name: 'Score à 0',            enabled: true, params: {},                                           pos: { x: 580,  y: 60 } },
+      { id: 'n_setc1',  kind: 'variable_set', name: 'Couleur n°1 (orange)', enabled: true, params: { name: 'couleur_num', value: 1, op: 'set' }, pos: { x: 840,  y: 60 } },
+      { id: 'n_fill0',  kind: 'fill',         name: '💡 Salle orange',       enabled: true, params: { color: ORANGE.color, intensity: 0.9 },      pos: { x: 1100, y: 60 } },
+      // ─ Bouton « Nouvelle couleur mystère » ─
+      { id: 'n_clkn',   kind: 'on_ui_click',  name: '🎨 Btn nouvelle couleur', enabled: true, params: { buttonId: 'nouvelle' },                   pos: { x: 60,   y: 300 } },
+      { id: 'n_sndc',   kind: 'play_sound',   name: '🔊 Clic',               enabled: true, params: { sound: 'click' },                           pos: { x: 320,  y: 300 } },
+      { id: 'n_rand',   kind: 'random_int',   name: '🎲 Tirage 1-3',         enabled: true, params: { min: 1, max: 3, varName: 'couleur_num' },   pos: { x: 580,  y: 300 } },
+      { id: 'n_ifc1',   kind: 'if',           name: 'Si n°1 ?',             enabled: true, params: { varName: 'couleur_num', op: 'eq', value: 1 }, pos: { x: 840,  y: 300 } },
+      { id: 'n_fillo',  kind: 'fill',         name: '🟠 Salle orange',       enabled: true, params: { color: ORANGE.color, intensity: 0.9 },      pos: { x: 1100, y: 240 } },
+      { id: 'n_ifc2',   kind: 'if',           name: 'Si n°2 ?',             enabled: true, params: { varName: 'couleur_num', op: 'eq', value: 2 }, pos: { x: 1100, y: 370 } },
+      { id: 'n_fillv',  kind: 'fill',         name: '🟢 Salle verte',        enabled: true, params: { color: VERT.color, intensity: 0.9 },        pos: { x: 1360, y: 310 } },
+      { id: 'n_fillb',  kind: 'fill',         name: '🔵 Salle bleue',        enabled: true, params: { color: BLEU.color, intensity: 0.9 },        pos: { x: 1360, y: 440 } },
+      // ─ Bouton « Mesurer » : mesure réelle + comparaison à la couleur active ─
+      { id: 'n_clkm',   kind: 'on_ui_click',  name: '📷 Btn mesurer',        enabled: true, params: { buttonId: 'mesurer' },                      pos: { x: 60,   y: 620 } },
+      { id: 'n_sndt',   kind: 'play_sound',   name: '🔊 Tic',                enabled: true, params: { sound: 'tick' },                            pos: { x: 320,  y: 620 } },
+      { id: 'n_meas',   kind: 'measure_start', name: '📷 Mesure CS-160',     enabled: true, params: { varX: 'meas_x', varY: 'meas_y', varLv: 'meas_lv', timeoutSec: 25 }, pos: { x: 580, y: 620 } },
+      { id: 'n_ifok',   kind: 'if',           name: 'Si mesure OK',         enabled: true, params: { varName: 'meas_ok', op: 'eq', value: 1 },   pos: { x: 840,  y: 620 } },
+      { id: 'n_mifc1',  kind: 'if',           name: 'Couleur n°1 ?',        enabled: true, params: { varName: 'couleur_num', op: 'eq', value: 1 }, pos: { x: 1100, y: 560 } },
+      { id: 'n_cmpo',   kind: 'measure_compare', name: '🎯 vs orange',       enabled: true, params: { targetX: ORANGE.x, targetY: ORANGE.y, toleranceDeltaE: TOL, maxPoints: PTS }, pos: { x: 1360, y: 500 } },
+      { id: 'n_mifc2',  kind: 'if',           name: 'Couleur n°2 ?',        enabled: true, params: { varName: 'couleur_num', op: 'eq', value: 2 }, pos: { x: 1360, y: 630 } },
+      { id: 'n_cmpv',   kind: 'measure_compare', name: '🎯 vs vert',         enabled: true, params: { targetX: VERT.x, targetY: VERT.y, toleranceDeltaE: TOL, maxPoints: PTS }, pos: { x: 1620, y: 570 } },
+      { id: 'n_cmpb',   kind: 'measure_compare', name: '🎯 vs bleu',         enabled: true, params: { targetX: BLEU.x, targetY: BLEU.y, toleranceDeltaE: TOL, maxPoints: PTS }, pos: { x: 1620, y: 700 } },
+      { id: 'n_snds',   kind: 'play_sound',   name: '🪙 Son points',         enabled: true, params: { sound: 'score' },                           pos: { x: 1880, y: 620 } },
+      { id: 'n_vib',    kind: 'vibrate',      name: '📳 Vibration',          enabled: true, params: { durationMs: 150 },                          pos: { x: 2140, y: 620 } },
+      { id: 'n_snde',   kind: 'play_sound',   name: '⚠ Erreur mesure',      enabled: true, params: { sound: 'error' },                           pos: { x: 1100, y: 760 } },
     ],
-    edges: [],
+    edges: [
+      { id: 'e1',  from: 'n_begin', to: 'n_snd0' },
+      { id: 'e2',  from: 'n_snd0',  to: 'n_reset' },
+      { id: 'e3',  from: 'n_reset', to: 'n_setc1' },
+      { id: 'e4',  from: 'n_setc1', to: 'n_fill0' },
+      // Ordre des sorties du « Si » : 1re = vrai, 2e = faux.
+      { id: 'e5',  from: 'n_clkn',  to: 'n_sndc' },
+      { id: 'e6',  from: 'n_sndc',  to: 'n_rand' },
+      { id: 'e7',  from: 'n_rand',  to: 'n_ifc1' },
+      { id: 'e8',  from: 'n_ifc1',  to: 'n_fillo' },
+      { id: 'e9',  from: 'n_ifc1',  to: 'n_ifc2' },
+      { id: 'e10', from: 'n_ifc2',  to: 'n_fillv' },
+      { id: 'e11', from: 'n_ifc2',  to: 'n_fillb' },
+      { id: 'e12', from: 'n_clkm',  to: 'n_sndt' },
+      { id: 'e13', from: 'n_sndt',  to: 'n_meas' },
+      { id: 'e14', from: 'n_meas',  to: 'n_ifok' },
+      { id: 'e15', from: 'n_ifok',  to: 'n_mifc1' },
+      { id: 'e16', from: 'n_ifok',  to: 'n_snde' },
+      { id: 'e17', from: 'n_mifc1', to: 'n_cmpo' },
+      { id: 'e18', from: 'n_mifc1', to: 'n_mifc2' },
+      { id: 'e19', from: 'n_mifc2', to: 'n_cmpv' },
+      { id: 'e20', from: 'n_mifc2', to: 'n_cmpb' },
+      { id: 'e21', from: 'n_cmpo',  to: 'n_snds' },
+      { id: 'e22', from: 'n_cmpv',  to: 'n_snds' },
+      { id: 'e23', from: 'n_cmpb',  to: 'n_snds' },
+      { id: 'e24', from: 'n_snds',  to: 'n_vib' },
+    ],
     uiLayout: [
-      // Bandeau titre
-      { id: 'u_title', kind: 'title_banner', x: 10, y: 10, width: 700, height: 50,
-        text: 'ChromaDetect – CS-160', bgColor: '#0a0f1a', textColor: '#06d6a0', fontSize: 20 },
-      // Diagramme CIE 1931 — cœur du jeu : cible aléatoire, mesure CS-160, ΔE, score
-      { id: 'u_cie', kind: 'cie_diagram', x: 10, y: 70, width: 700, height: 480,
-        cieTargetX: 0.3127, cieTargetY: 0.3290, cieTolerance: 5, cieRandom: true, points: 1000 },
+      { id: 'u_title',  kind: 'title_banner',  x: 20,  y: 14,  width: 480, height: 50, text: 'ChromaDetect - CS-160' },
+      { id: 'u_msg',    kind: 'message_box',   x: 20,  y: 76,  width: 480, height: 84, bgColor: '#7c3aed',
+        text: '1️⃣ Allume une couleur mystère · 2️⃣ Pointe le CS-160 vers une dalle · 3️⃣ Mesure : plus tu es précis, plus tu marques !' },
+      { id: 'u_btn1',   kind: 'button',        x: 20,  y: 176, width: 480, height: 52, text: '🎨 1. Nouvelle couleur mystère', eventId: 'nouvelle', bgColor: '#f97316', textColor: '#ffffff', fontSize: 16 },
+      { id: 'u_btn2',   kind: 'button',        x: 20,  y: 240, width: 480, height: 52, text: '📷 2. Mesurer avec le CS-160',   eventId: 'mesurer',  bgColor: '#4361ee', textColor: '#ffffff', fontSize: 16 },
+      { id: 'u_score',  kind: 'score_display', x: 20,  y: 308, width: 150, height: 70, text: 'Score',    varBind: 'score' },
+      { id: 'u_mx',     kind: 'score_display', x: 186, y: 308, width: 150, height: 70, text: 'x mesuré', varBind: 'meas_x' },
+      { id: 'u_my',     kind: 'score_display', x: 352, y: 308, width: 148, height: 70, text: 'y mesuré', varBind: 'meas_y' },
+      { id: 'u_gauge',  kind: 'gauge_ring',    x: 20,  y: 392, width: 96,  height: 96, varBind: 'meas_accuracy', bgColor: '#06d6a0' },
+      { id: 'u_lbl1',   kind: 'label',         x: 130, y: 392, width: 370, height: 44, text: 'Précision de la dernière mesure (0 à 100 %)', textColor: '#a0c4ff', fontSize: 13 },
+      { id: 'u_lbl2',   kind: 'label',         x: 130, y: 440, width: 370, height: 44, text: 'La salle reste allumée dans la couleur à mesurer', textColor: '#8892a8', fontSize: 12 },
+      { id: 'u_grid',   kind: 'plate_grid',    x: 520, y: 14,  width: 320, height: 474 },
     ],
+    comments: [],
+    pythonCode: '',
   };
 
-  // INSERT uniquement si absent — ne pas écraser les personnalisations faites dans l'éditeur
-  const existing = db.prepare("SELECT id FROM crg_games WHERE name = ?;").get(GAME_NAME);
+  // INSERT uniquement si absent — check par PRÉFIXE D'ID (robuste aux renommages
+  // faits dans l'éditeur, contrairement à un check par nom).
+  const existing = db.prepare("SELECT id FROM crg_games WHERE id LIKE 'chromadetect_%';").get();
   if (!existing) {
     const id = `chromadetect_${Date.now().toString(36)}`;
     db.prepare("INSERT INTO crg_games(id, name, kind, config_json, updated_at) VALUES(?, ?, 'editor', ?, datetime('now'));")
@@ -194,7 +265,7 @@ function seedChromatectGame(db: Database.Database) {
 }
 
 function seedLibreRGBGame(db: Database.Database) {
-  const GAME_NAME = 'Mode Libre — Couleur RGB';
+  const GAME_NAME = 'Mode Libre - Couleur RGB';
   // Jeu construit en blocs réels (pas de composant natif monolithique) :
   //   on_tick (50ms) → get_player_rgb → show_target_on_plates
   // Les sliders R/G/B apparaissent dans la barre de l'éditeur pendant l'exécution.
@@ -227,7 +298,7 @@ function seedLibreRGBGame(db: Database.Database) {
     uiLayout: [
       // Titre
       { id: 'u_title',   kind: 'title_banner',  x: 20,  y: 12,  width: 820, height: 52,
-        text: 'Mode Libre — Couleur RGB', bgColor: '#0b0f1c', textColor: '#e8eaf0' },
+        text: 'Mode Libre - Couleur RGB', bgColor: '#0b0f1c', textColor: '#e8eaf0' },
       // Pastille couleur courante (liée à la variable 'couleur')
       { id: 'u_swatch',  kind: 'color_swatch',  x: 20,  y: 80,  width: 100, height: 100,
         colorBind: 'couleur' },
@@ -249,7 +320,8 @@ function seedLibreRGBGame(db: Database.Database) {
       { id: 'u_grid',    kind: 'plate_grid',    x: 440, y: 228, width: 400, height: 300 },
     ],
   };
-  const existing = db.prepare("SELECT id FROM crg_games WHERE name = ?;").get(GAME_NAME);
+  // Check par PRÉFIXE D'ID — robuste aux renommages faits dans l'éditeur.
+  const existing = db.prepare("SELECT id FROM crg_games WHERE id LIKE 'libre_rgb_%';").get();
   if (!existing) {
     const id = `libre_rgb_${Date.now().toString(36)}`;
     db.prepare("INSERT INTO crg_games(id, name, kind, config_json, updated_at) VALUES(?, ?, 'editor', ?, datetime('now'));")

@@ -160,6 +160,13 @@ export function joinGuest(sessionId: string, name?: string): { token: string; se
     return null;
   }
 
+  // Purge les joueurs fantômes (déconnectés > 20 s) : ils n'apparaissent plus
+  // dans listPlayers mais leur ligne occupe toujours le siège en DB, ce qui
+  // ferait échouer l'INSERT (UNIQUE session_id+seat).
+  db.prepare(
+    "DELETE FROM crg_mp_players WHERE session_id = ? AND last_seen_at < datetime('now', '-20 seconds');",
+  ).run(sessionId);
+
   const players = listPlayers(sessionId);
   const taken = new Set(players.map((p) => p.seat));
 
