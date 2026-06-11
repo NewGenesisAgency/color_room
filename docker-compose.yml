@@ -20,7 +20,7 @@ services:
     # NB : pas de depends_on bloquant sur ollama → l'app démarre vite (phase 1),
     # jouable et éditable sans IA. L'IA locale s'active dès que le modèle est prêt.
     healthcheck:
-      # Check via node (fetch intégré à Node 20) — l'image n'embarque plus curl.
+      # Check via node (fetch intégré à Node 20) - l'image n'embarque plus curl.
       test: ["CMD", "node", "-e", "fetch('http://localhost:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 10s
       timeout: 3s
@@ -41,7 +41,7 @@ services:
       - "9000:9000"
       - "9443:9443"
 
-  # ── IA locale (Ollama) — démarrage en 2 temps ───────────────────────────────
+  # ── IA locale (Ollama) - démarrage en 2 temps ───────────────────────────────
   # Phase 1 : l'app et Ollama démarrent (l'app est tout de suite utilisable).
   # Phase 2 : ollama-pull télécharge le modèle en arrière-plan ; dès qu'il est
   #           prêt, l'assistant IA de l'éditeur devient disponible (hors-ligne).

@@ -5,7 +5,7 @@
  * POST : body JSON { username, password, confirmPassword, avatarColor?,
  *        avatarIcon?, classCode? }. Valide les champs, vérifie l'unicité du nom
  *        (insensible à la casse), crée l'utilisateur (type 'apprenant') et, si un
- *        code de classe valide est fourni, l'inscrit à cette classe — le tout dans
+ *        code de classe valide est fourni, l'inscrit à cette classe - le tout dans
  *        une transaction tout-ou-rien. Ouvre une session et pose le cookie
  *        `crg_session`. Renvoie { ok, user }.
  * Codes d'erreur : 400 (validation), 409 (nom déjà pris), 500 (erreur serveur).

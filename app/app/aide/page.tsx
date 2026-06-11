@@ -42,7 +42,7 @@ const GAMES = [
   { name: 'Maître du Blanc',   desc: 'Trouvez la température de couleur du blanc' },
   { name: 'Color Speed',       desc: 'Reconnaissez les couleurs le plus rapidement possible' },
   { name: 'Chasseur de Gamut', desc: 'Reproduisez exactement une couleur cible sur le diagramme CIE' },
-  { name: 'Spectre de Mots',   desc: 'Physique de la lumière — cachez ou révélez les mots' },
+  { name: 'Spectre de Mots',   desc: 'Physique de la lumière - cachez ou révélez les mots' },
   { name: 'Mix de Canaux',     desc: 'Créez la couleur cible en mixant 3 canaux LED' },
 ];
 

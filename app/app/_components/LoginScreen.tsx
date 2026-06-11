@@ -152,7 +152,7 @@ export default function LoginScreen({ sessionChecked, onSuccess, initialClassCod
             <span className="login-brand-dot" style={{ background:'#3b82f6' }} />
           </div>
           <h1 className="login-title">ColorRoom</h1>
-          <p className="login-tagline">Jeux Sérieux — Lumière &amp; Couleurs</p>
+          <p className="login-tagline">Jeux Sérieux - Lumière &amp; Couleurs</p>
         </div>
 
         {/* ═══════════════════════════════════ LOGIN ══════════════════════ */}
@@ -342,7 +342,7 @@ export default function LoginScreen({ sessionChecked, onSuccess, initialClassCod
                     Votre avatar
                   </div>
                   <p style={{ fontSize:12.5, color:'var(--text-2)', margin:'4px 0 0', lineHeight:1.5 }}>
-                    Couleur et icône — c&apos;est votre identité dans ColorRoom.
+                    Couleur et icône - c&apos;est votre identité dans ColorRoom.
                   </p>
                 </div>
 
@@ -443,7 +443,7 @@ export default function LoginScreen({ sessionChecked, onSuccess, initialClassCod
                     Code de classe
                   </div>
                   <p style={{ fontSize:12.5, color:'var(--text-2)', margin:'4px 0 0', lineHeight:1.5 }}>
-                    Facultatif — demandez-le à votre enseignant.
+                    Facultatif - demandez-le à votre enseignant.
                   </p>
                 </div>
 
@@ -452,7 +452,7 @@ export default function LoginScreen({ sessionChecked, onSuccess, initialClassCod
                     <input ref={firstInput} value={regCode}
                       onChange={e => setRegCode(e.target.value.toUpperCase())}
                       onKeyDown={e => e.key === 'Enter' && !regLoading && handleRegister()}
-                      placeholder="— — — — — —"
+                      placeholder="- - - - - -"
                       maxLength={6}
                       style={{
                         letterSpacing:'0.28em', textTransform:'uppercase',

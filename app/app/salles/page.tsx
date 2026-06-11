@@ -11,7 +11,7 @@
  *    (1-2-3 en bas, 7-8-9 en haut).
  *
  * La disposition est strictement FIDÈLE au mapping physique calibré sur site
- * (cf. plateIdForIndex dans app/jeux/page.tsx) — elle n'est pas modifiable ici.
+ * (cf. plateIdForIndex dans app/jeux/page.tsx) - elle n'est pas modifiable ici.
  *
  * Interactions :
  *  - clic sur une dalle → flash BLANC 2 s puis extinction (anti-spam : les
@@ -26,7 +26,7 @@ import { Map, Moon, Play, Square, Lightbulb, Info } from 'lucide-react';
 import NavigationMenu from '@/app/_components/NavigationMenu';
 import { PLATE_TYPE, remapChannels32, type TileType } from '@/lib/tileChannels';
 
-// ─── Disposition physique (NE PAS MODIFIER — calibrée sur place) ─────────────
+// ─── Disposition physique (NE PAS MODIFIER - calibrée sur place) ─────────────
 // Reproduit exactement plateIdForIndex de app/jeux/page.tsx :
 //  • Mur du fond 3×3, numéroté du BAS vers le HAUT, gauche→droite :
 //      1-2-3 (bas) / 4-5-6 (milieu) / 7-8-9 (haut)
@@ -38,7 +38,7 @@ import { PLATE_TYPE, remapChannels32, type TileType } from '@/lib/tileChannels';
  * @brief Rangées du plafond d'une salle, dans l'ordre d'AFFICHAGE (haut→bas).
  *
  * En haut de l'affichage : le côté entrée (19-20-21), en bas : près du mur
- * (10-11-12) — ainsi le plafond affiché au-dessus du mur reste contigu à la
+ * (10-11-12) - ainsi le plafond affiché au-dessus du mur reste contigu à la
  * rangée haute du mur (7-8-9), comme dans la salle réelle « dépliée ».
  *
  * @param room Index de salle (0 = salle 1, 1 = salle 2).
@@ -243,7 +243,7 @@ export default function SallesPage() {
           <div>
             <h1 style={{ margin: 0, fontSize: 24, fontWeight: 900, color: '#1a1a2e' }}>Plan des salles</h1>
             <p style={{ margin: '2px 0 0', fontSize: 13, color: 'rgba(0,0,0,0.5)' }}>
-              Disposition physique des 42 dalles LED — cliquez sur une dalle pour la tester (blanc 2 s)
+              Disposition physique des 42 dalles LED - cliquez sur une dalle pour la tester (blanc 2 s)
             </p>
           </div>
         </div>
@@ -296,7 +296,7 @@ export default function SallesPage() {
           </div>
           <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13, color: 'rgba(0,0,0,0.6)', lineHeight: 1.7 }}>
             <li>
-              <strong>Mur du fond (3×3)</strong> : numéroté du <strong>bas vers le haut</strong> —
+              <strong>Mur du fond (3×3)</strong> : numéroté du <strong>bas vers le haut</strong> -
               la rangée 1-2-3 est au sol, la rangée 7-8-9 touche le plafond (idem 22-24 / 28-30 en salle 2).
             </li>
             <li>
@@ -305,11 +305,11 @@ export default function SallesPage() {
             </li>
             <li>
               <span style={dotStyle('#ef4444')} /> Câblage <strong>rouge</strong>
-              {' '}· <span style={dotStyle('#3b82f6')} /> Câblage <strong>bleu</strong> —
+              {' '}· <span style={dotStyle('#3b82f6')} /> Câblage <strong>bleu</strong> -
               les deux types ont un ordre de canaux LED différent (cf. lib/tileChannels.ts).
             </li>
             <li>
-              <strong>Ce plan reflète le câblage physique calibré — il n&apos;est pas modifiable ici.</strong>
+              <strong>Ce plan reflète le câblage physique calibré - il n&apos;est pas modifiable ici.</strong>
             </li>
           </ul>
         </section>
@@ -467,7 +467,7 @@ function TileCell({ plateId, type, lit, busy, onTest }: {
     <button
       onClick={() => onTest(plateId)}
       disabled={busy && !lit}
-      title={`Dalle ${plateId} — câblage ${type} (cliquer pour tester)`}
+      title={`Dalle ${plateId} - câblage ${type} (cliquer pour tester)`}
       style={{
         position: 'relative',
         display: 'flex',

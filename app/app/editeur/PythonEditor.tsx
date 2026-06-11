@@ -1,17 +1,18 @@
 'use client';
 /**
  * @file app/editeur/PythonEditor.tsx
- * @brief Éditeur de code Python intégré (Pyodide) pour piloter les dalles.
+ * @brief Éditeur de code Python/JavaScript intégré pour piloter les dalles.
  *
  * Onglet « Python » de l'éditeur : zone de code avec coloration légère,
  * autocomplétion de l'API `colorroom` et exécution via Pyodide (Python
- * compilé en WebAssembly). Le code communique avec le jeu/les dalles à travers
- * un pont (PyBridge) : envoi de couleurs, lecture/écriture de variables, score,
- * émission d'événements. Pyodide est chargé hors-ligne en priorité (fichiers
+ * compilé en WebAssembly) ou directement en JavaScript (AsyncFunction).
+ * Le code communique avec le jeu/les dalles à travers un pont (PyBridge) :
+ * envoi de couleurs, lecture/écriture de variables, score, émission
+ * d'événements. Pyodide est chargé hors-ligne en priorité (fichiers
  * embarqués au build, cf. lib/pyodide.ts), avec repli CDN en développement.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { BookOpen, ChevronDown, ChevronUp, X, Play, Square, Trash2, FileCode, Lightbulb, Check } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { BookOpen, X, Play, Square, Trash2, FileCode, Lightbulb, Check, ArrowRight, ArrowUp, RotateCcw, Plus, Copy } from 'lucide-react';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export type PyBridge = {
@@ -26,17 +27,23 @@ export type PyBridge = {
   getScore: () => number;
 };
 
+export type CodeLanguage = 'python' | 'js';
+
 type Props = {
   code: string;
   onChange: (code: string) => void;
   bridge: PyBridge | null;
   tileCount: number;
+  /** Langage d'exécution du code. Défaut : 'python' (Pyodide). */
+  language?: 'python' | 'js';
+  /** Notifié quand l'utilisateur change de langage via le toggle. */
+  onLanguageChange?: (lang: 'python' | 'js') => void;
 };
 
 declare global { interface Window { loadPyodide?: (opts: { indexURL: string }) => Promise<any>; } }
 
 // ─── Exemple de code (bouton "Exemple") ────────────────────────────────────────
-const SNIPPET = `import colorroom as cr
+const SNIPPET_PY = `import colorroom as cr
 import math
 
 # ─── Arc-en-ciel animé ────────────────────────────────────────────────────────
@@ -58,74 +65,189 @@ if touche == ' ':
     cr.log(f"Action ! Score : {cr.get_score()}")
 `;
 
-// ─── Fonctions de l'API colorroom ──────────────────────────────────────────────
+const SNIPPET_JS = `// ─── Arc-en-ciel animé ────────────────────────────────────────────────────────
+// L'objet cr est fourni automatiquement : pas d'import nécessaire.
+const offset = Number(cr.get_variable('offset'));
+for (let i = 0; i < cr.tile_count; i++) {
+  const h = (i / cr.tile_count + offset) % 1.0;
+  const r = Math.round((0.5 + 0.5 * Math.sin(h * 6.28)) * 255);
+  const g = Math.round((0.5 + 0.5 * Math.sin(h * 6.28 + 2.09)) * 255);
+  const b = Math.round((0.5 + 0.5 * Math.sin(h * 6.28 + 4.19)) * 255);
+  cr.send_color(i + 1, r, g, b, 0.85);
+}
+cr.set_variable('offset', offset + 0.02);
+
+// ─── Réagir aux touches ────────────────────────────────────────────────────────
+const touche = cr.get_key();
+if (touche === ' ') {
+  cr.add_score(1);
+  cr.emit_event('action');
+  cr.log('Action ! Score : ' + cr.get_score());
+}
+`;
+
+// ─── Fonctions de l'API colorroom (identique en Python et en JavaScript) ──────
 const CR_API = [
-  { name: 'send_color', sig: '(plate_id, r, g, b, intensity)', desc: 'Allume la dalle plate_id (1-42) · r,g,b: 0-255 · intensity: 0.0-1.0', example: 'cr.send_color(1, 255, 0, 0, 0.8)' },
-  { name: 'set_tile',   sig: '(idx, r, g, b, intensity)',      desc: 'Dalle par index 0-based (0-41)', example: 'cr.set_tile(0, 0, 255, 0, 0.7)' },
-  { name: 'flush',      sig: '()',                              desc: 'Applique tous les set_tile en un seul rendu', example: 'cr.flush()' },
-  { name: 'get_key',    sig: '()',                              desc: "Dernière touche pressée puis reset : 'ArrowLeft' 'ArrowRight' 'ArrowUp' 'ArrowDown' ' ' 'Enter'", example: "touche = cr.get_key()" },
-  { name: 'set_variable', sig: "('nom', valeur)",               desc: 'Stocke une variable persistante (int, float, str)', example: "cr.set_variable('score', 0)" },
-  { name: 'get_variable', sig: "('nom')",                       desc: 'Lit une variable (retourne 0 si absente)', example: "n = cr.get_variable('compteur')" },
-  { name: 'add_score',  sig: '(points)',                        desc: 'Ajoute des points au score total du jeu', example: 'cr.add_score(10)' },
-  { name: 'get_score',  sig: '()',                              desc: 'Retourne le score courant (int)', example: "score = cr.get_score()" },
-  { name: 'emit_event', sig: "('type')",                        desc: "Émet un événement vers les blocs : déclenche les nœuds on_ui_click liés", example: "cr.emit_event('niveau_suivant')" },
-  { name: 'log',        sig: "('message')",                     desc: 'Affiche un message dans la console ci-dessous (debug)', example: "cr.log(f'Dalle {i}: {r},{g},{b}')" },
-  { name: 'tile_count', sig: '',                                desc: 'Constante : nombre de dalles disponibles (42)', example: "for i in range(cr.tile_count):" },
+  { name: 'send_color', sig: '(plate_id, r, g, b, intensity)', desc: 'Allume la dalle plate_id (1-42) · r,g,b: 0-255 · intensity: 0.0-1.0', example: 'cr.send_color(1, 255, 0, 0, 0.8)', exampleJs: 'cr.send_color(1, 255, 0, 0, 0.8);' },
+  { name: 'set_tile',   sig: '(idx, r, g, b, intensity)',      desc: 'Dalle par index 0-based (0-41)', example: 'cr.set_tile(0, 0, 255, 0, 0.7)', exampleJs: 'cr.set_tile(0, 0, 255, 0, 0.7);' },
+  { name: 'fill',       sig: '(r, g, b, intensity)',           desc: 'Allume toutes les dalles de la même couleur en un appel', example: 'cr.fill(0, 80, 255, 0.8)', exampleJs: 'cr.fill(0, 80, 255, 0.8);' },
+  { name: 'flush',      sig: '()',                              desc: 'Applique tous les set_tile en un seul rendu', example: 'cr.flush()', exampleJs: 'cr.flush();' },
+  { name: 'get_key',    sig: '()',                              desc: "Dernière touche pressée puis reset : 'ArrowLeft' 'ArrowRight' 'ArrowUp' 'ArrowDown' ' ' 'Enter'", example: "touche = cr.get_key()", exampleJs: "const touche = cr.get_key();" },
+  { name: 'set_variable', sig: "('nom', valeur)",               desc: 'Stocke une variable persistante (int, float, str)', example: "cr.set_variable('score', 0)", exampleJs: "cr.set_variable('score', 0);" },
+  { name: 'get_variable', sig: "('nom')",                       desc: 'Lit une variable (retourne 0 si absente)', example: "n = cr.get_variable('compteur')", exampleJs: "const n = Number(cr.get_variable('compteur'));" },
+  { name: 'add_score',  sig: '(points)',                        desc: 'Ajoute des points au score total du jeu', example: 'cr.add_score(10)', exampleJs: 'cr.add_score(10);' },
+  { name: 'get_score',  sig: '()',                              desc: 'Retourne le score courant (int)', example: "score = cr.get_score()", exampleJs: "const score = cr.get_score();" },
+  { name: 'emit_event', sig: "('type')",                        desc: "Émet un événement vers les blocs : déclenche les nœuds on_ui_click liés", example: "cr.emit_event('niveau_suivant')", exampleJs: "cr.emit_event('niveau_suivant');" },
+  { name: 'log',        sig: "('message')",                     desc: 'Affiche un message dans la console ci-dessous (debug)', example: "cr.log(f'Dalle {i}: {r},{g},{b}')", exampleJs: "cr.log('Dalle ' + i + ' : ' + r);" },
+  { name: 'tile_count', sig: '',                                desc: 'Constante : nombre de dalles disponibles (42)', example: "for i in range(cr.tile_count):", exampleJs: "for (let i = 0; i < cr.tile_count; i++) {" },
 ];
 
-// ─── Étapes du tutoriel guidé (A à Z) ──────────────────────────────────────────
-const TUTORIAL_STEPS = [
+// ─── Recettes prêtes à copier (s'adaptent au langage) ──────────────────────────
+const RECIPES: { title: string; desc: string; py: string; js: string }[] = [
+  {
+    title: 'Allumer une dalle',
+    desc: 'La base : la dalle 1 en rouge à 90 % d\'intensité.',
+    py: `import colorroom as cr
+
+# Dalle 1 en rouge à 90%
+cr.send_color(1, 255, 0, 0, 0.9)`,
+    js: `// Dalle 1 en rouge à 90%
+cr.send_color(1, 255, 0, 0, 0.9);`,
+  },
+  {
+    title: 'Dégradé sur 42 dalles',
+    desc: 'Un dégradé rouge → bleu réparti sur toutes les dalles (cr.tile_count = 42).',
+    py: `import colorroom as cr
+
+for i in range(cr.tile_count):
+    t = i / (cr.tile_count - 1)
+    cr.send_color(i + 1, int(255 * (1 - t)), 0, int(255 * t), 0.85)`,
+    js: `for (let i = 0; i < cr.tile_count; i++) {
+  const t = i / (cr.tile_count - 1);
+  cr.send_color(i + 1, Math.round(255 * (1 - t)), 0, Math.round(255 * t), 0.85);
+}`,
+  },
+  {
+    title: 'Réagir au score',
+    desc: 'Lit le score avec cr.get_score() et colore la salle selon l\'objectif.',
+    py: `import colorroom as cr
+
+score = cr.get_score()
+if score >= 10:
+    cr.fill(0, 200, 80, 0.9)   # vert : objectif atteint
+else:
+    cr.fill(255, 120, 0, 0.6)  # orange : continue !
+cr.log(f"Score actuel : {score}")`,
+    js: `const score = cr.get_score();
+if (score >= 10) {
+  cr.fill(0, 200, 80, 0.9);   // vert : objectif atteint
+} else {
+  cr.fill(255, 120, 0, 0.6);  // orange : continue !
+}
+cr.log('Score actuel : ' + score);`,
+  },
+];
+
+// ─── Étapes du tutoriel guidé (A à Z), par langage ─────────────────────────────
+type TutorialStep = { title: string; desc: string; code: string; mode: 'prepend' | 'append' | 'replace' };
+
+const TUTORIAL_STEPS_PY: TutorialStep[] = [
   {
     title: '1. Importer le module',
     desc: 'Toujours commencer par importer `colorroom`. Ça donne accès à toutes les fonctions `cr.*`.',
     code: 'import colorroom as cr\nimport math\n',
-    mode: 'prepend' as const,
+    mode: 'prepend',
   },
   {
     title: '2. Allumer une dalle',
-    desc: '`cr.send_color(plate_id, r, g, b, intensity)` — plate_id de 1 à 42, r/g/b de 0 à 255, intensity de 0.0 à 1.0.',
+    desc: '`cr.send_color(plate_id, r, g, b, intensity)` - plate_id de 1 à 42, r/g/b de 0 à 255, intensity de 0.0 à 1.0.',
     code: '\n# Allume la dalle 1 en rouge à 80%\ncr.send_color(1, 255, 0, 0, 0.8)\n',
-    mode: 'append' as const,
+    mode: 'append',
   },
   {
     title: '3. Boucle sur toutes les dalles',
     desc: '`cr.tile_count` vaut 42. Itère avec `for i in range(cr.tile_count)` et utilise `i + 1` comme plate_id.',
     code: '\n# Toutes les dalles en bleu\nfor i in range(cr.tile_count):\n    cr.send_color(i + 1, 0, 100, 255, 0.75)\n',
-    mode: 'append' as const,
+    mode: 'append',
   },
   {
     title: '4. Variables persistantes',
     desc: 'Les variables survivent entre plusieurs exécutions du script. Utilisez-les pour stocker un état (position, compteur…).',
     code: '\n# Compteur d\'exécutions\ncompteur = int(cr.get_variable(\'exec\')) + 1\ncr.set_variable(\'exec\', compteur)\ncr.log(f"Exécution n°{compteur}")\n',
-    mode: 'append' as const,
+    mode: 'append',
   },
   {
     title: '5. Réagir aux touches clavier',
     desc: '`cr.get_key()` retourne la dernière touche pressée (puis la réinitialise). Utilisez-le pour des jeux interactifs.',
     code: "\n# Réagir au clavier\ntouche = cr.get_key()\nif touche == 'ArrowLeft':\n    cr.send_color(1, 0, 0, 255, 0.9)   # bleu = gauche\nelif touche == 'ArrowRight':\n    cr.send_color(1, 255, 100, 0, 0.9)  # orange = droite\nelif touche == ' ':\n    cr.add_score(1)\n    cr.log(f'Score : {cr.get_score()}')\n",
-    mode: 'append' as const,
+    mode: 'append',
   },
   {
     title: '6. Arc-en-ciel + animation',
     desc: 'Combine `math.sin`, la boucle et une variable d\'offset pour créer une animation fluide relancée à chaque exécution.',
     code: '\nimport math\noffset = float(cr.get_variable(\'hue\'))\nfor i in range(cr.tile_count):\n    h = (i / cr.tile_count + offset) % 1.0\n    r = int((0.5 + 0.5 * math.sin(h * 6.28)) * 255)\n    g = int((0.5 + 0.5 * math.sin(h * 6.28 + 2.09)) * 255)\n    b = int((0.5 + 0.5 * math.sin(h * 6.28 + 4.19)) * 255)\n    cr.send_color(i + 1, r, g, b, 0.85)\ncr.set_variable(\'hue\', offset + 0.03)\n',
-    mode: 'append' as const,
+    mode: 'append',
   },
   {
-    title: '7. Jeu complet — tout ensemble',
+    title: '7. Jeu complet - tout ensemble',
     desc: 'Un mini-jeu complet : animation, score, évènements, logs. Remplace tout le code actuel.',
-    code: SNIPPET,
-    mode: 'replace' as const,
+    code: SNIPPET_PY,
+    mode: 'replace',
+  },
+];
+
+const TUTORIAL_STEPS_JS: TutorialStep[] = [
+  {
+    title: '1. L\'objet cr',
+    desc: 'En JavaScript, pas d\'import : l\'objet `cr` est fourni automatiquement à votre code avec toutes les fonctions de l\'API.',
+    code: '// L\'objet cr est déjà disponible - pas d\'import nécessaire.\ncr.log(\'API cr prête !\');\n',
+    mode: 'prepend',
+  },
+  {
+    title: '2. Allumer une dalle',
+    desc: '`cr.send_color(plate_id, r, g, b, intensity)` - plate_id de 1 à 42, r/g/b de 0 à 255, intensity de 0.0 à 1.0.',
+    code: '\n// Allume la dalle 1 en rouge à 80%\ncr.send_color(1, 255, 0, 0, 0.8);\n',
+    mode: 'append',
+  },
+  {
+    title: '3. Boucle sur toutes les dalles',
+    desc: '`cr.tile_count` vaut 42. Itère avec une boucle for classique et utilise `i + 1` comme plate_id.',
+    code: '\n// Toutes les dalles en bleu\nfor (let i = 0; i < cr.tile_count; i++) {\n  cr.send_color(i + 1, 0, 100, 255, 0.75);\n}\n',
+    mode: 'append',
+  },
+  {
+    title: '4. Variables persistantes',
+    desc: 'Les variables stockées via `cr.set_variable` survivent entre plusieurs exécutions du script (position, compteur…).',
+    code: '\n// Compteur d\'exécutions\nconst compteur = Number(cr.get_variable(\'exec\')) + 1;\ncr.set_variable(\'exec\', compteur);\ncr.log(\'Exécution n°\' + compteur);\n',
+    mode: 'append',
+  },
+  {
+    title: '5. Réagir aux touches clavier',
+    desc: '`cr.get_key()` retourne la dernière touche pressée (puis la réinitialise). Utilisez-le pour des jeux interactifs.',
+    code: "\n// Réagir au clavier\nconst touche = cr.get_key();\nif (touche === 'ArrowLeft') {\n  cr.send_color(1, 0, 0, 255, 0.9);   // bleu = gauche\n} else if (touche === 'ArrowRight') {\n  cr.send_color(1, 255, 100, 0, 0.9); // orange = droite\n} else if (touche === ' ') {\n  cr.add_score(1);\n  cr.log('Score : ' + cr.get_score());\n}\n",
+    mode: 'append',
+  },
+  {
+    title: '6. Arc-en-ciel + animation',
+    desc: 'Combine `Math.sin`, la boucle et une variable d\'offset pour créer une animation fluide relancée à chaque exécution.',
+    code: '\nconst offset = Number(cr.get_variable(\'hue\'));\nfor (let i = 0; i < cr.tile_count; i++) {\n  const h = (i / cr.tile_count + offset) % 1.0;\n  const r = Math.round((0.5 + 0.5 * Math.sin(h * 6.28)) * 255);\n  const g = Math.round((0.5 + 0.5 * Math.sin(h * 6.28 + 2.09)) * 255);\n  const b = Math.round((0.5 + 0.5 * Math.sin(h * 6.28 + 4.19)) * 255);\n  cr.send_color(i + 1, r, g, b, 0.85);\n}\ncr.set_variable(\'hue\', offset + 0.03);\n',
+    mode: 'append',
+  },
+  {
+    title: '7. Jeu complet - tout ensemble',
+    desc: 'Un mini-jeu complet : animation, score, évènements, logs. Remplace tout le code actuel.',
+    code: SNIPPET_JS,
+    mode: 'replace',
   },
 ];
 
 // ─── Système d'autocomplétion intelligente ─────────────────────────────────────
 type Suggestion = { text: string; desc: string; insert: string };
 
-function computeSuggestion(line: string, prefix: string): Suggestion | null {
+function computeSuggestion(line: string, prefix: string, lang: CodeLanguage): Suggestion | null {
   const trimmed = line.trimStart();
 
-  // cr. → complétion des fonctions
+  // cr. → complétion des fonctions (commun aux deux langages)
   const crMatch = /cr\.(\w*)$/.exec(prefix);
   if (crMatch) {
     const partial = crMatch[1].toLowerCase();
@@ -136,7 +258,18 @@ function computeSuggestion(line: string, prefix: string): Suggestion | null {
     }
   }
 
-  // Début de ligne : suggestions contextuelles
+  if (lang === 'js') {
+    if (!prefix.trim()) {
+      if (!trimmed) return { text: "cr.send_color(1, 255, 0, 0, 0.9);", desc: 'Allumer la dalle 1 en rouge', insert: "cr.send_color(1, 255, 0, 0, 0.9);" };
+      return null;
+    }
+    if (/^for\s*$/.test(prefix.trim())) return { text: ' (let i = 0; i < cr.tile_count; i++) {', desc: 'Boucle sur toutes les dalles', insert: ' (let i = 0; i < cr.tile_count; i++) {' };
+    if (/^if\s*$/.test(prefix.trim())) return { text: " (cr.get_key() === ' ') {", desc: 'Tester la touche Espace', insert: " (cr.get_key() === ' ') {" };
+    if (/^const\s+touche\s*=\s*$/.test(prefix.trim())) return { text: 'cr.get_key();', desc: 'Récupérer la dernière touche pressée', insert: 'cr.get_key();' };
+    return null;
+  }
+
+  // Début de ligne : suggestions contextuelles (Python)
   if (!prefix.trim()) {
     if (!trimmed) return { text: 'import colorroom as cr', desc: 'Importer le module colorroom', insert: 'import colorroom as cr' };
     return null;
@@ -156,8 +289,13 @@ function computeSuggestion(line: string, prefix: string): Suggestion | null {
 }
 
 // Suggestion de ligne suivante (après avoir appuyé Entrée)
-function computeNextLine(currentLine: string): string | null {
+function computeNextLine(currentLine: string, lang: CodeLanguage): string | null {
   const t = currentLine.trim();
+  if (lang === 'js') {
+    if (/^for\s*\(.*\)\s*\{$/.test(t)) return '  cr.send_color(i + 1, 255, 0, 0, 0.8);';
+    if (/^(if|else if)\s*\(.*\)\s*\{$/.test(t)) return '  ';
+    return null;
+  }
   if (/^for\s+\w+\s+in\s+range\(.*\):$/.test(t)) return '    cr.send_color(i + 1, 255, 0, 0, 0.8)';
   if (/^import colorroom as cr$/.test(t)) return 'import math';
   if (/^import math$/.test(t)) return '';
@@ -168,17 +306,21 @@ function computeNextLine(currentLine: string): string | null {
 }
 
 // ─── Composant principal ───────────────────────────────────────────────────────
-export default function PythonEditor({ code, onChange, bridge, tileCount }: Props) {
+export default function PythonEditor({ code, onChange, bridge, tileCount, language = 'python', onLanguageChange }: Props) {
   const [pyReady, setPyReady]     = useState(false);
   const [pyLoading, setPyLoading] = useState(false);
   const [running, setRunning]     = useState(false);
   const [logs, setLogs]           = useState<string[]>([]);
   const [error, setError]         = useState('');
 
+  const isJs = language === 'js';
+  const tutorialSteps = isJs ? TUTORIAL_STEPS_JS : TUTORIAL_STEPS_PY;
+
   // Tutoriel
   const [tutorialOpen, setTutorialOpen] = useState(true);
   const [tutorialStep, setTutorialStep] = useState(0);
   const [appliedSteps, setAppliedSteps] = useState<Set<number>>(new Set());
+  const [copiedRecipe, setCopiedRecipe] = useState<number | null>(null);
 
   // Autocomplétion
   const [suggestion, setSuggestion] = useState<Suggestion | null>(null);
@@ -186,6 +328,7 @@ export default function PythonEditor({ code, onChange, bridge, tileCount }: Prop
   const [showCrDropdown, setShowCrDropdown] = useState(false);
   const [crDropdownItems, setCrDropdownItems] = useState<typeof CR_API>([]);
   const [crDropdownSel, setCrDropdownSel] = useState(0);
+  void nextLineSug;
 
   const pyRef      = useRef<any>(null);
   const logsEndRef = useRef<HTMLDivElement>(null);
@@ -197,6 +340,14 @@ export default function PythonEditor({ code, onChange, bridge, tileCount }: Prop
     setLogs(prev => [...prev.slice(-299), msg]);
     setTimeout(() => logsEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 30);
   }
+
+  // Reset des aides quand on change de langage (le tutoriel diffère).
+  useEffect(() => {
+    setTutorialStep(0);
+    setAppliedSteps(new Set());
+    setSuggestion(null);
+    setShowCrDropdown(false);
+  }, [language]);
 
   // ── Chargement Pyodide ───────────────────────────────────────────────────────
   useEffect(() => {
@@ -239,25 +390,59 @@ export default function PythonEditor({ code, onChange, bridge, tileCount }: Prop
     })();
   }, []);
 
-  // ── Exécution ────────────────────────────────────────────────────────────────
-  async function runCode() {
-    if (!pyRef.current || !bridge) return;
-    const py = pyRef.current;
-    setRunning(true); setError(''); setLogs([]);
-    const cr = {
-      send_color:   bridge.sendColor,
-      set_tile:     bridge.setTile,
-      flush:        bridge.flush,
-      get_key:      bridge.getKey,
-      set_variable: bridge.setVariable,
-      get_variable: bridge.getVariable,
-      add_score:    bridge.addScore,
-      get_score:    bridge.getScore,
-      emit_event:   bridge.emitEvent,
-      log:          (msg: string) => addLog(String(msg)),
+  // ── API colorroom partagée Python/JavaScript ─────────────────────────────────
+  // Mêmes noms de fonctions des deux côtés : le module Pyodide `colorroom` et
+  // l'objet `cr` injecté dans le code JavaScript sont strictement identiques.
+  function buildCrApi(b: PyBridge) {
+    return {
+      send_color:   b.sendColor,
+      set_tile:     b.setTile,
+      fill:         (r: number, g: number, b2: number, intensity = 0.85) => {
+        for (let i = 0; i < tileCount; i++) b.setTile(i, r, g, b2, intensity);
+        b.flush();
+      },
+      flush:        b.flush,
+      get_key:      b.getKey,
+      set_variable: b.setVariable,
+      get_variable: b.getVariable,
+      add_score:    b.addScore,
+      get_score:    b.getScore,
+      emit_event:   b.emitEvent,
+      log:          (msg: unknown) => addLog(String(msg)),
       tile_count:   tileCount,
     };
-    py.registerJsModule('colorroom', cr);
+  }
+
+  // ── Exécution ────────────────────────────────────────────────────────────────
+  const canRun = !!bridge && (isJs || pyReady);
+
+  async function runCode() {
+    if (!bridge) return;
+
+    // Mode JavaScript : exécution directe via AsyncFunction, l'objet `cr` est
+    // passé en argument (même API que le module Python colorroom).
+    if (isJs) {
+      setRunning(true); setError(''); setLogs([]);
+      try {
+        const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor as new (...args: string[]) => (cr: unknown) => Promise<unknown>;
+        const fn = new AsyncFunction('cr', code);
+        await fn(buildCrApi(bridge));
+        addLog('✓ Exécution terminée');
+      } catch (e: any) {
+        const msg = String(e?.message ?? e);
+        setError(msg);
+        addLog('✗ ' + msg);
+      } finally {
+        setRunning(false);
+      }
+      return;
+    }
+
+    // Mode Python : Pyodide + module colorroom.
+    if (!pyRef.current) return;
+    const py = pyRef.current;
+    setRunning(true); setError(''); setLogs([]);
+    py.registerJsModule('colorroom', buildCrApi(bridge));
     py.setStdout({ batched: (s: string) => addLog(s) });
     py.setStderr({ batched: (s: string) => addLog('⚠ ' + s) });
     try {
@@ -296,10 +481,10 @@ export default function PythonEditor({ code, onChange, bridge, tileCount }: Prop
     setShowCrDropdown(false);
 
     // Ghost text (suggestion de complétion de la ligne courante)
-    const sug = computeSuggestion(currentLine, prefix);
+    const sug = computeSuggestion(currentLine, prefix, language);
     setSuggestion(sug);
     setNextLineSug(null);
-  }, []);
+  }, [language]);
 
   const handleChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const newCode = e.target.value;
@@ -315,7 +500,7 @@ export default function PythonEditor({ code, onChange, bridge, tileCount }: Prop
     // Exécuter avec Ctrl+Entrée
     if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
       e.preventDefault();
-      if (pyReady && bridge && !running) runCode();
+      if (canRun && !running) runCode();
       return;
     }
 
@@ -370,7 +555,7 @@ export default function PythonEditor({ code, onChange, bridge, tileCount }: Prop
       const before = code.slice(0, pos);
       const lineStart = before.lastIndexOf('\n') + 1;
       const currentLine = before.slice(lineStart);
-      const nextSug = computeNextLine(currentLine.trim() ? currentLine : '');
+      const nextSug = computeNextLine(currentLine.trim() ? currentLine : '', language);
       setNextLineSug(nextSug);
       setSuggestion(null);
     }
@@ -383,11 +568,11 @@ export default function PythonEditor({ code, onChange, bridge, tileCount }: Prop
       onChange(newCode);
       setTimeout(() => { ta.selectionStart = ta.selectionEnd = pos + 4; ta.focus(); }, 0);
     }
-  }, [showCrDropdown, crDropdownItems, crDropdownSel, suggestion, code, onChange, analyzeCode, pyReady, bridge, running]);
+  }, [showCrDropdown, crDropdownItems, crDropdownSel, suggestion, code, onChange, analyzeCode, canRun, running, language]);
 
   // ── Appliquer une étape du tutoriel ──────────────────────────────────────────
   function applyStep(idx: number, mode: 'append' | 'prepend' | 'replace') {
-    const step = TUTORIAL_STEPS[idx];
+    const step = tutorialSteps[idx];
     if (!step) return;
     let newCode: string;
     if (mode === 'replace') newCode = step.code;
@@ -395,12 +580,26 @@ export default function PythonEditor({ code, onChange, bridge, tileCount }: Prop
     else newCode = (code.trimEnd() || '') + step.code;
     onChange(newCode.replace(/^\n/, ''));
     setAppliedSteps(prev => new Set([...prev, idx]));
-    setTutorialStep(Math.min(idx + 1, TUTORIAL_STEPS.length - 1));
+    setTutorialStep(Math.min(idx + 1, tutorialSteps.length - 1));
     taRef.current?.focus();
+  }
+
+  // ── Insérer un bout de code à la position du curseur ─────────────────────────
+  function insertAtCursor(snippet: string) {
+    const ta = taRef.current;
+    if (!ta) return;
+    const pos = ta.selectionStart;
+    const newCode = code.slice(0, pos) + snippet + code.slice(pos);
+    onChange(newCode);
+    setTimeout(() => { ta.selectionStart = ta.selectionEnd = pos + snippet.length; ta.focus(); }, 0);
   }
 
   // ── Styles ───────────────────────────────────────────────────────────────────
   const btnSm: React.CSSProperties = { padding: '5px 11px', borderRadius: 8, border: '1px solid rgba(0,0,0,0.12)', background: 'rgba(255,255,255,0.75)', cursor: 'pointer', fontSize: 11, fontWeight: 700, fontFamily: 'inherit', transition: 'all 120ms', display: 'flex', alignItems: 'center', gap: 4 };
+
+  const placeholder = isJs
+    ? "// Écrivez votre code JavaScript ici…\n// L'objet cr est fourni automatiquement :\n// cr.send_color(1, 255, 0, 0, 0.9)\n// Ou cliquez « Exemple » pour partir d'un template."
+    : "# Écrivez votre code Python ici…\n# Commencez par : import colorroom as cr\n# Ou cliquez « Exemple » pour partir d'un template.";
 
   return (
     <div style={{ display: 'flex', height: '100%', minHeight: 0, fontFamily: 'inherit' }}>
@@ -410,23 +609,35 @@ export default function PythonEditor({ code, onChange, bridge, tileCount }: Prop
 
         {/* Toolbar */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px', borderBottom: '1px solid rgba(0,0,0,0.08)', background: 'rgba(255,255,255,0.65)', flexShrink: 0, flexWrap: 'wrap' }}>
-          <span style={{ fontWeight: 800, fontSize: 13, color: '#1a1d2e' }}>Python</span>
+          {/* Toggle de langage (segmenté) */}
+          <div style={{ display: 'flex', borderRadius: 8, overflow: 'hidden', border: '1px solid rgba(0,0,0,0.12)' }}>
+            {(['python', 'js'] as const).map((l) => (
+              <button key={l}
+                onClick={() => onLanguageChange?.(l)}
+                title={l === 'python' ? 'Exécuter le code en Python (Pyodide)' : 'Exécuter le code en JavaScript (natif)'}
+                style={{ padding: '5px 12px', border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 800, fontFamily: 'inherit', transition: 'all 120ms',
+                  background: language === l ? 'linear-gradient(135deg,#4361ee,#7c3aed)' : 'rgba(255,255,255,0.8)',
+                  color: language === l ? '#fff' : 'rgba(0,0,0,0.55)' }}>
+                {l === 'python' ? 'Python' : 'JavaScript'}
+              </button>
+            ))}
+          </div>
           <span style={{ padding: '2px 8px', borderRadius: 999, fontSize: 10, fontWeight: 700,
-            background: pyReady ? 'rgba(5,150,105,0.12)' : pyLoading ? 'rgba(234,179,8,0.12)' : 'rgba(0,0,0,0.06)',
-            color: pyReady ? '#059669' : pyLoading ? '#ca8a04' : '#999' }}>
-            {pyLoading ? 'Chargement…' : pyReady ? 'Prêt' : 'Non chargé'}
+            background: (isJs || pyReady) ? 'rgba(5,150,105,0.12)' : pyLoading ? 'rgba(234,179,8,0.12)' : 'rgba(0,0,0,0.06)',
+            color: (isJs || pyReady) ? '#059669' : pyLoading ? '#ca8a04' : '#999' }}>
+            {isJs ? 'Prêt (JS natif)' : pyLoading ? 'Chargement…' : pyReady ? 'Prêt' : 'Non chargé'}
           </span>
           <span style={{ fontSize: 10, color: 'rgba(0,0,0,0.35)', fontWeight: 600 }}>Ctrl+Entrée = Exécuter · Tab = Compléter</span>
           <div style={{ flex: 1 }} />
-          <button style={btnSm} onClick={() => onChange(SNIPPET)}><FileCode size={12} /> Exemple</button>
+          <button style={btnSm} onClick={() => onChange(isJs ? SNIPPET_JS : SNIPPET_PY)}><FileCode size={12} /> Exemple</button>
           <button style={btnSm} onClick={() => setLogs([])}><Trash2 size={12} /> Console</button>
           <button style={{ ...btnSm, background: tutorialOpen ? 'rgba(67,97,238,0.1)' : 'rgba(255,255,255,0.75)', color: tutorialOpen ? '#4361ee' : undefined, borderColor: tutorialOpen ? 'rgba(67,97,238,0.3)' : undefined }}
             onClick={() => setTutorialOpen(v => !v)}>
-            <BookOpen size={12} /> Guide {tutorialOpen ? '✕' : '→'}
+            <BookOpen size={12} /> Guide {tutorialOpen ? <X size={11} /> : <ArrowRight size={11} />}
           </button>
           {!running
-            ? <button disabled={!pyReady || !bridge}
-                style={{ ...btnSm, background: (!pyReady || !bridge) ? 'rgba(0,0,0,0.08)' : 'linear-gradient(135deg,#4361ee,#7c3aed)', color: (!pyReady || !bridge) ? '#aaa' : '#fff', border: 'none', gap: 5 }}
+            ? <button disabled={!canRun}
+                style={{ ...btnSm, background: !canRun ? 'rgba(0,0,0,0.08)' : 'linear-gradient(135deg,#4361ee,#7c3aed)', color: !canRun ? '#aaa' : '#fff', border: 'none', gap: 5 }}
                 onClick={runCode}><Play size={12} /> Exécuter</button>
             : <button style={{ ...btnSm, background: 'rgba(220,38,38,0.08)', color: '#dc2626', borderColor: 'rgba(220,38,38,0.2)' }}
                 onClick={() => setRunning(false)}><Square size={12} /> Arrêter</button>}
@@ -441,7 +652,7 @@ export default function PythonEditor({ code, onChange, bridge, tileCount }: Prop
             onKeyDown={handleKeyDown}
             onSelect={(e) => { const ta = e.currentTarget; analyzeCode(code, ta.selectionStart ?? 0); }}
             spellCheck={false}
-            placeholder="# Écrivez votre code Python ici…&#10;# Commencez par : import colorroom as cr&#10;# Ou cliquez « Exemple » pour partir d'un template."
+            placeholder={placeholder}
             style={{ position: 'absolute', inset: 0, resize: 'none', border: 'none', outline: 'none',
               padding: '14px 18px', fontFamily: "'Fira Code','Cascadia Code',Consolas,monospace",
               fontSize: 13, lineHeight: 1.7, background: '#1a1d2e', color: '#e2e8f0',
@@ -475,7 +686,7 @@ export default function PythonEditor({ code, onChange, bridge, tileCount }: Prop
           <div style={{ background: '#0f1723', borderTop: '1px solid rgba(67,97,238,0.2)', padding: '5px 18px', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
             <Lightbulb size={13} color="#818cf8" />
             <span style={{ fontFamily: 'monospace', fontSize: 12, color: 'rgba(165,180,252,0.7)' }}>{suggestion.insert}</span>
-            <span style={{ fontSize: 11, color: 'rgba(165,180,252,0.4)' }}>— {suggestion.desc}</span>
+            <span style={{ fontSize: 11, color: 'rgba(165,180,252,0.4)' }}>- {suggestion.desc}</span>
             <kbd style={{ marginLeft: 'auto', padding: '1px 7px', background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.3)', borderRadius: 5, fontSize: 10, color: '#a5b4fc', fontFamily: 'inherit' }}>Tab</kbd>
             <button onClick={() => setSuggestion(null)} style={{ background: 'transparent', border: 'none', color: 'rgba(165,180,252,0.4)', cursor: 'pointer', padding: 2 }}><X size={12} /></button>
           </div>
@@ -496,43 +707,83 @@ export default function PythonEditor({ code, onChange, bridge, tileCount }: Prop
         </div>
       </div>
 
-      {/* ── Panneau tutoriel (colonne droite, collapsible) ── */}
+      {/* ── Panneau guide (colonne droite, collapsible) ── */}
       {tutorialOpen && (
         <div style={{ width: 280, flexShrink: 0, display: 'flex', flexDirection: 'column', borderLeft: '1px solid rgba(0,0,0,0.08)', background: 'rgba(248,249,255,0.97)', overflowY: 'auto' }}>
           {/* Header */}
           <div style={{ padding: '10px 14px', borderBottom: '1px solid rgba(0,0,0,0.07)', display: 'flex', alignItems: 'center', gap: 8, background: 'linear-gradient(135deg,rgba(67,97,238,0.08),rgba(124,58,237,0.06))' }}>
             <BookOpen size={15} color="#4361ee" />
-            <span style={{ fontWeight: 800, fontSize: 13, color: '#1a1d2e', flex: 1 }}>Guide Python A → Z</span>
+            <span style={{ fontWeight: 800, fontSize: 13, color: '#1a1d2e', flex: 1 }}>Guide {isJs ? 'JavaScript' : 'Python'} A → Z</span>
             <button onClick={() => setTutorialOpen(false)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'rgba(0,0,0,0.4)', padding: 2 }}><X size={14} /></button>
+          </div>
+
+          {/* Rappel des bases du langage courant */}
+          <div style={{ padding: '8px 14px', borderBottom: '1px solid rgba(0,0,0,0.07)', fontSize: 10.5, color: 'rgba(0,0,0,0.55)', lineHeight: 1.55, background: 'rgba(67,97,238,0.04)' }}>
+            {isJs
+              ? <>L'objet <code style={{ color: '#4361ee', fontWeight: 700 }}>cr</code> est injecté automatiquement : <strong>aucun import</strong>. Le code peut utiliser <code>await</code> directement (exécuté comme fonction async).</>
+              : <>Commencez toujours par <code style={{ color: '#4361ee', fontWeight: 700 }}>import colorroom as cr</code>. Toutes les fonctions sont ensuite accessibles via <code>cr.*</code>.</>}
           </div>
 
           {/* Référence API rapide */}
           <details style={{ borderBottom: '1px solid rgba(0,0,0,0.07)' }}>
             <summary style={{ padding: '8px 14px', fontSize: 11, fontWeight: 800, cursor: 'pointer', color: '#4361ee', letterSpacing: '0.04em', listStyle: 'none', display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span>⌨ Référence API</span>
+              <span>Référence API ({CR_API.length} fonctions)</span>
             </summary>
             <div style={{ padding: '0 12px 10px', display: 'flex', flexDirection: 'column', gap: 4 }}>
-              {CR_API.map(f => (
-                <div key={f.name} style={{ background: '#f0f2ff', borderRadius: 7, padding: '5px 8px' }}>
-                  <code style={{ fontSize: 10, color: '#4361ee', fontWeight: 700 }}>cr.{f.name}{f.sig}</code>
-                  <div style={{ fontSize: 10, color: 'rgba(0,0,0,0.5)', marginTop: 2 }}>{f.desc}</div>
-                  <button onClick={() => { const ta = taRef.current; if (!ta) return; const pos = ta.selectionStart; const newCode = code.slice(0, pos) + f.example + code.slice(pos); onChange(newCode); setTimeout(() => { ta.selectionStart = ta.selectionEnd = pos + f.example.length; ta.focus(); }, 0); }}
-                    style={{ marginTop: 3, fontSize: 9, padding: '1px 6px', borderRadius: 4, border: '1px solid rgba(67,97,238,0.25)', background: 'rgba(67,97,238,0.06)', color: '#4361ee', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700 }}>
-                    Insérer exemple
-                  </button>
-                </div>
-              ))}
+              {CR_API.map(f => {
+                const ex = isJs ? f.exampleJs : f.example;
+                return (
+                  <div key={f.name} style={{ background: '#f0f2ff', borderRadius: 7, padding: '5px 8px' }}>
+                    <code style={{ fontSize: 10, color: '#4361ee', fontWeight: 700 }}>cr.{f.name}{f.sig}</code>
+                    <div style={{ fontSize: 10, color: 'rgba(0,0,0,0.5)', marginTop: 2 }}>{f.desc}</div>
+                    <code style={{ display: 'block', fontSize: 9, color: 'rgba(0,0,0,0.45)', marginTop: 2, whiteSpace: 'pre-wrap' }}>{ex}</code>
+                    <button onClick={() => insertAtCursor(ex)}
+                      style={{ marginTop: 3, fontSize: 9, padding: '1px 6px', borderRadius: 4, border: '1px solid rgba(67,97,238,0.25)', background: 'rgba(67,97,238,0.06)', color: '#4361ee', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700 }}>
+                      Insérer exemple
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </details>
+
+          {/* Exemples concrets prêts à copier */}
+          <details open style={{ borderBottom: '1px solid rgba(0,0,0,0.07)' }}>
+            <summary style={{ padding: '8px 14px', fontSize: 11, fontWeight: 800, cursor: 'pointer', color: '#4361ee', letterSpacing: '0.04em', listStyle: 'none', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span>Exemples prêts à l'emploi</span>
+            </summary>
+            <div style={{ padding: '0 12px 10px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {RECIPES.map((r, ri) => {
+                const snippet = isJs ? r.js : r.py;
+                return (
+                  <div key={r.title} style={{ background: 'rgba(255,255,255,0.8)', border: '1px solid rgba(0,0,0,0.07)', borderRadius: 8, padding: '6px 8px' }}>
+                    <div style={{ fontSize: 11, fontWeight: 800, color: '#1a1d2e' }}>{r.title}</div>
+                    <div style={{ fontSize: 10, color: 'rgba(0,0,0,0.5)', margin: '2px 0 5px' }}>{r.desc}</div>
+                    <pre style={{ margin: '0 0 6px', fontSize: 9.5, background: '#1a1d2e', color: '#a5b4fc', padding: '7px 9px', borderRadius: 6, overflow: 'auto', lineHeight: 1.5, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{snippet}</pre>
+                    <div style={{ display: 'flex', gap: 5 }}>
+                      <button onClick={() => { void navigator.clipboard?.writeText(snippet).then(() => { setCopiedRecipe(ri); setTimeout(() => setCopiedRecipe(c => (c === ri ? null : c)), 1500); }); }}
+                        style={{ fontSize: 9, padding: '2px 7px', borderRadius: 4, border: '1px solid rgba(67,97,238,0.25)', background: 'rgba(67,97,238,0.06)', color: '#4361ee', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 3 }}>
+                        {copiedRecipe === ri ? <><Check size={9} /> Copié</> : <><Copy size={9} /> Copier</>}
+                      </button>
+                      <button onClick={() => insertAtCursor((code.trim() ? '\n' : '') + snippet + '\n')}
+                        style={{ fontSize: 9, padding: '2px 7px', borderRadius: 4, border: '1px solid rgba(0,0,0,0.12)', background: 'rgba(255,255,255,0.8)', color: '#1a1d2e', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 3 }}>
+                        <Plus size={9} /> Insérer
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </details>
 
           {/* Étapes du tutoriel */}
           <div style={{ padding: '8px 10px', borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
             <div style={{ fontSize: 10, fontWeight: 800, color: 'rgba(0,0,0,0.4)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 6 }}>
-              Étapes ({tutorialStep + 1}/{TUTORIAL_STEPS.length})
+              Étapes ({tutorialStep + 1}/{tutorialSteps.length})
             </div>
             {/* Barre de progression */}
             <div style={{ display: 'flex', gap: 3, marginBottom: 8 }}>
-              {TUTORIAL_STEPS.map((_, i) => (
+              {tutorialSteps.map((_, i) => (
                 <div key={i} onClick={() => setTutorialStep(i)} style={{ flex: 1, height: 4, borderRadius: 2, cursor: 'pointer',
                   background: appliedSteps.has(i) ? '#4361ee' : i === tutorialStep ? 'rgba(67,97,238,0.4)' : 'rgba(0,0,0,0.1)' }} />
               ))}
@@ -540,7 +791,7 @@ export default function PythonEditor({ code, onChange, bridge, tileCount }: Prop
           </div>
 
           <div style={{ flex: 1, overflowY: 'auto', padding: '6px 10px', display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {TUTORIAL_STEPS.map((step, i) => {
+            {tutorialSteps.map((step, i) => {
               const isCurrent = i === tutorialStep;
               const isDone = appliedSteps.has(i);
               return (
@@ -561,13 +812,13 @@ export default function PythonEditor({ code, onChange, bridge, tileCount }: Prop
                       <pre style={{ margin: '0 0 8px', fontSize: 10, background: '#1a1d2e', color: '#a5b4fc', padding: '8px 10px', borderRadius: 7, overflow: 'auto', lineHeight: 1.5, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{step.code.trim()}</pre>
                       <div style={{ display: 'flex', gap: 5 }}>
                         <button onClick={(e) => { e.stopPropagation(); applyStep(i, step.mode); }}
-                          style={{ flex: 1, padding: '5px 8px', borderRadius: 7, border: 'none', background: 'linear-gradient(135deg,#4361ee,#7c3aed)', color: '#fff', fontSize: 11, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>
-                          {step.mode === 'replace' ? '↺ Remplacer' : step.mode === 'prepend' ? '⬆ Ajouter en début' : '+ Ajouter'}
+                          style={{ flex: 1, padding: '5px 8px', borderRadius: 7, border: 'none', background: 'linear-gradient(135deg,#4361ee,#7c3aed)', color: '#fff', fontSize: 11, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+                          {step.mode === 'replace' ? <><RotateCcw size={11} /> Remplacer</> : step.mode === 'prepend' ? <><ArrowUp size={11} /> Ajouter en début</> : <><Plus size={11} /> Ajouter</>}
                         </button>
-                        {i < TUTORIAL_STEPS.length - 1 && (
+                        {i < tutorialSteps.length - 1 && (
                           <button onClick={(e) => { e.stopPropagation(); setTutorialStep(i + 1); }}
-                            style={{ padding: '5px 8px', borderRadius: 7, border: '1px solid rgba(0,0,0,0.12)', background: 'rgba(255,255,255,0.8)', fontSize: 11, cursor: 'pointer', fontFamily: 'inherit' }}>
-                            Suivant →
+                            style={{ padding: '5px 8px', borderRadius: 7, border: '1px solid rgba(0,0,0,0.12)', background: 'rgba(255,255,255,0.8)', fontSize: 11, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 4 }}>
+                            Suivant <ArrowRight size={11} />
                           </button>
                         )}
                       </div>

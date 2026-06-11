@@ -7,14 +7,14 @@
  * en gérant les timeouts et le parsing JSON tolérant. Exporte l'instance
  * singleton `cs160Bridge`.
  *
- * CS-160 Bridge — KonicaBridge sur http://172.17.50.39:3000
+ * CS-160 Bridge - KonicaBridge sur http://172.17.50.39:3000
  *
  * Routes réelles (préfixe /api/) :
- *   GET  /api/health    — ping
- *   POST /api/connect   — connexion
+ *   GET  /api/health    - ping
+ *   POST /api/connect   - connexion
  *   POST /api/disconnect
- *   POST /api/measure   — mesure → MesureResult
- *   GET  /api/samples   — données stockées
+ *   POST /api/measure   - mesure → MesureResult
+ *   GET  /api/samples   - données stockées
  */
 
 import { getCs160BaseUrl as getBaseUrl } from '@/lib/settings';
@@ -45,7 +45,7 @@ async function call(path: string, method: 'GET' | 'POST', timeoutMs = 10000): Pr
     if (res.ok) return { success: true, data };
     return { success: false, error: typeof data === 'object' && data?.error ? data.error : `HTTP ${res.status}: ${text}` };
   } catch (err: any) {
-    return { success: false, error: err.name === 'TimeoutError' ? `Timeout (${timeoutMs}ms) — bridge inaccessible ?` : err.message };
+    return { success: false, error: err.name === 'TimeoutError' ? `Timeout (${timeoutMs}ms) - bridge inaccessible ?` : err.message };
   }
 }
 

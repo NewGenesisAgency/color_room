@@ -11,7 +11,7 @@
  * À la différence des autres jeux, ce composant ne reçoit pas {@link GameTileProps}
  * mais des props dédiées : `params` ({@link TetrisParams} : vitesse/difficulté),
  * `isPlaying`, et `onSnapshot` qui pousse l'état courant ({@link TetrisSnapshot})
- * au parent — c'est ce dernier qui projette le plateau sur les dalles physiques.
+ * au parent - c'est ce dernier qui projette le plateau sur les dalles physiques.
  */
 
 import { useEffect, useRef, useState } from 'react';
@@ -30,13 +30,13 @@ const TETRIS_TOUCH: TouchKey[] = [
 
 // ─── Tetrominos (7 pièces standard + 2 bonus) ────────────────────────────────
 const PIECES: { shape: number[][]; color: string }[] = [
-  { color: '#00c8ff', shape: [[1, 1, 1, 1]] },                          // I — cyan
-  { color: '#ffd600', shape: [[1, 1], [1, 1]] },                        // O — jaune
-  { color: '#b829dd', shape: [[0, 1, 0], [1, 1, 1]] },                  // T — violet
-  { color: '#22c55e', shape: [[0, 1, 1], [1, 1, 0]] },                  // S — vert
-  { color: '#ef4444', shape: [[1, 1, 0], [0, 1, 1]] },                  // Z — rouge
-  { color: '#ff8c00', shape: [[1, 0], [1, 0], [1, 1]] },                // L — orange
-  { color: '#4361ee', shape: [[0, 1], [0, 1], [1, 1]] },                // J — bleu
+  { color: '#00c8ff', shape: [[1, 1, 1, 1]] },                          // I - cyan
+  { color: '#ffd600', shape: [[1, 1], [1, 1]] },                        // O - jaune
+  { color: '#b829dd', shape: [[0, 1, 0], [1, 1, 1]] },                  // T - violet
+  { color: '#22c55e', shape: [[0, 1, 1], [1, 1, 0]] },                  // S - vert
+  { color: '#ef4444', shape: [[1, 1, 0], [0, 1, 1]] },                  // Z - rouge
+  { color: '#ff8c00', shape: [[1, 0], [1, 0], [1, 1]] },                // L - orange
+  { color: '#4361ee', shape: [[0, 1], [0, 1], [1, 1]] },                // J - bleu
 ];
 
 const COLS = 6;
@@ -221,7 +221,7 @@ function lockAndClear(s: GS): void {
 /**
  * Composant du mini-jeu Tetris.
  *
- * @param params Paramètres de partie (vitesse, difficulté) — voir {@link TetrisParams}.
+ * @param params Paramètres de partie (vitesse, difficulté) - voir {@link TetrisParams}.
  * @param isPlaying Vrai si la partie doit tourner (boucle de chute active).
  * @param onSnapshot Callback recevant l'état courant ({@link TetrisSnapshot}) à projeter sur les dalles.
  * @returns Le plateau de Tetris et ses contrôles.
@@ -426,7 +426,7 @@ export default function TetrisGame({
                     }} />
                   ))}
                 </div>
-              ) : <div style={{ color: '#334155', fontSize: 11 }}>—</div>}
+              ) : <div style={{ color: '#334155', fontSize: 11 }}>-</div>}
             </div>
           </div>
 
@@ -458,7 +458,7 @@ export default function TetrisGame({
           </div>
         </div>
 
-        {/* Grille — masquée par défaut : on joue sur les dalles de la Color Room */}
+        {/* Grille - masquée par défaut : on joue sur les dalles de la Color Room */}
         {SHOW_SCREEN_BOARD ? (
         <div style={{
           display: 'grid',
@@ -498,7 +498,7 @@ export default function TetrisGame({
           <div style={{ width: COLS * CELL + (COLS - 1) * GAP + 16, minHeight: 240, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, textAlign: 'center', padding: 20, background: '#0f172a', border: '2px solid #1e293b', borderRadius: 12, boxShadow: '0 0 40px rgba(6,214,160,0.08)' }}>
             <div style={{ fontSize: 34 }}>👁️</div>
             <div style={{ fontSize: 16, fontWeight: 900, color: '#e2e8f0' }}>Regarde la Color Room</div>
-            <div style={{ fontSize: 12, color: '#64748b', maxWidth: 200 }}>Le Tetris se joue sur les dalles — utilise les contrôles.</div>
+            <div style={{ fontSize: 12, color: '#64748b', maxWidth: 200 }}>Le Tetris se joue sur les dalles - utilise les contrôles.</div>
           </div>
         )}
 

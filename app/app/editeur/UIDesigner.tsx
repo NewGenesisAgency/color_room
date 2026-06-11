@@ -5,7 +5,7 @@
  *
  * Canevas 860×500 sur lequel on dépose et positionne des composants d'interface
  * (UILayoutComponent) : bouton, texte, score, minuteur, diagramme CIE, sliders
- * RGB, grille de plaques, D-pad, sprites, etc. — les mêmes éléments que /jeux et
+ * RGB, grille de plaques, D-pad, sprites, etc. - les mêmes éléments que /jeux et
  * /mesure. Chaque composant est déplaçable (snap + anti-chevauchement), liable à
  * une variable de jeu (varBind) et peut porter une action (eventId ou code
  * Python `pyOnClick`). La disposition produite est rejouée à l'identique dans
@@ -147,7 +147,7 @@ function defaultText(k: UICompKind) {
 
 function Preview({ c }: { c: UILayoutComponent }) {
   // Le wrapper positionne et dimensionne déjà l'élément ; l'aperçu doit le REMPLIR
-  // (inset:0), pas se repositionner à (x,y) — sinon il se décale de son contour.
+  // (inset:0), pas se repositionner à (x,y) - sinon il se décale de son contour.
   const base: React.CSSProperties = { position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center', boxSizing:'border-box', overflow:'hidden', pointerEvents:'none', userSelect:'none', fontSize: c.fontSize ?? 14, color: c.textColor ?? '#1a1d2e' };
   switch (c.kind) {
     case 'button':        return <div style={{ ...base, background: c.bgColor ?? '#4361ee', color: c.textColor ?? '#fff', borderRadius: 12, fontWeight: 700, boxShadow: '0 4px 14px rgba(67,97,238,0.28)' }}>{c.text || 'Bouton'}</div>;
@@ -284,7 +284,7 @@ export default function UIDesigner({ components, onChange, gameVariables = [] }:
           <button key={p.kind} onClick={() => add(p)}
             draggable
             onDragStart={e => { e.dataTransfer.setData('text/cr-ui-kind', p.kind); e.dataTransfer.effectAllowed = 'copy'; }}
-            title={`Glisser sur le canevas, ou cliquer pour ajouter — ${p.label}`}
+            title={`Glisser sur le canevas, ou cliquer pour ajouter - ${p.label}`}
             onMouseEnter={e => { e.currentTarget.style.borderColor = `${p.color}66`; e.currentTarget.style.background = `${p.color}0d`; e.currentTarget.style.transform = 'translateX(2px)'; }}
             onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(0,0,0,0.08)'; e.currentTarget.style.background = 'rgba(255,255,255,0.85)'; e.currentTarget.style.transform = 'none'; }}
             style={{ padding:'7px 8px', borderRadius:11, border:'1px solid rgba(0,0,0,0.08)', background:'rgba(255,255,255,0.85)', cursor:'grab', textAlign:'left', fontSize:12, fontWeight:600, fontFamily:'inherit', color:'#3a3f4b', display:'flex', alignItems:'center', gap:8, transition:'all 130ms' }}>

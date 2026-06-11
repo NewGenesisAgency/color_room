@@ -2,7 +2,7 @@
 // fonctionnement 100 % HORS-LIGNE (le Pi n'a internet qu'au build).
 // Exécuté pendant le build Docker (qui a internet). Best-effort : si le
 // téléchargement échoue (pas de réseau en dev local), on n'interrompt pas le
-// build — l'app retombera alors sur le CDN au runtime.
+// build - l'app retombera alors sur le CDN au runtime.
 import { mkdir, writeFile, stat } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';

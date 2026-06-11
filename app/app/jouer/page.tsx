@@ -21,7 +21,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
  * Le joueur rejoint la session active, reçoit un numéro de siège (= sa plaque)
  * et choisit une couleur ; celle-ci est envoyée en temps réel et s'allume sur
  * SA plaque dans la Color Room. La couleur RGB est encodée dans la valeur
- * entière soumise (0xRRGGBB) — aucun changement de schéma serveur requis.
+ * entière soumise (0xRRGGBB) - aucun changement de schéma serveur requis.
  */
 
 /**

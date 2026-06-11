@@ -21,7 +21,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 const COLS = 6;
 const ROWS = 7;
-// Couleurs classiques Puissance 4 — identiques à celles affichées sur les dalles.
+// Couleurs classiques Puissance 4 - identiques à celles affichées sur les dalles.
 const COLOR_R = '#ff1818';   // rouge
 const COLOR_J = '#ffc400';   // jaune
 

@@ -141,7 +141,7 @@ export function verifierGraphe(nodes: NoeudVerifiable[], edges: CableVerifiable[
       } else if (!atteignables.has(n.id) && !(LOGIC_OP_KINDS.has(n.kind) && aLienData.has(n.id))) {
         // Règle b : relié, mais aucun évènement ne mène jusqu'à lui.
         // Exception : un bloc calcul/logique relié par un FIL DE VALEUR est
-        // évalué à la demande — il n'a pas besoin d'être déclenché par un évènement.
+        // évalué à la demande - il n'a pas besoin d'être déclenché par un évènement.
         problemes.push({
           nodeId: n.id,
           niveau: 'avertissement',

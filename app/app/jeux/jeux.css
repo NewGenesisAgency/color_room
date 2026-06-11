@@ -482,7 +482,7 @@
 }
 .jeux .login-alt-link:hover::before { opacity: 1; }
 
-/* Partie gauche — question */
+/* Partie gauche - question */
 .jeux .login-alt-q {
   flex: 1;
   padding: 13px 16px;
@@ -511,7 +511,7 @@
   background: linear-gradient(to bottom, transparent, rgba(67,97,238,0.6), transparent);
 }
 
-/* Partie droite — CTA */
+/* Partie droite - CTA */
 .jeux .login-alt-cta {
   padding: 13px 18px;
   font-size: 13px;

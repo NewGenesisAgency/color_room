@@ -25,7 +25,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState, useMemo } from 'react';
-import { Palette, CheckCircle2, Crown, Trophy, RotateCcw, LogOut } from 'lucide-react';
+import { Palette, CheckCircle2, Crown, Trophy, RotateCcw, LogOut, AlertTriangle } from 'lucide-react';
 import QrCode from '@/app/_components/QrCode';
 
 // ── Types (miroir de lib/spectre.ts) ────────────────────────────────────────
@@ -195,7 +195,7 @@ function rgbToChannels32(r: number, g: number, b: number, intensity: number): nu
     ch[31] = Math.round(wv * 0.45);
   }
 
-  // Canaux rouges (10-14) — ch[11] = 642nm primaire
+  // Canaux rouges (10-14) - ch[11] = 642nm primaire
   if (Ro > 0) {
     const rv = v(Ro);
     ch[11] = Math.max(ch[11], rv);
@@ -205,14 +205,14 @@ function rgbToChannels32(r: number, g: number, b: number, intensity: number): nu
     ch[14] = Math.max(ch[14], Math.round(rv * 0.55));
   }
 
-  // Canaux verts (5-6) — ch[5] = 513nm primaire
+  // Canaux verts (5-6) - ch[5] = 513nm primaire
   if (Go > 0) {
     const gv = v(Go);
     ch[5] = Math.max(ch[5], gv);
     ch[6] = Math.max(ch[6], Math.round(gv * 0.75));
   }
 
-  // Canaux bleus / violets (0-4) — ch[4] = 479nm primaire (cyan-bleu)
+  // Canaux bleus / violets (0-4) - ch[4] = 479nm primaire (cyan-bleu)
   if (Bc > 0) {
     const bv = v(Bc);
     ch[4] = Math.max(ch[4], bv);
@@ -222,7 +222,7 @@ function rgbToChannels32(r: number, g: number, b: number, intensity: number): nu
     ch[0] = Math.max(ch[0], Math.round(bv * 0.40));
   }
 
-  // Canaux jaune / orange (7-9, 18-19) — ch[7] = 541nm primaire
+  // Canaux jaune / orange (7-9, 18-19) - ch[7] = 541nm primaire
   if (Y > 0) {
     const yv = v(Y);
     ch[7]  = Math.max(ch[7],  yv);
@@ -246,7 +246,7 @@ function rgbToChannels32(r: number, g: number, b: number, intensity: number): nu
  * @param intensity Intensité globale en pourcentage (défaut 85).
  */
 async function sendColorToAllPlates(r: number, g: number, b: number, intensity = 85) {
-  // PLATE_TYPE identifie les dalles bleues — on reméppe les canaux pour chaque type
+  // PLATE_TYPE identifie les dalles bleues - on reméppe les canaux pour chaque type
   const { PLATE_TYPE, remapChannels32 } = await import('@/lib/tileChannels');
   const chRouge = rgbToChannels32(r, g, b, intensity);
   const chBleu  = remapChannels32(chRouge, 'rouge', 'bleu');
@@ -505,7 +505,7 @@ export function SpectreGame({ embedded = false, initialJoinCode, onExit }: Spect
         body: JSON.stringify({ name: nameInput.trim(), maxRounds: maxRoundsInput }),
       });
       const data = await res.json();
-      if (!data.ok || !data.token) { setError(data.error ?? 'Création impossible — réessayez'); return; }
+      if (!data.ok || !data.token) { setError(data.error ?? 'Création impossible - réessayez'); return; }
       setToken(data.token);
       setSeat(data.seat);
       setSessionId(data.sessionId);
@@ -631,7 +631,7 @@ export function SpectreGame({ embedded = false, initialJoinCode, onExit }: Spect
                   style={{ flex: 1, padding: '10px 14px', borderRadius: 10, border: '1px solid rgba(0,0,0,0.15)', background: '#fff', color: '#1a1a2e', fontSize: 15, outline: 'none' }} />
               </div>
             )}
-            {error && <p style={{ color: '#ff6b6b', fontSize: 13, margin: 0 }}>⚠ {error}</p>}
+            {error && <p style={{ color: '#ff6b6b', fontSize: 13, margin: 0, display: 'flex', alignItems: 'center', gap: 6 }}><AlertTriangle size={14} /> {error}</p>}
             <button onClick={loginMode === 'create' ? handleCreate : handleJoin} disabled={loading}
               style={{ padding: '16px', borderRadius: 14, border: 'none', cursor: loading ? 'not-allowed' : 'pointer', fontWeight: 800, fontSize: 16, background: 'linear-gradient(135deg,#667eea,#764ba2)', color: '#fff', opacity: loading ? 0.7 : 1, transition: 'all 0.2s' }}>
               {loading ? '…' : loginMode === 'create' ? 'Créer la salle' : 'Rejoindre'}
@@ -746,7 +746,7 @@ export function SpectreGame({ embedded = false, initialJoinCode, onExit }: Spect
   }
 
   // ───────────────────────────────────────────────────────────────────────────
-  // GUESS — Diagramme chromatique CIE 1931
+  // GUESS - Diagramme chromatique CIE 1931
   // ───────────────────────────────────────────────────────────────────────────
   if (gameState.phase === 'guess') {
     const myCss = rgb(myRgb.r, myRgb.g, myRgb.b);
@@ -827,7 +827,7 @@ export function SpectreGame({ embedded = false, initialJoinCode, onExit }: Spect
         {/* Submit / waiting */}
         {submitted ? (
           <div style={{ width: '100%', maxWidth: 540, textAlign: 'center', padding: '14px', borderRadius: 14, background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.3)', color: '#22c55e', fontWeight: 700, fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, boxSizing: 'border-box' }}>
-            <CheckCircle2 size={18} /> Réponse soumise — en attente des autres joueurs…
+            <CheckCircle2 size={18} /> Réponse soumise - en attente des autres joueurs…
           </div>
         ) : (
           <div style={{ width: '100%', maxWidth: 540, textAlign: 'center', color: 'rgba(0,0,0,0.5)', fontSize: 13, boxSizing: 'border-box' }}>
@@ -914,7 +914,7 @@ export function SpectreGame({ embedded = false, initialJoinCode, onExit }: Spect
   }
 
   // ────────────────────────────────────────────────────────────────────────────
-  // FINISHED — Classement final
+  // FINISHED - Classement final
   // ────────────────────────────────────────────────────────────────────────────
   if (gameState.phase === 'finished' || sessionStatus === 'finished') {
     const winner = sortedPlayers[0];

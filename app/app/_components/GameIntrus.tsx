@@ -5,7 +5,7 @@
  * @brief Mini-jeu "L'Intrus" mode sniper : repérer au CS-160 la dalle légèrement différente.
  *
  * Toutes les dalles s'allument dans une couleur identique sauf une, à peine
- * différente (luminosité ou teinte) — indétectable à l'œil et à l'écran (où tout
+ * différente (luminosité ou teinte) - indétectable à l'œil et à l'écran (où tout
  * est affiché identique). Le joueur sélectionne une dalle, l'analyse avec le
  * colorimètre CS-160 (lecture x, y, Lv via l'API /api/cs160), compare les écarts
  * de mesure entre dalles, puis accuse l'intrus. Course contre la montre : à chaque
@@ -18,7 +18,7 @@ import { Crosshair, Ruler, Target, Timer, Trophy, X } from 'lucide-react';
 import type { GameTileProps } from './GameColorSpeed';
 import { DIFF_LABELS, type DifficultyLevel } from './GameColorSpeed';
 
-// ── L'Intrus — mode "Sniper" de précision ─────────────────────────────────────
+// ── L'Intrus - mode "Sniper" de précision ─────────────────────────────────────
 // Toutes les dalles s'allument dans une couleur identique sauf UNE, légèrement
 // différente (teinte ou luminosité), presque invisible à l'œil. Le joueur vise
 // chaque dalle avec le CS-160, lit la mesure, et désigne l'intrus. Course contre
@@ -123,7 +123,7 @@ export default function GameIntrus({ onSendColor, onTurnOff, onTurnOffAll, onQui
     setReadings({});
     setReveal(false);
     setMsg('Visez une dalle avec le CS-160 puis analysez-la.');
-    // Toutes les 42 dalles sont utilisées (concept de l'intrus = 1 dalle sur N) — intensité 95 pour meilleure visibilité
+    // Toutes les 42 dalles sont utilisées (concept de l'intrus = 1 dalle sur N) - intensité 95 pour meilleure visibilité
     for (let i = 0; i < numTiles; i++) onSendColor(i, next[i].r, next[i].g, next[i].b, 95);
   }, [numTiles, onSendColor]);
 
@@ -165,12 +165,12 @@ export default function GameIntrus({ onSendColor, onTurnOff, onTurnOffAll, onQui
       } else if (data?.error) detail = String(data.error);
     } catch { /* appareil indisponible */ }
     if (!reading) {
-      setMsg(`CS-160 indisponible${detail ? ` (${detail})` : ''} — pointez l'appareil sur une dalle et réessayez.`);
+      setMsg(`CS-160 indisponible${detail ? ` (${detail})` : ''} - pointez l'appareil sur une dalle et réessayez.`);
       setMeasuring(false);
       return;
     }
     setReadings((r) => ({ ...r, [selected]: reading! }));
-    setMsg(`Dalle ${selected + 1} analysée — Lv=${reading.Lv.toFixed(1)} · x=${reading.x.toFixed(4)} y=${reading.y.toFixed(4)}`);
+    setMsg(`Dalle ${selected + 1} analysée - Lv=${reading.Lv.toFixed(1)} · x=${reading.x.toFixed(4)} y=${reading.y.toFixed(4)}`);
     setMeasuring(false);
   }
 
@@ -215,7 +215,7 @@ export default function GameIntrus({ onSendColor, onTurnOff, onTurnOffAll, onQui
       <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start', padding: '20px 22px' }}>
         <div style={{ flex: 1 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 18, fontWeight: 900, marginBottom: 8 }}>
-            <Crosshair size={20} color="#06d6a0" /> L&apos;Intrus — Mode Sniper
+            <Crosshair size={20} color="#06d6a0" /> L&apos;Intrus - Mode Sniper
             {difficulty !== 'moyen' && (
               <span style={{ display:'inline-flex', alignItems:'center', gap:4, padding:'2px 10px', borderRadius:20, fontSize:11, fontWeight:800, background:`${DIFF_LABELS[difficulty].color}22`, color:DIFF_LABELS[difficulty].color, border:`1px solid ${DIFF_LABELS[difficulty].color}44` }}>
                 {DIFF_LABELS[difficulty].emoji} {DIFF_LABELS[difficulty].label}

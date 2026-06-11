@@ -171,7 +171,7 @@ export default function CieMeasureWidget({
         const pts = Math.round(points * Math.max(0, 1 - dE / 100));
         setBest((b) => (b === null ? pts : Math.max(b, pts)));
       } else {
-        setError('CS-160 non connecté — pointez l\'appareil et réessayez.');
+        setError('CS-160 non connecté - pointez l\'appareil et réessayez.');
       }
     } catch {
       setError('Erreur de communication avec le CS-160');
@@ -220,13 +220,13 @@ export default function CieMeasureWidget({
         <div style={cell}>
           <div style={cellLabel}>Mesure x,y</div>
           <div style={{ fontFamily: 'monospace', fontSize: 12, fontWeight: 700, color: measured ? '#e8eaf0' : 'rgba(255,255,255,.2)' }}>
-            {measured ? `${measured.x.toFixed(3)}, ${measured.y.toFixed(3)}` : '—, —'}
+            {measured ? `${measured.x.toFixed(3)}, ${measured.y.toFixed(3)}` : '-, -'}
           </div>
         </div>
         <div style={{ ...cell, background: dE === null ? 'rgba(255,255,255,.05)' : success ? 'rgba(6,214,160,.12)' : 'rgba(239,68,68,.1)', borderColor: dE === null ? 'rgba(255,255,255,.08)' : success ? 'rgba(6,214,160,.3)' : 'rgba(239,68,68,.3)' }}>
           <div style={cellLabel}>ΔE</div>
           <div style={{ fontSize: 16, fontWeight: 900, color: dE === null ? 'rgba(255,255,255,.2)' : success ? '#06d6a0' : '#ef4444' }}>
-            {dE === null ? '—' : dE.toFixed(1)}
+            {dE === null ? '-' : dE.toFixed(1)}
           </div>
         </div>
       </div>

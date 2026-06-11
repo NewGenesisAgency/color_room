@@ -164,7 +164,7 @@ export default function GameLibreRGB({ onSendColor, onTurnOffAll, onQuit }: Game
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ fontSize: 15, fontWeight: 900, color: '#e8eaf0', letterSpacing: '-0.01em' }}>
-            Mode Libre — Couleur RGB
+            Mode Libre - Couleur RGB
           </div>
           <button
             onClick={() => { onTurnOffAll(); onQuit?.(); }}

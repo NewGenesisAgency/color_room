@@ -362,7 +362,7 @@ export default function ChromaticityDiagram({ onSendColor, onTurnOffAll, onQuit,
       if (data.success && data.data?.lvxy) { const { x, y } = data.data.lvxy; if (Number.isFinite(x) && Number.isFinite(y)) m = { x, y }; }
     } catch { /* appareil absent */ }
     setMeasuring(false);
-    if (!m) { setMeasureMsg('CS-160 non connecté — pointez l\'appareil sur une dalle de la salle gauche, puis réessayez.'); return; }
+    if (!m) { setMeasureMsg('CS-160 non connecté - pointez l\'appareil sur une dalle de la salle gauche, puis réessayez.'); return; }
     setMeasureMsg('');
     scoreAt(m.x, m.y);
   }

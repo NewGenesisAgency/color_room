@@ -7,7 +7,7 @@
 }
 
 /* ============================================================
-   ColorRoom /aide — Design system (mirrors /jeux)
+   ColorRoom /aide - Design system (mirrors /jeux)
    ============================================================ */
 
 .aide {
@@ -16,7 +16,7 @@
   --bg-2:       #ffffff;
   --bg-3:       #eef1f8;
 
-  /* Surfaces — liquid glass */
+  /* Surfaces - liquid glass */
   --surface:    rgba(255,255,255,0.72);
   --surface-2:  rgba(255,255,255,0.86);
   --surface-3:  rgba(255,255,255,0.96);
@@ -157,7 +157,7 @@
     0 4px 24px rgba(0,0,0,0.07),
     0 1px 4px rgba(0,0,0,0.04);
 
-  /* Hidden by default — JS adds .visible */
+  /* Hidden by default - JS adds .visible */
   opacity: 0;
   transform: translateY(12px);
   filter: blur(3px);

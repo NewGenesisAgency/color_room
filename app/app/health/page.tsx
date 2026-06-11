@@ -10,7 +10,7 @@
  *    Supervision (plaques LED) et de l'API CS-160 (colorimètre), avec latence
  *    et statut HTTP.
  *  - Test des plaques : balayage séquentiel des 42 plaques (1 → 42) pour
- *    vérifier câblage et numérotation, plus « tout allumer / tout éteindre » —
+ *    vérifier câblage et numérotation, plus « tout allumer / tout éteindre » -
  *    via /api/supervision/batch.
  *  - Contrôle des canaux : 32 sliders (regroupés par bande spectrale) qui
  *    pilotent une plaque (ou toutes) avec envoi auto debouncé (200 ms).
@@ -285,20 +285,20 @@ export default function HealthPage() {
           </div>
 
           <StatusRow icon={Server} label="Serveur web (Next.js)" ok={health?.serverOk ?? null}
-            detail={health ? (health.serverOk ? 'En ligne' : 'Injoignable') : '—'} />
+            detail={health ? (health.serverOk ? 'En ligne' : 'Injoignable') : '-'} />
           <StatusRow icon={Lightbulb} label="API Supervision (plaques LED)" ok={health?.supervision?.reachable ?? null}
             detail={health?.supervision
               ? (health.supervision.reachable
                 ? `Joignable · HTTP ${health.supervision.httpStatus ?? '?'} · ${health.supervision.ms} ms`
                 : `Injoignable · ${health.supervision.error ?? 'erreur'} · ${health.supervision.ms} ms`)
-              : '—'}
+              : '-'}
             sub={health?.supervision?.url} />
           <StatusRow icon={Cpu} label="API CS-160 (colorimètre)" ok={health?.cs160?.reachable ?? null}
             detail={health?.cs160
               ? (health.cs160.reachable
                 ? `Joignable · HTTP ${health.cs160.httpStatus ?? '?'} · ${health.cs160.ms} ms`
                 : `Injoignable · ${health.cs160.error ?? 'erreur'} · ${health.cs160.ms} ms`)
-              : '—'}
+              : '-'}
             sub={health?.cs160?.url} last />
 
           {health && (
@@ -306,7 +306,7 @@ export default function HealthPage() {
               background: health.allReachable ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.08)',
               border: `1px solid ${health.allReachable ? 'rgba(34,197,94,0.35)' : 'rgba(239,68,68,0.3)'}`,
               color: health.allReachable ? '#16a34a' : '#ef4444' }}>
-              {health.allReachable ? 'Tout est connecté ✓' : 'Une ou plusieurs APIs sont injoignables — vérifiez les adresses dans Configuration et le réseau.'}
+              {health.allReachable ? 'Tout est connecté ✓' : 'Une ou plusieurs APIs sont injoignables - vérifiez les adresses dans Configuration et le réseau.'}
               <span style={{ display: 'block', fontWeight: 500, fontSize: 11, opacity: 0.7, marginTop: 2 }}>
                 Dernier test : {new Date(health.checkedAt).toLocaleTimeString()}
               </span>

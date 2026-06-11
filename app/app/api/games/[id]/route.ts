@@ -3,7 +3,7 @@
  * @brief Lecture, mise à jour et suppression d'un jeu ciblé par son id.
  *
  * GET    : renvoie le jeu d'id donné -> { ok, game } ; 404 s'il n'existe pas.
- * PATCH  : met à jour partiellement le jeu (name, kind, config — champs omis
+ * PATCH  : met à jour partiellement le jeu (name, kind, config - champs omis
  *          conservés). 400 si name/kind résultant vide ; 404 si introuvable ;
  *          500 si la relecture échoue. Renvoie { ok, game }.
  * DELETE : supprime le jeu -> { ok, game } (champs vidés) ; 404 si rien supprimé.

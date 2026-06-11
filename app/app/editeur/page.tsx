@@ -8,7 +8,7 @@
  * games (interface inspirée d'Unreal). Vue d'ensemble des grandes sections :
  *
  *  - IMPORTS & MODULES LAZY : chargement dynamique (ssr:false) des modules
- *    lourds — vue 3D (Room3D / Three.js), aperçu Tetris, éditeur Python
+ *    lourds - vue 3D (Room3D / Three.js), aperçu Tetris, éditeur Python
  *    (PythonEditor / Pyodide), designer d'interface (UIDesigner) et panneau de
  *    mesure CS-160 (CS160Panel).
  *  - TYPES & MODÈLES : fabrique d'identifiants, état des dalles, et surtout la
@@ -53,7 +53,7 @@ const CS160Panel = dynamic(() => import('@/app/_components/CS160Panel'), { ssr: 
 const PythonEditor = dynamic(() => import('./PythonEditor'), { ssr: false });
 const UIDesigner = dynamic(() => import('./UIDesigner'), { ssr: false });
 
-import { Boxes, Gamepad2, Plus, Play, Pause, RotateCcw, Save, Trash2, FolderPlus, X, Lightbulb, Layers, Zap, Palette, Clock, MousePointer2, LayoutGrid, Maximize2, Minimize2, Eye, EyeOff, Frame, Star, Heart, Sun, Moon, Flame, Snowflake, Music, Target, Puzzle, Sparkles, Trophy, Rocket, Ghost, Dice1, Brain, Check, GitBranch, Hash, Settings2, Shuffle, Search, Users, Film, Thermometer, ScanLine, Wifi, WifiOff, Crown, Gem, Bug, Bot, Atom, Bird, Cat, Dog, Fish, Leaf, Cloud, Droplet, Mountain, Anchor, Bell, Bomb, Camera, Egg, Feather, Gift, Hexagon, Key, Lock, Medal, Pizza, Plane, Rainbow, Skull, Smile, Wand2, Waves, Crosshair, Dice5, Joystick, FlaskConical, Swords, ChevronDown, GraduationCap, SlidersHorizontal, RefreshCw, Copy, Scissors, FileCode, type LucideIcon } from 'lucide-react';
+import { Boxes, Gamepad2, Plus, Play, Pause, RotateCcw, Save, Trash2, FolderPlus, X, Lightbulb, Layers, Zap, Palette, Clock, MousePointer2, LayoutGrid, Maximize2, Minimize2, Eye, EyeOff, Frame, Star, Heart, Sun, Moon, Flame, Snowflake, Music, Target, Puzzle, Sparkles, Trophy, Rocket, Ghost, Dice1, Brain, Check, GitBranch, Hash, Settings2, Shuffle, Search, Users, Film, Thermometer, ScanLine, Wifi, WifiOff, Crown, Gem, Bug, Bot, Atom, Bird, Cat, Dog, Fish, Leaf, Cloud, Droplet, Mountain, Anchor, Bell, Bomb, Camera, Egg, Feather, Gift, Hexagon, Key, Lock, Medal, Pizza, Plane, Rainbow, Skull, Smile, Wand2, Waves, Crosshair, Dice5, Joystick, FlaskConical, Swords, ChevronDown, GraduationCap, SlidersHorizontal, RefreshCw, Copy, Scissors, FileCode, AlertTriangle, Laptop, type LucideIcon } from 'lucide-react';
 
 type IdFactory = () => string;
 
@@ -340,6 +340,8 @@ type GameDoc = {
   edges: GraphEdge[];
   uiComponents?: GameUIComponent[];
   pythonCode?: string;
+  /** Langage de l'onglet code (défaut python) - partagé avec PythonEditor. */
+  scriptLanguage?: 'python' | 'js';
   uiLayout?: UILayoutComponent[];
   comments?: GameComment[];
 };
@@ -394,7 +396,7 @@ type NodeCatalogItem = {
 const NODE_CATALOG: NodeCatalogItem[] = [
   { kind: 'event_begin', category: 'Évènements', title: 'Évènement', defaults: {} },
   { kind: 'wait', category: 'Flux', title: 'Attendre', defaults: { seconds: 1 } },
-  { kind: 'script_python', category: 'Script', title: 'Script Python', defaults: { code: 'import colorroom as cr\n# cr.fill(255, 80, 0, 0.8)\n# cr.add_score(10)\n' } },
+  { kind: 'script_python', category: 'Script', title: 'Script Python / JS', defaults: { language: 'python', code: 'import colorroom as cr\n# cr.fill(255, 80, 0, 0.8)\n# cr.add_score(10)\n' } },
   { kind: 'sequence', category: 'Flux', title: 'Séquence', defaults: {} },
   { kind: 'while', category: 'Flux', title: 'Tant que', defaults: {} },
   { kind: 'if', category: 'Flux', title: 'Si', defaults: {} },
@@ -1280,6 +1282,61 @@ export default function EditeurPage() {
   >({});
   const measurePinsRef = useRef<(() => void) | null>(null);
 
+  // ── Animations des câbles : naissance (connexion), fantôme (déconnexion),
+  //    ondes de choc (ripples) au point d'impact ─────────────────────────────
+  const [bornEdgeIds, setBornEdgeIds] = useState<Set<string>>(new Set());
+  const [wireRipples, setWireRipples] = useState<Array<{ id: string; x: number; y: number; tone: 'link' | 'cut' }>>([]);
+  const [dyingWires, setDyingWires] = useState<Array<{ id: string; d: string; data?: boolean }>>([]);
+
+  /** Déclenche l'animation de naissance d'un câble + onde au point d'arrivée. */
+  const animerNaissanceCable = (edgeId: string, x?: number, y?: number, tone: 'link' | 'cut' = 'link') => {
+    setBornEdgeIds((s) => { const n = new Set(s); n.add(edgeId); return n; });
+    window.setTimeout(() => setBornEdgeIds((s) => { const n = new Set(s); n.delete(edgeId); return n; }), 950);
+    if (x !== undefined && y !== undefined) animerOnde(x, y, tone);
+  };
+
+  /** Onde de choc circulaire (double anneau) au point (x, y) du graphe. */
+  const animerOnde = (x: number, y: number, tone: 'link' | 'cut' = 'link') => {
+    const rid = `r_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
+    setWireRipples((r) => [...r, { id: rid, x, y, tone }]);
+    window.setTimeout(() => setWireRipples((r) => r.filter((p) => p.id !== rid)), 800);
+  };
+
+  /** Calcule le chemin Bézier d'un câble (pour figer un fantôme à la suppression). */
+  const cheminCable = (e: GraphEdge): string | null => {
+    const g = editorRef.current.games.find((gg) => gg.id === editorRef.current.activeGameId);
+    const from = g?.nodes.find((n) => n.id === e.from);
+    const to = g?.nodes.find((n) => n.id === e.to);
+    if (!from || !to) return null;
+    if (e.kind === 'data') {
+      const p1 = dataPinPositions[e.from]?.out;
+      const p2 = dataPinPositions[e.to]?.[e.toPort ?? 'a'];
+      const x1 = p1 ? p1.x : from.pos.x + 280, y1 = p1 ? p1.y : from.pos.y + 70;
+      const x2 = p2 ? p2.x : to.pos.x, y2 = p2 ? p2.y : to.pos.y + 70;
+      const dx = Math.max(40, Math.min(180, Math.abs(x2 - x1) * 0.5));
+      return `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`;
+    }
+    const p1 = pinPositions[e.from]?.out;
+    const p2 = pinPositions[e.to]?.in;
+    const x1 = p1 ? p1.x : from.pos.x + 280, y1 = p1 ? p1.y : from.pos.y + 104;
+    const x2 = p2 ? p2.x : to.pos.x, y2 = p2 ? p2.y : to.pos.y + 104;
+    const dx = Math.max(60, Math.min(220, (x2 - x1) * 0.5));
+    return `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`;
+  };
+
+  /** Fige un fantôme du câble qui se dissout (animation de déconnexion). */
+  const animerMortCable = (e: GraphEdge) => {
+    const d = cheminCable(e);
+    if (!d) return;
+    const ghostId = `ghost_${e.id}_${Date.now().toString(36)}`;
+    setDyingWires((w) => [...w, { id: ghostId, d, data: e.kind === 'data' }]);
+    window.setTimeout(() => setDyingWires((w) => w.filter((x) => x.id !== ghostId)), 520);
+    // Onde rouge au milieu du câble supprimé
+    const p1 = e.kind === 'data' ? dataPinPositions[e.from]?.out : pinPositions[e.from]?.out;
+    const p2 = e.kind === 'data' ? dataPinPositions[e.to]?.[e.toPort ?? 'a'] : pinPositions[e.to]?.in;
+    if (p1 && p2) animerOnde((p1.x + p2.x) / 2, (p1.y + p2.y) / 2, 'cut');
+  };
+
   const [graphPanning, setGraphPanning] = useState<{ active: boolean; x: number; y: number }>({
     active: false,
     x: 0,
@@ -1299,7 +1356,7 @@ export default function EditeurPage() {
   const [tourOpen, setTourOpen] = useState(false); // tuto en coachmarks ancrés (blocs + designer)
 
   // Tuto de bienvenue au TOUT PREMIER passage dans l'éditeur (pas seulement à la
-  // création d'un jeu). Relançable ensuite via le bouton 🎓.
+  // création d'un jeu). Relançable ensuite via le bouton tuto (chapeau).
   useEffect(() => {
     try {
       if (!window.localStorage.getItem('crg_editor_tour_seen')) {
@@ -1610,24 +1667,33 @@ export default function EditeurPage() {
     const g0 = editorRef.current.games.find((g) => g.id === activeGameId);
     const target = g0?.nodes.find((n) => n.id === to);
     // Règle Unreal : un ÉVÈNEMENT est une SOURCE (point d'entrée). On ne peut donc
-    // jamais le brancher en entrée — et surtout pas connecter 2 events ensemble.
+    // jamais le brancher en entrée - et surtout pas connecter 2 events ensemble.
     if (isEventKind(target?.kind)) {
-      setStatus('⚡ Un évènement est un point de départ : on ne peut pas le brancher en entrée.');
+      setStatus('Un évènement est un point de départ : on ne peut pas le brancher en entrée.');
       return;
     }
+    const newId = `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
+    let created = false;
     commit((cur) => {
       const nextGames = cur.games.map((g) => {
         if (g.id !== cur.activeGameId) return g;
         if (g.edges.some((e) => e.from === from && e.to === to && estExec(e))) return g;
-        const id = `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
-        return { ...g, edges: [...g.edges, { id, from, to }] };
+        created = true;
+        return { ...g, edges: [...g.edges, { id: newId, from, to }] };
       });
       return { ...cur, games: nextGames };
     });
+    if (created) {
+      const p2 = pinPositions[to]?.in;
+      animerNaissanceCable(newId, p2?.x, p2?.y);
+    }
   };
 
   const removeEdgeById = (edgeId: string) => {
     if (!activeGameId) return;
+    const g = editorRef.current.games.find((gg) => gg.id === activeGameId);
+    const edge = g?.edges.find((e) => e.id === edgeId);
+    if (edge) animerMortCable(edge);
     commit((cur) => ({
       ...cur,
       games: cur.games.map((g) => g.id === cur.activeGameId ? { ...g, edges: g.edges.filter((e) => e.id !== edgeId) } : g),
@@ -1643,6 +1709,9 @@ export default function EditeurPage() {
    */
   const removeDataEdgeById = (edgeId: string) => {
     if (!activeGameId) return;
+    const g = editorRef.current.games.find((gg) => gg.id === activeGameId);
+    const edge = g?.edges.find((e) => e.id === edgeId);
+    if (edge) animerMortCable(edge);
     commit((cur) => ({
       ...cur,
       games: cur.games.map((g) => g.id === cur.activeGameId ? { ...g, edges: g.edges.filter((e) => e.id !== edgeId) } : g),
@@ -1701,6 +1770,8 @@ export default function EditeurPage() {
         };
       }),
     }));
+    const pTo = dataPinPositions[toNodeId]?.[toPort];
+    animerNaissanceCable(edgeId, pTo?.x, pTo?.y);
     setStatus(`Fil de valeur créé : ${outName} → ${toPort}`);
   };
 
@@ -2040,7 +2111,7 @@ export default function EditeurPage() {
         gardeExec.declenche = true;
         abort.abort();
         setIsPlaying(false);
-        setStatus('⚠ Trop d\'exécutions par seconde — boucle probable. Aperçu arrêté.');
+        setStatus('⚠ Trop d\'exécutions par seconde - boucle probable. Aperçu arrêté.');
         return true;
       }
       return false;
@@ -2451,7 +2522,7 @@ export default function EditeurPage() {
           while (wBody && wVar && evalW() && wGuard < 1000) { executeNodeSync(wBody, depth + 1); wGuard++; }
           // Protection déclenchée : la condition est toujours vraie après 1000 tours.
           if (wGuard >= 1000 && evalW()) {
-            setStatus('⚠ Boucle infinie détectée dans "Tant que" — vérifie ta condition');
+            setStatus('⚠ Boucle infinie détectée dans "Tant que" - vérifie ta condition');
             centrerSurNoeudRef.current(nodeId);
           }
           break;
@@ -2612,7 +2683,7 @@ export default function EditeurPage() {
             }
             // Protection frMax déclenchée : la boucle n'a pas atteint sa borne de fin.
             if (frIter > frMax && !signal.aborted) {
-              setStatus('⚠ Boucle infinie détectée dans "Pour i = N à M" — vérifie début/fin/pas');
+              setStatus('⚠ Boucle infinie détectée dans "Pour i = N à M" - vérifie début/fin/pas');
               centrerSurNoeudRef.current(nodeId);
             }
             const frOut = game.edges.filter(e=>e.from===nodeId && estExec(e));
@@ -2645,31 +2716,43 @@ export default function EditeurPage() {
             break;
           }
           case 'script_python': {
-            // Exécute le code Python du bloc (Pyodide, hors-ligne) avec l'API
-            // colorroom branchée sur le pont de l'aperçu, puis continue le flux.
+            // Exécute le code du bloc (Python via Pyodide OU JavaScript natif,
+            // selon params.language) avec la même API colorroom/cr, puis continue.
             const code = String(node.params.code ?? '');
+            const lang = String(node.params.language ?? 'python');
             if (code.trim()) {
-              try {
-                const py = await getPyodide() as any;
-                const b = pyBridge;
-                py.registerJsModule('colorroom', {
-                  send_color: b.sendColor,
-                  set_tile: b.setTile,
-                  fill: (r: number, g: number, bl: number, intensity = 0.85) => { for (let i = 1; i <= 42; i++) b.sendColor(i, r, g, bl, intensity); },
-                  flush: b.flush,
-                  set_variable: b.setVariable,
-                  get_variable: b.getVariable,
-                  add_score: b.addScore,
-                  get_score: b.getScore,
-                  emit_event: b.emitEvent,
-                  play_sound: (s: string) => playSfx(String(s)),
-                  vibrate: (ms: number) => vibrate(Math.max(10, Math.round(Number(ms) || 200))),
-                  log: (m: unknown) => console.log('[py]', m),
-                  tile_count: 42,
-                });
-                await py.runPythonAsync(code);
-                b.flush();
-              } catch (e) { console.warn('[script_python] erreur', e); }
+              const b = pyBridge;
+              const api = {
+                send_color: b.sendColor,
+                set_tile: b.setTile,
+                fill: (r: number, g: number, bl: number, intensity = 0.85) => { for (let i = 1; i <= 42; i++) b.sendColor(i, r, g, bl, intensity); },
+                flush: b.flush,
+                set_variable: b.setVariable,
+                get_variable: b.getVariable,
+                add_score: b.addScore,
+                get_score: b.getScore,
+                emit_event: b.emitEvent,
+                play_sound: (s: string) => playSfx(String(s)),
+                vibrate: (ms: number) => vibrate(Math.max(10, Math.round(Number(ms) || 200))),
+                log: (m: unknown) => console.log(lang === 'js' ? '[js]' : '[py]', m),
+                tile_count: 42,
+              };
+              if (lang === 'js') {
+                try {
+                  // JavaScript natif : pas de Pyodide, exécution immédiate (cr.xxx).
+                  const AsyncFunction = Object.getPrototypeOf(async function () { /* noop */ }).constructor as new (...args: string[]) => (cr: typeof api) => Promise<unknown>;
+                  const fn = new AsyncFunction('cr', code);
+                  await fn(api);
+                  b.flush();
+                } catch (e) { console.warn('[script_js] erreur', e); }
+              } else {
+                try {
+                  const py = await getPyodide() as any;
+                  py.registerJsModule('colorroom', api);
+                  await py.runPythonAsync(code);
+                  b.flush();
+                } catch (e) { console.warn('[script_python] erreur', e); }
+              }
             }
             break;
           }
@@ -3107,6 +3190,7 @@ export default function EditeurPage() {
       uiLayout: g.uiLayout ?? [],
       comments: g.comments ?? [],
       pythonCode: g.pythonCode ?? '',
+      scriptLanguage: g.scriptLanguage ?? 'python',
     };
   };
 
@@ -3122,6 +3206,7 @@ export default function EditeurPage() {
     uiLayout: UILayoutComponent[];
     comments: GameComment[];
     pythonCode?: string;
+    scriptLanguage?: 'python' | 'js';
   } | null => {
     if (!config || typeof config !== 'object') return null;
     const o = config as any;
@@ -3137,7 +3222,8 @@ export default function EditeurPage() {
     const uiLayout = Array.isArray(o.uiLayout) ? (o.uiLayout as UILayoutComponent[]) : [];
     const comments = Array.isArray(o.comments) ? (o.comments as GameComment[]) : [];
     const pythonCode = typeof o.pythonCode === 'string' ? o.pythonCode : undefined;
-    return { tileCount, icon, difficulty, description, bgColor, accentColor, nodes, edges, uiLayout, comments, pythonCode };
+    const scriptLanguage = o.scriptLanguage === 'js' ? 'js' as const : o.scriptLanguage === 'python' ? 'python' as const : undefined;
+    return { tileCount, icon, difficulty, description, bgColor, accentColor, nodes, edges, uiLayout, comments, pythonCode, scriptLanguage };
   };
 
   const createDbGame = async (name: string, initialGame: GameDoc): Promise<string | null> => {
@@ -3510,7 +3596,7 @@ export default function EditeurPage() {
       ];
       initialEdges = [{ id: makeId(), from: eventId, to: gameId }];
       templateUiLayout = [
-        { id: makeId(), kind: 'title_banner',   x: 40,  y: 16,  width: 420, height: 52, text: "L'Intrus — Mode Sniper" },
+        { id: makeId(), kind: 'title_banner',   x: 40,  y: 16,  width: 420, height: 52, text: "L'Intrus - Mode Sniper" },
         { id: makeId(), kind: 'timer_display',  x: 40,  y: 84,  width: 130, height: 64, text: 'Temps' },
         { id: makeId(), kind: 'score_display',  x: 186, y: 84,  width: 130, height: 64, text: 'Score' },
         { id: makeId(), kind: 'round_badge',    x: 332, y: 84,  width: 120, height: 64, text: 'Niveau' },
@@ -3584,7 +3670,7 @@ export default function EditeurPage() {
       ];
       initialEdges = [{ id: makeId(), from: eventId, to: gameId }];
       templateUiLayout = [
-        { id: makeId(), kind: 'title_banner', x: 40, y: 16,  width: 420, height: 52, text: 'Mode Libre — Couleur RGB' },
+        { id: makeId(), kind: 'title_banner', x: 40, y: 16,  width: 420, height: 52, text: 'Mode Libre - Couleur RGB' },
         { id: makeId(), kind: 'color_swatch', x: 40, y: 84,  width: 80,  height: 80  },
         { id: makeId(), kind: 'rgb_sliders',  x: 136, y: 84, width: 310, height: 130 },
         { id: makeId(), kind: 'cie_diagram',  x: 40, y: 232, width: 420, height: 300 },
@@ -3884,7 +3970,7 @@ export default function EditeurPage() {
     setDirty(false);
     setStatus(`Jeu créé: ${gameName}`);
     // Lance le tuto ancré (coachmarks) automatiquement la 1re fois seulement ;
-    // ensuite il reste relançable via le bouton 🎓 de la barre d'outils.
+    // ensuite il reste relançable via le bouton tuto (chapeau) de la barre d'outils.
     try {
       if (!window.localStorage.getItem('crg_editor_tour_seen')) {
         setTourOpen(true);
@@ -3928,6 +4014,7 @@ export default function EditeurPage() {
               uiLayout: cfg.uiLayout,
               comments: cfg.comments,
               pythonCode: cfg.pythonCode,
+              scriptLanguage: cfg.scriptLanguage,
             } satisfies GameDoc;
           })
           .filter(Boolean) as GameDoc[];
@@ -4335,7 +4422,7 @@ export default function EditeurPage() {
       const data = await res.json();
       if (!data?.ok) {
         setAiError(data?.message || 'Échec.');
-        setAiMessages([...baseMsgs, { id: aiMkId(), role: 'assistant', content: '⚠ ' + (data?.message || 'Échec de la génération.'), ts: Date.now(), error: true }]);
+        setAiMessages([...baseMsgs, { id: aiMkId(), role: 'assistant', content: 'Erreur : ' + (data?.message || 'Échec de la génération.'), ts: Date.now(), error: true }]);
         return;
       }
       const game = data.game;
@@ -4357,7 +4444,7 @@ export default function EditeurPage() {
       const allMsgs = [...baseMsgs, aMsg];
       setAiMessages(allMsgs);
       void persistConversation(gid, allMsgs);
-      setStatus(`IA : ${summary} (${data.model}) — pense à sauvegarder`);
+      setStatus(`IA : ${summary} (${data.model}) - pense à sauvegarder`);
     } catch (e: unknown) {
       setAiError('Erreur réseau ou serveur. ' + (e instanceof Error ? e.message : ''));
     } finally {
@@ -4366,7 +4453,7 @@ export default function EditeurPage() {
     }
   };
 
-  // Annule une réponse IA (restaure le snapshot d'avant — annulable/refaisable via l'historique).
+  // Annule une réponse IA (restaure le snapshot d'avant - annulable/refaisable via l'historique).
   const revertAiMessage = (msgId: string) => {
     const before = aiBeforeRef.current[msgId];
     if (!before) { setStatus('Snapshot indisponible'); return; }
@@ -4419,7 +4506,7 @@ export default function EditeurPage() {
     return () => { cancelled = true; };
   }, [aiOpen, activeGameId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Statut de l'IA (Gemini prêt / modèle local en cours de chargement) — mode 2 temps.
+  // Statut de l'IA (Gemini prêt / modèle local en cours de chargement) - mode 2 temps.
   useEffect(() => {
     if (!aiOpen) return;
     let cancelled = false;
@@ -4836,46 +4923,52 @@ export default function EditeurPage() {
   // blocs (Nœuds) ET le designer d'interface. Chaque `before` révèle la cible.
   const tourSteps: CoachStep[] = [
     {
-      title: 'Bienvenue dans l\'éditeur de jeux 🎮',
-      text: 'Ce petit tutoriel montre comment créer un jeu de A à Z. Cliquez sur « Suivant » pour voir chaque étape, ou « Passer le tuto » à tout moment.',
+      title: 'Bienvenue dans l\'éditeur de jeux',
+      text: 'Ce tutoriel montre comment créer un jeu de A à Z, étape par étape. Cliquez sur « Suivant » pour avancer, « Précédent » pour revenir, ou « Passer le tuto » à tout moment. Vous pourrez le relancer avec le bouton chapeau de diplômé.',
     },
     {
       selector: '[data-tour="editor-new"]',
       title: '1. Créer un jeu',
-      text: 'Tout commence ici : « Nouveau jeu » crée un projet. Vous pouvez partir d\'un modèle ou d\'une page blanche.',
+      text: 'Tout commence ici : « Nouveau jeu » crée un projet. Partez d\'un modèle prêt à jouer (réflexes, ambiance, mesure CS-160...) ou d\'une page blanche. « Créer avec l\'IA » génère un jeu complet à partir d\'une simple phrase.',
     },
     {
       selector: '[data-tour="editor-tabs"]',
-      title: '2. Trois modes de création',
-      text: 'Nœuds = logique en blocs reliés · Python = code low-code · Interface = designer visuel. On peut combiner les trois.',
+      title: '2. Trois façons de créer',
+      text: 'Nœuds : la logique en blocs reliés par des câbles (recommandé pour débuter). Python : du code Python ou JavaScript, au choix. Interface : le designer visuel de l\'écran du joueur. Les trois se combinent dans un même jeu.',
     },
     {
       selector: '[data-tour="editor-blocs"]',
-      title: '3. Les blocs (Nœuds)',
-      text: 'Double-cliquez (ou clic droit) sur le canevas pour ajouter un bloc, puis tirez un câble entre le point de sortie (droite) et l\'entrée (gauche) du bloc suivant : démarrer → remplir une dalle → attendre → boucler…',
+      title: '3. Poser et relier des blocs',
+      text: 'Double-cliquez (ou clic droit) sur le canevas pour ajouter un bloc. Tirez ensuite un câble du triangle de SORTIE (à droite d\'un bloc) vers l\'ENTRÉE (à gauche) du suivant. Exemple : Démarrer, puis Remplir les dalles, puis Attendre 1 s.',
       before: () => setEditorTab('canvas'),
     },
     {
       selector: '[data-tour="editor-blocs"]',
-      title: '4. Les ÉVÈNEMENTS ⚡',
-      text: 'Les blocs ambrés (Démarrer, Clic sur dalle, Touche clavier, Timer…) sont des POINTS DE DÉPART. Ils n\'ont pas d\'entrée : on ne peut pas les brancher entre eux. Chaque évènement lance sa propre chaîne de blocs.',
+      title: '4. Les évènements : les points de départ',
+      text: 'Les blocs ambrés (Démarrer, Clic sur dalle, Touche clavier, Timer, Compte à rebours...) sont des POINTS DE DÉPART : ils n\'ont pas d\'entrée et lancent chacun leur propre chaîne de blocs. Un jeu réagit au joueur grâce à eux.',
+      before: () => setEditorTab('canvas'),
+    },
+    {
+      selector: '[data-tour="editor-blocs"]',
+      title: '5. Le bloc Script : Python ou JavaScript',
+      text: 'Besoin d\'aller plus loin que les blocs ? Le bloc « Script Python / JS » exécute votre code quand le flux l\'atteint. Choisissez le langage avec les deux boutons du bloc. L\'API cr (send_color, fill, add_score, play_sound...) est la même dans les deux langages.',
       before: () => setEditorTab('canvas'),
     },
     {
       selector: '[data-tour="editor-ui"]',
-      title: '4. Le designer d\'interface',
-      text: 'Glissez des composants (boutons, sliders, score, minuteur, diagramme CIE…), placez-les sur l\'écran et liez-les à des variables. C\'est ce que verra le joueur.',
+      title: '6. Le designer d\'interface',
+      text: 'Glissez des composants (boutons, sliders, score, minuteur, diagramme CIE...), placez-les sur l\'écran et liez-les à des variables du jeu via « varBind ». C\'est l\'écran que verra le joueur sur la tablette.',
       before: () => setEditorTab('ui'),
     },
     {
       selector: '[data-tour="editor-play"]',
-      title: '6. Tester sur les dalles en temps réel',
-      text: 'Activez l\'aperçu (ON) : votre jeu tourne sur les 42 dalles LED comme dans /jeux. Cliquez les dalles dans la vue 3D pour déclencher vos évènements et vérifier que tout réagit.',
+      title: '7. Tester sur les dalles en temps réel',
+      text: 'Activez l\'aperçu (ON) : votre jeu tourne sur les 42 dalles LED comme dans la page Jeux. Cliquez les dalles dans la vue 3D pour déclencher vos évènements et vérifier que tout réagit comme prévu.',
       before: () => setEditorTab('canvas'),
     },
     {
-      title: 'Prêt à jouer ! ✨',
-      text: 'Enregistrez votre jeu : il apparaîtra dans la page « Jeux » comme un jeu natif, jouable par tous. Relancez ce tuto à tout moment via le bouton 🎓.',
+      title: 'Prêt à jouer !',
+      text: 'Enregistrez votre jeu (Ctrl+S) : il apparaît dans la page « Jeux », jouable par tous. Astuce : le panneau Vérification signale les blocs mal branchés avant de lancer.',
     },
   ];
 
@@ -4903,7 +4996,7 @@ export default function EditeurPage() {
             <div style={{ width: 34, height: 34, borderRadius: 10, display: 'grid', placeItems: 'center', background: 'linear-gradient(135deg,#7c3aed,#ec4899)', flexShrink: 0, boxShadow: '0 4px 14px rgba(124,58,237,0.35)' }}><Sparkles size={18} color="#fff" /></div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <h2 style={{ margin: 0, fontSize: 15, fontWeight: 800, color: '#0f172a' }}>Assistant IA</h2>
-              <p style={{ margin: 0, fontSize: 11, color: 'rgba(15,23,42,0.5)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{activeGame ? `Jeu : ${activeGame.name}` : 'Aucun jeu — il en créera un'}</p>
+              <p style={{ margin: 0, fontSize: 11, color: 'rgba(15,23,42,0.5)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{activeGame ? `Jeu : ${activeGame.name}` : 'Aucun jeu - il en créera un'}</p>
               {aiStatus && !aiStatus.ready && <p style={{ margin: '2px 0 0', fontSize: 10.5, color: '#b45309', display: 'flex', alignItems: 'center', gap: 5 }}><span style={{ width: 7, height: 7, borderRadius: '50%', background: '#f59e0b', animation: 'aiPulse 1.1s ease-in-out infinite' }} />{aiStatus.message}</p>}
             </div>
             <button onClick={() => { const n = !aiShowList; setAiShowList(n); if (n) void loadAiConvList(); }} title="Conversations enregistrées" style={{ background: aiShowList ? 'rgba(124,58,237,0.16)' : 'rgba(15,23,42,0.04)', border: '1px solid rgba(15,23,42,0.1)', color: aiShowList ? '#7c3aed' : 'rgba(15,23,42,0.6)', borderRadius: 8, padding: '6px 8px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}><Clock size={13} /></button>
@@ -4969,8 +5062,8 @@ export default function EditeurPage() {
                     if (group.length === 0) return null;
                     return (
                       <div key={prov}>
-                        <div style={{ padding: '6px 12px 4px', fontSize: 10, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: prov === 'gemini' ? '#0e7490' : '#6d28d9', background: 'rgba(15,23,42,0.04)' }}>
-                          {prov === 'gemini' ? '☁ Google Gemini (cloud)' : '💻 Ollama (local, hors-ligne)'}
+                        <div style={{ padding: '6px 12px 4px', fontSize: 10, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: prov === 'gemini' ? '#0e7490' : '#6d28d9', background: 'rgba(15,23,42,0.04)', display: 'flex', alignItems: 'center', gap: 5 }}>
+                          {prov === 'gemini' ? <><Cloud size={11} /> Google Gemini (cloud)</> : <><Laptop size={11} /> Ollama (local, hors-ligne)</>}
                         </div>
                         {group.map((m) => (
                           <button
@@ -5023,7 +5116,7 @@ export default function EditeurPage() {
                   border: m.role === 'assistant' && !m.error ? '1px solid rgba(15,23,42,0.08)' : (m.error ? '1px solid rgba(239,68,68,0.3)' : 'none'),
                   boxShadow: m.role === 'assistant' && !m.error ? '0 2px 8px rgba(15,23,42,0.06)' : 'none' }}>
                   {m.content}
-                  {m.summary && <div style={{ marginTop: 6, fontSize: 11, color: m.role === 'user' ? 'rgba(255,255,255,0.75)' : 'rgba(15,23,42,0.5)' }}>🧩 {m.summary}{m.model ? ` · ${m.model}` : ''}</div>}
+                  {m.summary && <div style={{ marginTop: 6, fontSize: 11, color: m.role === 'user' ? 'rgba(255,255,255,0.75)' : 'rgba(15,23,42,0.5)', display: 'flex', alignItems: 'center', gap: 4 }}><Puzzle size={11} /> {m.summary}{m.model ? ` · ${m.model}` : ''}</div>}
                 </div>
                 {m.role === 'assistant' && !m.error && aiBeforeRef.current[m.id] && (
                   <div style={{ display: 'flex', gap: 6, marginTop: 5 }}>
@@ -5040,7 +5133,7 @@ export default function EditeurPage() {
             )}
           </div>
 
-          {aiError && <div style={{ margin: '0 16px', padding: '8px 10px', borderRadius: 8, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.3)', color: '#b91c1c', fontSize: 12 }}>⚠ {aiError}</div>}
+          {aiError && <div style={{ margin: '0 16px', padding: '8px 10px', borderRadius: 8, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.3)', color: '#b91c1c', fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}><AlertTriangle size={13} style={{ flexShrink: 0 }} /> {aiError}</div>}
 
           <div style={{ padding: 12, borderTop: '1px solid rgba(15,23,42,0.08)', flexShrink: 0, background: 'linear-gradient(0deg,rgba(255,255,255,0.5),rgba(255,255,255,0))' }}>
             <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
@@ -5490,7 +5583,7 @@ export default function EditeurPage() {
                       </button>
                     </div>
                   )}
-                  {/* Boutons de test : un par nœud "Clic sur bouton UI" — permet de
+                  {/* Boutons de test : un par nœud "Clic sur bouton UI" - permet de
                       déclencher les évènements UI sans quitter la preview */}
                   {hasRuntimeEvents && isPlaying && (() => {
                     const uiIds = Array.from(new Set(
@@ -6024,17 +6117,24 @@ export default function EditeurPage() {
 
                     <svg className="bp__wires" width="2000" height="2000" viewBox="0 0 2000 2000" preserveAspectRatio="none">
                       <defs>
+                        {/* Pointe de câble « liquid glass » : petite, blanche, dégradé bleuté.
+                            markerUnits=userSpaceOnUse → taille FIXE (ne gonfle plus avec le trait). */}
+                        <linearGradient id="bp-arrow-grad" x1="0" y1="0" x2="1" y2="1">
+                          <stop offset="0%" stopColor="#ffffff" />
+                          <stop offset="55%" stopColor="#dbe6ff" />
+                          <stop offset="100%" stopColor="#9db4f8" />
+                        </linearGradient>
                         <marker
                           id="bp-arrow"
-                          viewBox="0 0 6 6"
-                          refX="5.2"
-                          refY="3"
-                          markerWidth="6"
-                          markerHeight="6"
+                          viewBox="0 0 8 8"
+                          refX="6.4"
+                          refY="4"
+                          markerWidth="10"
+                          markerHeight="10"
                           orient="auto"
-                          markerUnits="strokeWidth"
+                          markerUnits="userSpaceOnUse"
                         >
-                          <path d="M 0 0 L 6 3 L 0 6 z" fill="var(--c-action)" opacity="0.78" />
+                          <path d="M 1 1.1 L 7 4 L 1 6.9 Q 2.4 4 1 1.1 Z" fill="url(#bp-arrow-grad)" stroke="rgba(67,97,238,0.55)" strokeWidth="0.55" strokeLinejoin="round" className="bp-arrowhead" />
                         </marker>
                       </defs>
                       {(activeGame?.edges ?? []).filter(estExec).map((e) => {
@@ -6058,12 +6158,13 @@ export default function EditeurPage() {
                         const d = `M ${x1} ${y1} C ${c1x} ${c1y}, ${c2x} ${c2y}, ${x2} ${y2}`;
 
                         const active = pendingLink?.fromNodeId && (pendingLink.fromNodeId === e.from || pendingLink.fromNodeId === e.to);
+                        const born = bornEdgeIds.has(e.id);
                         return (
                           <g key={e.id}>
                             <path
                               d={d}
                               markerEnd="url(#bp-arrow)"
-                              className={active ? 'bp-wire bp-wire--active' : 'bp-wire'}
+                              className={`bp-wire${active ? ' bp-wire--active' : ''}${born ? ' bp-wire--born' : ''}`}
                             />
                             {/* Zone de clic large et invisible : clic = supprimer le câble */}
                             <path
@@ -6094,9 +6195,10 @@ export default function EditeurPage() {
                         const dx = Math.max(40, Math.min(180, Math.abs(x2 - x1) * 0.5));
                         const d = `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`;
                         const couleur = couleurPortSortie(from.kind);
+                        const bornData = bornEdgeIds.has(e.id);
                         return (
                           <g key={e.id}>
-                            <path d={d} className="bp-wire-data" style={{ stroke: couleur }} />
+                            <path d={d} className={`bp-wire-data${bornData ? ' bp-wire--born' : ''}`} style={{ stroke: couleur }} />
                             <path
                               d={d}
                               className="bp-wire__hit"
@@ -6141,6 +6243,20 @@ export default function EditeurPage() {
                         const d = `M ${x1} ${y1} C ${c1x} ${c1y}, ${c2x} ${c2y}, ${x2} ${y2}`;
                         return <path key="__preview" d={d} markerEnd="url(#bp-arrow)" className="bp-wire bp-wire--preview" />;
                       })() : null}
+
+                      {/* Fantômes des câbles supprimés : se dissolvent en tombant */}
+                      {dyingWires.map((w) => (
+                        <path key={w.id} d={w.d} className={w.data ? 'bp-wire-data bp-wire--dying' : 'bp-wire bp-wire--dying'} />
+                      ))}
+
+                      {/* Ondes de choc aux points de connexion / déconnexion */}
+                      {wireRipples.map((r) => (
+                        <g key={r.id} className={`bp-ripple${r.tone === 'cut' ? ' bp-ripple--cut' : ''}`}>
+                          <circle cx={r.x} cy={r.y} r="5" className="bp-ripple__core" />
+                          <circle cx={r.x} cy={r.y} r="5" className="bp-ripple__ring" />
+                          <circle cx={r.x} cy={r.y} r="5" className="bp-ripple__ring bp-ripple__ring--late" />
+                        </g>
+                      ))}
                     </svg>
 
                     {(activeGame?.nodes ?? [])
@@ -6216,7 +6332,7 @@ export default function EditeurPage() {
                           data-nodeid={n.id}
                           onContextMenu={(e) => {
                             // Clic droit sur un bloc → menu d'actions du nœud (et NON
-                            // le menu d'ajout du canevas) — comportement type UE5.
+                            // le menu d'ajout du canevas) - comportement type UE5.
                             e.preventDefault();
                             e.stopPropagation();
                             const bp = (e.currentTarget as HTMLElement).closest('.bp') as HTMLElement | null;
@@ -6455,16 +6571,40 @@ export default function EditeurPage() {
                           {n.kind === 'script_python' ? (
                             <div className="bp-node__vars" onPointerDown={(e) => e.stopPropagation()}>
                               <div className="bp-node__var">
-                                <span className="bp-node__varlabel">Code Python (exécuté quand le flux atteint ce bloc)</span>
+                                {/* Sélecteur de langage : Python (Pyodide) ou JavaScript (natif) */}
+                                <div style={{ display: 'flex', gap: 4, marginBottom: 6 }}>
+                                  {([['python', 'Python'], ['js', 'JavaScript']] as const).map(([lng, label]) => {
+                                    const actif = String(n.params.language ?? 'python') === lng;
+                                    return (
+                                      <button
+                                        key={lng}
+                                        onClick={() => updateNodeParamsById(n.id, { language: lng })}
+                                        style={{
+                                          flex: 1, padding: '4px 8px', fontSize: 10.5, fontWeight: 700, borderRadius: 8, cursor: 'pointer',
+                                          border: actif ? '1px solid rgba(67,97,238,0.5)' : '1px solid rgba(15,23,42,0.12)',
+                                          background: actif ? 'linear-gradient(135deg,rgba(67,97,238,0.14),rgba(124,58,237,0.10))' : 'rgba(255,255,255,0.6)',
+                                          color: actif ? '#4361ee' : 'rgba(15,23,42,0.5)',
+                                        }}
+                                      >
+                                        {label}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                                <span className="bp-node__varlabel">{String(n.params.language ?? 'python') === 'js' ? 'Code JavaScript (exécuté quand le flux atteint ce bloc)' : 'Code Python (exécuté quand le flux atteint ce bloc)'}</span>
                                 <textarea
                                   className="bp-node__varinput"
                                   style={{ height: 110, fontFamily: 'monospace', fontSize: 11, resize: 'vertical', width: '100%', lineHeight: 1.45 }}
                                   spellCheck={false}
                                   value={String(n.params.code ?? '')}
                                   onChange={(e) => updateNodeParamsById(n.id, { code: e.target.value })}
-                                  placeholder={'import colorroom as cr\ncr.fill(255, 80, 0, 0.8)\ncr.add_score(10)'}
+                                  placeholder={String(n.params.language ?? 'python') === 'js'
+                                    ? 'cr.fill(255, 80, 0, 0.8);\ncr.add_score(10);\n// await aussi possible'
+                                    : 'import colorroom as cr\ncr.fill(255, 80, 0, 0.8)\ncr.add_score(10)'}
                                 />
-                                <span style={{ fontSize: 10, color: '#94a3b8' }}>API : cr.send_color / fill / set_tile / set_variable / get_variable / add_score / emit_event / play_sound / vibrate. Hors-ligne.</span>
+                                <span style={{ fontSize: 10, color: '#94a3b8' }}>{String(n.params.language ?? 'python') === 'js'
+                                  ? 'API (objet cr) : cr.send_color / fill / set_tile / set_variable / get_variable / add_score / emit_event / play_sound / vibrate. Exécution instantanée.'
+                                  : 'API : cr.send_color / fill / set_tile / set_variable / get_variable / add_score / emit_event / play_sound / vibrate. Hors-ligne.'}</span>
                               </div>
                             </div>
                           ) : n.kind === 'wait' ? (
@@ -7298,7 +7438,7 @@ export default function EditeurPage() {
                                  bp-pin--in est volontairement absente pour qu'un câble
                                  lâché ici ne crée PAS de liaison invalide). */
                               <div className="bp-pin" style={{ opacity: 0.45, cursor: 'default' }}>
-                                <span className="bp-pin__label" style={{ fontSize: 10, fontWeight: 700, color: '#f59e0b', letterSpacing: '.05em' }}>⚡ ÉVÈNEMENT</span>
+                                <span className="bp-pin__label" style={{ fontSize: 10, fontWeight: 700, color: '#f59e0b', letterSpacing: '.05em', display: 'inline-flex', alignItems: 'center', gap: 3 }}><Zap size={10} /> ÉVÈNEMENT</span>
                               </div>
                             )}
                             <div
@@ -7357,7 +7497,7 @@ export default function EditeurPage() {
                       );
                     })}
                   </div>
-                  {/* Menu contextuel d'un NŒUD (clic droit sur un bloc) — actions UE5 */}
+                  {/* Menu contextuel d'un NŒUD (clic droit sur un bloc) - actions UE5 */}
                   {nodeMenu.open ? (() => {
                     const g = editor.games.find((gg) => gg.id === editor.activeGameId);
                     const node = g?.nodes.find((n) => n.id === nodeMenu.nodeId);
@@ -7534,7 +7674,7 @@ export default function EditeurPage() {
                                 <span className={`bp-verif-dot bp-verif-dot--${p.niveau === 'erreur' ? 'erreur' : 'avert'}`} />
                                 <span className="bp-verif__msg">
                                   {node ? <strong>{node.name || labelNodeKind(node.kind)}</strong> : null}
-                                  {node ? ' — ' : null}
+                                  {node ? ' - ' : null}
                                   {p.message}
                                 </span>
                               </button>
@@ -7660,6 +7800,8 @@ export default function EditeurPage() {
                     onChange={code => commit(cur => ({ ...cur, games: cur.games.map(g => g.id === cur.activeGameId ? { ...g, pythonCode: code } : g) }))}
                     bridge={pyBridge}
                     tileCount={Math.max(1, Math.round(Number(activeGame.tileCount ?? 42)))}
+                    language={activeGame.scriptLanguage ?? 'python'}
+                    onLanguageChange={lang => commit(cur => ({ ...cur, games: cur.games.map(g => g.id === cur.activeGameId ? { ...g, scriptLanguage: lang } : g) }))}
                   />
                 </div>
               )}
@@ -7900,7 +8042,7 @@ export default function EditeurPage() {
                       <div style={{ padding: 16, borderRadius: 12, background: '#fff', border: '1px solid rgba(0,0,0,0.06)', display: 'grid', gap: 14 }}>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 60px', gap: 10, alignItems: 'center' }}>
                           <div>
-                            <span className="g-label" style={{ marginBottom: 6, display: 'block' }}>Vitesse de chute (ms — plus grand = plus lent/facile)</span>
+                            <span className="g-label" style={{ marginBottom: 6, display: 'block' }}>Vitesse de chute (ms - plus grand = plus lent/facile)</span>
                             <input
                               type="range" className="g-slider g-slider--accent" min={800} max={5000} step={100}
                               value={getNum(selectedNode.params, 'speed', 3000)}
@@ -9993,7 +10135,7 @@ export default function EditeurPage() {
                     <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', opacity: 0.5, marginBottom: 8 }}>Modèles 100% blocs</div>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
                       {[
-                        { id: 'attrape_lumiere', icon: Target,   label: 'Attrape la lumière', desc: 'Clique la dalle verte avant la fin du chrono — graphe complet éditable' },
+                        { id: 'attrape_lumiere', icon: Target,   label: 'Attrape la lumière', desc: 'Clique la dalle verte avant la fin du chrono - graphe complet éditable' },
                         { id: 'ambiance',        icon: Waves,    label: 'Ambiance',           desc: 'Animations arc-en-ciel et vague cyan en boucle automatique' },
                         { id: 'duel_salles',     icon: Swords,   label: 'Duel des salles',    desc: 'Salle 1 contre Salle 2 : marque des points pour ton camp' },
                         { id: 'demo_python',     icon: FileCode, label: 'Démo Python',        desc: 'Blocs Python : dégradé arc-en-ciel + score au clic' },
@@ -10028,7 +10170,7 @@ export default function EditeurPage() {
                       {[
                         { id: 'snake',        icon: Gamepad2,          label: 'Snake',           desc: 'Snake chromatique spectral' },
                         { id: 'puissance4',   icon: Gamepad2,          label: 'Puissance 4',     desc: 'Jeu de stratégie Puissance 4' },
-                        { id: 'color_speed',  icon: Zap,               label: 'Color Speed',     desc: 'Réflexes — clique la bonne dalle' },
+                        { id: 'color_speed',  icon: Zap,               label: 'Color Speed',     desc: 'Réflexes - clique la bonne dalle' },
                         { id: 'maitre_blanc', icon: Palette,           label: 'Maître du Blanc', desc: 'Reproduis la température de blanc' },
                         { id: 'intrus',       icon: Crosshair,         label: "L'Intrus",        desc: 'Trouve la dalle différente au CS-160' },
                         { id: 'canal_mix',    icon: SlidersHorizontal, label: 'Mix Canaux',      desc: 'Mélange spectral CIE' },

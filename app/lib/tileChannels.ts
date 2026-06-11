@@ -4,7 +4,7 @@
  *
  * Chaque dalle possède 32 canaux LED, chacun centré sur une longueur d'onde
  * (nm) et associé à une couleur RGB approximative. Il existe DEUX câblages
- * physiques de dalles — « rouge » et « bleu » — dont l'ordre des canaux diffère.
+ * physiques de dalles - « rouge » et « bleu » - dont l'ordre des canaux diffère.
  * Ce module fournit :
  *   - PLATE_TYPE : le type physique de chaque dalle (1..42) ;
  *   - les tables de spectres CHANNELS_ROUGE / CHANNELS_BLEU ;

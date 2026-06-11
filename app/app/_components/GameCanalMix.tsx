@@ -22,12 +22,12 @@ import CieDiagramCanvas, { type CieMarker, type CiePolyline } from './CieDiagram
 import { CHANNELS_ROUGE, CHANNELS_BLEU, type TileType } from '@/lib/tileChannels';
 import { playSfx, vibrate } from '@/lib/audio/sfx';
 
-// ── Mix de Canaux — nouveau concept ────────────────────────────────────────────
+// ── Mix de Canaux - nouveau concept ────────────────────────────────────────────
 // 1. La salle DROITE s'allume avec un mélange secret de 3 canaux spectraux.
 // 2. Le joueur vise une dalle avec le CS-160 et clique "Mesurer".
 // 3. La mesure (x, y CIE) alimente findChannelWeights() qui inverse le mélange.
 // 4. Les 3 sliders se positionnent automatiquement sur les poids trouvés.
-// 5. La salle GAUCHE montre le résultat en temps réel — le joueur affine si besoin.
+// 5. La salle GAUCHE montre le résultat en temps réel - le joueur affine si besoin.
 // 6. "Valider" compare les deux mélanges et donne un score.
 
 const INTERESTING_ROUGE = [0, 1, 2, 4, 5, 6, 7, 8, 9, 11, 12, 17, 22, 23, 24];
@@ -215,7 +215,7 @@ const G: Record<string, React.CSSProperties> = {
 // ── Props ─────────────────────────────────────────────────────────────────────
 /** Props du jeu Mix de Canaux (étend les props communes {@link GameTileProps}). */
 interface GameCanalMixProps extends GameTileProps {
-  /** Envoi de 32 valeurs de canaux brutes (0-100) à une dalle — requis ici. */
+  /** Envoi de 32 valeurs de canaux brutes (0-100) à une dalle - requis ici. */
   onSendRawChannels: (tileIdx: number, channels: number[]) => void;
   /** Type de plaque LED utilisé pour le profil des canaux (rouge ou bleu). */
   plateType?: TileType;
@@ -365,7 +365,7 @@ export default function GameCanalMix({
     } catch { /* appareil absent */ }
 
     if (!result) {
-      setMsg(`CS-160 indisponible${detail ? ` (${detail})` : ''} — pointez l'appareil sur une dalle de la salle droite et réessayez.`);
+      setMsg(`CS-160 indisponible${detail ? ` (${detail})` : ''} - pointez l'appareil sur une dalle de la salle droite et réessayez.`);
       setMeasuring(false);
       return;
     }
@@ -375,7 +375,7 @@ export default function GameCanalMix({
     setMeasured(result);
     setWeights(computed);
     setPhase('measured');
-    setMsg(`Mesure : x=${result.x.toFixed(4)}, y=${result.y.toFixed(4)}, Lv=${result.Lv.toFixed(1)} cd/m² — Sliders calculés automatiquement.`);
+    setMsg(`Mesure : x=${result.x.toFixed(4)}, y=${result.y.toFixed(4)}, Lv=${result.Lv.toFixed(1)} cd/m² - Sliders calculés automatiquement.`);
     setMeasuring(false);
   }
 
@@ -448,7 +448,7 @@ export default function GameCanalMix({
             La <strong style={{color:'#06d6a0'}}>salle droite</strong> s&apos;allume avec un mélange secret de 3 canaux LED.<br />
             Visez une dalle avec le <strong style={{color:'#a78bfa'}}>CS-160</strong> et cliquez <em>Mesurer</em>.<br />
             La mesure (x, y CIE) calcule automatiquement les <strong>poids des canaux</strong> sur les sliders.<br />
-            Affinez si besoin, puis <em>Validez</em> — la <strong style={{color:'#4361ee'}}>salle gauche</strong> montre votre reconstitution.
+            Affinez si besoin, puis <em>Validez</em> - la <strong style={{color:'#4361ee'}}>salle gauche</strong> montre votre reconstitution.
           </p>
           <p style={{ fontSize:12, color:'rgba(255,255,255,.4)', margin:0 }}>{TOTAL_ROUNDS} manches · max {TOTAL_ROUNDS * 1000} pts</p>
         </div>
@@ -538,12 +538,12 @@ export default function GameCanalMix({
           </div>
         )}
 
-        {/* Sliders — actifs dès que mesurés ou en jeu (mode manuel) */}
+        {/* Sliders - actifs dès que mesurés ou en jeu (mode manuel) */}
         {(phase === 'measured' || phase === 'playing' || phase === 'result') && roundChans.length === 3 && (
           <div style={{ ...G.glass, padding:'12px 14px', display:'flex', flexDirection:'column', gap:11 }}>
             {phase === 'measured' && (
               <div style={{ fontSize:11, color:'#06d6a0', fontWeight:700, marginBottom:2, display:'flex', alignItems:'center', gap:6 }}>
-                <RefreshCw size={12} /> Poids calculés depuis la mesure — affinez si nécessaire
+                <RefreshCw size={12} /> Poids calculés depuis la mesure - affinez si nécessaire
               </div>
             )}
             {roundChans.map((ci, k) => {

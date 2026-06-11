@@ -29,16 +29,16 @@ export const metadata: Metadata = {
     template: 'Color Room Games - %s',
   },
   description:
-    "Projet académique (Académie de Lyon) — BTS CIEL Cybersécurité (Option A IR) — 'ColorRoom, serious games'. Partenaires: LUMEN Campus Lumière, ENTPE/LTDS/BPMNP.",
+    "Projet académique (Académie de Lyon) - BTS CIEL Cybersécurité (Option A IR) - 'ColorRoom, serious games'. Partenaires: LUMEN Campus Lumière, ENTPE/LTDS/BPMNP.",
   applicationName: 'ColorRoomGames',
   authors: [
-    { name: 'Étudiants (E1…E8) — Lycée Édouard Branly' },
+    { name: 'Étudiants (E1…E8) - Lycée Édouard Branly' },
     { name: 'M. DELBOSC Serge (enseignant)' },
     { name: 'M. LABAYRADE Raphaël (contact)' },
     { name: 'M. VELLA Andéol (contact)' },
     { name: 'NewGenesis' },
   ],
-  creator: 'Lycée Édouard Branly — BTS CIEL',
+  creator: 'Lycée Édouard Branly - BTS CIEL',
   publisher: 'Académie de Lyon',
   icons: {
     icon: '/favicon.ico',
@@ -48,7 +48,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: 'Color Room Games',
     description:
-      "Projet 'ColorRoom, serious games' — application web (Node-RED/JS + Docker) pour piloter et mesurer la lumière (ColorRoom / plaques lumineuses).",
+      "Projet 'ColorRoom, serious games' - application web (Node-RED/JS + Docker) pour piloter et mesurer la lumière (ColorRoom / plaques lumineuses).",
     type: 'website',
     images: [{ url: '/data.png' }],
   },
@@ -56,7 +56,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: 'Color Room Games',
     description:
-      "Projet 'ColorRoom, serious games' — application web (Node-RED/JS + Docker) pour piloter et mesurer la lumière (ColorRoom / plaques lumineuses).",
+      "Projet 'ColorRoom, serious games' - application web (Node-RED/JS + Docker) pour piloter et mesurer la lumière (ColorRoom / plaques lumineuses).",
     images: ['/data.png'],
   },
 };

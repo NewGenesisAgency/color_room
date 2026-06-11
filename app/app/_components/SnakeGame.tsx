@@ -21,7 +21,7 @@ import type { GameTileProps } from './GameColorSpeed';
 import { DIFF_LABELS, type DifficultyLevel } from './GameColorSpeed';
 import { SHOW_SCREEN_BOARD } from '@/lib/game/displayMode';
 
-// ── Snake Chromatique — 42 dalles (6 col × 7 row) ───────────────────────────
+// ── Snake Chromatique - 42 dalles (6 col × 7 row) ───────────────────────────
 // Le serpent traverse les deux salles (gauche + droite).
 // Chaque nourriture a une longueur d'onde spectrale différente.
 // Manger une nourriture flash la couleur du serpent vers cette longueur d'onde.
@@ -167,7 +167,7 @@ export default function SnakeGame({ onSendColor, onTurnOff, onTurnOffAll, onQuit
 
   const restart = useCallback(() => { gs.current = fresh(); draw(gs.current); rerender(); }, [draw, rerender]);
 
-  // Boucle principale — redémarre quand le niveau change
+  // Boucle principale - redémarre quand le niveau change
   useEffect(() => {
     const s = gs.current;
     if (s.over) return;
@@ -294,7 +294,7 @@ export default function SnakeGame({ onSendColor, onTurnOff, onTurnOffAll, onQuit
           <div style={{ position:'absolute', inset:0, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:8, textAlign:'center', padding:20, pointerEvents:'none' }}>
             <div style={{ fontSize:34 }}>👁️</div>
             <div style={{ fontSize:16, fontWeight:900, color:'#e2e8f0' }}>Regarde la Color Room</div>
-            <div style={{ fontSize:12, color:'#64748b', maxWidth:240 }}>Le jeu se joue sur les dalles — utilise les contrôles ci-dessous.</div>
+            <div style={{ fontSize:12, color:'#64748b', maxWidth:240 }}>Le jeu se joue sur les dalles - utilise les contrôles ci-dessous.</div>
           </div>
         )}
 

@@ -11,7 +11,7 @@
  * aussi les types partagés {@link XYZ}, {@link Lvxy}, {@link CS160Status}, {@link CalibType}, etc.
  *
  * @note Toutes les méthodes échouent silencieusement (retournent false/null) si
- *       l'appareil est indisponible — c'est attendu côté UI.
+ *       l'appareil est indisponible - c'est attendu côté UI.
  *
  * CS160 Colorimeter Service
  *
@@ -223,7 +223,7 @@ class CS160Service {
   async oneShotMeasurement(): Promise<{ xyz: XYZ | null; lvxy: Lvxy | null }> {
     // MÊME méthode que la page /mesure : un seul POST {action:'measure'} qui
     // renvoie directement data.data.{xyz,lvxy}. (La route /api/cs160 n'implémente
-    // PAS les actions polling/read_xyz/read_lvxy — l'ancien flux échouait toujours.)
+    // PAS les actions polling/read_xyz/read_lvxy - l'ancien flux échouait toujours.)
     try {
       const res = await fetch(this.baseUrl, {
         method: 'POST',

@@ -98,12 +98,12 @@ function xyzToSrgb(X: number, Y: number, Z: number) {
 }
 
 /**
- * Conversion XYZ → sRGB tenant compte de la LUMINANCE — utilisée pour la
+ * Conversion XYZ → sRGB tenant compte de la LUMINANCE - utilisée pour la
  * pastille de couleur mesurée.
  *
  * Problème de la version simple : diviser par max(r,g,b) efface toute
  * information de luminosité. Une dalle éteinte (Y ≈ 0.001 cd/m²) avec un
- * bruit léger donne la même saturation qu'une dalle à pleine puissance —
+ * bruit léger donne la même saturation qu'une dalle à pleine puissance -
  * d'où l'affichage de #00fff0 quand la dalle devrait être #000000.
  *
  * Solution :
@@ -541,7 +541,7 @@ export default function MesurePage() {
   const [samples,     setSamples]     = useState<any | null>(null);
 
   // ── Référence blanche pour la pastille de couleur ────────────────────────
-  // refY : Y (cd/m²) mesuré sur un blanc de référence — null = non calibré.
+  // refY : Y (cd/m²) mesuré sur un blanc de référence - null = non calibré.
   // noiseFloor : seuil sous lequel Y est traité comme bruit (dalle éteinte).
   const [refY,       setRefY]       = useState<number | null>(null);
   const [noiseFloor, setNoiseFloor] = useState<number>(0.1);
@@ -554,7 +554,7 @@ export default function MesurePage() {
       setConnected(!!data.connected);
       if (data.port) setDevicePort(data.port);
       setStatusLabel(data.connected
-        ? `CS-160 connecté${data.device ? ` — ${data.device}` : ''}`
+        ? `CS-160 connecté${data.device ? ` - ${data.device}` : ''}`
         : 'CS-160 déconnecté');
       setError('');
     } catch {
@@ -645,7 +645,7 @@ export default function MesurePage() {
         </div>
         <div>
           <h1 style={{ margin: 0, fontSize: 20, fontWeight: 700 }}>Colorimètre CS-160</h1>
-          <p style={{ margin: 0, fontSize: 12, color: '#64748b' }}>Konica Minolta — Luminance &amp; Chromaticité CIE 1931</p>
+          <p style={{ margin: 0, fontSize: 12, color: '#64748b' }}>Konica Minolta - Luminance &amp; Chromaticité CIE 1931</p>
         </div>
         <div style={{ marginLeft: 'auto', fontSize: 11, color: '#94a3b8', textAlign: 'right' }}>
           <code style={{ background: '#f1f5f9', padding: '2px 6px', borderRadius: 4 }}>172.17.50.39:3000</code>
@@ -698,7 +698,7 @@ export default function MesurePage() {
           <div style={{ fontSize: 12, fontWeight: 600, color: '#94a3b8', marginBottom: 10, letterSpacing: 0.5 }}>
             DIAGRAMME DE CHROMATICITÉ CIE 1931
             {currentPoint && <span style={{ marginLeft: 8, color: '#e2e8f0' }}>● mesure courante</span>}
-            {historyPoints.length > 0 && <span style={{ marginLeft: 8, color: 'rgba(226,232,240,0.45)' }}>— trajectoire (couleur = z, épaisseur = Z)</span>}
+            {historyPoints.length > 0 && <span style={{ marginLeft: 8, color: 'rgba(226,232,240,0.45)' }}>- trajectoire (couleur = z, épaisseur = Z)</span>}
           </div>
           <ChromaticityDiagram current={currentPoint} history={historyPoints} />
         </div>
@@ -708,7 +708,7 @@ export default function MesurePage() {
           {measurement ? (
             <>
               <div style={{ padding: 16, borderRadius: 12, background: '#eff6ff', border: '2px solid #93c5fd' }}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: '#1e40af', marginBottom: 12 }}>Résultats — {measurement.timestamp}</div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: '#1e40af', marginBottom: 12 }}>Résultats - {measurement.timestamp}</div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                   <ResultCard title="Lv/x/y">
                     <BigVal>{measurement.lvxy.Lv.toFixed(4)}</BigVal>

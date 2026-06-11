@@ -106,7 +106,7 @@ export default function Coachmarks({ open, steps, onClose, finishLabel = 'Termin
     : null;
 
   // Position de la bulle.
-  const TIP_W = 340;
+  const TIP_W = 380;
   let tipStyle: React.CSSProperties;
   if (spotlight) {
     const below = spotlight.top + spotlight.height + 14;
@@ -173,17 +173,17 @@ export default function Coachmarks({ open, steps, onClose, finishLabel = 'Termin
         </div>
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-          <button onClick={onClose} style={{ height: 38, padding: '0 14px', borderRadius: 10, border: '1px solid rgba(0,0,0,0.12)', background: 'rgba(0,0,0,0.03)', color: 'rgba(0,0,0,0.55)', fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>
+          <button onClick={onClose} style={{ height: 46, padding: '0 20px', borderRadius: 12, border: '1px solid rgba(0,0,0,0.12)', background: 'rgba(0,0,0,0.03)', color: 'rgba(0,0,0,0.55)', fontWeight: 700, fontSize: 14, cursor: 'pointer', fontFamily: 'inherit' }}>
             Passer le tuto
           </button>
           <div style={{ display: 'flex', gap: 8 }}>
             {index > 0 && (
-              <button onClick={prev} style={{ height: 38, padding: '0 14px', borderRadius: 10, border: '1px solid rgba(0,0,0,0.12)', background: '#fff', color: '#1a1a2e', fontWeight: 700, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontFamily: 'inherit' }}>
-                <ArrowLeft size={15} /> Précédent
+              <button onClick={prev} style={{ height: 46, padding: '0 20px', borderRadius: 12, border: '1px solid rgba(0,0,0,0.12)', background: '#fff', color: '#1a1a2e', fontWeight: 700, fontSize: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontFamily: 'inherit' }}>
+                <ArrowLeft size={16} /> Précédent
               </button>
             )}
-            <button onClick={next} style={{ height: 38, padding: '0 18px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg,#4361ee,#7c3aed)', color: '#fff', fontWeight: 800, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontFamily: 'inherit' }}>
-              {last ? <><Check size={15} /> {finishLabel}</> : <>Suivant <ArrowRight size={15} /></>}
+            <button onClick={next} style={{ height: 46, padding: '0 24px', borderRadius: 12, border: 'none', background: 'linear-gradient(135deg,#4361ee,#7c3aed)', color: '#fff', fontWeight: 800, fontSize: 15, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontFamily: 'inherit' }}>
+              {last ? <><Check size={16} /> {finishLabel}</> : <>Suivant <ArrowRight size={16} /></>}
             </button>
           </div>
         </div>

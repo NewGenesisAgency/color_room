@@ -70,6 +70,7 @@ import {
   Award,
   Brain,
   CheckCircle2,
+  Eye,
   DoorOpen,
   Flame,
   Gamepad2,
@@ -209,7 +210,7 @@ type TargetColor = { r: number; g: number; b: number };
 
 type TargetTemp = { name: string; temp: number };
 
-// Mapping index visuel (grille 6 colonnes, row-major — identique à Room3D/buildMeta)
+// Mapping index visuel (grille 6 colonnes, row-major - identique à Room3D/buildMeta)
 //   → numéro de plaque PHYSIQUE envoyé à la supervision.
 //
 // Numérotation physique réelle relevée sur site (par salle), du BAS vers le HAUT :
@@ -2315,45 +2316,63 @@ export default function JeuxPage() {
   // Grilles 2D des jeux éditeur (grid_create / grid_set / grid_sync_tiles)
   const hudGridsRef = useRef<Record<string, (string | null)[][]>>({});
 
-  // ── Action Python attachée à un élément UI (exécutée au clic, hors-ligne) ──
+  // ── Action Python/JS attachée à un élément UI (exécutée au clic, hors-ligne) ──
   // Même API "colorroom" que l'onglet Python de l'éditeur, branchée sur le jeu en cours.
   const pyBusyRef = useRef(false);
+  // API exposée au code utilisateur (module Pyodide `colorroom` ET objet `cr` en JS).
+  const buildColorroomApi = () => ({
+    send_color: (plateId: number, r: number, g: number, b: number, intensity = 0.85) => {
+      const pid = PLATE_ID_BY_INDEX[Math.max(0, Math.round(plateId) - 1)]; if (!pid) return;
+      sendRgbToPlate({ r: clamp255(r), g: clamp255(g), b: clamp255(b) }, Math.round(Math.max(0, Math.min(1, intensity)) * 100), pid);
+    },
+    fill: (r: number, g: number, b: number, intensity = 0.85) => {
+      for (let i = 0; i < 42; i++) { const pid = PLATE_ID_BY_INDEX[i]; if (pid) sendRgbToPlate({ r: clamp255(r), g: clamp255(g), b: clamp255(b) }, Math.round(Math.max(0, Math.min(1, intensity)) * 100), pid); }
+    },
+    set_tile: (idx: number, r: number, g: number, b: number, intensity = 0.85) => {
+      const pid = PLATE_ID_BY_INDEX[Math.max(0, Math.round(idx))]; if (!pid) return;
+      sendRgbToPlate({ r: clamp255(r), g: clamp255(g), b: clamp255(b) }, Math.round(Math.max(0, Math.min(1, intensity)) * 100), pid);
+    },
+    clear: () => { void blackoutHardware(); },
+    set_variable: (name: string, value: number | string) => { hudVarsRef.current[String(name)] = value as number | string; bumpHudVars(); },
+    get_variable: (name: string) => hudVarsRef.current[String(name)] ?? 0,
+    add_score: (points: number) => { const p = Math.round(Number(points) || 0); hudVarsRef.current.score = Number(hudVarsRef.current.score ?? 0) + p; bumpHudVars(); if (p > 0) awardPoints(p, '+' + p); },
+    get_score: () => Number(hudVarsRef.current.score ?? 0),
+    emit_event: (eventId: string) => {
+      const nodes = Array.isArray(hudRunRef.current?.cfg.nodes) ? (hudRunRef.current!.cfg.nodes as EditorNode[]) : [];
+      const ev = nodes.find((n) => (n.kind === 'on_ui_click') && n.enabled !== false && String(n.params?.buttonId ?? '') === String(eventId));
+      if (ev) fireHudEvent(String(ev.id));
+    },
+    play_sound: (s: string) => playSfx(String(s)),
+    vibrate: (ms: number) => vibrate(Math.max(10, Math.round(Number(ms) || 200))),
+    log: (m: unknown) => { try { console.log('[py]', m); } catch { /* ignore */ } },
+    tile_count: 42,
+  });
+
   const runElementPython = async (code: string) => {
     if (!code || !code.trim() || pyBusyRef.current) return;
     pyBusyRef.current = true;
     try {
       const py = await getPyodide() as any;
-      const cr = {
-        send_color: (plateId: number, r: number, g: number, b: number, intensity = 0.85) => {
-          const pid = PLATE_ID_BY_INDEX[Math.max(0, Math.round(plateId) - 1)]; if (!pid) return;
-          sendRgbToPlate({ r: clamp255(r), g: clamp255(g), b: clamp255(b) }, Math.round(Math.max(0, Math.min(1, intensity)) * 100), pid);
-        },
-        fill: (r: number, g: number, b: number, intensity = 0.85) => {
-          for (let i = 0; i < 42; i++) { const pid = PLATE_ID_BY_INDEX[i]; if (pid) sendRgbToPlate({ r: clamp255(r), g: clamp255(g), b: clamp255(b) }, Math.round(Math.max(0, Math.min(1, intensity)) * 100), pid); }
-        },
-        set_tile: (idx: number, r: number, g: number, b: number, intensity = 0.85) => {
-          const pid = PLATE_ID_BY_INDEX[Math.max(0, Math.round(idx))]; if (!pid) return;
-          sendRgbToPlate({ r: clamp255(r), g: clamp255(g), b: clamp255(b) }, Math.round(Math.max(0, Math.min(1, intensity)) * 100), pid);
-        },
-        clear: () => { void blackoutHardware(); },
-        set_variable: (name: string, value: number | string) => { hudVarsRef.current[String(name)] = value as number | string; bumpHudVars(); },
-        get_variable: (name: string) => hudVarsRef.current[String(name)] ?? 0,
-        add_score: (points: number) => { const p = Math.round(Number(points) || 0); hudVarsRef.current.score = Number(hudVarsRef.current.score ?? 0) + p; bumpHudVars(); if (p > 0) awardPoints(p, '+' + p); },
-        get_score: () => Number(hudVarsRef.current.score ?? 0),
-        emit_event: (eventId: string) => {
-          const nodes = Array.isArray(hudRunRef.current?.cfg.nodes) ? (hudRunRef.current!.cfg.nodes as EditorNode[]) : [];
-          const ev = nodes.find((n) => (n.kind === 'on_ui_click') && n.enabled !== false && String(n.params?.buttonId ?? '') === String(eventId));
-          if (ev) fireHudEvent(String(ev.id));
-        },
-        play_sound: (s: string) => playSfx(String(s)),
-        vibrate: (ms: number) => vibrate(Math.max(10, Math.round(Number(ms) || 200))),
-        log: (m: unknown) => { try { console.log('[py]', m); } catch { /* ignore */ } },
-        tile_count: 42,
-      };
-      py.registerJsModule('colorroom', cr);
+      py.registerJsModule('colorroom', buildColorroomApi());
       await py.runPythonAsync(String(code));
     } catch (e) {
       setMessage('Erreur Python : ' + String((e as Error)?.message ?? e));
+    } finally {
+      pyBusyRef.current = false;
+    }
+  };
+
+  // Variante JavaScript : même API `cr`, exécutée nativement via AsyncFunction
+  // (pas de Pyodide). Même guard de concurrence que runElementPython.
+  const runElementJs = async (code: string) => {
+    if (!code || !code.trim() || pyBusyRef.current) return;
+    pyBusyRef.current = true;
+    try {
+      const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor as new (...args: string[]) => (cr: unknown) => Promise<unknown>;
+      const fn = new AsyncFunction('cr', String(code));
+      await fn(buildColorroomApi());
+    } catch (e) {
+      setMessage('Erreur JavaScript : ' + String((e as Error)?.message ?? e));
     } finally {
       pyBusyRef.current = false;
     }
@@ -2578,12 +2597,17 @@ export default function JeuxPage() {
         const nextId = g.out.get(node.id)?.[0]; if (nextId) walk(nextId); return;
       }
 
-      // ── Script Python : exécute le code du bloc (hors-ligne via Pyodide) ──
-      // Le code tourne en asynchrone (Pyodide) ; on enchaîne immédiatement sur
-      // le bloc suivant — suffisant pour des effets (allumage, score…).
+      // ── Script Python/JS : exécute le code du bloc (hors-ligne) ──
+      // Python via Pyodide, JavaScript via AsyncFunction (param `language`).
+      // Le code tourne en asynchrone ; on enchaîne immédiatement sur
+      // le bloc suivant - suffisant pour des effets (allumage, score…).
       if (node.kind === 'script_python') {
         const code = String(params.code ?? '');
-        if (code.trim()) void runElementPython(code);
+        const lang = String(params.language ?? 'python');
+        if (code.trim()) {
+          if (lang === 'js') void runElementJs(code);
+          else void runElementPython(code);
+        }
         const nextId = g.out.get(node.id)?.[0]; if (nextId) walk(nextId); return;
       }
 
@@ -2848,7 +2872,7 @@ export default function JeuxPage() {
       }
 
       // measure_on_result : alias de measure_start (lit le résultat) ou nœud
-      // de « branchement après mesure » — continue immédiatement (le résultat
+      // de « branchement après mesure » - continue immédiatement (le résultat
       // a déjà été stocké par measure_start dans hudVarsRef).
       if (node.kind === 'measure_on_result') {
         const varX  = String(params.varX  ?? 'meas_x');
@@ -3384,7 +3408,7 @@ export default function JeuxPage() {
     if (safePoints > 0) {
       setScorePlusValue(safePoints);
       setScorePlusAnimKey((k) => k + 1);
-      // Persister le delta de score en DB — debounce client 6s pour éviter le 429
+      // Persister le delta de score en DB - debounce client 6s pour éviter le 429
       const gameName = (hudRun?.name ?? currentGame ?? 'Jeu').slice(0, 100);
       const now = Date.now();
       const last = scoreSubmitLastRef.current[gameName] ?? 0;
@@ -3471,7 +3495,7 @@ export default function JeuxPage() {
     // Spawn first piece
     spawnTetrixPiece();
 
-    // Start game loop — grille minuscule (6×7) : vitesse de base pilotée par le
+    // Start game loop - grille minuscule (6×7) : vitesse de base pilotée par le
     // nœud game_tetris (tetrixBaseSpeedRef), montant très doucement avec le niveau.
     const speed = Math.max(1200, tetrixBaseSpeedRef.current - (tetrixLevel - 1) * 150);
     tetrixTimerRef.current = window.setInterval(() => {
@@ -3880,7 +3904,7 @@ export default function JeuxPage() {
 
   // Envoie une couleur à une dalle. Passe par scheduleSetCanal : déduplication
   // par canal (on n'envoie QUE ce qui change) + envois sérialisés en un seul
-  // POST batch — supervision.exe ne reçoit jamais de rafale de requêtes stale.
+  // POST batch - supervision.exe ne reçoit jamais de rafale de requêtes stale.
   function sendColorToPlateImmediate(rgb: TargetColor, intensity100: number, plateId: number) {
     sendRgbToPlate(rgb, intensity100, plateId);
   }
@@ -3891,7 +3915,7 @@ export default function JeuxPage() {
     for (let i = 0; i < 32; i++) scheduleSetCanal(plateId, i, 0);
   }
 
-  // Envoie des couleurs à plusieurs dalles — regroupées en un seul POST batch.
+  // Envoie des couleurs à plusieurs dalles - regroupées en un seul POST batch.
   function sendColorsToPlates(platesData: { plateId: number; rgb: TargetColor; intensity: number }[]) {
     for (const { plateId, rgb, intensity } of platesData) {
       sendRgbToPlate(rgb, intensity, plateId);
@@ -5038,7 +5062,7 @@ export default function JeuxPage() {
                       <QrCode value={(typeof window !== 'undefined' ? window.location.origin : '') + '/jouer'} size={180} />
                     </div>
                     <div style={{ marginTop: 12, fontSize: 15, fontWeight: 800 }}>{mpPlayers.length} joueur{mpPlayers.length > 1 ? 's' : ''} connecté{mpPlayers.length > 1 ? 's' : ''}</div>
-                    <div style={{ marginTop: 4, fontSize: 12, opacity: 0.6 }}>👁️ Regarde les dalles de la Color Room, pas l&apos;écran.</div>
+                    <div style={{ marginTop: 4, fontSize: 12, opacity: 0.6, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}><Eye size={13} /> Regarde les dalles de la Color Room, pas l&apos;écran.</div>
                   </div>
                 )}
                 {gameActive && customRun ? (
@@ -5421,7 +5445,7 @@ export default function JeuxPage() {
                   );
                 })()}
 
-                {/* Jeux natifs lancés depuis un nœud de l'éditeur (game_*) — exécutent
+                {/* Jeux natifs lancés depuis un nœud de l'éditeur (game_*) - exécutent
                     le VRAI composant, donc identiques aux jeux de la liste. */}
                 {gameActive && !tetrisStandalone && hudRun && (() => {
                   const nodes = Array.isArray(hudRun.cfg.nodes) ? (hudRun.cfg.nodes as EditorNode[]) : [];
@@ -6201,7 +6225,7 @@ export default function JeuxPage() {
                     <span style={{ display: 'inline-flex', gap: 8, alignItems: 'center' }}>
                       <span style={{ width: 9, height: 9, borderRadius: '50%', flexShrink: 0, background: apiUp == null ? '#9ca3af' : apiUp ? '#22c55e' : '#ef4444', boxShadow: apiUp ? '0 0 8px #22c55e' : 'none' }} /> API Supervision
                     </span>
-                    <span>{apiUp == null ? '—' : apiUp ? 'Connectée' : 'Hors ligne'}</span>
+                    <span>{apiUp == null ? '-' : apiUp ? 'Connectée' : 'Hors ligne'}</span>
                   </div>
                   <div className="instrument-reading">
                     <span style={{ display: 'inline-flex', gap: 8, alignItems: 'center' }}>
@@ -6524,7 +6548,7 @@ export default function JeuxPage() {
                 <div style={{ width:44, height:44, borderRadius:14, background:'rgba(239,68,68,0.15)', border:'1px solid rgba(239,68,68,0.3)', display:'grid', placeItems:'center', flexShrink:0 }}>
                   {hwCheckModal.checking
                     ? <span style={{ width:20, height:20, borderRadius:'50%', border:'2.5px solid rgba(255,255,255,.2)', borderTopColor:'#fff', animation:'loginSpin .7s linear infinite', display:'inline-block' }} />
-                    : <span style={{ fontSize:20 }}>⚠️</span>}
+                    : <AlertTriangle size={20} color="#fca5a5" />}
                 </div>
                 <div>
                   <div style={{ fontSize:16, fontWeight:900, color:'#f8fafc' }}>
@@ -6561,7 +6585,7 @@ export default function JeuxPage() {
                   onClick={() => void checkHardwareBeforeStart()}
                   style={{ flex:1, padding:'12px', borderRadius:14, border:'none', cursor:'pointer', fontFamily:'inherit', fontWeight:800, fontSize:14, color:'#fff', background:'linear-gradient(135deg,#4361ee,#7c3aed)', boxShadow:'0 4px 16px rgba(67,97,238,.35)' }}
                 >
-                  🔄 Réessayer
+                  <RefreshCcw size={15} style={{ verticalAlign:'-2px', marginRight:6 }} /> Réessayer
                 </button>
                 <button
                   onClick={() => setHwCheckModal(null)}

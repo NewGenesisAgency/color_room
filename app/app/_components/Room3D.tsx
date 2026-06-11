@@ -20,7 +20,7 @@ import gsap from 'gsap';
 import { LogIn, ArrowLeft } from 'lucide-react';
 
 /*
- * ColorRoom — ultra-realistic two-room installation.
+ * ColorRoom - ultra-realistic two-room installation.
  * Custom GLSL panel shader (inner glow + near-invisible edge, no bezel).
  * Additive glow halos per plate. HDR env map. Pure-white architecture.
  *
@@ -30,7 +30,7 @@ import { LogIn, ArrowLeft } from 'lucide-react';
 
 // ── Layout ────────────────────────────────────────────────────────
 const PITCH   = 1.0;
-const PS      = 0.93;   // plate face — wide fill, thin gap
+const PS      = 0.93;   // plate face - wide fill, thin gap
 const PT      = 0.05;   // plate thickness
 
 const W_ROWS  = 3;
@@ -40,13 +40,13 @@ const ROOM_W  = COLS  * PITCH;   // 3.0
 const ROOM_H  = W_ROWS * PITCH;  // 3.0
 const ROOM_D  = C_ROWS * PITCH;  // 4.0 (ceiling plate span)
 
-const CEIL_Y  = ROOM_H + 0.35;  // 3.35 — ceiling just above top plates
+const CEIL_Y  = ROOM_H + 0.35;  // 3.35 - ceiling just above top plates
 const FLOOR_Y = -0.25;           // slightly below bottom plate edge
 
 const PILLAR_W = 0.022;          // very thin
 const HALF_GAP = 0.22;
 const GAP      = PILLAR_W + HALF_GAP * 2;   // 0.49
-const MARGIN_X = 0.30;           // narrow — like reference
+const MARGIN_X = 0.30;           // narrow - like reference
 
 const L_OX = MARGIN_X;
 const R_OX = L_OX + ROOM_W + GAP;
@@ -76,7 +76,7 @@ const RR_PIV = new THREE.Vector3(-R_CX,     -SCENE_CY, PIV_Z);
 
 // ── Room shell extents ────────────────────────────────────────────
 const SHELL_BACK   = -0.3;
-const SHELL_FRONT  = 5.5;   // reduced — less empty depth
+const SHELL_FRONT  = 5.5;   // reduced - less empty depth
 const SHELL_CZ     = (SHELL_BACK + SHELL_FRONT) / 2;
 const SHELL_D      = SHELL_FRONT - SHELL_BACK;
 // Pillar stops well before camera (ends at z=4)
@@ -96,11 +96,11 @@ function buildMeta(): PM[] {
     const lc   = col % 3;
     const ox   = room === 0 ? L_OX : R_OX;
     if (row < C_ROWS) {
-      // Ceiling first (rows 0-3) — row 0 = closest to user, row 3 = near back wall
+      // Ceiling first (rows 0-3) - row 0 = closest to user, row 3 = near back wall
       const cr = C_ROWS - 1 - row;
       out.push({ pos: new THREE.Vector3(ox + lc * PITCH, CEIL_Y, (cr + 0.5) * PITCH), rot: new THREE.Euler(Math.PI / 2, 0, 0), isWall: false });
     } else {
-      // Back wall (rows 4-6) — row 4 = top, row 6 = bottom
+      // Back wall (rows 4-6) - row 4 = top, row 6 = bottom
       const wr = row - C_ROWS;
       const y  = (W_ROWS - 1 - wr) * PITCH + PITCH / 2;
       out.push({ pos: new THREE.Vector3(ox + lc * PITCH, y, 0), rot: new THREE.Euler(0, 0, 0), isWall: true });
@@ -117,7 +117,7 @@ function css3(s: string) {
 }
 
 // ── Panel GLSL shader ─────────────────────────────────────────────
-// No visible dark border — bevel only at extreme last 6% of edge, 10% max.
+// No visible dark border - bevel only at extreme last 6% of edge, 10% max.
 // Inner glow brightens centre when lit.
 const PANEL_VERT_INJECT_DECL = `varying vec2 vPanelUV;`;
 const PANEL_VERT_INJECT_BODY = `vPanelUV = uv;`;
@@ -270,7 +270,7 @@ export default function Room3D({ plateColors, plateActive, onPlateClick, height 
     scene.add(pivot);
     pivotRef.current = pivot;
 
-    // ── HDR environment — async, doesn't block first frame ────────
+    // ── HDR environment - async, doesn't block first frame ────────
     let hdrTex: THREE.Texture | null = null;
     new RGBELoader().load('/env.hdr', (tex) => {
       tex.mapping = THREE.EquirectangularReflectionMapping;
@@ -293,7 +293,7 @@ export default function Room3D({ plateColors, plateActive, onPlateClick, height 
 
     // Wall texture repeated ~2×2 per room panel
     const wallTex = loadTex('/textures/wall.jpg', 4, 3);
-    // Floor texture — 4×4 repeat as requested
+    // Floor texture - 4×4 repeat as requested
     const floorTex = loadTex('/textures/floor.png', 4, 4);
 
     // ── Glow halo texture ─────────────────────────────────────────
@@ -348,14 +348,14 @@ export default function Room3D({ plateColors, plateActive, onPlateClick, height 
     cs.position.set(SCENE_CX, CEIL_Y + 0.11, SHELL_CZ);
     pivot.add(cs);
 
-    // Floor — wide, glossy white
+    // Floor - wide, glossy white
     const fl = new THREE.Mesh(new THREE.PlaneGeometry(shellW + 1.2, SHELL_D + 0.4), fMat);
     fl.rotation.x = -Math.PI / 2;
     fl.position.set(SCENE_CX, FLOOR_Y, SHELL_CZ);
     fl.receiveShadow = true;
     pivot.add(fl);
 
-    // Side walls — symmetric around SCENE_CX
+    // Side walls - symmetric around SCENE_CX
     const swGeo = new THREE.BoxGeometry(0.22, wallH, SHELL_D + 0.2);
     [SCENE_CX - shellW / 2 - 0.11, SCENE_CX + shellW / 2 + 0.11].forEach((wx) => {
       const sw = new THREE.Mesh(swGeo, wMat);
@@ -364,7 +364,7 @@ export default function Room3D({ plateColors, plateActive, onPlateClick, height 
       pivot.add(sw);
     });
 
-    // Thin black pillar — stops before camera
+    // Thin black pillar - stops before camera
     const pillar = new THREE.Mesh(
       new THREE.BoxGeometry(PILLAR_W, CEIL_Y - FLOOR_Y + 0.5, PILLAR_D),
       pMat,
@@ -373,7 +373,7 @@ export default function Room3D({ plateColors, plateActive, onPlateClick, height 
     pillar.castShadow = true;
     pivot.add(pillar);
 
-    // ── Plates + glow halos — NO bezels ───────────────────────────
+    // ── Plates + glow halos - NO bezels ───────────────────────────
     const platGeo = new THREE.BoxGeometry(PS, PS, PT);
     const gGeoS   = new THREE.PlaneGeometry(PS * 1.35, PS * 1.35);
     const gGeoL   = new THREE.PlaneGeometry(PS * 2.60, PS * 2.60);
@@ -399,7 +399,7 @@ export default function Room3D({ plateColors, plateActive, onPlateClick, height 
       plateMats.push(pm);
       clickMeshes.push(plate);
 
-      // Glow halo — tight
+      // Glow halo - tight
       const gm1 = new THREE.MeshBasicMaterial({
         map: glowTex, color: 0xffffff, transparent: true, opacity: 0,
         blending: THREE.AdditiveBlending, depthWrite: false,
@@ -410,7 +410,7 @@ export default function Room3D({ plateColors, plateActive, onPlateClick, height 
       if (m.isWall) gh1.position.z += 0.07; else gh1.position.y -= 0.07;
       pivot.add(gh1);
 
-      // Glow halo — wide
+      // Glow halo - wide
       const gm2 = new THREE.MeshBasicMaterial({
         map: glowTex, color: 0xffffff, transparent: true, opacity: 0,
         blending: THREE.AdditiveBlending, depthWrite: false,
@@ -550,7 +550,7 @@ export default function Room3D({ plateColors, plateActive, onPlateClick, height 
         </button>
       </div>
 
-      {/* Vue d'ensemble — top-left in left room, top-right in right room */}
+      {/* Vue d'ensemble - top-left in left room, top-right in right room */}
       {view === 'left' && (
         <button onClick={goOverview} style={BACK_BTN}>
           <ArrowLeft size={14} /> Vue d&apos;ensemble
@@ -562,7 +562,7 @@ export default function Room3D({ plateColors, plateActive, onPlateClick, height 
         </button>
       )}
 
-      {/* Switch room button — opposite corner */}
+      {/* Switch room button - opposite corner */}
       {view === 'left' && (
         <button onClick={() => goRoom('right')} style={{ ...BACK_BTN, left: 'auto', right: 14 }}>
           Salle droite <LogIn size={14} />

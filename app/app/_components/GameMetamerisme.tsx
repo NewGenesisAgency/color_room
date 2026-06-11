@@ -189,7 +189,7 @@ export default function GameMetamerisme({
   const timerRef = useRef<number>(0);
   const hwRef    = useRef<number>(0);
 
-  // Tiles always show the current illumination — same colour as the card background
+  // Tiles always show the current illumination - same colour as the card background
   const sendIllumToTiles = useCallback((il: RGB) => {
     window.clearTimeout(hwRef.current);
     hwRef.current = window.setTimeout(() => {
@@ -336,7 +336,7 @@ export default function GameMetamerisme({
             Un terme de physique lumineuse s&apos;affiche dans une couleur précise.
             Les dalles illuminent le fond avec la même couleur que l&apos;écran.{' '}
             <strong style={{ color: '#a78bfa' }}>CACHER :</strong> ajustez l&apos;éclairage jusqu&apos;à rendre le mot invisible.{' '}
-            <strong style={{ color: '#f59e0b' }}>RÉVÉLER :</strong> le mot est déjà fondu — faites-le réapparaître.
+            <strong style={{ color: '#f59e0b' }}>RÉVÉLER :</strong> le mot est déjà fondu - faites-le réapparaître.
           </p>
           <p style={{ fontSize: 12, color: 'rgba(255,255,255,.35)', margin: 0 }}>
             {TOTAL_ROUNDS} manches · {ROUND_TIME}s/manche · {TOTAL_ROUNDS * 1000} pts max
@@ -407,7 +407,7 @@ export default function GameMetamerisme({
           <button onClick={() => validate()} style={S.stopBtn}>⏹</button>
         </div>
 
-        {/* Word display — fond = illum = couleur des dalles */}
+        {/* Word display - fond = illum = couleur des dalles */}
         <div style={{
           ...S.glass,
           overflow: 'hidden',
@@ -428,7 +428,7 @@ export default function GameMetamerisme({
             </div>
           </div>
 
-          {/* The word — background mirrors tile colour exactly */}
+          {/* The word - background mirrors tile colour exactly */}
           <div style={{
             padding: '36px 24px',
             background: css(illum),
@@ -487,8 +487,8 @@ export default function GameMetamerisme({
           </div>
           <div style={{ fontSize: 10, color: 'rgba(255,255,255,.3)', marginTop: 3 }}>
             {round.mode === 'cacher'
-              ? `Cible : < ${Math.round(HIDE_WIN_DIST * 100)}% — rendez le fond identique à la couleur du mot`
-              : `Cible : > ${Math.round(REVEAL_WIN_DIST * 100)}% — éloignez le fond de la couleur du mot`}
+              ? `Cible : < ${Math.round(HIDE_WIN_DIST * 100)}% - rendez le fond identique à la couleur du mot`
+              : `Cible : > ${Math.round(REVEAL_WIN_DIST * 100)}% - éloignez le fond de la couleur du mot`}
           </div>
         </div>
 
@@ -553,7 +553,7 @@ export default function GameMetamerisme({
             background: hasWon ? '#4ade80' : 'linear-gradient(135deg,#7c3aed,#06d6a0)',
             color: hasWon ? '#000' : '#fff', fontWeight: 700, fontSize: 14, cursor: 'pointer',
           }}>
-            {hasWon ? '✓ Parfait — Valider !' : 'Valider ma réponse'}
+            {hasWon ? '✓ Parfait - Valider !' : 'Valider ma réponse'}
           </button>
         )}
 

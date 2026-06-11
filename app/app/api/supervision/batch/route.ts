@@ -29,7 +29,7 @@ const GAME_TIMEOUT_MS = 700;
 // L'ancienne implémentation utilisait :
 //   while (globalHwInFlight >= N) await new Promise(r => setTimeout(r, 5));
 // Problème : quand force() est appelé, les promises dormantes continuent de
-// s'exécuter dès qu'un slot se libère — même si leurs données sont obsolètes.
+// s'exécuter dès qu'un slot se libère - même si leurs données sont obsolètes.
 // Résultat : accumulation indéfinie de requêtes stale dans la file de supervision.exe,
 // qui sature sa connexion TCP et ralentit exponentiellement.
 //
@@ -142,7 +142,7 @@ export async function POST(req: Request) {
 
     // ── Snapshot du signal de force pour CE batch ─────────────────────────────
     // On capture le signal APRÈS forceReset() pour ne pas écouter le signal
-    // déjà aborté — on veut le nouveau signal de la nouvelle génération.
+    // déjà aborté - on veut le nouveau signal de la nouvelle génération.
     const batchForceSignal = forceAbortCtrl.signal;
 
     // ── Propager l'annulation client (disconnect) ─────────────────────────────

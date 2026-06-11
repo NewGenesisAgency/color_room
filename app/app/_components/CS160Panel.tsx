@@ -144,7 +144,7 @@ export default function CS160Panel({ className = '' }: CS160PanelProps) {
         const status = await cs160Service.getStatus();
         setDeviceInfo(status.deviceInfo || 'CS-160');
         setActiveCalibCh(status.calibChannel);
-        log('Connecté — ' + (status.deviceInfo || 'CS-160'));
+        log('Connecté - ' + (status.deviceInfo || 'CS-160'));
       } else {
         log('Erreur de connexion');
       }
@@ -183,7 +183,7 @@ export default function CS160Panel({ className = '' }: CS160PanelProps) {
     setIsMeasuring(true);
     log('Calibration RGB…');
     const ok = await cs160Service.performRGBCalibration(trueRed, trueGreen, trueBlue, calibId, targetChannel);
-    if (ok) { setActiveCalibCh(targetChannel); log(`Calibration RGB terminée — canal ${targetChannel}`); }
+    if (ok) { setActiveCalibCh(targetChannel); log(`Calibration RGB terminée - canal ${targetChannel}`); }
     else log('Erreur calibration RGB');
     setIsMeasuring(false);
   };
@@ -193,7 +193,7 @@ export default function CS160Panel({ className = '' }: CS160PanelProps) {
     setIsMeasuring(true);
     log('Calibration Single Point…');
     const ok = await cs160Service.performSinglePointCalibration(trueWhite, calibId, targetChannel);
-    if (ok) { setActiveCalibCh(targetChannel); log(`Calibration terminée — canal ${targetChannel}`); }
+    if (ok) { setActiveCalibCh(targetChannel); log(`Calibration terminée - canal ${targetChannel}`); }
     else log('Erreur calibration');
     setIsMeasuring(false);
   };

@@ -856,7 +856,7 @@
   padding-left: 12px;
 }
 
-/* Menu contextuel d'un nœud (clic droit) — compact, sans recherche */
+/* Menu contextuel d'un nœud (clic droit) - compact, sans recherche */
 .bp-menu--node { padding: 6px; }
 .bp-menu__nodehead {
   font-size: 10px;
@@ -934,7 +934,7 @@
   border-radius: 18px;
   border: 1px solid rgba(255,255,255,0.9);
   /* Liquid glass blanc PERFORMANT : dégradé quasi-opaque + reflet doux.
-     PAS de backdrop-filter ici — un blur par bloc force le GPU à recomposer
+     PAS de backdrop-filter ici - un blur par bloc force le GPU à recomposer
      tout le canvas à chaque frame (drag impossible, lag massif). Le rendu
      reste identique car le fond du canvas est uni et clair. */
   background: linear-gradient(180deg, rgba(255,255,255,0.97) 0%, rgba(250,251,254,0.93) 100%);
@@ -948,7 +948,7 @@
   transition: box-shadow 0.15s ease, border-color 0.15s ease;
 }
 
-/* Pastille d'icône colorée (catégorie) — minimaliste */
+/* Pastille d'icône colorée (catégorie) - minimaliste */
 .bp-node__chip {
   display: grid;
   place-items: center;
@@ -2420,7 +2420,7 @@ input[type='range'].slider-intensity::-moz-range-progress {
 /* ── Nœuds - WHITE LIQUID GLASS ──────────────────────────────────────────────
    Le visuel de référence est défini plus haut (.bp-node ligne ~935) : voile
    blanc translucide + blur + ombres douces. Ici on ne garde QUE les détails
-   spécifiques (pins UE5 en version claire) — plus aucune surcharge sombre. */
+   spécifiques (pins UE5 en version claire) - plus aucune surcharge sombre. */
 
 /* Sous-titre catégorie : bandeau clair, texte coloré par catégorie (inline) */
 .bp-node__kind-bar {
@@ -2446,40 +2446,57 @@ input[type='range'].slider-intensity::-moz-range-progress {
 }
 .bp-pin__label { color: rgba(16,20,34,0.55); }
 
-/* Dot = flèche d'exécution UE5, claire et lisible sur fond blanc */
+/* Dot = flèche d'exécution « liquid glass » : petit triangle blanc translucide,
+   dégradé bleuté, respiration lumineuse au repos, pop élastique au survol.
+   NB : box-shadow est rogné par clip-path → on utilise filter:drop-shadow
+   (appliqué APRÈS le clip, il épouse la forme du triangle). */
 .bp-dot {
-  width: 13px;
-  height: 13px;
-  border-radius: 2px;
-  background: rgba(67,97,238,0.45);
-  box-shadow: none;
-  border: 1.5px solid rgba(67,97,238,0.30);
-  clip-path: polygon(0% 15%, 60% 15%, 100% 50%, 60% 85%, 0% 85%);
+  width: 11px;
+  height: 11px;
+  border-radius: 0;
+  border: none;
+  background: linear-gradient(135deg, rgba(255,255,255,0.98) 0%, rgba(219,230,255,0.85) 55%, rgba(157,180,248,0.75) 100%);
+  clip-path: polygon(0% 12%, 58% 12%, 100% 50%, 58% 88%, 0% 88%);
+  animation: bp-dot-breathe 3.2s ease-in-out infinite;
+  transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes bp-dot-breathe {
+  0%, 100% { filter: drop-shadow(0 1px 2px rgba(67,97,238,0.30)) drop-shadow(0 0 1px rgba(67,97,238,0.5)); }
+  50%      { filter: drop-shadow(0 0 5px rgba(67,97,238,0.55)) drop-shadow(0 0 1px rgba(67,97,238,0.6)); }
+}
+
+.bp-pin:hover .bp-dot {
+  animation: none;
+  transform: scale(1.5);
+  filter: drop-shadow(0 0 7px rgba(67,97,238,0.75)) drop-shadow(0 0 16px rgba(67,97,238,0.35));
 }
 
 .bp-dot--active {
-  background: #4361ee;
-  border-color: #6d8bf5;
-  clip-path: polygon(0% 15%, 60% 15%, 100% 50%, 60% 85%, 0% 85%);
-  box-shadow: 0 0 10px rgba(67,97,238,0.45), 0 0 20px rgba(67,97,238,0.20);
+  background: linear-gradient(135deg, #ffffff 0%, #c0d0ff 45%, #4361ee 100%);
+  animation: bp-dot-snap 0.45s cubic-bezier(0.34, 1.56, 0.64, 1), bp-dot-breathe 3.2s ease-in-out 0.45s infinite;
 }
 
 .bp-dot--hot {
-  background: #f59e0b;
-  border-color: #fbbf24;
-  clip-path: polygon(0% 15%, 60% 15%, 100% 50%, 60% 85%, 0% 85%);
-  box-shadow: 0 0 10px rgba(245,158,11,0.55), 0 0 20px rgba(245,158,11,0.25);
+  background: linear-gradient(135deg, #fff7e8 0%, #ffd98a 45%, #f59e0b 100%);
+  animation: none;
+  filter: drop-shadow(0 0 6px rgba(245,158,11,0.65)) drop-shadow(0 0 14px rgba(245,158,11,0.30));
+}
+
+@keyframes bp-dot-snap {
+  0%   { transform: scale(0.6); }
+  45%  { transform: scale(1.7); }
+  100% { transform: scale(1); }
 }
 
 .bp-node--active .bp-dot {
-  background: #4361ee;
-  border-color: #6d8bf5;
-  box-shadow: 0 0 8px rgba(67,97,238,0.40);
+  background: linear-gradient(135deg, #ffffff 0%, #c0d0ff 45%, #4361ee 100%);
+  filter: drop-shadow(0 0 6px rgba(67,97,238,0.55));
 }
 
 /* Pin out - flèche dans l'autre sens */
 .bp-pin--out .bp-dot {
-  clip-path: polygon(40% 15%, 100% 15%, 100% 85%, 40% 85%, 0% 50%);
+  clip-path: polygon(42% 12%, 100% 12%, 100% 88%, 42% 88%, 0% 50%);
 }
 
 /* ── Wires - POINTS lumineux qui circulent (flux de données) ──────────────── */
@@ -3100,3 +3117,74 @@ input[type='range'].slider-intensity::-moz-range-progress {
     box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.22), 0 0 24px 6px rgba(34, 197, 94, 0.38);
   }
 }
+
+/* ════════════════════════════════════════════════════════════════════════════
+   ANIMATIONS DE CONNEXION / DÉCONNEXION DES CÂBLES (liquid glass)
+   - naissance : le câble surgit avec un halo qui se résorbe (pop élastique)
+   - mort : le fantôme du câble se dissout en tombant
+   - onde : double anneau de choc au point d'impact (bleu = lien, rouge = coupe)
+   ════════════════════════════════════════════════════════════════════════════ */
+
+.bp-wire--born {
+  animation: bp-wire-flow 0.45s linear infinite, bp-wire-born 0.95s cubic-bezier(0.22, 1, 0.36, 1) 1;
+}
+
+@keyframes bp-wire-born {
+  0%   { stroke-width: 11; opacity: 0;   filter: drop-shadow(0 0 22px rgba(130,160,250,1)); }
+  30%  { stroke-width: 8;  opacity: 1;   filter: drop-shadow(0 0 16px rgba(130,160,250,0.95)); }
+  70%  { stroke-width: 5;  opacity: 1;   filter: drop-shadow(0 0 10px rgba(130,160,250,0.8)); }
+  100% { stroke-width: 3.6; opacity: 0.95; filter: drop-shadow(0 0 6px rgba(130,160,250,0.65)); }
+}
+
+.bp-wire--dying {
+  animation: bp-wire-die 0.5s ease-out forwards;
+  pointer-events: none;
+}
+
+@keyframes bp-wire-die {
+  0%   { opacity: 0.9; transform: translateY(0); }
+  100% { opacity: 0; stroke-width: 0.5; transform: translateY(10px); filter: blur(4px); }
+}
+
+/* Ondes de choc : cercles SVG animés en scale autour de leur centre */
+.bp-ripple circle {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.bp-ripple__core {
+  fill: rgba(255,255,255,0.95);
+  stroke: rgba(67,97,238,0.85);
+  stroke-width: 1.5;
+  animation: bp-ripple-core 0.75s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.bp-ripple__ring {
+  fill: none;
+  stroke: rgba(67,97,238,0.6);
+  stroke-width: 2;
+  animation: bp-ripple-ring 0.75s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.bp-ripple__ring--late {
+  stroke: rgba(150,180,255,0.55);
+  stroke-width: 1.4;
+  animation-delay: 0.12s;
+  animation-fill-mode: both;
+}
+
+@keyframes bp-ripple-core {
+  0%   { transform: scale(0.3); opacity: 1; }
+  55%  { transform: scale(1.6); opacity: 0.95; }
+  100% { transform: scale(0.8); opacity: 0; }
+}
+
+@keyframes bp-ripple-ring {
+  0%   { transform: scale(0.4); opacity: 0.95; }
+  100% { transform: scale(5);   opacity: 0; }
+}
+
+/* Variante « coupe » (déconnexion) : rouge */
+.bp-ripple--cut .bp-ripple__core { stroke: rgba(239,68,68,0.85); }
+.bp-ripple--cut .bp-ripple__ring { stroke: rgba(239,68,68,0.6); }
+.bp-ripple--cut .bp-ripple__ring--late { stroke: rgba(252,165,165,0.55); }

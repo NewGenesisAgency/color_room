@@ -7,7 +7,7 @@
  * Rend le "fer à cheval" CIE 1931 avec son gamut peint pixel par pixel, le locus
  * spectral, le triangle sRGB, les axes et le point blanc D65. Le rendu est séparé
  * en deux couches : un fond statique dessiné une seule fois (par taille) et un
- * overlay redessiné à chaque changement de `markers`/`polylines` — ce qui rend le
+ * overlay redessiné à chaque changement de `markers`/`polylines` - ce qui rend le
  * déplacement de marqueurs (cible, mesure, point joueur) fluide. Utilisé par le
  * widget de mesure CIE et par plusieurs jeux de couleur. Les props principales
  * sont `markers` (points à afficher), `polylines` (tracés type triangle de
@@ -21,7 +21,7 @@ import { useEffect, useRef } from 'react';
 // repris du diagramme de /mesure et rendu réutilisable pour les jeux.
 // Deux couches : un fond statique (gamut + locus + triangle sRGB + axes) dessiné
 // une seule fois, et un overlay redessiné à chaque changement de marqueurs
-// (cible / mesure / point joueur) — performant pour le glissement de sliders.
+// (cible / mesure / point joueur) - performant pour le glissement de sliders.
 
 const SPECTRAL_LOCUS: { nm: number; x: number; y: number }[] = [
   { nm: 380, x: 0.1741, y: 0.0050 }, { nm: 390, x: 0.1738, y: 0.0049 }, { nm: 400, x: 0.1733, y: 0.0048 },
@@ -126,7 +126,7 @@ export default function CieDiagramCanvas({
     (size - PAD) - (y - Y_MIN) / (Y_MAX - Y_MIN) * (size - 2 * PAD),
   ];
 
-  // ── Fond statique (gamut coloré) — dessiné une fois par taille ──────────────
+  // ── Fond statique (gamut coloré) - dessiné une fois par taille ──────────────
   useEffect(() => {
     const canvas = bgRef.current;
     if (!canvas) return;
@@ -208,7 +208,7 @@ export default function CieDiagramCanvas({
     ctx.fillText('D65', dx + 6, dy + 4);
   }, [size]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Overlay des marqueurs — redessiné à chaque changement ──────────────────
+  // ── Overlay des marqueurs - redessiné à chaque changement ──────────────────
   useEffect(() => {
     const canvas = fgRef.current;
     if (!canvas) return;

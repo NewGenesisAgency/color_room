@@ -112,7 +112,7 @@ RÈGLES :
 - Sois COHÉRENT : chaque eventId d'UI doit avoir son nœud on_ui_click; chaque variable affichée doit être écrite par la logique.
 - Si un "JEU ACTUEL" est fourni, MODIFIE-le selon la demande et renvoie le jeu COMPLET mis à jour (jamais un diff ni un fragment). Conserve ce qui n'est pas concerné.
 
-EXEMPLE de sortie valide (jeu de réflexe simple — inspire-t'en) :
+EXEMPLE de sortie valide (jeu de réflexe simple - inspire-t'en) :
 {"name":"Tape la dalle","icon":"Zap","difficulty":2,"description":"Clique les dalles allumées pour marquer.","bgColor":"#0d1119","accentColor":"#22d3ee","nodes":[{"kind":"event_begin","name":"Démarrer","params":{},"x":80,"y":80},{"kind":"variable_set","name":"Score 0","params":{"name":"score","value":0,"op":"set"},"x":320,"y":80},{"kind":"fill","name":"Allumer","params":{"color":"#22d3ee","intensity":0.7,"mask":"all"},"x":560,"y":80},{"kind":"on_plate_click","name":"Clic dalle","params":{},"x":80,"y":300},{"kind":"add_score","name":"Plus 1","params":{"amount":1},"x":320,"y":300},{"kind":"play_sound","name":"Son","params":{"sound":"coin"},"x":560,"y":300}],"edges":[[0,1],[1,2],[3,4],[4,5]],"ui":[{"kind":"title_banner","x":20,"y":20,"width":400,"height":60,"text":"Tape la dalle"},{"kind":"score_display","x":20,"y":100,"width":200,"height":90,"varBind":"score","text":"Score"}]}
 
 - Génère un jeu complet et JOUABLE, pas un squelette. Réponds en JSON pur.`;
@@ -266,7 +266,7 @@ async function callOllama(sys: string, user: string): Promise<GameJson | null> {
     // Remonte le VRAI message d'Ollama (ex: "model not found, try pulling it first", OOM…)
     let detail = '';
     try { detail = String((await res.json())?.error ?? ''); } catch { try { detail = await res.text(); } catch { /* ignore */ } }
-    throw new Error(`HTTP ${res.status}${detail ? ' — ' + detail.slice(0, 240) : ''}`);
+    throw new Error(`HTTP ${res.status}${detail ? ' - ' + detail.slice(0, 240) : ''}`);
   }
   const data = await res.json();
   const text: string | undefined = data?.response;
@@ -338,7 +338,7 @@ export async function POST(req: Request) {
     }
   }
 
-  // ── Gemini (cloud) — modèle choisi ou cascade automatique ──────────────────
+  // ── Gemini (cloud) - modèle choisi ou cascade automatique ──────────────────
   if (hasKey && (!chosenModel || isGeminiModel(chosenModel))) {
     // Si modèle spécifique demandé, essaie-le en premier ; sinon cascade complète.
     const models = chosenModel
@@ -354,9 +354,9 @@ export async function POST(req: Request) {
         const raw = await callOllama(systemInstructionLite(tileCount), userContent);
         if (raw) {
           const game = sanitize(raw, tileCount);
-          if (game.nodes.length > 0) return NextResponse.json({ ok: true, model: `ollama/${fallbackModel}`, fallback: true, fallbackReason: 'Gemini non joignable (>5s) — bascule locale', game });
+          if (game.nodes.length > 0) return NextResponse.json({ ok: true, model: `ollama/${fallbackModel}`, fallback: true, fallbackReason: 'Gemini non joignable (>5s) - bascule locale', game });
         }
-      } catch { /* ignore — on renvoie l'erreur Gemini */ }
+      } catch { /* ignore - on renvoie l'erreur Gemini */ }
       return NextResponse.json({ ok: false, error: 'GEMINI_UNREACHABLE', message: 'Gemini n\'a pas répondu dans les 5 secondes et le modèle local est indisponible. Vérifie ta connexion ou installe Ollama.' }, { status: 503 });
     }
 
@@ -379,7 +379,7 @@ export async function POST(req: Request) {
       const raw = await callOllama(systemInstructionLite(tileCount), userContent);
       if (raw) {
         const game = sanitize(raw, tileCount);
-        if (game.nodes.length > 0) return NextResponse.json({ ok: true, model: `ollama/${fallbackModel}`, fallback: true, fallbackReason: 'Gemini a échoué — bascule locale', game });
+        if (game.nodes.length > 0) return NextResponse.json({ ok: true, model: `ollama/${fallbackModel}`, fallback: true, fallbackReason: 'Gemini a échoué - bascule locale', game });
       }
     } catch { /* ignore */ }
 

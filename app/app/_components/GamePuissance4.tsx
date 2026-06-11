@@ -14,7 +14,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Brain, Circle, Cpu, Flame, Minus, Play, RotateCcw, Smartphone, Square, Star, Trophy, Users, Zap } from 'lucide-react';
+import { Brain, Circle, Cpu, Eye, Flame, Minus, Play, RotateCcw, Smartphone, Square, Star, Trophy, Users, Zap } from 'lucide-react';
 import type { GameTileProps } from './GameColorSpeed';
 import { SHOW_SCREEN_BOARD } from '@/lib/game/displayMode';
 import { playSfx, vibrate } from '@/lib/audio/sfx';
@@ -30,7 +30,7 @@ type Cell = 0 | 1 | 2;
 type Grid = Cell[][];
 type Mode = 'pvp' | 'cpu' | 'online';
 type Phase = 'ready' | 'playing' | 'finished' | 'online';
-/** État de la salle online (poll /api/p4/state) — board de 42 cases '', 'R' ou 'J'. */
+/** État de la salle online (poll /api/p4/state) - board de 42 cases '', 'R' ou 'J'. */
 type OnlineState = { board: string[]; turn: string; winner: string | null; status: string; players: { r: boolean; j: boolean } };
 type Difficulty = 'novice' | 'facile' | 'moyen' | 'difficile' | 'legendaire';
 
@@ -276,7 +276,7 @@ export default function GamePuissance4({ onSendColor, onTurnOff, onTurnOffAll, o
   const [hoverCol, setHoverCol]     = useState<number | null>(null);
   const [winner, setWinner]         = useState<Cell | null>(null);
   const [isDraw, setIsDraw]         = useState(false);
-  // Ne compte comme "réussi" qu'une victoire du joueur (P1) ou un nul — pas une défaite.
+  // Ne compte comme "réussi" qu'une victoire du joueur (P1) ou un nul - pas une défaite.
   useEffect(() => { if (phase === 'finished' && (winner === P1 || isDraw)) onComplete?.(winner === P1 ? 300 : 100); }, [phase]); // eslint-disable-line react-hooks/exhaustive-deps
   // Son + vibration de fin de partie. Victoire/nul -> géré par onComplete (retour
   // central, évite le double son) ; ici uniquement la DÉFAITE (onComplete non appelé).
@@ -461,7 +461,7 @@ export default function GamePuissance4({ onSendColor, onTurnOff, onTurnOffAll, o
   const diffCfg   = DIFF_CONFIG[difficulty];
   const playerName = (p: Cell) => mode === 'pvp' ? `Joueur ${p}` : p === P1 ? 'Vous' : 'IA';
 
-  // ── Design tokens — dark minimalist, no liquid glass ───────────────────────
+  // ── Design tokens - dark minimalist, no liquid glass ───────────────────────
   const C = {
     shell:     'linear-gradient(180deg,#1a1e29 0%,#121420 100%)',
     raised:    '#262c3c',
@@ -751,7 +751,7 @@ export default function GamePuissance4({ onSendColor, onTurnOff, onTurnOffAll, o
         </div>
         ) : (
           <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:8, textAlign:'center', padding:'28px 16px' }}>
-            <div style={{ fontSize:34 }}>👁️</div>
+            <div style={{ display:'flex' }}><Eye size={34} color="#e2e8f0" /></div>
             <div style={{ fontSize:16, fontWeight:900, color:'#e2e8f0' }}>Regarde la Color Room</div>
             <div style={{ fontSize:12, color:C.textFaint, maxWidth:220 }}>Choisis une colonne ci-dessus ; les jetons s&apos;affichent sur les dalles.</div>
           </div>

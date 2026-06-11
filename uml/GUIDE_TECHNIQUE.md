@@ -1,4 +1,4 @@
-# ColorRoom — Guide technique (extraits de code expliqués)
+# ColorRoom - Guide technique (extraits de code expliqués)
 
 Document compagnon des diagrammes UML. Il explique les **morceaux de code
 importants**, la configuration **`.env`**, et le fonctionnement de l'**IA**
@@ -111,7 +111,7 @@ async function callGemini(model, key, sys, prompt) {
 
 - `responseMimeType: 'application/json'` garantit que Gemini renvoie du **JSON
   exploitable** directement (le schéma d'un jeu : `nodes`, `edges`, `uiLayout`).
-- La clé voyage en **paramètre d'URL** (`?key=...`) — c'est l'API officielle
+- La clé voyage en **paramètre d'URL** (`?key=...`) - c'est l'API officielle
   Google AI Studio.
 
 ### Obtenir une clé Google AI Studio (gratuit)
@@ -162,7 +162,7 @@ Le modèle (~1 Go) est ensuite stocké et fonctionne **100 % hors-ligne**.
 
 ---
 
-## 5. Authentification — hachage du mot de passe (`lib/auth.ts`)
+## 5. Authentification - hachage du mot de passe (`lib/auth.ts`)
 
 Les mots de passe ne sont **jamais stockés en clair**. On utilise **PBKDF2**
 (SHA-512, 100 000 itérations) avec un sel aléatoire par utilisateur :

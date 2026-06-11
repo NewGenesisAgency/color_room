@@ -15,7 +15,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { SlidersHorizontal, Save, RotateCcw, Activity, CheckCircle2, XCircle, Loader2, Terminal, Copy, Check, Sliders, Zap, Moon } from 'lucide-react';
+import { SlidersHorizontal, Save, RotateCcw, Activity, CheckCircle2, XCircle, Loader2, Terminal, Copy, Check, Sliders, Zap, Moon, AlertTriangle } from 'lucide-react';
 import NavigationMenu from '@/app/_components/NavigationMenu';
 import { CHANNELS_ROUGE, CHANNELS_BLEU, getPlateType, type TileType } from '@/lib/tileChannels';
 
@@ -77,7 +77,7 @@ export default function ConfigurationPage() {
   const [snapshot, setSnapshot] = useState<ConfigSnapshot | null>(null);
   const [health, setHealth] = useState<HealthResult>(null);
 
-  // 32 canaux LED — état des sliders
+  // 32 canaux LED - état des sliders
   const [channels, setChannels] = useState<number[]>(Array(32).fill(0));
   const [targetPlate, setTargetPlate] = useState<number>(0); // 0 = toutes les plaques
   const [previewType, setPreviewType] = useState<TileType>('rouge');
@@ -246,7 +246,7 @@ export default function ConfigurationPage() {
               health={health?.cs160}
             />
 
-            {error && <p style={{ color: '#ef4444', fontSize: 14, fontWeight: 600 }}>⚠ {error}</p>}
+            {error && <p style={{ color: '#ef4444', fontSize: 14, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}><AlertTriangle size={15} /> {error}</p>}
             {savedMsg && <p style={{ color: '#22c55e', fontSize: 14, fontWeight: 600 }}>✓ {savedMsg}</p>}
 
             <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 16 }}>
@@ -265,7 +265,7 @@ export default function ConfigurationPage() {
                 background: health.allReachable ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.08)',
                 border: `1px solid ${health.allReachable ? 'rgba(34,197,94,0.35)' : 'rgba(239,68,68,0.3)'}`,
                 color: health.allReachable ? '#16a34a' : '#ef4444' }}>
-                {health.allReachable ? 'Les deux APIs répondent correctement ✓' : 'Une ou plusieurs APIs sont injoignables — vérifiez les adresses et le réseau.'}
+                {health.allReachable ? 'Les deux APIs répondent correctement ✓' : 'Une ou plusieurs APIs sont injoignables - vérifiez les adresses et le réseau.'}
               </div>
             )}
 
@@ -343,7 +343,7 @@ export default function ConfigurationPage() {
             <div style={{ marginTop: 28, background: 'rgba(255,255,255,0.85)', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 16, padding: 20 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
                 <Terminal size={18} color="#7c3aed" />
-                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: '#1a1a2e' }}>Notes — ouvrir les ports (Windows)</h3>
+                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: '#1a1a2e' }}>Notes - ouvrir les ports (Windows)</h3>
               </div>
               <p style={{ margin: '0 0 16px', fontSize: 13, color: 'rgba(0,0,0,0.55)', lineHeight: 1.5 }}>
                 Pour que la Supervision soit joignable depuis le réseau, exécuter ces commandes dans

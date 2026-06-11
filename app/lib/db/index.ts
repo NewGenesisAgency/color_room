@@ -259,7 +259,7 @@ function seedChromatectGame(db: Database.Database) {
     pythonCode: '',
   };
 
-  // INSERT uniquement si absent — check par PRÉFIXE D'ID (robuste aux renommages
+  // INSERT uniquement si absent - check par PRÉFIXE D'ID (robuste aux renommages
   // faits dans l'éditeur, contrairement à un check par nom).
   const existing = db.prepare("SELECT id FROM crg_games WHERE id LIKE 'chromadetect_%';").get();
   if (!existing) {
@@ -326,7 +326,7 @@ function seedLibreRGBGame(db: Database.Database) {
       { id: 'u_grid',    kind: 'plate_grid',    x: 440, y: 228, width: 400, height: 300 },
     ],
   };
-  // Check par PRÉFIXE D'ID — robuste aux renommages faits dans l'éditeur.
+  // Check par PRÉFIXE D'ID - robuste aux renommages faits dans l'éditeur.
   const existing = db.prepare("SELECT id FROM crg_games WHERE id LIKE 'libre_rgb_%';").get();
   if (!existing) {
     const id = `libre_rgb_${Date.now().toString(36)}`;

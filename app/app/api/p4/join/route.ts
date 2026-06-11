@@ -3,7 +3,7 @@
  * @brief Rejoint une salle de Puissance 4 et attribue une couleur de jeton.
  *
  * POST : body JSON { roomId }. Le 1er joueur reçoit le jeton R (rose), le 2e le
- *        jeton J (bleu) — l'arrivée du 2e fait passer la salle en statut 'playing'.
+ *        jeton J (bleu) - l'arrivée du 2e fait passer la salle en statut 'playing'.
  *        Génère un token de joueur. Renvoie { ok, roomId, token, disc }.
  * Codes d'erreur : 400 (roomId manquant), 404 (salle introuvable), 409 (salle
  *        pleine ou conflit d'inscription concurrente).

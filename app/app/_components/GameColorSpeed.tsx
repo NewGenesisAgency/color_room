@@ -13,6 +13,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
+import { Trophy, Zap } from 'lucide-react';
 
 /**
  * Props communes à tous les mini-jeux de dalles (Color Speed, Intrus, etc.).
@@ -171,7 +172,7 @@ export default function GameColorSpeed({
     try { return Number(localStorage.getItem('cs_best') ?? 0); } catch { return 0; }
   });
 
-  /* refs — never stale in callbacks */
+  /* refs - never stale in callbacks */
   const phaseRef      = useRef<Phase>('ready');
   const activeTileRef = useRef<number | null>(null);
   const activeColRef  = useRef<{ r: number; g: number; b: number } | null>(null);
@@ -255,12 +256,12 @@ export default function GameColorSpeed({
     lightNextTile();
   }
 
-  /* ── tile click handler — registered ONCE (useEffect []) ─────────── */
+  /* ── tile click handler - registered ONCE (useEffect []) ─────────── */
   function handleTileClick(idx: number) {
     if (phaseRef.current !== 'playing' || activeTileRef.current === null) return;
 
     if (idx === activeTileRef.current) {
-      /* ✅ CORRECT HIT — points dégressifs : plus on met de temps, moins on gagne */
+      /* ✅ CORRECT HIT - points dégressifs : plus on met de temps, moins on gagne */
       const reaction = Date.now() - tileStartRef.current;
       const tier = speedTier(reaction);
 
@@ -318,15 +319,15 @@ export default function GameColorSpeed({
       <div style={P.readyRow}>
         <div style={{ flex: 1 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-            <span style={P.tag}>⚡ Color Speed</span>
+            <span style={{ ...P.tag, display: 'inline-flex', alignItems: 'center', gap: 5 }}><Zap size={13} /> Color Speed</span>
             {difficulty !== 'moyen' && (
               <span style={{ display:'inline-flex', alignItems:'center', gap:4, padding:'2px 10px', borderRadius:20, fontSize:11, fontWeight:800, background:`${DIFF_LABELS[difficulty].color}22`, color:DIFF_LABELS[difficulty].color, border:`1px solid ${DIFF_LABELS[difficulty].color}44` }}>
-                {DIFF_LABELS[difficulty].emoji} {DIFF_LABELS[difficulty].label}
+                <span style={{ width: 8, height: 8, borderRadius: '50%', background: DIFF_LABELS[difficulty].color, display: 'inline-block' }} /> {DIFF_LABELS[difficulty].label}
               </span>
             )}
           </div>
           <p style={P.rules}>
-            Une dalle s'allume dans la salle — touchez-la <em>le plus vite possible</em>.
+            Une dalle s'allume dans la salle - touchez-la <em>le plus vite possible</em>.
             Elle reste allumée tant que vous n'avez pas trouvé la bonne, mais
             <strong> plus vous attendez, moins vous gagnez de points</strong>.
             Combos = points en plus.
@@ -346,7 +347,7 @@ export default function GameColorSpeed({
               </div>
             ))}
           </div>
-          {best > 0 && <div style={P.best}>🏆 Record : <strong>{best}</strong></div>}
+          {best > 0 && <div style={P.best}><Trophy size={13} /> Record : <strong>{best}</strong></div>}
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flexShrink: 0 }}>
           <button onClick={beginCountdown} style={P.playBtn}>Jouer</button>
@@ -404,7 +405,7 @@ export default function GameColorSpeed({
   );
 
   /* ════════════════════════════════════════════════════════════════════
-     PLAYING — barre glass ultra-minimale
+     PLAYING - barre glass ultra-minimale
   ════════════════════════════════════════════════════════════════════ */
   return (
     <div style={P.wrap}>
@@ -461,7 +462,7 @@ export default function GameColorSpeed({
           </div>
         </div>
 
-        {/* Right — combo + stop */}
+        {/* Right - combo + stop */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           {combo > 1 && (
             <div key={combo} className="cs-combo" style={P.comboBadge}>×{combo}</div>

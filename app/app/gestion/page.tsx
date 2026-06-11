@@ -8,11 +8,11 @@
  * /api/auth/me). Organisée en trois onglets :
  *  - Utilisateurs : liste des comptes, création de comptes enseignant/admin
  *    (admin uniquement), réinitialisation de mot de passe, attribution de
- *    niveau, suppression (admin) — via /api/admin/users.
+ *    niveau, suppression (admin) - via /api/admin/users.
  *  - Classes : création/suppression de classes, code de classe copiable et
  *    QR code de jonction, dépliage des membres et export CSV des scores par
- *    classe — via /api/classes.
- *  - Scores : liste filtrable des scores et export CSV global — via /api/scores.
+ *    classe - via /api/classes.
+ *  - Scores : liste filtrable des scores et export CSV global - via /api/scores.
  * Les enseignants ne voient que leurs propres élèves/classes, les admins voient
  * tout. La page n'interagit pas avec les dalles : elle gère les données métier.
  */
@@ -594,7 +594,7 @@ export default function GestionPage() {
                               onClick={() => { setNiveauTarget(u.id); setNiveauValue(u.niveau ?? 'lycee'); }}
                               title="Modifier le niveau"
                             >
-                              {u.niveau ? NIVEAU_LABELS[u.niveau] ?? u.niveau : <span style={{ opacity: 0.4 }}>—</span>}
+                              {u.niveau ? NIVEAU_LABELS[u.niveau] ?? u.niveau : <span style={{ opacity: 0.4 }}>-</span>}
                             </button>
                           )}
                         </td>
@@ -802,8 +802,8 @@ export default function GestionPage() {
                                         {m.username}
                                       </div>
                                     </td>
-                                    <td style={{ fontSize: 12 }}>{m.niveau ? NIVEAU_LABELS[m.niveau] ?? m.niveau : '—'}</td>
-                                    <td style={{ fontSize: 12 }}>{memberScores.length > 0 ? `${memberScores.length} partie(s) · total ${best} pts` : '—'}</td>
+                                    <td style={{ fontSize: 12 }}>{m.niveau ? NIVEAU_LABELS[m.niveau] ?? m.niveau : '-'}</td>
+                                    <td style={{ fontSize: 12 }}>{memberScores.length > 0 ? `${memberScores.length} partie(s) · total ${best} pts` : '-'}</td>
                                   </tr>
                                 );
                               })}

@@ -17,7 +17,7 @@ import HeroTiles from './_components/HeroTiles';
  */
 export const metadata = {
   title: 'Accueil',
-  description: 'Color Room Games — interface web et serious games pour la ColorRoom.',
+  description: 'Color Room Games - interface web et serious games pour la ColorRoom.',
 };
 
 /**

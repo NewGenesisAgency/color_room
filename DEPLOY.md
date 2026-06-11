@@ -1,4 +1,4 @@
-# Color Room — Déploiement & fonctionnalités (de A à Z)
+# Color Room - Déploiement & fonctionnalités (de A à Z)
 
 Guide complet : déployer l'application, lancer le **modèle IA local (Ollama)**,
 et utiliser toutes les fonctionnalités. Pensé pour un **Raspberry Pi** (ARM64)
@@ -14,13 +14,13 @@ L'app tourne en **Docker Compose** avec 4 services :
 |---|---|---|
 | `color-room` | L'application Next.js (UI + API) | **8080** |
 | `ollama` | Serveur d'IA locale (modèle hors-ligne) | 11434 |
-| `ollama-pull` | Conteneur jetable qui télécharge le modèle puis s'arrête | — |
+| `ollama-pull` | Conteneur jetable qui télécharge le modèle puis s'arrête | - |
 | `portainer` | (optionnel) interface Docker | 9000 / 9443 |
 
 **Démarrage en 2 temps :**
-1. **Phase 1** — `color-room` démarre **tout de suite** : on peut jouer et créer
+1. **Phase 1** - `color-room` démarre **tout de suite** : on peut jouer et créer
    des jeux **sans IA**.
-2. **Phase 2** — `ollama-pull` télécharge le modèle **en arrière-plan**. Dès
+2. **Phase 2** - `ollama-pull` télécharge le modèle **en arrière-plan**. Dès
    qu'il est prêt, l'assistant IA de l'éditeur devient utilisable.
 
 ---
@@ -61,14 +61,14 @@ ADMIN_USERNAME=admin
 ADMIN_PASSWORD=ChangeMoi2026!
 ```
 
-### 3.b. Choix de l'IA — deux options
+### 3.b. Choix de l'IA - deux options
 
-**Option A — IA dans le cloud (Google Gemini)** *(plus puissant, nécessite Internet)*
+**Option A - IA dans le cloud (Google Gemini)** *(plus puissant, nécessite Internet)*
 ```env
 GEMINI_API_KEY=ta_cle_gemini   # https://aistudio.google.com/apikey
 ```
 
-**Option B — IA locale (Ollama, 100 % hors-ligne)** *(recommandé pour la salle)*
+**Option B - IA locale (Ollama, 100 % hors-ligne)** *(recommandé pour la salle)*
 ```env
 AI_PROVIDER=ollama
 OLLAMA_MODEL=qwen2.5:1.5b      # ~1 Go, RAPIDE sur un Pi 4 Go (défaut)
@@ -87,7 +87,7 @@ Sur un Pi en CPU, plus le modèle est gros, plus c'est lent. Le défaut privilé
 | `qwen2.5:1.5b` | ~1 Go | **rapide (~1 min, défaut)** | correcte |
 | `qwen2.5:3b` | ~1.9 Go | moyenne (~2-3 min) | bonne |
 | `qwen2.5:0.5b` | ~0.4 Go | très rapide | basique |
-| `qwen2.5:7b` | ~4.7 Go | ⚠ TUÉ (OOM) sur Pi 4 Go | — |
+| `qwen2.5:7b` | ~4.7 Go | ⚠ TUÉ (OOM) sur Pi 4 Go | - |
 
 Change le modèle via `OLLAMA_MODEL` dans `app/.env` (rien d'autre à modifier).
 
@@ -146,7 +146,7 @@ sudo systemctl restart color-room.service
 ### Jeux (`/jeux`)
 - Jeux natifs : Color Speed, Snake, Tetris, Puissance 4, Maître du Blanc,
   Métamérie, Mix de Canaux, L'Intrus (CS-160), Chromaticité…
-- **On joue sur les DALLES** : l'écran ne montre pas le plateau (anti-triche) —
+- **On joue sur les DALLES** : l'écran ne montre pas le plateau (anti-triche) -
   regarde la Color Room. (Réactivable en dev via `SHOW_SCREEN_BOARD` dans
   `app/lib/game/displayMode.ts`.)
 - **Sons + vibrations** (tablette Android) pour tous les jeux, hors-ligne.
@@ -155,7 +155,7 @@ sudo systemctl restart color-room.service
 - **1 joueur = 1 plaque** : lance le mode sur la tablette → QR ; chaque joueur
   ouvre **`/jouer`** sur son téléphone et choisit une couleur → **sa plaque**
   s'allume en temps réel.
-- **Puissance 4 — 2 téléphones** : QR → **`/p4`** ; 2 joueurs jouent à tour de
+- **Puissance 4 - 2 téléphones** : QR → **`/p4`** ; 2 joueurs jouent à tour de
   rôle, le **plateau s'affiche sur les dalles**.
 - **Écran scindé** (ex-coop) : 2 à 8 joueurs règlent chacun une teinte.
 
