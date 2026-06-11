@@ -26,11 +26,14 @@ export type ModelMeta = {
 };
 
 const GEMINI_CATALOG: Omit<ModelMeta, 'available' | 'unavailableReason'>[] = [
+  { id: 'gemini-3.5-flash',      provider: 'gemini', label: 'Gemini 3.5 Flash',      speed: '~2s',  quality: 5, effort: 1 },
+  { id: 'gemini-3.1-pro',        provider: 'gemini', label: 'Gemini 3.1 Pro',        speed: '~6s',  quality: 5, effort: 2 },
+  { id: 'gemini-2.5-pro',        provider: 'gemini', label: 'Gemini 2.5 Pro',        speed: '~8s',  quality: 5, effort: 2 },
+  { id: 'gemini-3.1-flash',      provider: 'gemini', label: 'Gemini 3.1 Flash',      speed: '~3s',  quality: 5, effort: 1 },
+  { id: 'gemini-3.1-flash-lite', provider: 'gemini', label: 'Gemini 3.1 Flash Lite', speed: '~2s',  quality: 4, effort: 1 },
   { id: 'gemini-2.5-flash',      provider: 'gemini', label: 'Gemini 2.5 Flash',      speed: '~3s',  quality: 5, effort: 1 },
   { id: 'gemini-2.5-flash-lite', provider: 'gemini', label: 'Gemini 2.5 Flash Lite', speed: '~2s',  quality: 4, effort: 1 },
   { id: 'gemini-2.0-flash',      provider: 'gemini', label: 'Gemini 2.0 Flash',      speed: '~3s',  quality: 4, effort: 1 },
-  { id: 'gemini-1.5-flash',      provider: 'gemini', label: 'Gemini 1.5 Flash',      speed: '~4s',  quality: 4, effort: 1 },
-  { id: 'gemini-1.5-pro',        provider: 'gemini', label: 'Gemini 1.5 Pro',        speed: '~8s',  quality: 5, effort: 2 },
 ];
 
 const OLLAMA_CATALOG: Omit<ModelMeta, 'available' | 'unavailableReason'>[] = [

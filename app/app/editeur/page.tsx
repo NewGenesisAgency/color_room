@@ -4855,7 +4855,9 @@ export default function EditeurPage() {
 
       {/* ── Chat IA (style outil, docké à droite : l'éditeur reste visible) ──── */}
       {aiOpen && (
-        <div style={{ position: 'fixed', top: 0, right: 0, bottom: 0, width: 'min(420px,96vw)', zIndex: 10050, display: 'flex', flexDirection: 'column', background: 'linear-gradient(180deg,#12131d,#0c0d14)', borderLeft: '1px solid rgba(255,255,255,0.1)', boxShadow: '-20px 0 60px rgba(0,0,0,0.5)' }}>
+        <div style={{ position: 'fixed', top: 0, right: 0, bottom: 0, width: 'min(clamp(280px, 50vw, 600px), 96vw)', zIndex: 10050, display: 'flex', flexDirection: 'column', background: 'rgba(18,19,29,0.75)', backdropFilter: 'blur(12px)', borderLeft: '1px solid rgba(255,255,255,0.15)', boxShadow: '-20px 0 60px rgba(0,0,0,0.5)' }}>
+          {/* Resize handle */}
+          <div style={{ position: 'absolute', top: 16, left: 16, width: 24, height: 24, cursor: 'ew-resize', zIndex: 10051 }} title="Redimensionner" draggable={true} />
           <style>{'@keyframes aiPulse{0%,100%{opacity:.45}50%{opacity:1}}'}</style>
           <div style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 10, borderBottom: '1px solid rgba(255,255,255,0.08)', flexShrink: 0 }}>
             <div style={{ width: 34, height: 34, borderRadius: 10, display: 'grid', placeItems: 'center', background: 'linear-gradient(135deg,#7c3aed,#ec4899)', flexShrink: 0 }}><Sparkles size={18} color="#fff" /></div>
@@ -4996,7 +4998,7 @@ export default function EditeurPage() {
           <div style={{ padding: 12, borderTop: '1px solid rgba(255,255,255,0.08)', flexShrink: 0 }}>
             <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
               <textarea value={aiPrompt} onChange={(e) => setAiPrompt(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void sendAiMessage(); } }}
+                onKeyDown={(e) => { if ((e.key === 'Enter' && !e.shiftKey) || (e.ctrlKey && e.code === 'Space')) { e.preventDefault(); void sendAiMessage(); } }}
                 disabled={aiBusy} rows={2}
                 placeholder={activeGame ? 'Demande une modification… (Entrée pour envoyer)' : 'Décris le jeu à créer…'}
                 style={{ flex: 1, resize: 'none', borderRadius: 12, padding: '10px 12px', fontSize: 13, lineHeight: 1.4, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }} />
