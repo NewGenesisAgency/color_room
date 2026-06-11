@@ -2202,16 +2202,21 @@ export default function EditeurPage() {
         case 'add_score': {
           runtimeScoreRef.current += getNum(node.params, 'amount', 1);
           setRuntimeScore(runtimeScoreRef.current);
+          // Expose aussi le score comme variable 'score' pour que les composants
+          // UI score_display{varBind:"score"} puissent l'afficher en preview.
+          vars['score'] = runtimeScoreRef.current;
           break;
         }
         case 'score_reset': {
           runtimeScoreRef.current = 0;
           setRuntimeScore(0);
+          vars['score'] = 0;
           break;
         }
         case 'score_set': {
           runtimeScoreRef.current = getNum(node.params, 'value', 0);
           setRuntimeScore(runtimeScoreRef.current);
+          vars['score'] = runtimeScoreRef.current;
           break;
         }
         case 'score_get': {

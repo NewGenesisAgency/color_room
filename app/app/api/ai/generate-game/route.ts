@@ -69,8 +69,16 @@ const DEFAULT_MODELS = [
 ];
 
 function systemInstruction(tileCount: number): string {
-  return `Tu es un générateur de jeux pour "ColorRoom", une salle de ${tileCount} plaques LED (grille 6 colonnes × 7 rangées, index 0..${tileCount - 1}) pilotées depuis une tablette.
+  return `Tu es un générateur de jeux pour "ColorRoom", une salle pédagogique de ${tileCount} plaques LED (grille 6 colonnes × 7 rangées, index 0..${tileCount - 1}) pilotées depuis une tablette.
 Tu produis UNIQUEMENT un objet JSON décrivant un jeu jouable, sans texte autour.
+
+CADRE STRICT - QUELS JEUX TU PEUX FAIRE :
+- ColorRoom est une INSTALLATION FIXE de ${tileCount} dalles colorées au sol. Le seul input du joueur est : cliquer une dalle (depuis la tablette ou pied sur la vraie dalle), appuyer une touche clavier (tablette), ou cliquer un bouton UI tablette. Il n'y a PAS de joystick, PAS de mouvement 3D, PAS de tir, PAS de combat.
+- Les jeux doivent rester EDUCATIFS / PEDAGOGIQUES / SENSORIELS : couleurs, mémoire, réflexes, motricité, mathématiques, multijoueur coopératif, exploration sensorielle (lumière/vibration/son), apprentissage du daltonisme, mélange RGB, fractions, sequences, logique.
+- Exemples ACCEPTES (cible : ces jeux fonctionnent bien) : "Color Speed" (clic dalle rapide), "Simon" (suite à mémoriser), "Memory" (paires de couleurs), "Mélange RGB" (curseurs pour reproduire une couleur), "Réflexe maths" (calculer un nombre puis cliquer une dalle), "Course en couleur" (allumer en rythme), "Daltonisme" (trouver l'intrus de couleur), "Métamérisme" (deux couleurs identiques sous deux conditions), "Puissance 4 lumineux", "Chasse au trésor" (suivre des indices lumineux).
+- Si la demande sort de ce cadre (Forza, GTA, Call of Duty, Fortnite, Minecraft, FPS, jeu de course voiture, jeu de combat, MMORPG, jeu en monde ouvert 3D, simulateur de vol, simulateur de vie, RPG, plateformer Mario, n'importe quel jeu vidéo "AAA" complexe, ou tout jeu nécessitant un personnage qui se déplace dans un monde), TU REFUSES POLIMENT en renvoyant exactement ce JSON :
+  { "refuse": true, "reason": "ColorRoom ne peut pas reproduire ce type de jeu. C'est une installation de ${tileCount} dalles LED au sol pilotées depuis une tablette : pas de mouvement 3D, pas de tir, pas de personnage. Je peux te faire un jeu éducatif de couleurs / réflexes / mémoire / mesure de lumière. Par exemple : 'un jeu de réflexes où il faut taper la dalle qui s'allume' ou 'un Simon avec 4 couleurs'." }
+  Tu ne genères AUCUN autre champ dans ce cas. Le serveur affichera le message à l'utilisateur.
 
 Schéma de sortie STRICT :
 {
@@ -106,12 +114,13 @@ RÈGLES :
 - INTERACTION DALLE : pour réagir au clic sur UNE dalle précise, utilise on_tile_click {tileIndex:0} (tileIndex commence à 0, donc la "dalle 1" = tileIndex 0). on_plate_click réagit au clic sur N'IMPORTE quelle dalle.
 - VARIABLE \`clickedTile\` : à chaque clic sur une dalle, le runtime écrit l'index dans la variable \`clickedTile\` (0..${tileCount - 1}). On_plate_click peut donc tester : compare_eq {a:"clickedTile", b:"targetTile"} → if {varName:"result", op:"eq", value:1} → succès / sinon échec. C'est LE pattern Color Speed.
 - RECETTE JEU DE RÉFLEXES (type Color Speed) DÉTAILLÉE - reproduis-la fidelement :
-  1. event_begin → variable_set {name:"score",value:0,op:"set"} → random_int {min:0,max:${tileCount - 1},varName:"targetTile"} → tile_set {tileIndex:"targetTile",color:"#22d3ee",intensity:0.85} → countdown_start {seconds:30}
+  IMPORTANT : pour allumer une dalle à un index VARIABLE (cible aléatoire), utilise tile_set_var {indexVar:"targetTile", defaultColor:"#22d3ee", intensity:0.85} (PAS tile_set qui n'accepte qu'un index littéral).
+  1. event_begin → variable_set {name:"score",value:0,op:"set"} → random_int {min:0,max:${tileCount - 1},varName:"targetTile"} → tile_set_var {indexVar:"targetTile",defaultColor:"#22d3ee",intensity:0.85} → countdown_start {seconds:30, varName:"countdown"}
   2. on_plate_click → compare_eq {a:"clickedTile",b:"targetTile",out:"hit"} → if {varName:"hit",op:"eq",value:1}
-     - branche vrai : add_score {amount:1} → play_sound {sound:"correct"} → random_int {min:0,max:${tileCount - 1},varName:"targetTile"} → clear_tiles → tile_set {tileIndex:"targetTile",color:"#22d3ee",intensity:0.85}
+     - branche vrai : add_score {amount:1} → play_sound {sound:"correct"} → clear_tiles → random_int {min:0,max:${tileCount - 1},varName:"targetTile"} → tile_set_var {indexVar:"targetTile",defaultColor:"#22d3ee",intensity:0.85}
      - branche faux : play_sound {sound:"wrong"} → vibrate {durationMs:120}
-  3. on_countdown_end → play_sound {sound:"win"}
-  L'UI DOIT contenir : title_banner + score_display(varBind:"score") + timer_display(varBind:"time") + plate_grid (sinon le joueur ne voit pas les 42 dalles sur sa tablette).
+  3. on_countdown_end {varName:"countdown"} → play_sound {sound:"win"} → clear_tiles
+  L'UI DOIT contenir : title_banner + score_display(varBind:"score") + timer_display(varBind:"countdown") + plate_grid (sinon le joueur ne voit pas les ${tileCount} dalles sur sa tablette).
 - L'UI est posée sur un canvas 860×500. Place les composants sans chevauchement. CHAQUE jeu doit contenir AU MINIMUM : un title_banner (titre du jeu), un score_display si un score existe, un timer_display si un compte a rebours existe, ET un plate_grid si on interagit avec les dalles (sinon le joueur ne peut pas cliquer dessus depuis la tablette).
 - Lie les affichages à des variables via "varBind" (ex: un score_display avec varBind "score").
 - Icônes : "sprite" (icône Lucide via "icon", ex Trophy, Star, Heart, Check, X, Zap, Crown, ThumbsUp) ou "svg_icon" (SVG perso). Pour sprite/svg_icon, "varBind" sert de visibilité : l'icône n'apparaît que si la variable est non nulle (ex. afficher un Trophy avec varBind "gagne"). Couleur via "bgColor".
@@ -119,13 +128,19 @@ RÈGLES :
 - Sois COHÉRENT : chaque eventId d'UI doit avoir son nœud on_ui_click; chaque variable affichée doit être écrite par la logique.
 - Si un "JEU ACTUEL" est fourni, MODIFIE-le selon la demande et renvoie le jeu COMPLET mis à jour (jamais un diff ni un fragment). Conserve ce qui n'est pas concerné.
 
-EXEMPLE de sortie valide (jeu de réflexe simple - inspire-t'en) :
-{"name":"Tape la dalle","icon":"Zap","difficulty":2,"description":"Clique les dalles allumées pour marquer.","bgColor":"#0d1119","accentColor":"#22d3ee","nodes":[{"kind":"event_begin","name":"Démarrer","params":{},"x":80,"y":80},{"kind":"variable_set","name":"Score 0","params":{"name":"score","value":0,"op":"set"},"x":320,"y":80},{"kind":"fill","name":"Allumer","params":{"color":"#22d3ee","intensity":0.7,"mask":"all"},"x":560,"y":80},{"kind":"on_plate_click","name":"Clic dalle","params":{},"x":80,"y":300},{"kind":"add_score","name":"Plus 1","params":{"amount":1},"x":320,"y":300},{"kind":"play_sound","name":"Son","params":{"sound":"coin"},"x":560,"y":300}],"edges":[[0,1],[1,2],[3,4],[4,5]],"ui":[{"kind":"title_banner","x":20,"y":20,"width":400,"height":60,"text":"Tape la dalle"},{"kind":"score_display","x":20,"y":100,"width":200,"height":90,"varBind":"score","text":"Score"}]}
+EXEMPLE COMPLET de Color Speed (jeu pédagogique simple - copie cette structure) :
+{"name":"Tape la dalle","icon":"Zap","difficulty":2,"description":"Clique la dalle qui s'allume.","bgColor":"#0d1119","accentColor":"#22d3ee","nodes":[{"kind":"event_begin","name":"Démarrer","params":{},"x":80,"y":80},{"kind":"variable_set","name":"Score 0","params":{"name":"score","value":0,"op":"set"},"x":320,"y":80},{"kind":"random_int","name":"Cible aléa.","params":{"min":0,"max":${tileCount - 1},"varName":"targetTile"},"x":560,"y":80},{"kind":"tile_set_var","name":"Allumer cible","params":{"indexVar":"targetTile","defaultColor":"#22d3ee","intensity":0.85},"x":800,"y":80},{"kind":"countdown_start","name":"30s","params":{"seconds":30,"varName":"countdown"},"x":1040,"y":80},{"kind":"on_plate_click","name":"Clic dalle","params":{},"x":80,"y":260},{"kind":"compare_eq","name":"Bonne dalle ?","params":{"a":"clickedTile","b":"targetTile","out":"hit"},"x":320,"y":260},{"kind":"if","name":"Si juste","params":{"varName":"hit","op":"eq","value":1},"x":560,"y":260},{"kind":"add_score","name":"+1","params":{"amount":1},"x":800,"y":220},{"kind":"play_sound","name":"correct","params":{"sound":"correct"},"x":1040,"y":220},{"kind":"clear_tiles","name":"Éteindre","params":{},"x":1280,"y":220},{"kind":"random_int","name":"Nouvelle cible","params":{"min":0,"max":${tileCount - 1},"varName":"targetTile"},"x":1520,"y":220},{"kind":"tile_set_var","name":"Rallumer","params":{"indexVar":"targetTile","defaultColor":"#22d3ee","intensity":0.85},"x":1760,"y":220},{"kind":"play_sound","name":"wrong","params":{"sound":"wrong"},"x":800,"y":340},{"kind":"vibrate","name":"vib","params":{"durationMs":120},"x":1040,"y":340},{"kind":"on_countdown_end","name":"Fin","params":{"varName":"countdown"},"x":80,"y":460},{"kind":"play_sound","name":"win","params":{"sound":"win"},"x":320,"y":460},{"kind":"clear_tiles","name":"clear","params":{},"x":560,"y":460}],"edges":[[0,1],[1,2],[2,3],[3,4],[5,6],[6,7],[7,8],[8,9],[9,10],[10,11],[11,12],[7,13],[13,14],[15,16],[16,17]],"ui":[{"kind":"title_banner","x":20,"y":16,"width":820,"height":56,"text":"Tape la dalle"},{"kind":"score_display","x":20,"y":84,"width":220,"height":88,"varBind":"score","text":"Score"},{"kind":"timer_display","x":260,"y":84,"width":220,"height":88,"varBind":"countdown","text":"Temps"},{"kind":"plate_grid","x":500,"y":84,"width":340,"height":400,"gridCols":6}]}
+
+REMARQUE : la branche FAUSSE du "if" (index 7) pointe vers play_sound "wrong" puis vibrate (edges [7,13],[13,14]). La branche VRAIE pointe vers add_score (edge [7,8]). Quand if a 2 sorties, la 1re est vrai, la 2e est faux.
+RÈGLE D'OR : Si tu veux allumer une dalle dont l'index est stocké dans une VARIABLE, utilise OBLIGATOIREMENT tile_set_var {indexVar:"nomVar",defaultColor:"#xxx",intensity:0.x}. tile_set ne fonctionne qu'avec un nombre littéral.
 
 - Génère un jeu complet et JOUABLE, pas un squelette. Réponds en JSON pur.`;
 }
 
 type GameJson = {
+  /** Le modele peut renvoyer { refuse: true, reason: ... } pour les jeux hors-cadre */
+  refuse?: boolean;
+  reason?: string;
   name?: string; icon?: string; difficulty?: number; description?: string;
   bgColor?: string; accentColor?: string;
   nodes?: Array<{ kind?: string; name?: string; params?: Record<string, unknown>; x?: number; y?: number }>;
@@ -204,8 +219,38 @@ function sanitize(raw: GameJson, tileCount: number) {
       ...(typeof c.svg === 'string' ? { svg: c.svg.slice(0, 4000) } : {}),
     }));
 
+  // ── Auto-injection des composants UI essentiels manquants ────────────────
+  // Si l'IA a oublie un composant indispensable, on l'ajoute pour garantir un
+  // jeu jouable depuis la tablette. Critere : si le jeu a des on_plate_click /
+  // on_tile_click mais pas de plate_grid → on ajoute ; si add_score mais pas
+  // de score_display → on ajoute ; etc.
+  const usesPlateClick = nodes.some((n) => n.kind === 'on_plate_click' || n.kind === 'on_tile_click' || n.kind === 'on_click');
+  const usesScore = nodes.some((n) => n.kind === 'add_score' || n.kind === 'score_set' || n.kind === 'get_score' || n.kind === 'score_reset');
+  const usesCountdown = nodes.some((n) => n.kind === 'countdown_start' || n.kind === 'on_countdown_end');
+  const hasKind = (k: string) => ui.some((c) => c.kind === k);
+
+  const gameName = typeof raw.name === 'string' && raw.name.trim() ? raw.name.trim().slice(0, 60) : 'Jeu IA';
+
+  // 1. title_banner toujours utile : il identifie le jeu sur la tablette.
+  if (!hasKind('title_banner')) {
+    ui.unshift({ kind: 'title_banner', x: 20, y: 16, width: 820, height: 56, text: gameName });
+  }
+  // 2. score_display obligatoire si le jeu manipule un score.
+  if (usesScore && !hasKind('score_display')) {
+    ui.push({ kind: 'score_display', x: 20, y: 84, width: 220, height: 88, varBind: 'score', text: 'Score' });
+  }
+  // 3. timer_display obligatoire si le jeu a un compte a rebours.
+  if (usesCountdown && !hasKind('timer_display')) {
+    ui.push({ kind: 'timer_display', x: 260, y: 84, width: 220, height: 88, varBind: 'time', text: 'Temps' });
+  }
+  // 4. plate_grid OBLIGATOIRE si le jeu attend des clics dalle : sans ce
+  // composant le joueur ne peut PAS interagir depuis la tablette.
+  if (usesPlateClick && !hasKind('plate_grid')) {
+    ui.push({ kind: 'plate_grid', x: 500, y: 84, width: 340, height: 400, gridCols: 6 });
+  }
+
   return {
-    name: typeof raw.name === 'string' && raw.name.trim() ? raw.name.trim().slice(0, 60) : 'Jeu IA',
+    name: gameName,
     icon: typeof raw.icon === 'string' ? raw.icon : 'Sparkles',
     difficulty: Math.max(1, Math.min(5, Math.round(Number(raw.difficulty) || 2))),
     description: typeof raw.description === 'string' ? raw.description.slice(0, 200) : '',
@@ -246,14 +291,21 @@ async function geminiReachable(key: string, timeoutMs = 5000): Promise<boolean> 
 
 // Prompt COURT pour les petits modèles locaux (moins de contexte/RAM, plus fiable).
 function systemInstructionLite(tileCount: number): string {
-  return `Génère UNIQUEMENT un JSON décrivant un mini-jeu pour une salle de ${tileCount} dalles LED (grille 6x7, index 0..${tileCount - 1}). Aucun texte autour.
-Format: {"name":str,"icon":"Zap","difficulty":2,"description":str,"bgColor":"#0d1119","accentColor":"#22d3ee","nodes":[{"kind":K,"name":str,"params":{},"x":n,"y":n}],"edges":[[from,to]],"ui":[{"kind":U,"x":n,"y":n,"width":n,"height":n,"text"?:str,"varBind"?:str}]}
-K possibles: event_begin, variable_set{name,value,op:"set"|"add"}, random_int{min,max,varName}, add_score{amount}, if{varName,op:"gt"|"lt"|"eq",value}, fill{color,intensity}, tile{tileIndex,color,intensity}, pulse{baseColor,targetColor,speed}, on_plate_click, on_tile_click{tileIndex}, on_timer{intervalMs}, on_key{key}, wait{seconds}, for_range{varName,start,end,step}, play_sound{sound}, vibrate{durationMs}, color_hsl{hue,saturation,lightness}.
-U possibles: title_banner, label, score_display{varBind}, timer_display, button{eventId}, color_swatch, progress_bar{varBind}, rgb_sliders, plate_grid, message_box.
+  return `Genere UNIQUEMENT un JSON pour ColorRoom, salle EDUCATIVE de ${tileCount} dalles LED au sol (grille 6x7, index 0..${tileCount - 1}).
+Si la demande est un jeu video AAA (Forza, GTA, CoD, Fortnite, FPS, course, monde ouvert, RPG 3D) renvoie {"refuse":true,"reason":"texte"} et rien d'autre.
+Sinon Format strict: {"name":str,"icon":"Zap","difficulty":2,"description":str,"bgColor":"#0d1119","accentColor":"#22d3ee","nodes":[{"kind":K,"name":str,"params":{},"x":n,"y":n}],"edges":[[from,to]],"ui":[{"kind":U,"x":n,"y":n,"width":n,"height":n,"text"?:str,"varBind"?:str}]}
+K possibles: event_begin, variable_set{name,value,op:"set"|"add"}, random_int{min,max,varName}, add_score{amount}, if{varName,op:"gt"|"lt"|"eq",value}, compare_eq{a,b,out}, fill{color,intensity}, tile_set{tileIndex,color,intensity}, clear_tiles, pulse{baseColor,targetColor,speed}, on_plate_click, on_tile_click{tileIndex}, on_timer{intervalMs}, on_key{key}, on_countdown_end, countdown_start{seconds}, wait{seconds}, play_sound{sound}, vibrate{durationMs}.
+U possibles: title_banner, label, score_display{varBind}, timer_display{varBind}, button{eventId}, color_swatch, progress_bar{varBind}, rgb_sliders, plate_grid{gridCols}, message_box.
+Variable runtime \`clickedTile\` = index de la derniere dalle cliquee (sur on_plate_click).
 sons: click, correct, wrong, win, lose, coin, levelup.
-Commence par event_begin (index 0). Lie l'UI aux variables via varBind. Reste SIMPLE et JOUABLE.
-EXEMPLE valide:
-{"name":"Tape la dalle","icon":"Zap","difficulty":2,"description":"Clique les dalles allumees.","bgColor":"#0d1119","accentColor":"#22d3ee","nodes":[{"kind":"event_begin","name":"Demarrer","params":{},"x":80,"y":80},{"kind":"variable_set","name":"Score","params":{"name":"score","value":0,"op":"set"},"x":320,"y":80},{"kind":"fill","name":"Allumer","params":{"color":"#22d3ee","intensity":0.7},"x":560,"y":80},{"kind":"on_plate_click","name":"Clic","params":{},"x":80,"y":300},{"kind":"add_score","name":"+1","params":{"amount":1},"x":320,"y":300},{"kind":"play_sound","name":"Son","params":{"sound":"coin"},"x":560,"y":300}],"edges":[[0,1],[1,2],[3,4],[4,5]],"ui":[{"kind":"title_banner","x":20,"y":20,"width":400,"height":60,"text":"Tape la dalle"},{"kind":"score_display","x":20,"y":100,"width":200,"height":90,"varBind":"score","text":"Score"}]}`;
+REGLES :
+- Commence TOUJOURS par event_begin (index 0).
+- Lie l'UI aux variables via varBind (ex score_display varBind:"score").
+- Si jeu interactif a dalles : l'UI DOIT contenir plate_grid + title_banner + score_display (sans plate_grid le joueur ne peut PAS cliquer sur les dalles).
+- Reste SIMPLE, EDUCATIF, JOUABLE.
+REGLE D'OR : pour allumer une dalle avec un index variable, utilise tile_set_var {indexVar:"nomVar",defaultColor:"#xxx",intensity:0.x} (pas tile_set qui ne marche qu'avec un index littéral).
+EXEMPLE Color Speed (copie cette structure exacte) :
+{"name":"Tape la dalle","icon":"Zap","difficulty":2,"description":"Clique la dalle qui s'allume.","bgColor":"#0d1119","accentColor":"#22d3ee","nodes":[{"kind":"event_begin","name":"Demarrer","params":{},"x":80,"y":80},{"kind":"variable_set","name":"Score","params":{"name":"score","value":0,"op":"set"},"x":320,"y":80},{"kind":"random_int","name":"Cible","params":{"min":0,"max":${tileCount - 1},"varName":"targetTile"},"x":560,"y":80},{"kind":"tile_set_var","name":"Allumer","params":{"indexVar":"targetTile","defaultColor":"#22d3ee","intensity":0.85},"x":800,"y":80},{"kind":"countdown_start","name":"30s","params":{"seconds":30,"varName":"countdown"},"x":1040,"y":80},{"kind":"on_plate_click","name":"Clic","params":{},"x":80,"y":260},{"kind":"compare_eq","name":"Bon ?","params":{"a":"clickedTile","b":"targetTile","out":"hit"},"x":320,"y":260},{"kind":"if","name":"Si juste","params":{"varName":"hit","op":"eq","value":1},"x":560,"y":260},{"kind":"add_score","name":"+1","params":{"amount":1},"x":800,"y":220},{"kind":"play_sound","name":"correct","params":{"sound":"correct"},"x":1040,"y":220},{"kind":"clear_tiles","name":"Eteindre","params":{},"x":1280,"y":220},{"kind":"random_int","name":"Nouvelle","params":{"min":0,"max":${tileCount - 1},"varName":"targetTile"},"x":1520,"y":220},{"kind":"tile_set_var","name":"Rallumer","params":{"indexVar":"targetTile","defaultColor":"#22d3ee","intensity":0.85},"x":1760,"y":220},{"kind":"play_sound","name":"wrong","params":{"sound":"wrong"},"x":800,"y":340},{"kind":"on_countdown_end","name":"Fin","params":{"varName":"countdown"},"x":80,"y":480},{"kind":"play_sound","name":"win","params":{"sound":"win"},"x":320,"y":480}],"edges":[[0,1],[1,2],[2,3],[3,4],[5,6],[6,7],[7,8],[8,9],[9,10],[10,11],[11,12],[7,13],[14,15]],"ui":[{"kind":"title_banner","x":20,"y":16,"width":820,"height":56,"text":"Tape la dalle"},{"kind":"score_display","x":20,"y":84,"width":220,"height":88,"varBind":"score","text":"Score"},{"kind":"timer_display","x":260,"y":84,"width":220,"height":88,"varBind":"countdown","text":"Temps"},{"kind":"plate_grid","x":500,"y":84,"width":340,"height":400,"gridCols":6}]}`;
 }
 
 // Appel d'un modèle local via Ollama (hors-ligne). format:json force une sortie JSON.
@@ -296,6 +348,53 @@ async function runOllama(model: string, tileCount: number, userContent: string) 
   }
 }
 
+// Detecte les demandes qu'on ne peut PAS reproduire sur 42 dalles LED.
+// On fait un check rapide cote serveur (coute 0, pas d'appel IA) avant de
+// brûler du quota Gemini pour un refus.
+function detectImpossibleGame(prompt: string): string | null {
+  const p = prompt.toLowerCase();
+  // Noms de franchises 3D / FPS / racing / open world / sim
+  const blockList = [
+    'forza', 'gran turismo', 'need for speed', 'mario kart', 'mario',
+    'gta', 'grand theft auto', 'call of duty', 'cod ', 'cod\n', 'battlefield',
+    'fortnite', 'apex', 'valorant', 'counter strike', 'csgo', 'cs:go', 'cs go',
+    'minecraft', 'roblox', 'fifa', 'pes ', 'nba 2k',
+    'zelda', 'pokémon', 'pokemon', 'animal crossing',
+    'world of warcraft', 'wow ', 'league of legends',
+    'overwatch', 'rainbow six', 'r6 ', 'pubg', 'warzone',
+    'gta v', 'gta 5', 'gta vi', 'rdr ', 'red dead',
+    'sims', 'cyberpunk', 'witcher', 'skyrim', 'fallout',
+    'doom', 'half-life', 'portal',
+  ];
+  for (const kw of blockList) {
+    if (p.includes(kw)) return kw;
+  }
+  // Concepts qui ne tiennent pas sur 42 dalles (mouvement 3D, tir, monde ouvert)
+  const conceptList = [
+    'monde ouvert', 'open world',
+    'tir à la première personne', 'fps', 'first person shooter',
+    'jeu de tir', 'shoot', 'shooter',
+    'jeu de course', 'racing game', 'simulateur de course',
+    'simulateur de vol', 'flight sim',
+    'jeu de combat', 'fighting game',
+    'mmorpg', 'rpg en 3d', 'jeu en 3d', 'jeu 3d',
+    'plateformer', 'plateforme',
+    'battle royale', 'mmo',
+  ];
+  for (const kw of conceptList) {
+    if (p.includes(kw)) return kw;
+  }
+  return null;
+}
+
+function buildRefusal(matched: string, tileCount: number) {
+  return NextResponse.json({
+    ok: false,
+    error: 'OUT_OF_SCOPE',
+    message: `ColorRoom ne peut pas reproduire ce type de jeu (« ${matched} »). C'est une installation de ${tileCount} dalles LED au sol pilotées depuis une tablette : pas de mouvement 3D, pas de tir, pas de personnage. Je peux te faire un jeu éducatif de couleurs, de réflexes, de mémoire, de mesure de lumière. Exemples : « un jeu de réflexes où il faut taper la dalle qui s'allume », « un Simon avec 4 couleurs », « un memory de paires de couleurs », « un jeu d'addition où on clique le bon nombre ».`,
+  }, { status: 400 });
+}
+
 export async function POST(req: Request) {
   let body: any;
   try { body = await req.json(); } catch { body = {}; }
@@ -304,6 +403,16 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: 'NO_PROMPT', message: 'Décris le jeu à créer.' }, { status: 400 });
   }
   const tileCount = Math.max(1, Math.min(42, Math.round(Number(body?.tileCount) || 42)));
+
+  // ── Garde-fou : refus immediat des jeux hors-cadre (Forza, GTA, FPS...)
+  // Sauf si on est en multi-tours (currentGame existant) — l'utilisateur peut
+  // alors continuer a affiner sans declencher le filtre sur des references
+  // historiques dans son prompt.
+  const isFollowUp = !!body?.currentGame;
+  if (!isFollowUp) {
+    const matched = detectImpossibleGame(prompt);
+    if (matched) return buildRefusal(matched, tileCount);
+  }
 
   // Modèle explicitement choisi par l'utilisateur (depuis le sélecteur UI).
   const chosenModel: string = typeof body?.model === 'string' ? body.model.trim() : '';
@@ -333,6 +442,9 @@ export async function POST(req: Request) {
     try {
       const raw = await runOllama(model, tileCount, userContent);
       if (!raw) return NextResponse.json({ ok: false, error: 'OLLAMA_EMPTY', message: `Le modèle ${model} a renvoyé une réponse vide. Réessaie avec une demande plus simple.` }, { status: 502 });
+      if (raw.refuse === true) {
+        return NextResponse.json({ ok: false, error: 'OUT_OF_SCOPE', message: String(raw.reason ?? 'Ce jeu ne peut pas etre reproduit sur les dalles ColorRoom.') }, { status: 400 });
+      }
       const game = sanitize(raw, tileCount);
       if (game.nodes.length === 0) return NextResponse.json({ ok: false, error: 'OLLAMA_INVALID', message: `${model} n'a produit aucun bloc valide. Essaie un modèle plus capable.` }, { status: 502 });
       return NextResponse.json({ ok: true, model: `ollama/${model}`, game });
@@ -372,6 +484,13 @@ export async function POST(req: Request) {
       try {
         const raw = await callGemini(model, key, sys, userContent);
         if (!raw) { errors.push(`${model}: réponse vide/illisible`); continue; }
+        // Le modele a refuse la demande (jeu hors-cadre detecte par lui-meme)
+        if (raw.refuse === true) {
+          return NextResponse.json({
+            ok: false, error: 'OUT_OF_SCOPE',
+            message: String(raw.reason ?? 'Ce jeu ne peut pas etre reproduit sur les dalles ColorRoom.'),
+          }, { status: 400 });
+        }
         const game = sanitize(raw, tileCount);
         if (game.nodes.length === 0) { errors.push(`${model}: aucun bloc valide`); continue; }
         return NextResponse.json({ ok: true, model, game });
@@ -398,6 +517,9 @@ export async function POST(req: Request) {
   try {
     const raw = await callOllama(systemInstructionLite(tileCount), userContent);
     if (!raw) return NextResponse.json({ ok: false, error: 'OLLAMA_EMPTY', message: `Le modèle local ${model} a renvoyé une réponse vide. Réessaie avec une demande plus simple.` }, { status: 502 });
+    if (raw.refuse === true) {
+      return NextResponse.json({ ok: false, error: 'OUT_OF_SCOPE', message: String(raw.reason ?? 'Ce jeu ne peut pas etre reproduit sur les dalles ColorRoom.') }, { status: 400 });
+    }
     const game = sanitize(raw, tileCount);
     if (game.nodes.length === 0) return NextResponse.json({ ok: false, error: 'OLLAMA_INVALID', message: 'Le modèle local n\'a produit aucun bloc valide. Réessaie ou utilise un modèle plus capable.' }, { status: 502 });
     return NextResponse.json({ ok: true, model: `ollama/${model}`, game });
