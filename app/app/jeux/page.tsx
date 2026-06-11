@@ -109,6 +109,7 @@ import {
   ChevronsDown,
   Users,
 } from 'lucide-react';
+import { Avatar } from '@/app/_components/avatarIcons';
 
 type UserType = 'apprenant' | 'enseignant';
 
@@ -968,7 +969,7 @@ export default function JeuxPage() {
   // Code de classe issu d'un QR code / deep-link (/jeux?classe=CODE) à rejoindre
   const [pendingClassCode, setPendingClassCode] = useState('');
   const [userAvatarColor, setUserAvatarColor] = useState('#4361ee');
-  const [userAvatarIcon, setUserAvatarIcon] = useState('U');
+  const [userAvatarIcon, setUserAvatarIcon] = useState('User');
   const [userClasses, setUserClasses] = useState<string[]>([]);
   const [gameSearch, setGameSearch] = useState('');
   const [gameVisibleCount, setGameVisibleCount] = useState(4);
@@ -1712,7 +1713,7 @@ export default function JeuxPage() {
           setUserType((cached.role ?? 'apprenant') as UserType);
           if (cached.niveau) setNiveau(cached.niveau as Niveau);
           if (cached.avatarColor) setUserAvatarColor(cached.avatarColor);
-          if (cached.avatarIcon) setUserAvatarIcon(cached.avatarIcon.slice(0, 1).toUpperCase() || 'U');
+          if (cached.avatarIcon) setUserAvatarIcon(cached.avatarIcon || 'User');
           setView('main');
           setSessionChecked(true); // skip loader
           hasCachedUser = true;
@@ -1731,7 +1732,7 @@ export default function JeuxPage() {
           setUserType(data.user.role as UserType);
           if (data.user.niveau) setNiveau(data.user.niveau as Niveau);
           if (data.user.avatarColor) setUserAvatarColor(data.user.avatarColor);
-          if (data.user.avatarIcon) setUserAvatarIcon((data.user.avatarIcon as string).slice(0, 1).toUpperCase() || 'U');
+          if (data.user.avatarIcon) setUserAvatarIcon((data.user.avatarIcon as string) || 'User');
           void fetch('/api/auth/me/classes', { cache: 'no-store' })
             .then(r => r.json()).then(d => { if (d.classes) setUserClasses(d.classes.map((c: {name:string}) => c.name)); })
             .catch(() => {});
@@ -4694,7 +4695,7 @@ export default function JeuxPage() {
             setUserType((user.role === 'enseignant' || user.role === 'formateur') ? 'enseignant' : 'apprenant');
             if (user.niveau) setNiveau(user.niveau as Niveau);
             if (user.avatarColor) setUserAvatarColor(user.avatarColor);
-            if (user.avatarIcon) setUserAvatarIcon(user.avatarIcon.slice(0, 1).toUpperCase() || 'U');
+            if (user.avatarIcon) setUserAvatarIcon(user.avatarIcon || 'User');
             void fetch('/api/auth/me/classes', { cache: 'no-store' })
               .then(r => r.json()).then(d => { if (d.classes) setUserClasses(d.classes.map((c: {name:string}) => c.name)); })
               .catch(() => {});
@@ -4708,10 +4709,8 @@ export default function JeuxPage() {
               {/* ── Profil utilisateur redesign ────────────────────────── */}
               <div className="section">
                 <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 16px', borderRadius: 18, background: 'rgba(255,255,255,0.65)', border: '1px solid rgba(255,255,255,0.85)', backdropFilter: 'blur(20px)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.95), 0 3px 12px rgba(0,0,0,0.06)', marginBottom: 12 }}>
-                  {/* Avatar */}
-                  <div style={{ width: 52, height: 52, borderRadius: '50%', background: `linear-gradient(135deg, ${userAvatarColor}, ${userAvatarColor}99)`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, fontWeight: 900, color: '#fff', flexShrink: 0, boxShadow: `0 0 0 3px rgba(255,255,255,0.8), 0 4px 14px ${userAvatarColor}55` }}>
-                    {userAvatarIcon}
-                  </div>
+                  {/* Avatar stylé : pastille gradient + icône lucide + reflet glass */}
+                  <Avatar icon={userAvatarIcon} color={userAvatarColor} size={52} />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontWeight: 800, fontSize: 15, color: 'var(--text)', letterSpacing: '-0.01em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {currentUser || '-'}

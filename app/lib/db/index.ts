@@ -156,6 +156,16 @@ function migrate(db: Database.Database) {
   try { db.exec("ALTER TABLE crg_mp_players ADD COLUMN seat_score INTEGER DEFAULT 0;"); } catch { /* already exists */ }
   db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_crg_mp_sessions_room_code ON crg_mp_sessions(room_code) WHERE room_code IS NOT NULL;");
 
+  // ─── Migrations crg_users : colonnes ajoutees apres coup ───────────────────
+  // Une base creee avec un schema plus ancien n'a pas avatar_color/avatar_icon
+  // (CREATE TABLE IF NOT EXISTS ne modifie pas une table existante). Sans ces
+  // ALTER, le SELECT du login plante : "no such column: avatar_color".
+  try { db.exec("ALTER TABLE crg_users ADD COLUMN user_type TEXT NOT NULL DEFAULT 'apprenant';"); } catch { /* already exists */ }
+  try { db.exec("ALTER TABLE crg_users ADD COLUMN password_hash TEXT;"); } catch { /* already exists */ }
+  try { db.exec("ALTER TABLE crg_users ADD COLUMN niveau TEXT;"); } catch { /* already exists */ }
+  try { db.exec("ALTER TABLE crg_users ADD COLUMN avatar_color TEXT DEFAULT '#4361ee';"); } catch { /* already exists */ }
+  try { db.exec("ALTER TABLE crg_users ADD COLUMN avatar_icon TEXT DEFAULT 'User';"); } catch { /* already exists */ }
+
   // ─── Jeux seed ───────────────────────────────────────────────────────────────
   seedChromatectGame(db);
   seedLibreRGBGame(db);
