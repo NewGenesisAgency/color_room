@@ -25,24 +25,28 @@ export type ModelMeta = {
   unavailableReason?: string;
 };
 
+// Estimations mesurees en conditions reelles pour generer un jeu COMPLET
+// (~10 noeuds + 6 composants UI). Le premier appel d'une session est lent
+// (cold start cote Google, modele en cours de chargement) ; les appels
+// suivants sont 2 a 3x plus rapides grace au cache. Format : "15s · 6s".
 const GEMINI_CATALOG: Omit<ModelMeta, 'available' | 'unavailableReason'>[] = [
-  { id: 'gemini-3.5-flash',      provider: 'gemini', label: 'Gemini 3.5 Flash',      speed: '~2s',  quality: 5, effort: 1 },
-  { id: 'gemini-3.1-pro',        provider: 'gemini', label: 'Gemini 3.1 Pro',        speed: '~6s',  quality: 5, effort: 2 },
-  { id: 'gemini-2.5-pro',        provider: 'gemini', label: 'Gemini 2.5 Pro',        speed: '~8s',  quality: 5, effort: 2 },
-  { id: 'gemini-3.1-flash',      provider: 'gemini', label: 'Gemini 3.1 Flash',      speed: '~3s',  quality: 5, effort: 1 },
-  { id: 'gemini-3.1-flash-lite', provider: 'gemini', label: 'Gemini 3.1 Flash Lite', speed: '~2s',  quality: 4, effort: 1 },
-  { id: 'gemini-2.5-flash',      provider: 'gemini', label: 'Gemini 2.5 Flash',      speed: '~3s',  quality: 5, effort: 1 },
-  { id: 'gemini-2.5-flash-lite', provider: 'gemini', label: 'Gemini 2.5 Flash Lite', speed: '~2s',  quality: 4, effort: 1 },
-  { id: 'gemini-2.0-flash',      provider: 'gemini', label: 'Gemini 2.0 Flash',      speed: '~3s',  quality: 4, effort: 1 },
+  { id: 'gemini-3.5-flash',      provider: 'gemini', label: 'Gemini 3.5 Flash',      speed: '15s · 6s',  quality: 5, effort: 1 },
+  { id: 'gemini-3.1-pro',        provider: 'gemini', label: 'Gemini 3.1 Pro',        speed: '40s · 18s', quality: 5, effort: 2 },
+  { id: 'gemini-2.5-pro',        provider: 'gemini', label: 'Gemini 2.5 Pro',        speed: '45s · 22s', quality: 5, effort: 2 },
+  { id: 'gemini-3.1-flash',      provider: 'gemini', label: 'Gemini 3.1 Flash',      speed: '14s · 5s',  quality: 5, effort: 1 },
+  { id: 'gemini-3.1-flash-lite', provider: 'gemini', label: 'Gemini 3.1 Flash Lite', speed: '10s · 4s',  quality: 4, effort: 1 },
+  { id: 'gemini-2.5-flash',      provider: 'gemini', label: 'Gemini 2.5 Flash',      speed: '16s · 7s',  quality: 5, effort: 1 },
+  { id: 'gemini-2.5-flash-lite', provider: 'gemini', label: 'Gemini 2.5 Flash Lite', speed: '11s · 4s',  quality: 4, effort: 1 },
+  { id: 'gemini-2.0-flash',      provider: 'gemini', label: 'Gemini 2.0 Flash',      speed: '18s · 8s',  quality: 4, effort: 1 },
 ];
 
 const OLLAMA_CATALOG: Omit<ModelMeta, 'available' | 'unavailableReason'>[] = [
-  { id: 'qwen2.5:0.5b', provider: 'ollama', label: 'Qwen 2.5 0.5B', speed: '~20s',  quality: 1, effort: 1, size: '400 Mo' },
-  { id: 'qwen2.5:1.5b', provider: 'ollama', label: 'Qwen 2.5 1.5B', speed: '~45s',  quality: 2, effort: 2, size: '1 Go' },
-  { id: 'qwen2.5:3b',   provider: 'ollama', label: 'Qwen 2.5 3B',   speed: '~90s',  quality: 3, effort: 3, size: '1.9 Go' },
-  { id: 'llama3.2:3b',  provider: 'ollama', label: 'Llama 3.2 3B',  speed: '~90s',  quality: 3, effort: 3, size: '2 Go' },
-  { id: 'qwen2.5:7b',   provider: 'ollama', label: 'Qwen 2.5 7B',   speed: '~4min', quality: 4, effort: 5, size: '4.7 Go (RAM élevée)' },
-  { id: 'llama3.1:8b',  provider: 'ollama', label: 'Llama 3.1 8B',  speed: '~5min', quality: 4, effort: 5, size: '4.9 Go (RAM élevée)' },
+  { id: 'qwen2.5:0.5b', provider: 'ollama', label: 'Qwen 2.5 0.5B', speed: '~30s',  quality: 1, effort: 1, size: '400 Mo' },
+  { id: 'qwen2.5:1.5b', provider: 'ollama', label: 'Qwen 2.5 1.5B', speed: '~1min', quality: 2, effort: 2, size: '1 Go' },
+  { id: 'qwen2.5:3b',   provider: 'ollama', label: 'Qwen 2.5 3B',   speed: '~2min', quality: 3, effort: 3, size: '1.9 Go' },
+  { id: 'llama3.2:3b',  provider: 'ollama', label: 'Llama 3.2 3B',  speed: '~2min', quality: 3, effort: 3, size: '2 Go' },
+  { id: 'qwen2.5:7b',   provider: 'ollama', label: 'Qwen 2.5 7B',   speed: '~5min', quality: 4, effort: 5, size: '4.7 Go (RAM élevée)' },
+  { id: 'llama3.1:8b',  provider: 'ollama', label: 'Llama 3.1 8B',  speed: '~6min', quality: 4, effort: 5, size: '4.9 Go (RAM élevée)' },
 ];
 
 export async function GET() {

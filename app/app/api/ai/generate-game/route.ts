@@ -103,9 +103,16 @@ RÈGLES :
 - Vibration (tablette) : vibrate {durationMs}. Utilise-le sur les évènements forts (erreur, fin de partie).
 - Audio (hors-ligne): play_sound {sound}. Sons: click, select, tick, pop, swoosh, correct, wrong, success, error, alert, win, lose, levelup, coin, powerup, countdown, start, score. Utilise 'correct'/'wrong' pour le feedback pédagogique, 'win'/'lose' en fin de partie, 'coin'/'score' pour les points.
 - TIMER / compte à rebours : countdown_start {seconds} lance un minuteur ; on_countdown_end est un ÉVÈNEMENT d'entrée (comme event_begin) déclenché à 0. Pour un jeu chronométré : event_begin → countdown_start {seconds:30}, et un nœud on_countdown_end séparé → play_sound {sound:"win"} + fin. Affiche le temps avec un timer_display (varBind "time" ou via countdown).
-- INTERACTION DALLE : pour réagir au clic sur UNE dalle précise, utilise on_tile_click {tileIndex:0} (tileIndex commence à 0, donc la "dalle 1" = tileIndex 0). on_plate_click réagit au clic sur N'IMPORTE quelle dalle. Pattern "si dalle 1 cliquée → succès" : on_tile_click {tileIndex:0} → play_sound {sound:"success"} → add_score {amount:1}.
-- RECETTE JEU DE RÉFLEXES (type Color Speed) : event_begin → score 0 → countdown_start {seconds:30} → allumer une dalle aléatoire (random_int dans une variable + tile/tile_set). on_plate_click → si bonne dalle : add_score + play_sound "correct" + rallumer ailleurs ; sinon play_sound "wrong". on_countdown_end → play_sound "win". TOUJOURS finir par un feedback sonore.
-- L'UI est posée sur un canvas 860×500. Place les composants sans chevauchement.
+- INTERACTION DALLE : pour réagir au clic sur UNE dalle précise, utilise on_tile_click {tileIndex:0} (tileIndex commence à 0, donc la "dalle 1" = tileIndex 0). on_plate_click réagit au clic sur N'IMPORTE quelle dalle.
+- VARIABLE \`clickedTile\` : à chaque clic sur une dalle, le runtime écrit l'index dans la variable \`clickedTile\` (0..${tileCount - 1}). On_plate_click peut donc tester : compare_eq {a:"clickedTile", b:"targetTile"} → if {varName:"result", op:"eq", value:1} → succès / sinon échec. C'est LE pattern Color Speed.
+- RECETTE JEU DE RÉFLEXES (type Color Speed) DÉTAILLÉE - reproduis-la fidelement :
+  1. event_begin → variable_set {name:"score",value:0,op:"set"} → random_int {min:0,max:${tileCount - 1},varName:"targetTile"} → tile_set {tileIndex:"targetTile",color:"#22d3ee",intensity:0.85} → countdown_start {seconds:30}
+  2. on_plate_click → compare_eq {a:"clickedTile",b:"targetTile",out:"hit"} → if {varName:"hit",op:"eq",value:1}
+     - branche vrai : add_score {amount:1} → play_sound {sound:"correct"} → random_int {min:0,max:${tileCount - 1},varName:"targetTile"} → clear_tiles → tile_set {tileIndex:"targetTile",color:"#22d3ee",intensity:0.85}
+     - branche faux : play_sound {sound:"wrong"} → vibrate {durationMs:120}
+  3. on_countdown_end → play_sound {sound:"win"}
+  L'UI DOIT contenir : title_banner + score_display(varBind:"score") + timer_display(varBind:"time") + plate_grid (sinon le joueur ne voit pas les 42 dalles sur sa tablette).
+- L'UI est posée sur un canvas 860×500. Place les composants sans chevauchement. CHAQUE jeu doit contenir AU MINIMUM : un title_banner (titre du jeu), un score_display si un score existe, un timer_display si un compte a rebours existe, ET un plate_grid si on interagit avec les dalles (sinon le joueur ne peut pas cliquer dessus depuis la tablette).
 - Lie les affichages à des variables via "varBind" (ex: un score_display avec varBind "score").
 - Icônes : "sprite" (icône Lucide via "icon", ex Trophy, Star, Heart, Check, X, Zap, Crown, ThumbsUp) ou "svg_icon" (SVG perso). Pour sprite/svg_icon, "varBind" sert de visibilité : l'icône n'apparaît que si la variable est non nulle (ex. afficher un Trophy avec varBind "gagne"). Couleur via "bgColor".
 - Relie les boutons à la logique via "eventId" et un nœud "on_ui_click" {buttonId} correspondant.

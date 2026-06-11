@@ -53,7 +53,7 @@ const CS160Panel = dynamic(() => import('@/app/_components/CS160Panel'), { ssr: 
 const PythonEditor = dynamic(() => import('./PythonEditor'), { ssr: false });
 const UIDesigner = dynamic(() => import('./UIDesigner'), { ssr: false });
 
-import { Boxes, Gamepad2, Plus, Play, Pause, RotateCcw, Save, Trash2, FolderPlus, X, Lightbulb, Layers, Zap, Palette, Clock, MousePointer2, LayoutGrid, Maximize2, Minimize2, Eye, EyeOff, Frame, Star, Heart, Sun, Moon, Flame, Snowflake, Music, Target, Puzzle, Sparkles, Trophy, Rocket, Ghost, Dice1, Brain, Check, GitBranch, Hash, Settings2, Shuffle, Search, Users, Film, Thermometer, ScanLine, Wifi, WifiOff, Crown, Gem, Bug, Bot, Atom, Bird, Cat, Dog, Fish, Leaf, Cloud, Droplet, Mountain, Anchor, Bell, Bomb, Camera, Egg, Feather, Gift, Hexagon, Key, Lock, Medal, Pizza, Plane, Rainbow, Skull, Smile, Wand2, Waves, Crosshair, Dice5, Joystick, FlaskConical, Swords, ChevronDown, GraduationCap, SlidersHorizontal, RefreshCw, Copy, Scissors, FileCode, AlertTriangle, Laptop, ArrowRight, type LucideIcon } from 'lucide-react';
+import { Boxes, Gamepad2, Plus, Play, Pause, RotateCcw, Save, Trash2, FolderPlus, X, Lightbulb, Layers, Zap, Palette, Clock, MousePointer2, LayoutGrid, Maximize2, Minimize2, Eye, EyeOff, Frame, Star, Heart, Sun, Moon, Flame, Snowflake, Music, Target, Puzzle, Sparkles, Trophy, Rocket, Ghost, Dice1, Brain, Check, GitBranch, Hash, Settings2, Shuffle, Search, Users, Film, Thermometer, ScanLine, Wifi, WifiOff, Crown, Gem, Bug, Bot, Atom, Bird, Cat, Dog, Fish, Leaf, Cloud, Droplet, Mountain, Anchor, Bell, Bomb, Camera, Egg, Feather, Gift, Hexagon, Key, Lock, Medal, Pizza, Plane, Rainbow, Skull, Smile, Wand2, Waves, Crosshair, Dice5, Joystick, FlaskConical, Swords, ChevronDown, GraduationCap, SlidersHorizontal, RefreshCw, Copy, Scissors, FileCode, AlertTriangle, Laptop, ArrowRight, ArrowUp, type LucideIcon } from 'lucide-react';
 
 type IdFactory = () => string;
 
@@ -4385,10 +4385,37 @@ export default function EditeurPage() {
   };
 
   // Applique un jeu IA sur le jeu cible avec animation, en UN seul pas d'historique.
+  // Bascule entre les onglets de l'editeur au fur et a mesure pour que l'utilisateur
+  // VOIE l'IA travailler : canvas pour poser les blocs, puis UI pour deposer
+  // les composants visuels, puis python si un script_python a ete genere.
   const applyAiGame = async (gid: string, game: any, before: EditorSnapshot) => {
     const ids: string[] = (game.nodes as unknown[]).map(() => aiMkId());
-    setEditor((cur) => ({ ...cur, games: cur.games.map((g) => g.id === gid ? { ...g, nodes: [], edges: [], uiLayout: [] } : g), selectedNodeId: null }));
-    await aiSleep(120);
+
+    // 1. Infos projet appliquees AVANT le reste (nom + icone + couleurs + description).
+    setAiStep('Mise à jour des infos du projet…');
+    setEditor((cur) => ({
+      ...cur,
+      games: cur.games.map((g) => g.id === gid ? {
+        ...g,
+        ...(typeof game.name === 'string' && game.name.trim() ? { name: game.name.trim().slice(0, 60) } : {}),
+        ...(typeof game.description === 'string' ? { description: String(game.description ?? '').slice(0, 500) } : {}),
+        ...(typeof game.bgColor === 'string' && /^#[0-9a-f]{6}$/i.test(game.bgColor) ? { bgColor: game.bgColor } : {}),
+        ...(typeof game.accentColor === 'string' && /^#[0-9a-f]{6}$/i.test(game.accentColor) ? { accentColor: game.accentColor } : {}),
+        ...(Number.isFinite(Number(game.tileCount)) ? { tileCount: Math.max(1, Math.min(42, Math.round(Number(game.tileCount)))) } : {}),
+        ...(game.icon ? { icon: game.icon as GameDoc['icon'] } : {}),
+        nodes: [], edges: [], uiLayout: [],
+      } : g),
+      selectedNodeId: null,
+    }));
+    await aiSleep(250);
+
+    // 2. Bascule sur l'onglet "canvas" pour montrer la pose des blocs.
+    if (game.nodes.length > 0) {
+      setEditorTab('canvas');
+      setAiStep('Ouverture de l\'éditeur de blocs…');
+      await aiSleep(300);
+    }
+
     for (let i = 0; i < game.nodes.length; i++) {
       const n = game.nodes[i];
       const spec = NODE_CATALOG.find((x) => x.kind === n.kind);
@@ -4410,19 +4437,37 @@ export default function EditeurPage() {
       setEditor((cur) => ({ ...cur, games: cur.games.map((g) => g.id === gid ? { ...g, edges: [...g.edges, edge] } : g) }));
       await aiSleep(80);
     }
-    setAiStep('Construction de l’interface…');
-    const uiLayout = ((game.ui ?? []) as Record<string, unknown>[]).map((c) => ({ id: aiMkId(), ...c })) as unknown as UILayoutComponent[];
+
+    // 3. UI : bascule sur l'onglet "ui" et depose les composants un par un.
+    const uiList = (game.ui ?? []) as Record<string, unknown>[];
+    if (uiList.length > 0) {
+      setEditorTab('ui');
+      setAiStep('Ouverture du designer d\'interface…');
+      await aiSleep(350);
+      const uiLayout: UILayoutComponent[] = [];
+      for (let i = 0; i < uiList.length; i++) {
+        const c = uiList[i];
+        uiLayout.push({ id: aiMkId(), ...c } as unknown as UILayoutComponent);
+        setAiStep(`Composant UI ${i + 1}/${uiList.length} : ${String(c.kind ?? '')}`);
+        setEditor((cur) => ({ ...cur, games: cur.games.map((g) => g.id === gid ? { ...g, uiLayout: [...uiLayout] } : g) }));
+        await aiSleep(110);
+      }
+    }
+
+    // 4. Si l'IA a genere un script Python/JS, bascule rapidement sur l'onglet
+    // python pour le mettre en evidence avant de revenir sur canvas.
+    const hasScript = (game.nodes as Array<{ kind?: string }>).some((n) => n?.kind === 'script_python');
+    if (hasScript) {
+      setEditorTab('python');
+      setAiStep('Édition du script Python/JS…');
+      await aiSleep(450);
+      setEditorTab('canvas');
+    }
+
     const diff = Math.max(1, Math.min(5, Math.round(Number(game.difficulty) || 2))) as GameDoc['difficulty'];
     setEditor((cur) => ({
       ...cur,
-      games: cur.games.map((g) => g.id === gid ? {
-        ...g, uiLayout, difficulty: diff,
-        description: String(game.description ?? g.description ?? ''),
-        bgColor: String(game.bgColor ?? g.bgColor ?? '#0d1119'),
-        accentColor: String(game.accentColor ?? g.accentColor ?? '#7c3aed'),
-        tileCount: Number(game.tileCount ?? g.tileCount ?? 42),
-        ...(game.icon ? { icon: game.icon as GameDoc['icon'] } : {}),
-      } : g),
+      games: cur.games.map((g) => g.id === gid ? { ...g, difficulty: diff } : g),
     }));
     // UN seul pas d'historique pour toute la génération (annulable d'un coup)
     setHistory((h) => ({ past: [...h.past, before], future: [] }));
@@ -5200,13 +5245,20 @@ export default function EditeurPage() {
             <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', padding: 8, borderRadius: 18, background: 'rgba(255,255,255,0.7)', border: '1px solid rgba(255,255,255,0.9)', boxShadow: '0 6px 20px rgba(15,23,42,0.08), inset 0 1px 0 rgba(255,255,255,0.9)' }}>
               <textarea ref={aiTextareaRef}
                 value={aiPrompt} onChange={(e) => setAiPrompt(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void sendAiMessage(); } }}
+                onKeyDown={(e) => {
+                  // Stop la propagation pour eviter tout listener global (Python game
+                  // keys etc.) qui intercepterait espace/zqsd dans cette textarea.
+                  e.stopPropagation();
+                  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void sendAiMessage(); }
+                }}
                 disabled={aiBusy} rows={1}
-                placeholder={activeGame ? 'Demande une modification…  (Entrée = envoyer · Maj+Entrée = nouvelle ligne)' : 'Décris le jeu à créer…  (Entrée pour envoyer)'}
+                placeholder={activeGame ? 'Demande une modification… (entrée pour envoyer, maj+entrée pour une nouvelle ligne)' : 'Décris le jeu à créer… (entrée pour envoyer)'}
                 style={{ flex: 1, resize: 'none', borderRadius: 12, padding: '10px 12px', fontSize: 13.5, lineHeight: 1.5, background: 'transparent', border: 'none', color: '#0f172a', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box', overflow: 'auto', minHeight: 44, maxHeight: 260 }} />
               <button onClick={() => void sendAiMessage()} disabled={aiBusy || !aiPrompt.trim()}
-                style={{ width: 40, height: 40, flexShrink: 0, borderRadius: 13, border: 'none', cursor: aiBusy || !aiPrompt.trim() ? 'not-allowed' : 'pointer', color: '#fff', background: aiBusy || !aiPrompt.trim() ? 'rgba(124,58,237,0.3)' : 'linear-gradient(135deg,#7c3aed,#ec4899)', display: 'grid', placeItems: 'center', boxShadow: aiBusy || !aiPrompt.trim() ? 'none' : '0 4px 14px rgba(124,58,237,0.4), inset 0 1px 0 rgba(255,255,255,0.4)', transition: 'transform .12s' }}>
-                <Sparkles size={17} />
+                title={aiBusy ? 'Génération en cours…' : 'Envoyer'}
+                className="ai-send-btn"
+                style={{ width: 42, height: 42, flexShrink: 0, borderRadius: 13, border: 'none', cursor: aiBusy || !aiPrompt.trim() ? 'not-allowed' : 'pointer', color: '#fff', background: aiBusy || !aiPrompt.trim() ? 'rgba(124,58,237,0.32)' : 'linear-gradient(135deg,#7c3aed 0%,#ec4899 100%)', display: 'grid', placeItems: 'center', boxShadow: aiBusy || !aiPrompt.trim() ? 'none' : '0 6px 16px rgba(124,58,237,0.42), inset 0 1px 0 rgba(255,255,255,0.45)' }}>
+                <ArrowUp size={18} strokeWidth={2.6} className="ai-send-arrow" />
               </button>
             </div>
             <p style={{ margin: '8px 4px 0', fontSize: 10, color: 'rgba(15,23,42,0.38)', textAlign: 'center' }}>{aiSelectedModel ? aiModels.find((m) => m.id === aiSelectedModel)?.label ?? aiSelectedModel : 'Auto (Gemini → Ollama)'} · modifs en direct · sauvegarde auto</p>

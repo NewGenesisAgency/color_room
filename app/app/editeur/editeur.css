@@ -1561,6 +1561,51 @@ input[type='checkbox']:focus-visible {
   transform: translateX(-50%) translateY(0);
 }
 
+/* ──────────────────────────────────────────────────────────────────────────
+   Bouton "Envoyer" du chat IA : flèche qui se soulève + halo au hover
+   ────────────────────────────────────────────────────────────────────────── */
+.ai-send-btn {
+  position: relative;
+  overflow: hidden;
+  transition: transform 180ms cubic-bezier(0.34,1.56,0.64,1),
+              box-shadow 220ms ease,
+              filter 200ms ease;
+}
+
+.ai-send-arrow {
+  transition: transform 220ms cubic-bezier(0.34,1.56,0.64,1);
+}
+
+.ai-send-btn::after {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  background: linear-gradient(120deg, transparent 35%, rgba(255,255,255,0.30) 50%, transparent 65%);
+  transform: translateX(-120%);
+  transition: transform 700ms ease;
+  pointer-events: none;
+}
+
+.ai-send-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  filter: brightness(1.08);
+  box-shadow: 0 12px 26px rgba(124,58,237,0.55), inset 0 1px 0 rgba(255,255,255,0.5) !important;
+}
+
+.ai-send-btn:hover:not(:disabled) .ai-send-arrow {
+  transform: translateY(-3px) rotate(-3deg);
+}
+
+.ai-send-btn:hover:not(:disabled)::after { transform: translateX(120%); }
+
+.ai-send-btn:active:not(:disabled) {
+  transform: translateY(0) scale(0.95);
+}
+
+.ai-send-btn:active:not(:disabled) .ai-send-arrow {
+  transform: translateY(-6px) rotate(0);
+}
+
 .g-btn--success {
   background: rgba(5,150,105,0.09);
   color: #059669;
