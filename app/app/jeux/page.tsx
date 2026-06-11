@@ -976,6 +976,11 @@ export default function JeuxPage() {
   const [pendingGame, setPendingGame] = useState<
     { title: string; desc: string; accent: string; iconBg: string; iconColor: string; Icon: React.ComponentType<{ size?: number; color?: string }>; launch: () => void; howTo?: string } | null
   >(null);
+  // Confirmation "Quitter le jeu en cours ?" quand on choisit un autre jeu pendant
+  // qu'un jeu tourne. Mémorise la carte choisie pour la relancer après confirmation.
+  const [confirmSwitch, setConfirmSwitch] = useState<
+    { title: string; desc: string; accent: string; iconBg: string; iconColor: string; Icon: React.ComponentType<{ size?: number; color?: string }>; launch: () => void; howTo?: string } | null
+  >(null);
   const [hudVarsTick, setHudVarsTick] = useState(0); // re-render de l'overlay quand une variable change
   const [score, setScore] = useState<number>(0);
   const [gamesCompleted, setGamesCompleted] = useState<number>(0);
@@ -3294,6 +3299,20 @@ export default function JeuxPage() {
     stopSimonGame();
   }
 
+  type GamePick = { title: string; desc: string; accent: string; iconBg: string; iconColor: string; Icon: React.ComponentType<{ size?: number; color?: string }>; launch: () => void; howTo?: string };
+
+  /**
+   * Point d'entrée unique quand on choisit un jeu (clic carte ou bouton play).
+   * - Aucun jeu en cours -> ouvre directement la pop-up "Commencer".
+   * - Un jeu tourne deja -> demande confirmation "Quitter le jeu en cours ?".
+   *   Si l'utilisateur confirme, on arrete l'ancien et on ouvre la pop-up
+   *   "Commencer" du nouveau (cf. confirmSwitch + le rendu de la pop-up).
+   */
+  function pickGame(card: GamePick) {
+    if (gameActive) { setConfirmSwitch(card); return; }
+    setPendingGame(card);
+  }
+
   /** Détecte si le jeu sélectionné nécessite le CS-160 */
   function gameNeedsCs160(): boolean {
     const CS160_KINDS = new Set(['game_intrus', 'game_canal_mix']);
@@ -4967,7 +4986,7 @@ export default function JeuxPage() {
                         {visible.map((c) => (
                           <div key={c.key}
                             className={`game-card${c.selected ? ' selected' : ''}`}
-                            onClick={() => setPendingGame(c)}
+                            onClick={() => pickGame(c)}
                             role="button" tabIndex={0}
                           >
                             <div className="game-icon" style={{ background: c.iconBg }}>
@@ -4982,7 +5001,7 @@ export default function JeuxPage() {
                             </div>
                             <button className="play-btn"
                               style={{ background: c.accent, color: '#fff', boxShadow: c.selected ? `0 0 0 2px ${c.accent}80, 0 4px 14px ${c.accent}66` : `0 3px 10px ${c.accent}55` }}
-                              onClick={(e) => { e.stopPropagation(); setPendingGame(c); }}
+                              onClick={(e) => { e.stopPropagation(); pickGame(c); }}
                             ><Play size={15} /></button>
                           </div>
                         ))}
@@ -6385,6 +6404,44 @@ export default function JeuxPage() {
                   style={{ flex: 1, padding: '12px 18px', borderRadius: 14, border: 'none', background: `linear-gradient(135deg, ${pendingGame.accent}, ${pendingGame.accent}cc)`, color: '#fff', fontWeight: 800, fontSize: 15, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, boxShadow: `0 6px 20px ${pendingGame.accent}55` }}
                 >
                   <Play size={17} /> Commencer le jeu
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Pop-up de confirmation : quitter le jeu en cours pour en lancer un autre.
+          Oui -> on arrete l'ancien et on enchaine sur la pop-up "Commencer". */}
+      {confirmSwitch && (
+        <div
+          onClick={() => setConfirmSwitch(null)}
+          style={{ position: 'fixed', inset: 0, zIndex: 10000, display: 'grid', placeItems: 'center', padding: 20, background: 'rgba(8,10,20,0.62)', backdropFilter: 'blur(14px)' }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{ width: 'min(400px, 100%)', borderRadius: 24, overflow: 'hidden', background: 'linear-gradient(180deg,#161a26,#10131d)', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 30px 80px rgba(0,0,0,0.5)', animation: 'fadeIn 0.2s ease' }}
+          >
+            <div style={{ padding: '24px 24px 22px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+                <span style={{ width: 44, height: 44, borderRadius: 14, background: 'rgba(245,158,11,0.16)', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+                  <AlertTriangle size={22} color="#f59e0b" />
+                </span>
+                <div style={{ fontSize: 19, fontWeight: 900, color: '#fff', letterSpacing: '-0.02em' }}>Quitter le jeu en cours ?</div>
+              </div>
+              <p style={{ margin: '0 0 20px', fontSize: 13.5, color: 'rgba(255,255,255,0.72)', lineHeight: 1.6 }}>
+                Un jeu est en cours. Le lancer <strong style={{ color: confirmSwitch.accent }}>{confirmSwitch.title}</strong> va arrêter le jeu actuel et éteindre les dalles.
+              </p>
+              <div style={{ display: 'flex', gap: 10 }}>
+                <button
+                  onClick={() => setConfirmSwitch(null)}
+                  style={{ flex: 1, padding: '12px 18px', borderRadius: 14, border: '1px solid rgba(255,255,255,0.14)', background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.7)', fontWeight: 700, fontSize: 14, cursor: 'pointer', fontFamily: 'inherit' }}
+                >Non, rester</button>
+                <button
+                  onClick={() => { const g = confirmSwitch; setConfirmSwitch(null); stopGame(); setPendingGame(g); }}
+                  style={{ flex: 1, padding: '12px 18px', borderRadius: 14, border: 'none', background: `linear-gradient(135deg, ${confirmSwitch.accent}, ${confirmSwitch.accent}cc)`, color: '#fff', fontWeight: 800, fontSize: 14.5, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, boxShadow: `0 6px 20px ${confirmSwitch.accent}55` }}
+                >
+                  <Play size={16} /> Oui, changer
                 </button>
               </div>
             </div>

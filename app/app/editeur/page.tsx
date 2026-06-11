@@ -4978,7 +4978,7 @@ export default function EditeurPage() {
 
       {/* ── Chat IA (style outil, docké à droite : l'éditeur reste visible) ──── */}
       {aiOpen && (
-        <div style={{ position: 'fixed', top: 0, right: 0, bottom: 0, width: `min(${aiPanelWidth}px, 98vw)`, zIndex: 10050, display: 'flex', flexDirection: 'column', background: 'rgba(255,255,255,0.72)', backdropFilter: 'blur(28px) saturate(180%)', WebkitBackdropFilter: 'blur(28px) saturate(180%)', borderLeft: '1px solid rgba(255,255,255,0.8)', boxShadow: '-24px 0 70px rgba(15,23,42,0.18)', color: '#0f172a' }}>
+        <div style={{ position: 'fixed', top: 14, right: 14, bottom: 14, width: `min(${aiPanelWidth}px, calc(100vw - 28px))`, zIndex: 10050, display: 'flex', flexDirection: 'column', borderRadius: 22, overflow: 'hidden', background: 'linear-gradient(180deg, rgba(255,255,255,0.82) 0%, rgba(255,255,255,0.66) 100%)', backdropFilter: 'blur(36px) saturate(190%)', WebkitBackdropFilter: 'blur(36px) saturate(190%)', border: '1px solid rgba(255,255,255,0.9)', boxShadow: '0 24px 70px rgba(15,23,42,0.22), inset 0 1px 0 rgba(255,255,255,0.95), inset 0 0 0 1px rgba(255,255,255,0.35)', color: '#0f172a' }}>
           {/* Poignée de redimensionnement (bord gauche, drag réel) */}
           <div
             onMouseDown={(e) => {
@@ -4987,22 +4987,25 @@ export default function EditeurPage() {
               document.body.style.cursor = 'ew-resize';
             }}
             title="Glisser pour redimensionner"
-            style={{ position: 'absolute', top: 0, left: -3, bottom: 0, width: 10, cursor: 'ew-resize', zIndex: 10052, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: 12, cursor: 'ew-resize', zIndex: 10052, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
           >
-            <div style={{ width: 4, height: 46, borderRadius: 4, background: 'rgba(124,58,237,0.45)', boxShadow: '0 0 8px rgba(124,58,237,0.4)' }} />
+            <div style={{ width: 4, height: 42, borderRadius: 4, background: 'rgba(124,58,237,0.28)' }} />
           </div>
           <style>{'@keyframes aiPulse{0%,100%{opacity:.45}50%{opacity:1}}@keyframes aiShimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}'}</style>
-          <div style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 10, borderBottom: '1px solid rgba(15,23,42,0.08)', flexShrink: 0, background: 'linear-gradient(180deg,rgba(255,255,255,0.55),rgba(255,255,255,0))' }}>
-            <div style={{ width: 34, height: 34, borderRadius: 10, display: 'grid', placeItems: 'center', background: 'linear-gradient(135deg,#7c3aed,#ec4899)', flexShrink: 0, boxShadow: '0 4px 14px rgba(124,58,237,0.35)' }}><Sparkles size={18} color="#fff" /></div>
+          {/* Halo coloré diffus en haut (reflet liquid glass) */}
+          <div style={{ position: 'absolute', top: -60, left: '50%', transform: 'translateX(-50%)', width: '120%', height: 140, background: 'radial-gradient(ellipse at center, rgba(124,58,237,0.16), rgba(236,72,153,0.06) 45%, transparent 70%)', pointerEvents: 'none' }} />
+          <div style={{ position: 'relative', padding: '16px 18px 13px', display: 'flex', alignItems: 'center', gap: 11, flexShrink: 0 }}>
+            <div style={{ width: 36, height: 36, borderRadius: 12, display: 'grid', placeItems: 'center', background: 'linear-gradient(135deg,#7c3aed,#ec4899)', flexShrink: 0, boxShadow: '0 6px 16px rgba(124,58,237,0.4), inset 0 1px 0 rgba(255,255,255,0.5)' }}><Sparkles size={18} color="#fff" /></div>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <h2 style={{ margin: 0, fontSize: 15, fontWeight: 800, color: '#0f172a' }}>Assistant IA</h2>
-              <p style={{ margin: 0, fontSize: 11, color: 'rgba(15,23,42,0.5)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{activeGame ? `Jeu : ${activeGame.name}` : 'Aucun jeu - il en créera un'}</p>
+              <h2 style={{ margin: 0, fontSize: 15.5, fontWeight: 800, color: '#0f172a', letterSpacing: '-0.01em' }}>Assistant IA</h2>
+              <p style={{ margin: 0, fontSize: 11, color: 'rgba(15,23,42,0.45)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{activeGame ? `Jeu : ${activeGame.name}` : 'Aucun jeu - il en créera un'}</p>
               {aiStatus && !aiStatus.ready && <p style={{ margin: '2px 0 0', fontSize: 10.5, color: '#b45309', display: 'flex', alignItems: 'center', gap: 5 }}><span style={{ width: 7, height: 7, borderRadius: '50%', background: '#f59e0b', animation: 'aiPulse 1.1s ease-in-out infinite' }} />{aiStatus.message}</p>}
             </div>
-            <button onClick={() => { const n = !aiShowList; setAiShowList(n); if (n) void loadAiConvList(); }} title="Conversations enregistrées" style={{ background: aiShowList ? 'rgba(124,58,237,0.16)' : 'rgba(15,23,42,0.04)', border: '1px solid rgba(15,23,42,0.1)', color: aiShowList ? '#7c3aed' : 'rgba(15,23,42,0.6)', borderRadius: 8, padding: '6px 8px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}><Clock size={13} /></button>
-            <button onClick={newAiConversation} title="Nouvelle conversation" style={{ background: 'rgba(15,23,42,0.04)', border: '1px solid rgba(15,23,42,0.1)', color: 'rgba(15,23,42,0.6)', borderRadius: 8, padding: '6px 8px', cursor: 'pointer', fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}><Plus size={13} /> Nouveau</button>
-            <button onClick={() => setAiOpen(false)} style={{ background: 'transparent', border: 'none', color: 'rgba(15,23,42,0.5)', cursor: 'pointer', padding: 4 }}><X size={18} /></button>
+            <button onClick={() => { const n = !aiShowList; setAiShowList(n); if (n) void loadAiConvList(); }} title="Conversations enregistrées" style={{ background: aiShowList ? 'rgba(124,58,237,0.14)' : 'transparent', border: 'none', color: aiShowList ? '#7c3aed' : 'rgba(15,23,42,0.5)', borderRadius: 10, padding: '7px', cursor: 'pointer', display: 'flex', alignItems: 'center', transition: 'background .15s' }}><Clock size={14} /></button>
+            <button onClick={newAiConversation} title="Nouvelle conversation" style={{ background: 'transparent', border: 'none', color: 'rgba(15,23,42,0.5)', borderRadius: 10, padding: '7px', cursor: 'pointer', display: 'flex', alignItems: 'center', transition: 'background .15s' }}><Plus size={15} /></button>
+            <button onClick={() => setAiOpen(false)} title="Fermer" style={{ background: 'transparent', border: 'none', color: 'rgba(15,23,42,0.45)', cursor: 'pointer', padding: 7, borderRadius: 10, display: 'flex', alignItems: 'center' }}><X size={17} /></button>
           </div>
+          <div style={{ height: 1, margin: '0 16px', background: 'linear-gradient(90deg, transparent, rgba(15,23,42,0.1) 20%, rgba(15,23,42,0.1) 80%, transparent)', flexShrink: 0 }} />
 
           {aiShowList && (
             <div style={{ borderBottom: '1px solid rgba(15,23,42,0.08)', maxHeight: 200, overflowY: 'auto', background: 'rgba(255,255,255,0.4)', flexShrink: 0 }}>
@@ -5103,7 +5106,7 @@ export default function EditeurPage() {
                     { t: 'Dalle 1 allumée → succès', p: 'Crée un jeu simple : la dalle 1 s\'allume en vert. Si on clique sur la dalle 1, joue le son "success" et ajoute 1 point. Sinon, joue le son "error". On peut cliquer la dalle 1 pour interagir.' },
                     { t: 'Ajoute un timer + son de victoire', p: 'Ajoute au jeu actuel un timer de 60 secondes affiché, et joue le son "win" quand le temps est écoulé.' },
                   ].map((ex) => (
-                    <button key={ex.t} onClick={() => setAiPrompt(ex.p)} style={{ fontSize: 12, padding: '9px 11px', borderRadius: 10, border: '1px solid rgba(15,23,42,0.1)', background: 'rgba(255,255,255,0.6)', color: '#334155', cursor: 'pointer', textAlign: 'left', fontWeight: 600, boxShadow: '0 1px 3px rgba(15,23,42,0.05)' }}>{ex.t}</button>
+                    <button key={ex.t} onClick={() => setAiPrompt(ex.p)} style={{ fontSize: 12, padding: '11px 13px', borderRadius: 13, border: '1px solid rgba(255,255,255,0.9)', background: 'rgba(255,255,255,0.55)', backdropFilter: 'blur(8px)', color: '#334155', cursor: 'pointer', textAlign: 'left', fontWeight: 600, boxShadow: '0 2px 8px rgba(15,23,42,0.06), inset 0 1px 0 rgba(255,255,255,0.9)', display: 'flex', alignItems: 'center', gap: 8 }}><Sparkles size={13} style={{ color: '#7c3aed', flexShrink: 0 }} /> {ex.t}</button>
                   ))}
                 </div>
               </div>
@@ -5135,19 +5138,19 @@ export default function EditeurPage() {
 
           {aiError && <div style={{ margin: '0 16px', padding: '8px 10px', borderRadius: 8, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.3)', color: '#b91c1c', fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}><AlertTriangle size={13} style={{ flexShrink: 0 }} /> {aiError}</div>}
 
-          <div style={{ padding: 12, borderTop: '1px solid rgba(15,23,42,0.08)', flexShrink: 0, background: 'linear-gradient(0deg,rgba(255,255,255,0.5),rgba(255,255,255,0))' }}>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
+          <div style={{ padding: '12px 14px 14px', flexShrink: 0 }}>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', padding: 6, borderRadius: 18, background: 'rgba(255,255,255,0.7)', border: '1px solid rgba(255,255,255,0.9)', boxShadow: '0 6px 20px rgba(15,23,42,0.08), inset 0 1px 0 rgba(255,255,255,0.9)' }}>
               <textarea value={aiPrompt} onChange={(e) => setAiPrompt(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void sendAiMessage(); } }}
                 disabled={aiBusy} rows={2}
                 placeholder={activeGame ? 'Demande une modification…  (Entrée = envoyer · Maj+Entrée = nouvelle ligne)' : 'Décris le jeu à créer…  (Entrée pour envoyer)'}
-                style={{ flex: 1, resize: 'none', borderRadius: 12, padding: '10px 12px', fontSize: 13, lineHeight: 1.4, background: 'rgba(255,255,255,0.9)', border: '1px solid rgba(15,23,42,0.14)', color: '#0f172a', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box', boxShadow: 'inset 0 1px 3px rgba(15,23,42,0.05)' }} />
+                style={{ flex: 1, resize: 'none', borderRadius: 12, padding: '8px 10px', fontSize: 13, lineHeight: 1.45, background: 'transparent', border: 'none', color: '#0f172a', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }} />
               <button onClick={() => void sendAiMessage()} disabled={aiBusy || !aiPrompt.trim()}
-                style={{ width: 42, height: 42, flexShrink: 0, borderRadius: 12, border: 'none', cursor: aiBusy || !aiPrompt.trim() ? 'not-allowed' : 'pointer', color: '#fff', background: aiBusy || !aiPrompt.trim() ? 'rgba(124,58,237,0.35)' : 'linear-gradient(135deg,#7c3aed,#ec4899)', display: 'grid', placeItems: 'center', boxShadow: aiBusy || !aiPrompt.trim() ? 'none' : '0 4px 14px rgba(124,58,237,0.35)' }}>
-                <Sparkles size={18} />
+                style={{ width: 40, height: 40, flexShrink: 0, borderRadius: 13, border: 'none', cursor: aiBusy || !aiPrompt.trim() ? 'not-allowed' : 'pointer', color: '#fff', background: aiBusy || !aiPrompt.trim() ? 'rgba(124,58,237,0.3)' : 'linear-gradient(135deg,#7c3aed,#ec4899)', display: 'grid', placeItems: 'center', boxShadow: aiBusy || !aiPrompt.trim() ? 'none' : '0 4px 14px rgba(124,58,237,0.4), inset 0 1px 0 rgba(255,255,255,0.4)', transition: 'transform .12s' }}>
+                <Sparkles size={17} />
               </button>
             </div>
-            <p style={{ margin: '6px 2px 0', fontSize: 10, color: 'rgba(15,23,42,0.4)' }}>{aiSelectedModel ? aiModels.find((m) => m.id === aiSelectedModel)?.label ?? aiSelectedModel : 'Auto (Gemini → Ollama)'} · modifs en direct · « Annuler » disponible · sauvegarde auto</p>
+            <p style={{ margin: '8px 4px 0', fontSize: 10, color: 'rgba(15,23,42,0.38)', textAlign: 'center' }}>{aiSelectedModel ? aiModels.find((m) => m.id === aiSelectedModel)?.label ?? aiSelectedModel : 'Auto (Gemini → Ollama)'} · modifs en direct · sauvegarde auto</p>
           </div>
         </div>
       )}
