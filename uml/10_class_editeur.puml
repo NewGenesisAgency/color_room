@@ -1,241 +1,37 @@
-@startuml ColorRoom_ClassDiagram_Editeur
-
+@startuml ColorRoom_Classes_Editeur
 skinparam classAttributeIconSize 0
-skinparam classFontSize 12
-skinparam classBackgroundColor #FEFEFE
+skinparam classFontStyle bold
+skinparam classBackgroundColor #FAF5FF
 skinparam classBorderColor #7C3AED
 skinparam classArrowColor #6D28D9
-skinparam packageBackgroundColor #FAF5FF
-skinparam packageBorderColor #A78BFA
-skinparam stereotypeCBackgroundColor #EDE9FE
-skinparam stereotypeIBackgroundColor #FEF3C7
-skinparam noteBackgroundColor #FFFBEB
-skinparam noteBorderColor #D97706
+hide circle
+hide methods
 
-title ColorRoom — Diagramme de classes : Moteur Blueprint (Éditeur)
+title ColorRoom - Modèle de l'éditeur (Blueprint)
 
-package "Document de jeu" {
-  class GameDoc {
-    +id : string
-    +name : string
-    +tileCount : int?
-    +icon : GameIconName?
-    +difficulty : GameDifficulty?
-    +description : string?
-    +bgColor : string?
-    +accentColor : string?
-    +maxPlayers : int?
-    +gameMode : GameMode?
-    +pythonCode : string?
-    +nodes : EditorNode[]
-    +edges : GraphEdge[]
-    +uiComponents : GameUIComponent[]?
-    +uiLayout : UILayoutComponent[]?
-    +comments : GameComment[]?
-  }
-
-  class EditorNode {
-    +id : string
-    +kind : EditorNodeKind
-    +name : string
-    +enabled : boolean
-    +pos : {x: int, y: int}
-    +params : Map<string, any>
-    --
-    +isEvent() : boolean
-    +hasDataPorts() : boolean
-  }
-
-  class GraphEdge {
-    +id : string
-    +from : string
-    +to : string
-    +kind : EdgeKind?
-    +toPort : string?
-  }
-
-  class GameComment {
-    +id : string
-    +title : string
-    +color : string
-    +x : int
-    +y : int
-    +w : int
-    +h : int
-  }
-
-  class UILayoutComponent {
-    +id : string
-    +kind : UICompKind
-    +x : int
-    +y : int
-    +width : int
-    +height : int
-    +text : string?
-    +varBind : string?
-    +colorBind : string?
-    +bgColor : string?
-    +textColor : string?
-    +fontSize : int?
-    +eventId : string?
-    +min : float?
-    +max : float?
-  }
-
-  class GameUIComponent {
-    +id : string
-    +kind : UICompKind
-    +label : string
-    +color : string?
-    +nodeRef : string?
-    +varName : string?
-    +min : float?
-    +max : float?
-    +step : float?
-    +value : float?
-  }
-
-  enum EdgeKind {
-    EXEC
-    DATA
-  }
-
-  enum GameMode {
-    SOLO
-    COOP
-    VERSUS
-  }
+class GameDoc {
+  id : string
+  name : string
 }
 
-package "Métadonnées des nœuds" {
-  class NodeMeta <<ValueObject>> {
-    +kind : EditorNodeKind
-    +desc : string
-    +syn : string[]
-  }
-
-  class NodeCatalogItem {
-    +kind : EditorNodeKind
-    +category : string
-    +title : string
-    +defaults : Map<string, any>
-  }
-
-  note right of NodeMeta
-    171 kinds documentés
-    (descriptions FR + synonymes
-    pour recherche palette)
-  end note
+class Node {
+  id : string
+  kind : string
 }
 
-package "Validation" {
-  class Verifier <<Service>> {
-    +{static} verifierGraphe(\n  nodes: EditorNode[],\n  edges: GraphEdge[]\n) : Probleme[]
-  }
-
-  class Probleme <<ValueObject>> {
-    +nodeId : string?
-    +niveau : NiveauProbleme
-    +message : string
-  }
-
-  enum NiveauProbleme {
-    ERREUR
-    AVERTISSEMENT
-  }
-
-  note right of Verifier
-    <b>7 règles de validation :</b>
-    1. Bloc isolé (sans connexion)
-    2. Bloc jamais déclenché
-    3. Évènement sans sortie exec
-    4. wait ≤ 0s
-    5. while/for_range sans bodyNodeId
-    6. script_python vide
-    7. on_ui_click sans buttonId
-  end note
+class Edge {
+  from : string
+  to : string
+  kind : exec | data
 }
 
-package "Exécution (Runtime /jeux)" {
-  class GraphRuntime <<Service>> {
-    -graph : {out: Map<id, id[]>}
-    -hudVarsRef : Ref<Map>
-    -execCount : int
-    --
-    +buildGraph(nodes, edges) : void
-    +walk(nodeId: string) : Promise<void>
-    +executeNodeAsync(node) : Promise<string?>
-    +compterExecution() : void
-    +dispatchEvent(eventId: string) : void
-  }
-
-  class HardwareBatch <<Service>> {
-    -queue : Map<int, BatchEntry>
-    -timer : int?
-    --
-    +scheduleSetCanal(plateId, channels) : void
-    +flushHardwareBatch() : Promise<void>
-    +doSendBatch(plates) : Promise<void>
-    +remapIfNeeded(plateId, ch) : channel[]
-  }
-
-  class HudState <<Service>> {
-    +score : int
-    +countdowns : Map<string, Countdown>
-    +vars : Map<string, any>
-    +tileColors : string[]
-    --
-    +setVar(name, value) : void
-    +addScore(points) : void
-    +startCountdown(id, ms, onEnd) : void
-    +stopCountdown(id) : void
-  }
+class UIComponent {
+  kind : string
 }
 
-package "Interpréteur Python (Pyodide)" {
-  class PyodideRuntime <<Service>> {
-    -instance : PyodideInterface?
-    -busy : boolean
-    --
-    +{static} getPyodide() : Promise<Pyodide>
-    +runPythonAsync(code: string) : Promise<any>
-  }
-
-  class ColorroomPyAPI <<Interface>> {
-    +send_color(idx, r, g, b, intensity?)
-    +fill(r, g, b, intensity?)
-    +set_tile(idx, r, g, b)
-    +set_variable(name, value)
-    +add_score(points)
-    +emit_event(eventId)
-    +play_sound(soundId)
-    +vibrate(pattern)
-  }
-}
-
-' ─── Relations ───────────────────────────────────────────
-GameDoc "1" *-- "*" EditorNode : contains
-GameDoc "1" *-- "*" GraphEdge : connects
-GameDoc "1" *-- "*" GameComment : annotates
-GameDoc "1" *-- "*" UILayoutComponent : layouts
-GameDoc "1" *-- "*" GameUIComponent : ui
-
-GraphEdge --> EdgeKind : typed by
-GraphEdge "*" --> "2" EditorNode : links (from/to)
-
-NodeMeta --> EditorNode : describes
-NodeCatalogItem --> EditorNode : templates
-
-Verifier ..> GameDoc : analyses
-Verifier ..> Probleme : produces
-Probleme --> NiveauProbleme : severity
-
-GraphRuntime ..> GameDoc : interprets
-GraphRuntime --> HardwareBatch : delegates hardware
-GraphRuntime --> HudState : updates
-GraphRuntime --> PyodideRuntime : delegates Python
-
-HardwareBatch ..> ColorroomPyAPI : implements (via Python)
-PyodideRuntime ..> ColorroomPyAPI : exposes API
+GameDoc "1" *-- "*" Node
+GameDoc "1" *-- "*" Edge
+GameDoc "1" *-- "*" UIComponent
+Edge --> Node : relie
 
 @enduml

@@ -1,111 +1,15 @@
-@startuml ColorRoom_StateMachine_CS160
-
+@startuml ColorRoom_Etats_CS160
 skinparam stateBackgroundColor #F0FDF4
 skinparam stateBorderColor #16A34A
 skinparam stateArrowColor #475569
-skinparam stateFontSize 12
-skinparam noteBackgroundColor #FFFBEB
-skinparam noteBorderColor #D97706
 
-title ColorRoom — Machine à états : Colorimètre CS-160
+title ColorRoom - États du colorimètre CS-160
 
-[*] --> DECONNECTE
-
-state "DECONNECTE" as DECONNECTE {
-  DECONNECTE : connected = false
-  DECONNECTE : Aucun port ouvert
-}
-
-state "CONNEXION_EN_COURS" as CONNEXION {
-  CONNEXION : Scan des ports série
-  CONNEXION : Test /dev/ttyUSB0..3
-  CONNEXION : Baudrate 9600
-}
-
-state "CONNECTE" as CONNECTE {
-  CONNECTE : Port ouvert
-  CONNECTE : connected = true
-
-  state "EN_ATTENTE" as EN_ATTENTE {
-    EN_ATTENTE : Prêt à mesurer
-    EN_ATTENTE : Rétro-éclairage actif
-  }
-
-  state "STABILISATION" as STABILISATION {
-    STABILISATION : Attente 800 ms
-    STABILISATION : (stabilisation thermique)
-  }
-
-  state "MESURE_EN_COURS" as MESURE {
-    MESURE : CMD_MEASURE envoyé
-    MESURE : Attente réponse capteur
-    MESURE : tentatives = 0..1
-  }
-
-  state "RESULTAT_VALIDE" as RESULTAT {
-    RESULTAT : {X, Y, Z, Lv, x, y} reçu
-    RESULTAT : Données stockées
-  }
-
-  state "ECHEC_MESURE" as ECHEC {
-    ECHEC : r.success = false
-    ECHEC : tentatives épuisées (≥ 2)
-  }
-
-  EN_ATTENTE --> STABILISATION : Requête measure reçue
-  STABILISATION --> MESURE : 800 ms écoulés
-  MESURE --> RESULTAT : Réponse valide
-  MESURE --> STABILISATION : Réponse invalide\n[tentatives < 2]
-  MESURE --> ECHEC : [tentatives ≥ 2]
-  RESULTAT --> EN_ATTENTE : Mesure consommée
-  ECHEC --> EN_ATTENTE : Erreur retournée
-}
-
-state "CALIBRATION" as CALIBRATION {
-  CALIBRATION : Mode calibration actif
-  CALIBRATION : cs160_calib_ch sélectionné
-  CALIBRATION : cs160_rgb_calib envoyé
-}
-
-state "ERREUR_CONNEXION" as ERR_CONN {
-  ERR_CONN : Port non trouvé
-  ERR_CONN : Timeout connexion
-  ERR_CONN : Périphérique non reconnu
-}
-
-' ─── Transitions ─────────────────────────────────────────
-DECONNECTE --> CONNEXION : connect() appelé
-CONNEXION --> CONNECTE : Port trouvé & ouvert
-CONNEXION --> ERR_CONN : Timeout / Erreur
-ERR_CONN --> DECONNECTE : Réinitialisation
-ERR_CONN --> CONNEXION : Retry (auto dans measure)
-
-CONNECTE --> DECONNECTE : Déconnexion USB\n/ erreur série fatale
-CONNECTE --> CALIBRATION : cs160_connect {calib: true}
-CALIBRATION --> CONNECTE : Calibration terminée
-CALIBRATION --> DECONNECTE : Erreur critique
-
-note right of STABILISATION
-  <b>800 ms fixe</b>
-  Couvre :
-  • Stabilisation thermique
-  • Initialisation interne
-  • Synchronisation trame série
-end note
-
-note right of MESURE
-  <b>Données retournées :</b>
-  XYZ : tristimuli CIE
-  Lv : luminance (cd/m²)
-  x, y : chromaticité CIE 1931
-end note
-
-note bottom of CONNECTE
-  <b>Reconnexion automatique :</b>
-  Si DECONNECTE lors d'une
-  requête measure, connect()
-  est rappelé automatiquement
-  (api/cs160/route.ts)
-end note
+[*] --> Déconnecté
+Déconnecté --> Connecté : connect()
+Connecté --> Mesure : measure()
+Mesure --> Connecté : résultat
+Mesure --> Connecté : échec
+Connecté --> Déconnecté : USB retiré
 
 @enduml

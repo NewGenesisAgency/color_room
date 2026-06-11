@@ -1,141 +1,16 @@
-@startuml ColorRoom_StateMachine_Jeu
-
+@startuml ColorRoom_Etats_Jeu
 skinparam stateBackgroundColor #EFF6FF
 skinparam stateBorderColor #2563EB
 skinparam stateArrowColor #475569
-skinparam stateFontSize 12
-skinparam noteBackgroundColor #FFFBEB
-skinparam noteBorderColor #D97706
-skinparam stateStartColor #1E3A5F
-skinparam stateEndColor #1E3A5F
 
-title ColorRoom — Machine à états : Cycle de vie d'un jeu éditeur
+title ColorRoom - États d'un jeu
 
-[*] --> INACTIF : Application démarrée
-
-state "INACTIF" as INACTIF {
-  INACTIF : Liste des jeux affichée
-  INACTIF : Dalles éteintes
-}
-
-state "CHARGEMENT" as CHARGEMENT {
-  CHARGEMENT : Parsing JSON config
-  CHARGEMENT : buildGraph(nodes, edges)
-  CHARGEMENT : Initialisation hudVarsRef
-  CHARGEMENT : Chargement Pyodide (si Python)
-}
-
-state "PRET" as PRET {
-  PRET : Graphe analysé
-  PRET : Nœuds event_begin identifiés
-  PRET : Bouton "Jouer" actif
-}
-
-state "EN COURS" as EN_COURS {
-  state "Exécution normale" as EXEC_NORM {
-    EXEC_NORM : walk() actif
-    EXEC_NORM : isPlaying = true
-  }
-  state "Attente évènement" as ATTENTE {
-    ATTENTE : on_plate_click en attente
-    ATTENTE : on_timer en attente
-    ATTENTE : on_key en attente
-    ATTENTE : on_ui_click en attente
-    ATTENTE : on_countdown_end en attente
-  }
-  state "Exécution Python" as EXEC_PY {
-    EXEC_PY : pyBusyRef = true
-    EXEC_PY : Pyodide.runPythonAsync()
-  }
-  state "Mesure CS-160" as MESURE {
-    MESURE : measure_start actif
-    MESURE : Attente connexion série
-    MESURE : Attente stabilisation 800ms
-    MESURE : Timeout 25s
-  }
-  state "Animation" as ANIM {
-    ANIM : Interval 400ms actif
-    ANIM : anim_rainbow / wave / fade / strobe
-  }
-
-  EXEC_NORM --> ATTENTE : nœud on_* rencontré
-  ATTENTE --> EXEC_NORM : évènement déclenché
-  EXEC_NORM --> EXEC_PY : nœud script_python
-  EXEC_PY --> EXEC_NORM : code terminé
-  EXEC_NORM --> MESURE : nœud measure_start
-  MESURE --> EXEC_NORM : mesure_on_result déclenché
-  EXEC_NORM --> ANIM : nœud anim_*
-  ANIM --> EXEC_NORM : fin durée animation
-}
-
-state "PAUSE" as PAUSE {
-  PAUSE : isPlaying = false (temp)
-  PAUSE : slowMotion actif (180ms/nœud)
-}
-
-state "ERREUR" as ERREUR {
-  ERREUR : Erreur d'exécution
-  ERREUR : Message affiché
-  ERREUR : Nœud en surbrillance rouge
-}
-
-state "TERMINE" as TERMINE {
-  TERMINE : walk() arrêté
-  TERMINE : isPlaying = false
-  TERMINE : Dalles éteintes (blackout)
-  TERMINE : Score final affiché
-}
-
-state "EDITION" as EDITION {
-  state "Modification graphe" as MODIF {
-    MODIF : Drag nœud
-    MODIF : Ajout / suppression wire
-    MODIF : Édition paramètres
-  }
-  state "Vérification" as VERIF {
-    VERIF : verifierGraphe() lancé
-    VERIF : Problème[] affichés
-  }
-  state "Aperçu" as APERCU {
-    APERCU : executeNodeSync()
-    APERCU : Preview dalles temps réel
-  }
-
-  MODIF --> VERIF : auto-validate (debounce 300ms)
-  VERIF --> MODIF : corrections
-  MODIF --> APERCU : nœud preview cliqué
-  APERCU --> MODIF : retour édition
-}
-
-' ─── Transitions principales ─────────────────────────────
-INACTIF --> CHARGEMENT : Sélection d'un jeu
-CHARGEMENT --> PRET : Succès
-CHARGEMENT --> ERREUR : JSON invalide / nœuds manquants
-PRET --> EN_COURS : Clic "Jouer"\n[event_begin déclenché]
-PRET --> EDITION : Clic "Éditer"
-EDITION --> PRET : Sauvegarde
-EN_COURS --> PAUSE : Clic "Pause" / slowMotion activé
-PAUSE --> EN_COURS : Clic "Reprendre"
-EN_COURS --> ERREUR : Exception non gérée\n/ guard > 5000 exec/s
-ERREUR --> PRET : Clic "Réinitialiser"
-EN_COURS --> TERMINE : Dernier nœud atteint\n/ score_limit atteint\n/ Clic "Stop"
-TERMINE --> INACTIF : Clic "Retour"
-TERMINE --> EN_COURS : Clic "Rejouer"\n[reset complet]
-INACTIF --> EDITION : Clic "Nouvel éditeur"
-
-note right of EN_COURS
-  <b>Protection anti-boucle infinie :</b>
-  compterExecution() → abort si
-  > 5000 exécutions/seconde
-  centrerSurNoeudRef() activé
-  pour localiser le nœud fautif
-end note
-
-note left of EDITION
-  <b>Format de sauvegarde :</b>
-  GameDoc JSON → crg_games.config_json
-  Auto-save toutes les 2s
-  (debounce sur modification)
-end note
+[*] --> Prêt
+Prêt --> EnCours : Jouer
+EnCours --> Pause : Pause
+Pause --> EnCours : Reprendre
+EnCours --> Terminé : fin / stop
+Terminé --> EnCours : Rejouer
+Terminé --> [*] : Quitter
 
 @enduml

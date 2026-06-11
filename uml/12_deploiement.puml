@@ -1,113 +1,28 @@
-@startuml ColorRoom_DeploymentDiagram
-
-skinparam nodeFontSize 12
+@startuml ColorRoom_Deploiement
 skinparam nodeBackgroundColor #FEF9C3
 skinparam nodeBorderColor #CA8A04
 skinparam componentBackgroundColor #EFF6FF
 skinparam componentBorderColor #2563EB
-skinparam databaseBackgroundColor #FDF4FF
-skinparam databaseBorderColor #9333EA
-skinparam artifactBackgroundColor #F0FDF4
-skinparam artifactBorderColor #16A34A
-skinparam cloudBackgroundColor #FFF7ED
-skinparam cloudBorderColor #EA580C
 skinparam arrowColor #475569
-skinparam noteBackgroundColor #FFFBEB
-skinparam noteBorderColor #D97706
 
-title ColorRoom — Diagramme de déploiement
+title ColorRoom - Déploiement
 
-node "Raspberry Pi 4\n(ARM64, 4 GB RAM\nUbuntu 22.04 LTS)" as RPI {
-
-  node "Docker Engine\n(docker-compose.yml)" as DOCKER {
-
-    node "Container: colorroom-app\nImage: colorroom:latest\nPort: 3000" as C_APP {
-      component "Next.js 16\n(Node 20 Alpine)" as NEXTJS
-      database "colorroom.db\n(SQLite, better-sqlite3)\n/data/colorroom.db" as SQLITE
-      artifact "/app/public/pyodide/\n(Pyodide WASM ~15 MB)" as PYODIDE_FILES
-      note right of PYODIDE_FILES
-        Téléchargé au docker build
-        via scripts/fetch-pyodide.mjs
-        Sert en offline depuis /pyodide/
-      end note
-    }
-
-    node "Container: ollama\nImage: ollama/ollama\nPort: 11434" as C_OLLAMA {
-      artifact "qwen2.5:1.5b\n(~1 GB, ~/.ollama/models/)" as MODEL_QWEN
-      note right of MODEL_QWEN
-        Téléchargé au 1er démarrage
-        ollama pull qwen2.5:1.5b
-        ~1 min sur Pi (RAM suffisante)
-      end note
-    }
-
+node "Raspberry Pi" {
+  node "Docker" {
+    component "App Next.js" as APP
+    component "Ollama" as AI
   }
-
-  node "Processus hôte\n(Windows via Wine\nou VM Windows)" as HOST_PROC {
-    component "supervision.exe\nHTTP Server :8080" as SUPERV_EXE
-    note right of SUPERV_EXE
-      API propriétaire
-      Contrôle physique dalles
-      POST /setplates
-    end note
-  }
-
-  node "Port série USB" as USB_NODE {
-    component "CS-160\nColorimètre\n(ttyUSB0, 9600 baud)" as CS160_DEV
-  }
-
-  node "Réseau local\n(LAN / WiFi)" as LAN_NODE {
-    component "Switch / Access Point" as AP
-  }
-
+  component "supervision.exe" as SUP
 }
 
-node "Salle 1\n(21 dalles LED)" as SALLE1 {
-  component "12 dalles plafond\n(3×4 grille)" as S1_PLAFOND
-  component "9 dalles mur\n(3×3 grille)" as S1_MUR
-}
+node "Clients Wi-Fi" as CLI
+node "Dalles LED" as LED
+node "CS-160" as CS
 
-node "Salle 2\n(21 dalles LED)" as SALLE2 {
-  component "12 dalles plafond\n(3×4 grille)" as S2_PLAFOND
-  component "9 dalles mur\n(3×3 grille)" as S2_MUR
-}
-
-cloud "Internet\n(optionnel)" as CLOUD {
-  component "Google Gemini API\n(gemini-pro)" as GEMINI_CLOUD
-  component "Pyodide CDN\n(fallback dev)" as PYODIDE_CDN
-}
-
-node "Appareils clients\n(Wi-Fi LAN)" as CLIENTS {
-  node "PC Enseignant\n(Chrome/Firefox)" as PC_ENS
-  node "Smartphone Joueur\n(iOS/Android)" as PHONE
-  node "Tablette Salle\n(fixe)" as TABLET
-}
-
-' ─── Connexions ─────────────────────────────────────────
-NEXTJS --> SUPERV_EXE : HTTP :8080\n(POST /batch)
-NEXTJS --> CS160_DEV : Serial /dev/ttyUSB0
-NEXTJS --> MODEL_QWEN : HTTP :11434
-NEXTJS --> SQLITE : File I/O
-
-PC_ENS --> AP : Wi-Fi 2.4/5 GHz
-PHONE --> AP : Wi-Fi
-TABLET --> AP : Wi-Fi
-AP --> NEXTJS : HTTP :3000
-
-SUPERV_EXE --> LAN_NODE : DMX / UDP\nou Ethernet
-LAN_NODE --> SALLE1 : Câble réseau
-LAN_NODE --> SALLE2 : Câble réseau
-
-NEXTJS ..> GEMINI_CLOUD : HTTPS (si Ollama absent)
-NEXTJS ..> PYODIDE_CDN : HTTPS (si offline absent)
-
-note bottom of RPI
-  <b>Commandes d'installation :</b>
-  1. git clone repo && cd color_room
-  2. docker compose up --build -d
-  3. (1ère fois) docker exec ollama ollama pull qwen2.5:1.5b
-  4. Configurer .env (GEMINI_API_KEY optionnel)
-  5. Accès : http://<pi-ip>:3000
-end note
+CLI --> APP
+APP --> AI
+APP --> SUP
+APP --> CS
+SUP --> LED
 
 @enduml

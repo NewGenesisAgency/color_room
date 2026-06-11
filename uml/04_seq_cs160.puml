@@ -1,112 +1,20 @@
-@startuml ColorRoom_Sequence_CS160
-
-skinparam sequenceArrowThickness 2
+@startuml ColorRoom_Seq_CS160
 skinparam sequenceArrowColor #2563EB
-skinparam sequenceLifeLineBorderColor #64748B
 skinparam sequenceParticipantBackgroundColor #EFF6FF
 skinparam sequenceParticipantBorderColor #2563EB
-skinparam sequenceActorBackgroundColor #DBEAFE
-skinparam sequenceActorBorderColor #1D4ED8
-skinparam sequenceGroupBackgroundColor #F0FDF4
-skinparam sequenceGroupBorderColor #16A34A
-skinparam noteFontSize 11
-skinparam noteBackgroundColor #FFFBEB
-skinparam noteBorderColor #D97706
 
-title ColorRoom — Diagramme de séquence : Mesure colorimétrique (CS-160)
+title ColorRoom - Mesure CS-160
 
-actor "Utilisateur" as USER
-participant "Page /jeux\n(Runtime)" as RUNTIME
-participant "API Route\n/api/cs160" as API
-participant "CS160Bridge\n(lib/cs160Bridge.ts)" as BRIDGE
-participant "CS-160\n(Port série)" as DEVICE
-participant "Dalle LED\n(plaque cible)" as DALLE
+actor Joueur
+participant "App" as APP
+participant "API /cs160" as API
+participant "CS-160" as CS
 
-== Initialisation ==
-
-USER -> RUNTIME : Lance jeu avec nœud [measure_start]
-activate RUNTIME
-
-RUNTIME -> DALLE : sendRgbToPlate(target_color)
-note right : Allume la plaque cible\navec la couleur de référence
-
-RUNTIME -> RUNTIME : setTimeout(25 000 ms)
-note right : Délai de sécurité\n(couvre la connexion série)
-
-== Connexion & mesure ==
-
-RUNTIME -> API : POST /api/cs160\n{action: "measure"}
-activate API
-
-API -> BRIDGE : connect()
-activate BRIDGE
-
-BRIDGE -> DEVICE : openSerial(/dev/ttyUSB0, 9600)
-activate DEVICE
-
-alt Connexion OK
-  DEVICE --> BRIDGE : ACK
-  BRIDGE --> API : connected = true
-else Déjà connecté
-  BRIDGE --> API : connected = true (no-op)
-end
-
-deactivate DEVICE
-
-loop tentatives = 0..1 (max 2 essais)
-  BRIDGE -> BRIDGE : sleep(800 ms)
-  note right : Stabilisation du capteur\navant lecture
-
-  BRIDGE -> DEVICE : CMD_MEASURE
-  activate DEVICE
-  DEVICE --> BRIDGE : {X, Y, Z, Lv, x, y}
-  deactivate DEVICE
-
-  alt Mesure valide
-    BRIDGE -> BRIDGE : r.success = true
-    BRIDGE --> API : {success: true, data: {xyz, lvxy}}
-    note right : Sort de la boucle
-  else Mesure invalide
-    BRIDGE -> BRIDGE : r.success = false
-    note right : Réessai si tentative < 2
-  end
-end
-
-deactivate BRIDGE
-
-API --> RUNTIME : {success, data: {X, Y, Z, Lv, x, y}}
-deactivate API
-
-== Traitement des résultats ==
-
-alt success == true
-  RUNTIME -> RUNTIME : Déclenche nœud [measure_on_result]
-  RUNTIME -> RUNTIME : Stocke {x, y, Lv} dans hudVarsRef
-
-  opt Nœud [measure_compare] présent
-    RUNTIME -> RUNTIME : colorDistance(mesure, cible)
-    RUNTIME -> RUNTIME : Calcule score (0–100)
-    RUNTIME -> USER : Affiche résultat + score
-  end
-
-  opt Nœud [measure_show_cie] présent
-    RUNTIME -> USER : Affiche diagramme CIE 1931\navec point mesuré
-  end
-
-else success == false
-  RUNTIME -> USER : Affiche erreur\n"CS-160 indisponible (detail)"
-  RUNTIME -> RUNTIME : Déclenche nœud [on_error] si défini
-end
-
-RUNTIME --> USER : Continue l'exécution du graphe
-deactivate RUNTIME
-
-note over USER, DEVICE
-  <b>Délais cumulés :</b>
-  • Connexion série : ~100–500 ms
-  • Stabilisation : 800 ms × N essais
-  • Timeout sécurité : 25 000 ms
-  • Débit série : 9600 baud
-end note
+Joueur -> APP : lance la mesure
+APP -> API : POST measure
+API -> CS : connect + lecture
+CS --> API : x, y, Lv
+API --> APP : résultat
+APP --> Joueur : couleur + score
 
 @enduml

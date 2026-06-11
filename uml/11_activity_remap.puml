@@ -1,65 +1,21 @@
-@startuml ColorRoom_Activity_RemapCanaux
-
+@startuml ColorRoom_Activite_Remap
 skinparam activityBackgroundColor #EFF6FF
 skinparam activityBorderColor #2563EB
-skinparam activityArrowColor #475569
 skinparam activityDiamondBackgroundColor #FEF9C3
 skinparam activityDiamondBorderColor #CA8A04
-skinparam noteBackgroundColor #FFFBEB
-skinparam noteBorderColor #D97706
-skinparam startColor #1E3A5F
-skinparam endColor #1E3A5F
+skinparam activityArrowColor #475569
 
-title ColorRoom — Diagramme d'activité : Remappage canaux R/B
+title ColorRoom - Envoi couleur à une dalle
 
 start
-
-:Reçoit commande d'éclairage;
-note right
-  Couleur RGB + intensité
-  Index de la dalle (1–42)
-end note
-
-:Calcule channels[32] en référence ROUGE;
-note right
-  channels[0..31] correspondent
-  aux longueurs d'onde ROUGE
-  (CHANNELS_ROUGE[i].nm)
-end note
-
-:Interroge PLATE_TYPE[dalleId];
-
-if (PLATE_TYPE[dalleId] == 'bleu' ?) then (oui)
-  :Appel remapChannels32(\n  channels,\n  srcType='rouge',\n  dstType='bleu'\n);
-  note right
-    <b>MAP_ROUGE_TO_BLEU</b>
-    Pour chaque canal bleu j :
-    bleu[j] = rouge[MAP_BLEU_TO_ROUGE[j]]
-    Préserve l'intention lumineuse
-    malgré câblage différent
-  end note
-  :channels remappés pour dalle BLEU;
-else (non - c'est ROUGE)
-  :channels inchangés;
+:couleur RGB + id dalle;
+if (dalle de type bleu ?) then (oui)
+  :remap canaux rouge -> bleu;
+else (non)
+  :canaux inchangés;
 endif
-
-:Construit payload API Supervision;
-note right
-  [{plateId, channels: [{index, value}]}]
-  Filtre les channels à 0 (optimisation)
-end note
-
-:POST /api/supervision/batch;
-:supervision.exe envoie DMX / réseau;
-:Dalles LED s'allument avec couleur souhaitée;
-
-note right
-  Dalles ROUGE : canaux physiques 0-31
-  directement compatibles (pas de transformation)
-  Dalles BLEU : MAP_ROUGE_TO_BLEU[32]
-  corrige les indices physiques
-end note
-
+:POST /api/supervision;
+:dalle allumée;
 stop
 
 @enduml

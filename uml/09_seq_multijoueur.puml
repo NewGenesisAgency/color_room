@@ -1,110 +1,24 @@
-@startuml ColorRoom_Sequence_Multijoueur
-
-skinparam sequenceArrowThickness 2
+@startuml ColorRoom_Seq_MP
 skinparam sequenceArrowColor #DC2626
-skinparam sequenceLifeLineBorderColor #64748B
 skinparam sequenceParticipantBackgroundColor #FFF1F2
 skinparam sequenceParticipantBorderColor #DC2626
-skinparam sequenceActorBackgroundColor #FFE4E6
-skinparam sequenceActorBorderColor #9F1239
-skinparam noteBackgroundColor #FFFBEB
-skinparam noteBorderColor #D97706
 
-title ColorRoom — Diagramme de séquence : Session multijoueur (P4 / Split-Screen)
+title ColorRoom - Session multijoueur
 
-actor "Joueur 1 (Hôte)\nPC Enseignant" as J1
-actor "Joueur 2\nTéléphone" as J2
-actor "Joueur 3\nTéléphone" as J3
-actor "Joueur 4\nTéléphone" as J4
+actor "Hôte" as H
+actor "Joueur" as J
+participant "API /mp" as API
+database "SQLite" as DB
 
-participant "Page /jeux\n(Runtime Hôte)" as HOST
-participant "API /api/mp\n(Sessions)" as API_MP
-participant "Base de données\n(crg_mp_sessions\ncrg_mp_players)" as DB
-participant "API Supervision\n(Dalles)" as SUPERV
-participant "Page /p4\n(Puissance 4)" as P4_PAGE
-participant "API /api/p4\n(Rooms P4)" as API_P4
-
-== Création de session ==
-
-J1 -> HOST : Sélectionne jeu multijoueur\n[maxPlayers=4, mode=versus]
-HOST -> API_MP : POST /api/mp/sessions\n{game_id, max_players: 4,\n mode: 'versus', difficulty: 2}
-activate API_MP
-API_MP -> DB : INSERT crg_mp_sessions\n{status:'waiting', room_code: 'XKQF'}
-DB --> API_MP : session {id, room_code}
-API_MP --> HOST : {session_id, room_code: "XKQF",\n join_url: ".../rejoindre/XKQF"}
-deactivate API_MP
-
-HOST -> J1 : Affiche QR code / URL\n"Rejoindre : /rejoindre/XKQF"
-HOST -> SUPERV : Affiche "Waiting for players"\n(dalles clignotent en blanc)
-
-== Rejoindre la session ==
-
-J2 -> API_MP : POST /api/mp/sessions/XKQF/join\n{name: "Alice"}
-activate API_MP
-API_MP -> DB : INSERT crg_mp_players\n{seat: 1, token: "tok-alice"}
-DB --> API_MP : player {seat: 1, token}
-API_MP --> J2 : {token, seat: 1, color: "rouge"}
-deactivate API_MP
-
-J3 -> API_MP : POST /api/mp/sessions/XKQF/join\n{name: "Bob"}
-API_MP -> DB : INSERT crg_mp_players {seat: 2}
-API_MP --> J3 : {token, seat: 2, color: "jaune"}
-
-J4 -> API_MP : POST /api/mp/sessions/XKQF/join\n{name: "Charlie"}
-API_MP -> DB : INSERT crg_mp_players {seat: 3}
-API_MP --> J4 : {token, seat: 3, color: "vert"}
-
-== Démarrage ==
-
-J1 -> HOST : Clique "Démarrer"\n(tous joueurs connectés)
-HOST -> API_MP : PATCH /api/mp/sessions/XKQF\n{status: 'playing'}
-API_MP -> DB : UPDATE status='playing'
-
-HOST -> SUPERV : Allume dalles R/B\nselon sièges joueurs
-HOST -> J2 : (polling) session status=playing
-HOST -> J3 : (polling) session status=playing
-HOST -> J4 : (polling) session status=playing
-
-== Déroulement (exemple Canal Mix) ==
-
-HOST -> SUPERV : Allume dalles avec\ncouleur cible (RGB)
-HOST -> J2 : Affiche sliders canaux\n(son téléphone comme manette)
-J2 -> API_MP : POST /api/mp/sessions/XKQF/input\n{seat: 1, channels: [255, 0, 100, ...]}
-API_MP -> DB : UPDATE state_json
-HOST -> HOST : (polling) lit state_json
-HOST -> SUPERV : Met à jour dalles\nselon soumission J2
-
-== Fin de partie ==
-
-HOST -> HOST : Calcule scores\npar siège
-HOST -> API_MP : PATCH /api/mp/sessions/XKQF\n{status: 'finished', state_json: scores}
-HOST -> SUPERV : Animation victoire\n(dalles du gagnant clignotent)
-HOST -> J1 : Affiche podium scores
-J2 -> API_MP : GET /api/mp/sessions/XKQF\n→ résultats finaux
-
-== Scénario alternatif : Puissance 4 P4 ==
-
-note over J1, API_P4
-  <b>Puissance 4 (mode dédié)</b>
-  2 joueurs : rouge (J1) vs jaune (J2)
-  Chaque dalle = une colonne du plateau
-end note
-
-J1 -> P4_PAGE : Ouvre /p4?room=NEW
-P4_PAGE -> API_P4 : POST /api/p4/rooms\n{player_r_token: "tok-j1"}
-API_P4 -> DB : INSERT crg_p4_rooms\n{board_json: "empty 6×7", turn: "rouge"}
-API_P4 --> P4_PAGE : {room_id, join_url}
-
-J2 -> P4_PAGE : Ouvre /p4?room={room_id}
-P4_PAGE -> API_P4 : PATCH /api/p4/rooms/{id}\n{player_j_token: "tok-j2"}
-
-loop Tour par tour
-  J1 -> P4_PAGE : Touche la dalle\n(colonne choisie)
-  P4_PAGE -> API_P4 : POST /api/p4/rooms/{id}/move\n{column: 3, token: "tok-j1"}
-  API_P4 -> API_P4 : Vérifie victoire\n(grid_check_4_in_row)
-  API_P4 -> DB : UPDATE board_json, turn
-  API_P4 --> P4_PAGE : {board, turn: "jaune", winner: null}
-  P4_PAGE -> SUPERV : Met à jour dalles\n(affiche plateau physique)
-end
+H -> API : crée session
+API -> DB : code partie
+API --> H : code (ex: XKQF)
+J -> API : rejoint (code)
+API -> DB : ajoute joueur
+H -> API : démarre
+J -> API : envoie son coup
+API -> DB : maj état
+H -> API : lit l'état
+H --> H : met à jour les dalles
 
 @enduml

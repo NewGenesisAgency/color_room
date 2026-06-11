@@ -1,299 +1,47 @@
-@startuml ColorRoom_ClassDiagram_Domaine
-
+@startuml ColorRoom_Classes
 skinparam classAttributeIconSize 0
-skinparam classFontSize 13
-skinparam classFontName Arial
-skinparam classBackgroundColor #FEFEFE
-skinparam classBorderColor #334155
+skinparam classFontStyle bold
+skinparam classBackgroundColor #EFF6FF
+skinparam classBorderColor #2563EB
 skinparam classArrowColor #475569
-skinparam noteFontSize 11
-skinparam packageBackgroundColor #F0F4FF
-skinparam packageBorderColor #7B93C8
-skinparam stereotypeCBackgroundColor #DBEAFE
-skinparam stereotypeABackgroundColor #D1FAE5
-skinparam stereotypeIBackgroundColor #FEF3C7
-skinparam stereotypeEBackgroundColor #FCE7F3
+hide circle
+hide methods
 
-title ColorRoom — Diagramme de classes du domaine
+title ColorRoom - Classes principales
 
-package "Matériel physique" {
-  class Dalle {
-    +id : int {1..42}
-    +type : TileType
-    +salle : int {1|2}
-    +indexDansSalle : int {0..20}
-    --
-    +getChannels() : ChannelProfile[]
-    +remapChannels(src: TileType) : int[]
-  }
-
-  enum TileType {
-    ROUGE
-    BLEU
-  }
-
-  class ChannelProfile {
-    +nm : int?
-    +label : string
-    +rgb : [int, int, int]
-  }
-
-  class Salle {
-    +numero : int {1|2}
-    +dallesPlafond : Dalle[12]
-    +dallesMur : Dalle[9]
-    --
-    +allumerToutes(color: RGB)
-    +eteindreTous()
-  }
-
-  class ColorimétrieCS160 {
-    +port : string
-    +connected : boolean
-    --
-    +connect() : Promise<bool>
-    +measure() : Promise<MesureCouleur>
-    +setBacklight(on: bool)
-  }
-
-  class MesureCouleur {
-    +timestamp : string
-    +X : float
-    +Y : float
-    +Z : float
-    +Lv : float
-    +x : float
-    +y : float
-  }
+class Salle {
+  numero : int
 }
 
-package "Persistence (SQLite)" {
-  class Jeu <<Entity>> {
-    +id : string
-    +name : string
-    +kind : string
-    +config_json : string
-    +created_at : datetime
-    +updated_at : datetime
-  }
-
-  class Utilisateur <<Entity>> {
-    +id : string
-    +name : string
-    +user_type : UserType
-    +password_hash : string
-    +niveau : Niveau
-    +avatar_color : string
-    +avatar_icon : string
-    +created_at : datetime
-  }
-
-  class Session <<Entity>> {
-    +id : string
-    +user_id : string
-    +token : string
-    +expires_at : datetime
-    +created_at : datetime
-  }
-
-  class Classe <<Entity>> {
-    +id : string
-    +name : string
-    +code : string
-    +created_by : string
-    +niveau : Niveau
-    +created_at : datetime
-  }
-
-  class Score <<Entity>> {
-    +id : string
-    +user_id : string
-    +game_name : string
-    +score : int
-    +played_at : datetime
-  }
-
-  class SessionMultijoueur <<Entity>> {
-    +id : string
-    +status : string
-    +game_id : string
-    +state_json : string
-    +room_code : string
-    +max_players : int
-    +difficulty : int
-    +mode : string
-    --
-    +getState() : object
-    +setState(s: object)
-  }
-
-  class JoueurMultijoueur <<Entity>> {
-    +id : string
-    +session_id : string
-    +token : string
-    +name : string
-    +seat : int {1..8}
-    +last_seen_at : datetime
-    +is_ready : boolean
-    +seat_score : int
-  }
-
-  class SalleP4 <<Entity>> {
-    +id : string
-    +player_r_token : string
-    +player_j_token : string
-    +board_json : string
-    +turn : string
-    +winner : string?
-    +status : string
-  }
+class Dalle {
+  id : int
+  type : rouge | bleu
 }
 
-package "Moteur de jeux (Éditeur)" {
-  class GameDoc {
-    +id : string
-    +name : string
-    +tileCount : int?
-    +icon : GameIconName?
-    +difficulty : GameDifficulty?
-    +description : string?
-    +bgColor : string?
-    +accentColor : string?
-    +maxPlayers : int?
-    +gameMode : GameMode?
-    +pythonCode : string?
-    --
-    +validate() : Probleme[]
-  }
-
-  class EditorNode {
-    +id : string
-    +kind : EditorNodeKind
-    +name : string
-    +enabled : boolean
-    +pos : {x: int, y: int}
-    +params : Map<string, any>
-  }
-
-  class GraphEdge {
-    +id : string
-    +from : string
-    +to : string
-    +kind : EdgeKind?
-    +toPort : string?
-  }
-
-  class GameComment {
-    +id : string
-    +title : string
-    +color : string
-    +x : int
-    +y : int
-    +w : int
-    +h : int
-  }
-
-  class UILayoutComponent {
-    +id : string
-    +kind : UICompKind
-    +x : int
-    +y : int
-    +width : int
-    +height : int
-    +text : string?
-    +varBind : string?
-    +colorBind : string?
-    +eventId : string?
-    +min : float?
-    +max : float?
-  }
-
-  enum EdgeKind {
-    EXEC
-    DATA
-  }
-
-  enum GameMode {
-    SOLO
-    COOP
-    VERSUS
-  }
-
-  enum GameDifficulty {
-    1 = FACILE
-    2 = MOYEN
-    3 = DIFFICILE
-    4 = EXPERT
-    5 = MAITRE
-  }
-
-  class Verifier {
-    +{static} verifierGraphe(nodes, edges) : Probleme[]
-  }
-
-  class Probleme {
-    +nodeId : string?
-    +niveau : NiveauProbleme
-    +message : string
-  }
-
-  enum NiveauProbleme {
-    ERREUR
-    AVERTISSEMENT
-  }
-
-  class NodeMeta {
-    +kind : EditorNodeKind
-    +desc : string
-    +syn : string[]
-  }
+class Jeu {
+  id : string
+  name : string
 }
 
-package "IA (Génération)" {
-  class GenerateurIA {
-    +model : string
-    +temperature : float
-    +num_predict : int
-    --
-    +genererJeu(prompt: string) : GameDoc
-    +genererCode(prompt: string) : string
-  }
-
-  class ChatIA {
-    +id : string
-    +game_id : string
-    +title : string
-    +messages_json : string
-    +created_at : datetime
-  }
+class Utilisateur {
+  id : string
+  name : string
 }
 
-' ─── Relations ───────────────────────────────────────────────
-Salle "1" *-- "21" Dalle : contient
-Dalle "1" --> "1" TileType : a
-Dalle "1" --> "*" ChannelProfile : expose
-ColorimétrieCS160 "1" ..> "1" MesureCouleur : produit
+class Score {
+  game : string
+  points : int
+}
 
-Utilisateur "1" -- "*" Session : possède
-Utilisateur "1" -- "*" Score : cumule
-Utilisateur "*" -- "*" Classe : appartient à
-SessionMultijoueur "1" *-- "1..8" JoueurMultijoueur : regroupe
-SessionMultijoueur "1" --> "1" Jeu : lance
+class SessionMP {
+  code : string
+  status : string
+}
 
-GameDoc "1" *-- "*" EditorNode : contient
-GameDoc "1" *-- "*" GraphEdge : relie
-GameDoc "1" *-- "*" GameComment : annote
-GameDoc "1" *-- "*" UILayoutComponent : affiche
-GraphEdge "1" --> "1" EdgeKind : a
-GraphEdge "*" --> "2" EditorNode : connecte (from/to)
-
-Verifier ..> GameDoc : analyse
-Verifier ..> Probleme : produit
-NodeMeta "1" --> "1" EditorNode : décrit
-
-GenerateurIA ..> GameDoc : génère
-ChatIA "*" --> "1" Jeu : améliore
-
-Jeu "1" --> "1" GameDoc : sérialise
+Salle "1" *-- "21" Dalle
+Utilisateur "1" -- "*" Score
+SessionMP "1" *-- "2..4" Utilisateur
+SessionMP --> Jeu
+Jeu --> Dalle : pilote
 
 @enduml

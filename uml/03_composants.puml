@@ -1,169 +1,25 @@
-@startuml ColorRoom_ComponentDiagram
-
-skinparam componentFontSize 12
+@startuml ColorRoom_Composants
 skinparam componentBackgroundColor #EFF6FF
 skinparam componentBorderColor #2563EB
-skinparam interfaceBackgroundColor #ECFDF5
-skinparam interfaceBorderColor #10B981
-skinparam nodeBackgroundColor #FEF9C3
-skinparam nodeBorderColor #CA8A04
 skinparam databaseBackgroundColor #FDF4FF
 skinparam databaseBorderColor #9333EA
-skinparam arrowColor #334155
-skinparam packageBackgroundColor #F8FAFC
-skinparam packageBorderColor #94A3B8
-skinparam cloudBackgroundColor #FFF7ED
-skinparam cloudBorderColor #EA580C
+skinparam arrowColor #475569
 
-title ColorRoom — Diagramme de composants (Architecture)
+title ColorRoom - Architecture
 
-node "Raspberry Pi 4 (ARM64)" as RPI {
+component "Navigateur\n(PC / Téléphone)" as WEB
+component "Next.js\n(app + API)" as APP
+database "SQLite" as DB
+component "Ollama\n(IA locale)" as AI
+component "supervision.exe" as SUP
+component "CS-160\n(colorimètre)" as CS
+component "42 dalles LED" as LED
 
-  node "Docker Compose" as DC {
-
-    package "container: colorroom-app\n(Next.js 16 / Node 20)" as NEXT_CTR {
-
-      package "App Router (app/)" as APP_ROUTER {
-        component "/ (accueil)" as C_HOME
-        component "/jeux (runtime)" as C_JEUX
-        component "/editeur (blueprint)" as C_EDIT
-        component "/salles (plan)" as C_SALLES
-        component "/sante (diagnostic)" as C_SANTE
-        component "/multijoueur (session)" as C_MULTI
-        component "/p4 (puissance 4)" as C_P4
-      }
-
-      package "API Routes (app/api/)" as API_ROUTES {
-        component "api/supervision/\nbatch" as A_SUPERV
-        component "api/cs160" as A_CS160
-        component "api/ai/\ngenerate-game" as A_AI
-        component "api/jeux\napi/games" as A_GAMES
-        component "api/auth\napi/users" as A_AUTH
-        component "api/mp/*\n(multijoueur)" as A_MP
-        component "api/p4/*\n(puissance 4)" as A_P4
-      }
-
-      package "Composants partagés (_components/)" as COMPS {
-        component "GameIntrus" as C_INTRUS
-        component "GameCanalMix" as C_CANALM
-        component "NavigationMenu" as C_NAV
-        component "TileGrid" as C_TILEGRID
-      }
-
-      package "Bibliothèques (lib/)" as LIBS {
-        component "tileChannels.ts\n(PLATE_TYPE, remapChannels32)" as L_TILES
-        component "db/index.ts\n(better-sqlite3)" as L_DB
-        component "pyodide.ts\n(Pyodide loader)" as L_PYODIDE
-        component "supervision.ts\n(HTTP bridge)" as L_SUPERV
-        component "cs160Bridge.ts\n(Serial bridge)" as L_CS160
-      }
-
-      package "Éditeur (app/editeur/)" as EDITOR_PKG {
-        component "nodeMeta.ts\n(171 kinds)" as E_META
-        component "verifier.ts\n(7 règles)" as E_VERIF
-        component "UIDesigner.tsx" as E_UID
-        component "PythonEditor.tsx" as E_PY
-      }
-
-      database "colorroom.db\n(SQLite)" as DB {
-        component "crg_games" as T_GAMES
-        component "crg_users" as T_USERS
-        component "crg_mp_sessions" as T_MP
-        component "crg_p4_rooms" as T_P4
-        component "crg_scores" as T_SCORES
-      }
-
-      folder "public/pyodide/\n(WASM, offline)" as PYODIDE_STATIC
-    }
-
-    package "container: ollama\n(LLM local)" as OLLAMA_CTR {
-      component "qwen2.5:1.5b\n(~1 GB)" as M_QWEN
-    }
-
-  }
-
-  node "supervision.exe\n(Windows process)" as SUPERV_EXE {
-    interface "HTTP :8080" as I_HTTP_SUPERV
-  }
-
-  node "Port série USB\n(CS-160)" as SERIAL {
-    interface "/dev/ttyUSB0" as I_SERIAL
-  }
-
-}
-
-cloud "Internet (optionnel)" as INTERNET {
-  component "Google Gemini API" as GEMINI
-  component "CDN Pyodide" as PYODIDE_CDN
-}
-
-node "Navigateur client\n(PC / Tablette / Téléphone)" as BROWSER {
-  component "Next.js SSR/CSR" as B_CLIENT
-  component "WebSocket (polling)" as B_WS
-  component "Vibration API" as B_VIB
-  component "Web Audio API" as B_AUDIO
-}
-
-' ─── Dalles LED (hardware physique) ────────────────────────
-node "42 dalles LED\n(2 salles × 21)" as DALLES {
-  component "21× Salle 1" as D_S1
-  component "21× Salle 2" as D_S2
-}
-
-' ─── Flux de communication ─────────────────────────────────
-BROWSER --> C_HOME : HTTPS
-BROWSER --> C_JEUX : HTTPS
-BROWSER --> C_EDIT : HTTPS
-BROWSER --> C_SALLES : HTTPS
-B_WS --> A_MP : SSE / polling
-
-C_JEUX --> A_SUPERV : fetch POST
-C_JEUX --> A_CS160 : fetch POST
-C_EDIT --> A_SUPERV : fetch POST (preview)
-C_EDIT --> A_AI : fetch POST
-C_SALLES --> A_SUPERV : fetch POST
-
-A_SUPERV --> L_SUPERV : appelle
-A_CS160 --> L_CS160 : appelle
-A_GAMES --> L_DB : SQL
-A_AUTH --> L_DB : SQL
-A_MP --> L_DB : SQL
-A_P4 --> L_DB : SQL
-A_AI --> OLLAMA_CTR : HTTP :11434
-A_AI --> GEMINI : HTTPS (fallback)
-
-L_SUPERV --> I_HTTP_SUPERV : POST /setplates
-L_CS160 --> I_SERIAL : Serial API
-L_TILES ..> A_SUPERV : remapChannels32()
-L_PYODIDE ..> PYODIDE_STATIC : charge WASM
-L_PYODIDE ..> PYODIDE_CDN : fallback CDN
-
-I_HTTP_SUPERV --> SUPERV_EXE : commandes
-SUPERV_EXE --> DALLES : DMX / réseau
-
-I_SERIAL --> SERIAL : mesure
-SERIAL --> C_CANALM : résultat
-SERIAL --> C_INTRUS : résultat
-
-C_INTRUS --> A_CS160
-C_CANALM --> A_CS160
-
-L_TILEGRID .left. C_TILEGRID
-
-B_VIB ..> BROWSER : navigator.vibrate()
-B_AUDIO ..> BROWSER : AudioContext
-
-note bottom of L_TILES
-  Toutes les API hardware
-  passent par remapChannels32()
-  avant envoi à supervision.exe
-end note
-
-note right of OLLAMA_CTR
-  2-phase Docker startup :
-  1. pull qwen2.5:1.5b
-  2. serve :11434
-  ~1 min au premier boot
-end note
+WEB --> APP : HTTP
+APP --> DB
+APP --> AI : génération jeu
+APP --> SUP : couleurs
+APP --> CS : série
+SUP --> LED
 
 @enduml
