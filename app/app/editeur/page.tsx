@@ -3375,8 +3375,8 @@ export default function EditeurPage() {
       const tetrisId = makeId();
       initialNodes = [
         { id: eventId, kind: 'event_begin', name: 'Démarrer', enabled: true, params: {}, pos: { x: 80, y: 200 } },
-        { id: tickId, kind: 'on_tick', name: 'Tick Jeu (500ms)', enabled: true, params: { intervalMs: 500 }, pos: { x: 320, y: 200 } },
-        { id: tetrisId, kind: 'game_tetris_block', name: 'Tetris Blocs', enabled: true, params: { speed: 500, cols: 6, rows: 7 }, pos: { x: 560, y: 200 } },
+        { id: tickId, kind: 'on_tick', name: 'Tick Jeu (500ms)', enabled: true, params: { intervalMs: 500 }, pos: { x: 460, y: 200 } },
+        { id: tetrisId, kind: 'game_tetris_block', name: 'Tetris Blocs', enabled: true, params: { speed: 500, cols: 6, rows: 7 }, pos: { x: 860, y: 200 } },
       ];
       initialEdges = [
         { id: makeId(), from: tickId, to: tetrisId },
@@ -3389,7 +3389,7 @@ export default function EditeurPage() {
       const gameId = makeId();
       initialNodes = [
         { id: eventId, kind: 'event_begin', name: 'Démarrer', enabled: true, params: {}, pos: { x: 80, y: 120 } },
-        { id: gameId,  kind: 'game_snake',  name: 'Snake Chromatique', enabled: true, params: { speed: 700 }, pos: { x: 380, y: 120 } },
+        { id: gameId,  kind: 'game_snake',  name: 'Snake Chromatique', enabled: true, params: { speed: 700 }, pos: { x: 460, y: 120 } },
       ];
       initialEdges = [{ id: makeId(), from: eventId, to: gameId }];
       templateUiLayout = [
@@ -3403,7 +3403,7 @@ export default function EditeurPage() {
       const gameId = makeId();
       initialNodes = [
         { id: eventId, kind: 'event_begin',    name: 'Démarrer', enabled: true, params: {}, pos: { x: 80, y: 120 } },
-        { id: gameId,  kind: 'game_puissance4', name: 'Puissance 4', enabled: true, params: { mode: 'pvp' }, pos: { x: 380, y: 120 } },
+        { id: gameId,  kind: 'game_puissance4', name: 'Puissance 4', enabled: true, params: { mode: 'pvp' }, pos: { x: 460, y: 120 } },
       ];
       initialEdges = [{ id: makeId(), from: eventId, to: gameId }];
       templateUiLayout = [
@@ -3417,7 +3417,7 @@ export default function EditeurPage() {
       const gameId = makeId();
       initialNodes = [
         { id: eventId, kind: 'event_begin',    name: 'Démarrer', enabled: true, params: {}, pos: { x: 80, y: 120 } },
-        { id: gameId,  kind: 'game_color_speed', name: 'Color Speed', enabled: true, params: { gameDuration: 60, tileCount: 42 }, pos: { x: 380, y: 120 } },
+        { id: gameId,  kind: 'game_color_speed', name: 'Color Speed', enabled: true, params: { gameDuration: 60, tileCount: 42 }, pos: { x: 460, y: 120 } },
       ];
       initialEdges = [{ id: makeId(), from: eventId, to: gameId }];
       templateUiLayout = [
@@ -3431,7 +3431,7 @@ export default function EditeurPage() {
       const gameId = makeId();
       initialNodes = [
         { id: eventId, kind: 'event_begin',     name: 'Démarrer', enabled: true, params: {}, pos: { x: 80, y: 120 } },
-        { id: gameId,  kind: 'game_maitre_blanc', name: 'Maître du Blanc', enabled: true, params: { rounds: 10, threshold: 0.025 }, pos: { x: 380, y: 120 } },
+        { id: gameId,  kind: 'game_maitre_blanc', name: 'Maître du Blanc', enabled: true, params: { rounds: 10, threshold: 0.025 }, pos: { x: 460, y: 120 } },
       ];
       initialEdges = [{ id: makeId(), from: eventId, to: gameId }];
       templateUiLayout = [
@@ -3447,7 +3447,7 @@ export default function EditeurPage() {
       const gameId = makeId();
       initialNodes = [
         { id: eventId, kind: 'event_begin', name: 'Démarrer', enabled: true, params: {}, pos: { x: 80, y: 120 } },
-        { id: gameId,  kind: 'game_intrus', name: "L'Intrus (Sniper)", enabled: true, params: {}, pos: { x: 380, y: 120 } },
+        { id: gameId,  kind: 'game_intrus', name: "L'Intrus (Sniper)", enabled: true, params: {}, pos: { x: 460, y: 120 } },
       ];
       initialEdges = [{ id: makeId(), from: eventId, to: gameId }];
       templateUiLayout = [
@@ -3463,7 +3463,7 @@ export default function EditeurPage() {
       const gameId = makeId();
       initialNodes = [
         { id: eventId, kind: 'event_begin',  name: 'Démarrer', enabled: true, params: {}, pos: { x: 80, y: 120 } },
-        { id: gameId,  kind: 'game_canal_mix', name: 'Mix de Canaux', enabled: true, params: {}, pos: { x: 380, y: 120 } },
+        { id: gameId,  kind: 'game_canal_mix', name: 'Mix de Canaux', enabled: true, params: {}, pos: { x: 460, y: 120 } },
       ];
       initialEdges = [{ id: makeId(), from: eventId, to: gameId }];
       templateUiLayout = [
@@ -3477,7 +3477,7 @@ export default function EditeurPage() {
       const gameId = makeId();
       initialNodes = [
         { id: eventId, kind: 'event_begin',  name: 'Démarrer', enabled: true, params: {}, pos: { x: 80, y: 120 } },
-        { id: gameId,  kind: 'game_metamere', name: 'Métamérie', enabled: true, params: {}, pos: { x: 380, y: 120 } },
+        { id: gameId,  kind: 'game_metamere', name: 'Métamérie', enabled: true, params: {}, pos: { x: 460, y: 120 } },
       ];
       initialEdges = [{ id: makeId(), from: eventId, to: gameId }];
       templateUiLayout = [
@@ -3493,7 +3493,7 @@ export default function EditeurPage() {
       const gameId = makeId();
       initialNodes = [
         { id: eventId, kind: 'event_begin',       name: 'Démarrer', enabled: true, params: {}, pos: { x: 80, y: 120 } },
-        { id: gameId,  kind: 'game_chromaticite', name: 'Chromaticité CIE', enabled: true, params: {}, pos: { x: 380, y: 120 } },
+        { id: gameId,  kind: 'game_chromaticite', name: 'Chromaticité CIE', enabled: true, params: {}, pos: { x: 460, y: 120 } },
       ];
       initialEdges = [{ id: makeId(), from: eventId, to: gameId }];
       templateUiLayout = [
@@ -3507,7 +3507,7 @@ export default function EditeurPage() {
       const gameId = makeId();
       initialNodes = [
         { id: eventId, kind: 'event_begin',   name: 'Démarrer', enabled: true, params: {}, pos: { x: 80, y: 120 } },
-        { id: gameId,  kind: 'game_spectrum', name: 'Spectre Chromatique', enabled: true, params: { maxRounds: 5, revealMs: 5000, guessMs: 30000 }, pos: { x: 380, y: 120 } },
+        { id: gameId,  kind: 'game_spectrum', name: 'Spectre Chromatique', enabled: true, params: { maxRounds: 5, revealMs: 5000, guessMs: 30000 }, pos: { x: 460, y: 120 } },
       ];
       initialEdges = [{ id: makeId(), from: eventId, to: gameId }];
       templateUiLayout = [
@@ -3521,7 +3521,7 @@ export default function EditeurPage() {
       const gameId = makeId();
       initialNodes = [
         { id: eventId, kind: 'event_begin',   name: 'Démarrer', enabled: true, params: {}, pos: { x: 80, y: 120 } },
-        { id: gameId,  kind: 'game_libre_rgb', name: 'Mode Libre RGB', enabled: true, params: {}, pos: { x: 380, y: 120 } },
+        { id: gameId,  kind: 'game_libre_rgb', name: 'Mode Libre RGB', enabled: true, params: {}, pos: { x: 460, y: 120 } },
       ];
       initialEdges = [{ id: makeId(), from: eventId, to: gameId }];
       templateUiLayout = [
@@ -3716,10 +3716,10 @@ export default function EditeurPage() {
       initialNodes = [
         // ── Rangée 1 : dégradé arc-en-ciel au démarrage ──
         { id: eventId,   kind: 'event_begin',    name: 'Démarrer',        enabled: true, params: {}, pos: { x: 80,  y: 80 } },
-        { id: pyDegrade, kind: 'script_python',  name: 'Dégradé Python',  enabled: true, params: { code: 'import colorroom as cr\nimport colorsys\n\n# Dégradé arc-en-ciel sur les 42 dalles (plateId de 1 à 42)\nfor i in range(42):\n    teinte = i / 42.0\n    r, g, b = colorsys.hls_to_rgb(teinte, 0.5, 1.0)\n    cr.send_color(i + 1, int(r * 255), int(g * 255), int(b * 255), 0.85)\n' }, pos: { x: 360, y: 80 } },
+        { id: pyDegrade, kind: 'script_python',  name: 'Dégradé Python',  enabled: true, params: { code: 'import colorroom as cr\nimport colorsys\n\n# Dégradé arc-en-ciel sur les 42 dalles (plateId de 1 à 42)\nfor i in range(42):\n    teinte = i / 42.0\n    r, g, b = colorsys.hls_to_rgb(teinte, 0.5, 1.0)\n    cr.send_color(i + 1, int(r * 255), int(g * 255), int(b * 255), 0.85)\n' }, pos: { x: 460, y: 80 } },
         // ── Rangée 2 : clic → dalle blanche + 1 point (en Python) ──
-        { id: clickEv,   kind: 'on_plate_click', name: 'Clic sur dalle',  enabled: true, params: {}, pos: { x: 80,  y: 320 } },
-        { id: pyClic,    kind: 'script_python',  name: 'Clic Python',     enabled: true, params: { code: 'import colorroom as cr\n\n# Allume la dalle cliquée en blanc et marque un point\nidx = int(cr.get_variable("clickedTile"))\ncr.send_color(idx + 1, 255, 255, 255, 0.9)\ncr.add_score(1)\n' }, pos: { x: 360, y: 320 } },
+        { id: clickEv,   kind: 'on_plate_click', name: 'Clic sur dalle',  enabled: true, params: {}, pos: { x: 80,  y: 420 } },
+        { id: pyClic,    kind: 'script_python',  name: 'Clic Python',     enabled: true, params: { code: 'import colorroom as cr\n\n# Allume la dalle cliquée en blanc et marque un point\nidx = int(cr.get_variable("clickedTile"))\ncr.send_color(idx + 1, 255, 255, 255, 0.9)\ncr.add_score(1)\n' }, pos: { x: 460, y: 420 } },
       ];
       initialEdges = [
         { id: makeId(), from: eventId, to: pyDegrade },
@@ -3751,25 +3751,27 @@ export default function EditeurPage() {
       const sndWin   = makeId();
       const sndWrong = makeId();
       const sndErr   = makeId();
+      // Pas horizontal de 380px (bloc ~290px de large) et rangées espacées
+      // de 400px+ → lecture aérée gauche→droite, haut→bas.
       initialNodes = [
         // ── Rangée 1 : démarrage, salle orange + variables de la cible ──
-        { id: eventId,  kind: 'event_begin',     name: 'Démarrer',          enabled: true, params: {},                                                                       pos: { x: 80,   y: 80 } },
-        { id: sndStart, kind: 'play_sound',      name: 'Son départ',        enabled: true, params: { sound: 'start' },                                                       pos: { x: 360,  y: 80 } },
-        { id: fillOr,   kind: 'fill',            name: 'Salle orange',      enabled: true, params: { color: '#ff8800', intensity: 0.8 },                                     pos: { x: 640,  y: 80 } },
-        { id: setCX,    kind: 'variable_set',    name: 'Cible x = 0.50',    enabled: true, params: { name: 'cibleX', value: 0.50, op: 'set' },                               pos: { x: 920,  y: 80 } },
-        { id: setCY,    kind: 'variable_set',    name: 'Cible y = 0.41',    enabled: true, params: { name: 'cibleY', value: 0.41, op: 'set' },                               pos: { x: 1200, y: 80 } },
+        { id: eventId,  kind: 'event_begin',     name: 'Démarrer',          enabled: true, params: {},                                                                       pos: { x: 60,   y: 60 } },
+        { id: sndStart, kind: 'play_sound',      name: 'Son départ',        enabled: true, params: { sound: 'start' },                                                       pos: { x: 440,  y: 60 } },
+        { id: fillOr,   kind: 'fill',            name: 'Salle orange',      enabled: true, params: { color: '#ff8800', intensity: 0.8 },                                     pos: { x: 820,  y: 60 } },
+        { id: setCX,    kind: 'variable_set',    name: 'Cible x = 0.50',    enabled: true, params: { name: 'cibleX', value: 0.50, op: 'set' },                               pos: { x: 1200, y: 60 } },
+        { id: setCY,    kind: 'variable_set',    name: 'Cible y = 0.41',    enabled: true, params: { name: 'cibleY', value: 0.41, op: 'set' },                               pos: { x: 1580, y: 60 } },
         // ── Rangée 2 : clic « Mesurer » → mesure réelle puis comparaison ──
-        { id: clickEv,  kind: 'on_ui_click',     name: 'Bouton Mesurer',    enabled: true, params: { buttonId: 'mesurer' },                                                  pos: { x: 80,   y: 320 } },
-        { id: mesure,   kind: 'measure_start',   name: 'Mesure CS-160',     enabled: true, params: { varX: 'meas_x', varY: 'meas_y', varLv: 'meas_lv', timeoutSec: 25 },     pos: { x: 360,  y: 320 } },
-        { id: siOk,     kind: 'if',              name: 'Si mesure OK',      enabled: true, params: { varName: 'meas_ok', op: 'eq', value: 1 },                               pos: { x: 640,  y: 320 } },
+        { id: clickEv,  kind: 'on_ui_click',     name: 'Bouton Mesurer',    enabled: true, params: { buttonId: 'mesurer' },                                                  pos: { x: 60,   y: 480 } },
+        { id: mesure,   kind: 'measure_start',   name: 'Mesure CS-160',     enabled: true, params: { varX: 'meas_x', varY: 'meas_y', varLv: 'meas_lv', timeoutSec: 25 },     pos: { x: 440,  y: 480 } },
+        { id: siOk,     kind: 'if',              name: 'Si mesure OK',      enabled: true, params: { varName: 'meas_ok', op: 'eq', value: 1 },                               pos: { x: 820,  y: 480 } },
         // measure_compare lit meas_x/meas_y et écrit la précision dans meas_accuracy
         // (0-100). maxPoints: 0 → les points sont attribués par le bloc add_score.
-        { id: cmp,      kind: 'measure_compare', name: 'Comparer à la cible', enabled: true, params: { targetX: 0.50, targetY: 0.41, toleranceDeltaE: 8, maxPoints: 0 },     pos: { x: 920,  y: 260 } },
-        { id: siBon,    kind: 'if',              name: 'Si précision > 0',  enabled: true, params: { varName: 'meas_accuracy', op: 'gt', value: 0 },                         pos: { x: 1200, y: 260 } },
-        { id: addPts,   kind: 'add_score',       name: '+100 points',       enabled: true, params: { amount: 100 },                                                          pos: { x: 1480, y: 200 } },
-        { id: sndWin,   kind: 'play_sound',      name: 'Son victoire',      enabled: true, params: { sound: 'win' },                                                         pos: { x: 1760, y: 200 } },
-        { id: sndWrong, kind: 'play_sound',      name: 'Son raté',          enabled: true, params: { sound: 'wrong' },                                                       pos: { x: 1480, y: 380 } },
-        { id: sndErr,   kind: 'play_sound',      name: 'Son erreur mesure', enabled: true, params: { sound: 'error' },                                                       pos: { x: 920,  y: 460 } },
+        { id: cmp,      kind: 'measure_compare', name: 'Comparer à la cible', enabled: true, params: { targetX: 0.50, targetY: 0.41, toleranceDeltaE: 8, maxPoints: 0 },     pos: { x: 1200, y: 380 } },
+        { id: siBon,    kind: 'if',              name: 'Si précision > 0',  enabled: true, params: { varName: 'meas_accuracy', op: 'gt', value: 0 },                         pos: { x: 1580, y: 380 } },
+        { id: addPts,   kind: 'add_score',       name: '+100 points',       enabled: true, params: { amount: 100 },                                                          pos: { x: 1960, y: 280 } },
+        { id: sndWin,   kind: 'play_sound',      name: 'Son victoire',      enabled: true, params: { sound: 'win' },                                                         pos: { x: 2340, y: 280 } },
+        { id: sndWrong, kind: 'play_sound',      name: 'Son raté',          enabled: true, params: { sound: 'wrong' },                                                       pos: { x: 1960, y: 600 } },
+        { id: sndErr,   kind: 'play_sound',      name: 'Son erreur mesure', enabled: true, params: { sound: 'error' },                                                       pos: { x: 1200, y: 720 } },
       ];
       initialEdges = [
         { id: makeId(), from: eventId,  to: sndStart },
@@ -3792,7 +3794,7 @@ export default function EditeurPage() {
         { id: makeId(), kind: 'score_display', x: 40,  y: 84,  width: 140, height: 64, text: 'Score', varBind: 'score' },
         { id: makeId(), kind: 'score_display', x: 196, y: 84,  width: 125, height: 64, text: 'x mesuré', varBind: 'meas_x' },
         { id: makeId(), kind: 'score_display', x: 336, y: 84,  width: 125, height: 64, text: 'y mesuré', varBind: 'meas_y' },
-        { id: makeId(), kind: 'button',        x: 40,  y: 164, width: 420, height: 48, text: '📷 Mesurer avec le CS-160', eventId: 'mesurer', bgColor: '#ff8800' },
+        { id: makeId(), kind: 'button',        x: 40,  y: 164, width: 420, height: 48, text: 'Mesurer avec le CS-160', eventId: 'mesurer', bgColor: '#ff8800' },
         { id: makeId(), kind: 'message_box',   x: 40,  y: 228, width: 420, height: 88, text: 'Pointe le CS-160 vers une dalle orange et clique Mesurer. La mesure est RÉELLE (x,y du colorimètre).', bgColor: '#ff8800' },
       ] as UILayoutComponent[];
     }
@@ -4228,6 +4230,10 @@ export default function EditeurPage() {
     // UN seul pas d'historique pour toute la génération (annulable d'un coup)
     setHistory((h) => ({ past: [...h.past, before], future: [] }));
     setDirty(true);
+    // Les positions générées par l'IA sont souvent tassées / chevauchées →
+    // réorganisation automatique (colonnes par profondeur, espacement aéré).
+    await aiSleep(150);
+    autoLayoutNodesRef.current?.();
     // Diff visuel : surligne les blocs ajoutés/modifiés par l'IA pendant ~6 s.
     setAiHighlightIds(new Set(ids));
     window.setTimeout(() => setAiHighlightIds(new Set()), 6000);
@@ -4549,8 +4555,10 @@ export default function EditeurPage() {
     const edges = activeGame.edges;
     if (nodes.length === 0) return;
 
-    const NODE_W = 340;  // largeur nœud + gap horizontal
-    const NODE_H = 240;  // hauteur nœud + gap vertical
+    // Un bloc fait 290px de large et jusqu'à ~300px de haut avec ses
+    // paramètres → marges généreuses pour une lecture aérée sans chevauchement.
+    const NODE_W = 420;  // largeur nœud + gap horizontal
+    const NODE_H = 360;  // hauteur nœud + gap vertical
 
     // BFS depuis tous les nœuds événements pour calculer la profondeur (colonne)
     const depth: Record<string, number> = {};
@@ -4591,14 +4599,27 @@ export default function EditeurPage() {
       cols[col].push(n.id);
     });
 
-    // Calculer les nouvelles positions
+    // Calculer les nouvelles positions. Dans chaque colonne, les nœuds sont
+    // triés par la position (rang) de leurs parents dans la colonne précédente
+    // (heuristique barycentre) → les fils suivent leurs pères, moins de
+    // croisements, ordre de lecture logique haut→bas.
     const colNums = Object.keys(cols).map(Number).sort((a, b) => a - b);
     const newPositions: Record<string, { x: number; y: number }> = {};
+    const rowOf: Record<string, number> = {};
     colNums.forEach((col, ci) => {
-      const nodeIds = cols[col];
-      const totalH = nodeIds.length * NODE_H;
+      let nodeIds = cols[col];
+      if (ci > 0) {
+        const barycenter = (id: string): number => {
+          const parentRows = edges
+            .filter((e) => e.to === id && rowOf[e.from] !== undefined)
+            .map((e) => rowOf[e.from]!);
+          return parentRows.length ? parentRows.reduce((a, b) => a + b, 0) / parentRows.length : 999;
+        };
+        nodeIds = [...nodeIds].sort((a, b) => barycenter(a) - barycenter(b));
+      }
       const startY = 80;
       nodeIds.forEach((id, ni) => {
+        rowOf[id] = ni;
         newPositions[id] = { x: 80 + ci * NODE_W, y: startY + ni * NODE_H };
       });
     });
@@ -5078,7 +5099,7 @@ export default function EditeurPage() {
                         onBlur={() => void saveActiveGame()}
                         placeholder="Décrivez le jeu, ses règles, son objectif…"
                         rows={4}
-                        style={{ minHeight: 84, resize: 'vertical', fontSize: 13, lineHeight: 1.5, padding: '10px 12px', fontFamily: 'inherit' }}
+                        style={{ minHeight: 84, resize: 'vertical', fontSize: 13, lineHeight: 1.5, padding: '10px 12px 18px', fontFamily: 'inherit' }}
                       />
                     </label>
 
@@ -6316,7 +6337,7 @@ export default function EditeurPage() {
                           {n.kind === 'script_python' ? (
                             <div className="bp-node__vars" onPointerDown={(e) => e.stopPropagation()}>
                               <div className="bp-node__var">
-                                <span className="bp-node__varlabel">🐍 Code Python (exécuté quand le flux atteint ce bloc)</span>
+                                <span className="bp-node__varlabel">Code Python (exécuté quand le flux atteint ce bloc)</span>
                                 <textarea
                                   className="bp-node__varinput"
                                   style={{ height: 110, fontFamily: 'monospace', fontSize: 11, resize: 'vertical', width: '100%', lineHeight: 1.45 }}

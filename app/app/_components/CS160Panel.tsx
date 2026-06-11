@@ -33,26 +33,30 @@ import {
   ChevronUp
 } from 'lucide-react';
 
-// ── Tokens dark glass (identiques aux jeux) ────────────────────────────────────
+// ── Tokens WHITE LIQUID GLASS (même langage visuel que les blocs de l'éditeur) ──
 const D: Record<string, React.CSSProperties> = {
   wrap: {
-    background: 'linear-gradient(160deg,#0b0f1c,#0d1226)',
-    border: '1px solid rgba(255,255,255,.07)',
+    background: 'linear-gradient(180deg, rgba(255,255,255,.88) 0%, rgba(255,255,255,.74) 100%)',
+    backdropFilter: 'blur(30px) saturate(180%)',
+    WebkitBackdropFilter: 'blur(30px) saturate(180%)',
+    border: '1px solid rgba(255,255,255,.9)',
     borderRadius: 18,
-    color: '#e8eaf0',
-    fontFamily: 'system-ui,-apple-system,sans-serif',
+    color: '#1e2133',
+    fontFamily: 'inherit',
     overflow: 'hidden',
+    boxShadow: 'inset 0 1px 0 rgba(255,255,255,.95), 0 1px 2px rgba(22,30,60,.04), 0 10px 30px rgba(22,30,60,.08)',
   },
   section: {
-    background: 'rgba(255,255,255,.04)',
-    border: '1px solid rgba(255,255,255,.08)',
+    background: 'rgba(255,255,255,.55)',
+    border: '1px solid rgba(22,30,60,.08)',
     borderRadius: 12,
     padding: '12px 14px',
+    boxShadow: 'inset 0 1px 0 rgba(255,255,255,.9)',
   },
   sectionTitle: {
     fontSize: 10,
     fontWeight: 800,
-    color: 'rgba(255,255,255,.38)',
+    color: 'rgba(16,20,34,.45)',
     textTransform: 'uppercase' as const,
     letterSpacing: '.1em',
     marginBottom: 10,
@@ -68,27 +72,30 @@ const D: Record<string, React.CSSProperties> = {
   btnGhost: {
     display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
     padding: '8px 14px', borderRadius: 10,
-    border: '1px solid rgba(255,255,255,.12)',
-    background: 'rgba(255,255,255,.05)',
-    color: 'rgba(255,255,255,.7)', fontSize: 12, fontWeight: 700, cursor: 'pointer',
+    border: '1px solid rgba(22,30,60,.12)',
+    background: 'rgba(255,255,255,.8)',
+    color: 'rgba(16,20,34,.7)', fontSize: 12, fontWeight: 700, cursor: 'pointer',
     fontFamily: 'inherit',
+    boxShadow: 'inset 0 1px 0 rgba(255,255,255,1), 0 1px 3px rgba(22,30,60,.06)',
   },
   input: {
     width: '100%', padding: '7px 10px', borderRadius: 8,
-    background: 'rgba(255,255,255,.07)',
-    border: '1px solid rgba(255,255,255,.12)',
-    color: '#e8eaf0', fontSize: 12, fontFamily: 'monospace',
+    background: 'rgba(255,255,255,.92)',
+    border: '1.5px solid rgba(22,30,60,.10)',
+    color: '#1e2133', fontSize: 12, fontFamily: 'monospace',
     boxSizing: 'border-box' as const,
+    boxShadow: 'inset 0 1px 0 rgba(255,255,255,1), 0 1px 3px rgba(22,30,60,.05)',
   },
   select: {
     width: '100%', padding: '7px 8px', borderRadius: 8,
-    background: 'rgba(255,255,255,.07)',
-    border: '1px solid rgba(255,255,255,.12)',
-    color: '#e8eaf0', fontSize: 12,
+    background: 'rgba(255,255,255,.92)',
+    border: '1.5px solid rgba(22,30,60,.10)',
+    color: '#1e2133', fontSize: 12,
     boxSizing: 'border-box' as const,
+    boxShadow: 'inset 0 1px 0 rgba(255,255,255,1), 0 1px 3px rgba(22,30,60,.05)',
   },
   label: {
-    fontSize: 10, color: 'rgba(255,255,255,.38)', fontWeight: 700,
+    fontSize: 10, color: 'rgba(16,20,34,.45)', fontWeight: 700,
     textTransform: 'uppercase' as const, letterSpacing: '.06em',
     display: 'block', marginBottom: 4,
   },
@@ -198,18 +205,18 @@ export default function CS160Panel({ className = '' }: CS160PanelProps) {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '14px 14px' }}>
 
         {/* ── Header connexion ── */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.08)', borderRadius: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: 'rgba(255,255,255,.55)', border: '1px solid rgba(22,30,60,.08)', borderRadius: 12, boxShadow: 'inset 0 1px 0 rgba(255,255,255,.9)' }}>
           <div style={{ width: 10, height: 10, borderRadius: '50%', background: connectedColor, flexShrink: 0, boxShadow: `0 0 8px ${connectedColor}` }} />
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontWeight: 800, fontSize: 13 }}>CS-160 Colorimètre</div>
-            {deviceInfo && <div style={{ fontSize: 11, color: 'rgba(255,255,255,.45)', marginTop: 1 }}>{deviceInfo}</div>}
+            {deviceInfo && <div style={{ fontSize: 11, color: 'rgba(16,20,34,.5)', marginTop: 1 }}>{deviceInfo}</div>}
           </div>
           <button
             onClick={handleConnect}
             disabled={isConnecting}
             style={{
               ...D.btnGhost,
-              color: isConnected ? '#ef9999' : '#06d6a0',
+              color: isConnected ? '#dc2626' : '#059669',
               borderColor: isConnected ? 'rgba(239,68,68,.3)' : 'rgba(6,214,160,.3)',
               opacity: isConnecting ? 0.6 : 1,
               cursor: isConnecting ? 'wait' : 'pointer',
@@ -223,7 +230,7 @@ export default function CS160Panel({ className = '' }: CS160PanelProps) {
 
         {/* ── Message log ── */}
         {message && (
-          <div style={{ fontSize: 11, color: 'rgba(255,255,255,.55)', padding: '7px 10px', background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.07)', borderRadius: 8, fontFamily: 'monospace' }}>
+          <div style={{ fontSize: 11, color: 'rgba(16,20,34,.6)', padding: '7px 10px', background: 'rgba(255,255,255,.55)', border: '1px solid rgba(22,30,60,.07)', borderRadius: 8, fontFamily: 'monospace' }}>
             {message}
           </div>
         )}
@@ -253,9 +260,9 @@ export default function CS160Panel({ className = '' }: CS160PanelProps) {
           {lastMeasurement && (lastMeasurement.lvxy || lastMeasurement.xyz) && (
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 10 }}>
               {lastMeasurement.lvxy && (
-                <div style={{ padding: '8px 10px', background: 'rgba(6,214,160,.08)', border: '1px solid rgba(6,214,160,.2)', borderRadius: 8 }}>
-                  <div style={{ fontSize: 9, fontWeight: 800, color: '#06d6a0', letterSpacing: '.06em', marginBottom: 4 }}>Lvxy</div>
-                  <div style={{ fontFamily: 'monospace', fontSize: 11, lineHeight: 1.6, color: '#e8eaf0' }}>
+                <div style={{ padding: '8px 10px', background: 'rgba(6,214,160,.08)', border: '1px solid rgba(6,214,160,.25)', borderRadius: 8 }}>
+                  <div style={{ fontSize: 9, fontWeight: 800, color: '#059669', letterSpacing: '.06em', marginBottom: 4 }}>Lvxy</div>
+                  <div style={{ fontFamily: 'monospace', fontSize: 11, lineHeight: 1.6, color: '#1e2133' }}>
                     Lv: {lastMeasurement.lvxy.Lv.toFixed(2)}<br />
                     x: {lastMeasurement.lvxy.x.toFixed(4)}<br />
                     y: {lastMeasurement.lvxy.y.toFixed(4)}
@@ -263,9 +270,9 @@ export default function CS160Panel({ className = '' }: CS160PanelProps) {
                 </div>
               )}
               {lastMeasurement.xyz && (
-                <div style={{ padding: '8px 10px', background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.08)', borderRadius: 8 }}>
-                  <div style={{ fontSize: 9, fontWeight: 800, color: 'rgba(255,255,255,.38)', letterSpacing: '.06em', marginBottom: 4 }}>XYZ</div>
-                  <div style={{ fontFamily: 'monospace', fontSize: 11, lineHeight: 1.6, color: '#e8eaf0' }}>
+                <div style={{ padding: '8px 10px', background: 'rgba(255,255,255,.55)', border: '1px solid rgba(22,30,60,.08)', borderRadius: 8 }}>
+                  <div style={{ fontSize: 9, fontWeight: 800, color: 'rgba(16,20,34,.45)', letterSpacing: '.06em', marginBottom: 4 }}>XYZ</div>
+                  <div style={{ fontFamily: 'monospace', fontSize: 11, lineHeight: 1.6, color: '#1e2133' }}>
                     X: {lastMeasurement.xyz.X.toFixed(2)}<br />
                     Y: {lastMeasurement.xyz.Y.toFixed(2)}<br />
                     Z: {lastMeasurement.xyz.Z.toFixed(2)}
@@ -279,7 +286,7 @@ export default function CS160Panel({ className = '' }: CS160PanelProps) {
         {/* ── Calibration ── */}
         <div style={D.section}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: showCalibPanel ? 10 : 0 }}>
-            <div style={D.sectionTitle}>Calibration — <span style={{ color: '#a78bfa' }}>Ch {activeCalibCh}</span></div>
+            <div style={D.sectionTitle}>Calibration - <span style={{ color: '#7c3aed' }}>Ch {activeCalibCh}</span></div>
             <button
               onClick={() => setShowCalibPanel(v => !v)}
               style={{ ...D.btnGhost, padding: '4px 8px', fontSize: 11 }}
@@ -297,9 +304,9 @@ export default function CS160Panel({ className = '' }: CS160PanelProps) {
                 disabled={!isConnected}
                 style={{
                   padding: '4px 10px', borderRadius: 7,
-                  border: `1px solid ${activeCalibCh === ch ? 'rgba(139,92,246,.5)' : 'rgba(255,255,255,.1)'}`,
-                  background: activeCalibCh === ch ? 'rgba(139,92,246,.2)' : 'rgba(255,255,255,.04)',
-                  color: activeCalibCh === ch ? '#a78bfa' : 'rgba(255,255,255,.45)',
+                  border: `1px solid ${activeCalibCh === ch ? 'rgba(124,58,237,.45)' : 'rgba(22,30,60,.12)'}`,
+                  background: activeCalibCh === ch ? 'rgba(124,58,237,.12)' : 'rgba(255,255,255,.8)',
+                  color: activeCalibCh === ch ? '#7c3aed' : 'rgba(16,20,34,.55)',
                   fontSize: 11, fontWeight: 700, cursor: isConnected ? 'pointer' : 'not-allowed',
                   opacity: isConnected ? 1 : 0.4, fontFamily: 'inherit',
                 }}
@@ -320,9 +327,9 @@ export default function CS160Panel({ className = '' }: CS160PanelProps) {
                     onClick={() => setCalibType(t)}
                     style={{
                       flex: 1, padding: '7px 10px', borderRadius: 8,
-                      border: `1px solid ${calibType === t ? 'rgba(139,92,246,.5)' : 'rgba(255,255,255,.1)'}`,
-                      background: calibType === t ? 'rgba(139,92,246,.15)' : 'rgba(255,255,255,.04)',
-                      color: calibType === t ? '#a78bfa' : 'rgba(255,255,255,.55)',
+                      border: `1px solid ${calibType === t ? 'rgba(124,58,237,.45)' : 'rgba(22,30,60,.12)'}`,
+                      background: calibType === t ? 'rgba(124,58,237,.10)' : 'rgba(255,255,255,.8)',
+                      color: calibType === t ? '#7c3aed' : 'rgba(16,20,34,.6)',
                       fontSize: 12, fontWeight: 700, cursor: 'pointer',
                       display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
                       fontFamily: 'inherit',

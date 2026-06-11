@@ -1013,7 +1013,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 9px 11px 8px 9px;
+  padding: 11px 12px 10px 11px;
   border-radius: 17px 17px 0 0;
   /* Header blanc translucide, texte sombre (liquid glass white). Le liseré
      coloré de catégorie est posé en inline style (borderLeft). */
@@ -1077,7 +1077,7 @@
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  padding: 4px 12px 5px;
+  padding: 6px 13px 7px;
   background: rgba(0,0,0,0.035);
   border-bottom: 1px solid rgba(0,0,0,0.06);
   color: var(--c-content);
@@ -2447,168 +2447,64 @@ input[type='range'].slider-intensity::-moz-range-progress {
 
 .bp-empty__hint { color: rgba(180,190,210,0.30); }
 
-/* ── Nœuds - dark cards UE5 ─────────────────────────────────────────────── */
-.bp-node {
-  background: #23262f;
-  border: 1.5px solid rgba(255,255,255,0.08);
-  box-shadow:
-    0 6px 24px rgba(0,0,0,0.65),
-    0 2px 6px rgba(0,0,0,0.45),
-    inset 0 1px 0 rgba(255,255,255,0.04);
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-}
+/* ── Nœuds - WHITE LIQUID GLASS ──────────────────────────────────────────────
+   Le visuel de référence est défini plus haut (.bp-node ligne ~935) : voile
+   blanc translucide + blur + ombres douces. Ici on ne garde QUE les détails
+   spécifiques (pins UE5 en version claire) — plus aucune surcharge sombre. */
 
-.bp-node:hover {
-  border-color: rgba(255,255,255,0.20);
-  box-shadow:
-    0 10px 36px rgba(0,0,0,0.75),
-    0 3px 10px rgba(0,0,0,0.55),
-    inset 0 1px 0 rgba(255,255,255,0.06);
-  transform: translateY(-1px);
-}
-
-/* Nœud sélectionné : bordure bleue UE5 */
-.bp-node--active {
-  border-color: #4f9ee8 !important;
-  box-shadow:
-    0 0 0 1px rgba(79,158,232,0.55),
-    0 0 24px rgba(79,158,232,0.18),
-    0 10px 36px rgba(0,0,0,0.75),
-    inset 0 1px 0 rgba(255,255,255,0.05) !important;
-}
-
-/* En-tête du nœud - conserve la couleur de catégorie (inline style) mais assombri */
-.bp-node__header {
-  filter: brightness(0.88) saturate(1.15);
-}
-
-/* Sous-titre catégorie */
+/* Sous-titre catégorie : bandeau clair, texte coloré par catégorie (inline) */
 .bp-node__kind-bar {
-  background: rgba(0,0,0,0.32);
-  border-bottom: 1px solid rgba(0,0,0,0.28);
-  color: rgba(255,255,255,0.48);
   font-size: 9.5px;
   letter-spacing: 0.08em;
 }
 
-/* Labels paramètres */
-.bp-node__varlabel { color: rgba(180,190,210,0.52); }
-.bp-node__varunit  { color: rgba(160,175,200,0.38); }
-
-/* Inputs dans le nœud */
-.bp-node__varinput {
-  background: rgba(0,0,0,0.48);
-  border: 1.5px solid rgba(255,255,255,0.11);
-  color: rgba(220,228,242,0.92);
-  box-shadow: inset 0 2px 5px rgba(0,0,0,0.45);
-}
-.bp-node__varinput:focus {
-  border-color: #4f9ee8;
-  box-shadow: 0 0 0 2.5px rgba(79,158,232,0.22), inset 0 2px 5px rgba(0,0,0,0.45);
-}
-
-.bp-node__varselect {
-  background: rgba(0,0,0,0.48) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23888'/%3E%3C/svg%3E") no-repeat right 10px center;
-  border: 1.5px solid rgba(255,255,255,0.11);
-  color: rgba(220,228,242,0.92);
-  box-shadow: inset 0 2px 5px rgba(0,0,0,0.45);
-}
-.bp-node__varselect:focus {
-  border-color: #4f9ee8;
-  box-shadow: 0 0 0 2.5px rgba(79,158,232,0.22), inset 0 2px 5px rgba(0,0,0,0.45);
-}
-
-/* Segment selector */
-.bp-node__seg {
-  background: rgba(0,0,0,0.28);
-  border: 1px solid rgba(255,255,255,0.07);
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-}
-.bp-node__segbtn { color: rgba(190,200,220,0.60); }
-.bp-node__segbtn:hover {
-  background: rgba(255,255,255,0.09);
-  border-color: rgba(255,255,255,0.14);
-  color: rgba(220,228,242,0.90);
-}
-.bp-node__segbtn--active {
-  background: rgba(79,158,232,0.24);
-  border-color: rgba(79,158,232,0.42);
-  color: rgba(220,228,242,0.97);
-  box-shadow: 0 2px 8px rgba(0,0,0,0.45);
-}
-
-/* Color picker */
-.bp-node__color {
-  background: rgba(0,0,0,0.22);
-  border: 1px solid rgba(255,255,255,0.07);
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-}
-
-/* Zone bouton désactiver */
-.bp-node__hbtn {
-  background: rgba(0,0,0,0.28);
-  color: rgba(255,255,255,0.72);
-}
-.bp-node__hbtn:hover {
-  background: rgba(0,0,0,0.50);
-  color: rgba(255,255,255,0.95);
-}
-.bp-node__hbtn--del:hover {
-  background: rgba(220,38,38,0.55);
-  color: #fff;
-}
-
-.bp-node--disabled { opacity: 0.40; }
+.bp-node--disabled { opacity: 0.45; }
 
 /* ── Zone I/O (pins) ─────────────────────────────────────────────────────── */
 .bp-node__io {
-  border-top: 1px solid rgba(255,255,255,0.06);
-  background: rgba(0,0,0,0.14);
+  border-top: 1px solid rgba(22,30,60,0.06);
+  background: rgba(255,255,255,0.35);
   padding: 8px 12px 10px;
   margin-top: 8px;
 }
 
-/* ── Pins UE5 ────────────────────────────────────────────────────────────── */
+/* ── Pins UE5 (version claire) ──────────────────────────────────────────── */
 .bp-pin {
-  color: rgba(180,192,215,0.72);
+  color: rgba(16,20,34,0.55);
   font-size: 11px;
-  font-weight: 500;
+  font-weight: 600;
 }
-.bp-pin__label { color: rgba(180,192,215,0.72); }
+.bp-pin__label { color: rgba(16,20,34,0.55); }
 
-/* Dot = exec pin style UE5 (pentagone pointé) */
+/* Dot = flèche d'exécution UE5, claire et lisible sur fond blanc */
 .bp-dot {
   width: 13px;
   height: 13px;
   border-radius: 2px;
-  background: rgba(210,218,235,0.55);
+  background: rgba(67,97,238,0.45);
   box-shadow: none;
-  border: 1.5px solid rgba(210,218,235,0.38);
-  /* Forme de flèche exécution UE5 */
+  border: 1.5px solid rgba(67,97,238,0.30);
   clip-path: polygon(0% 15%, 60% 15%, 100% 50%, 60% 85%, 0% 85%);
 }
 
 .bp-dot--active {
-  background: #4f9ee8;
-  border-color: #7bb8f5;
+  background: #4361ee;
+  border-color: #6d8bf5;
   clip-path: polygon(0% 15%, 60% 15%, 100% 50%, 60% 85%, 0% 85%);
-  box-shadow: 0 0 10px rgba(79,158,232,0.65), 0 0 20px rgba(79,158,232,0.30);
+  box-shadow: 0 0 10px rgba(67,97,238,0.45), 0 0 20px rgba(67,97,238,0.20);
 }
 
 .bp-dot--hot {
   background: #f59e0b;
   border-color: #fbbf24;
   clip-path: polygon(0% 15%, 60% 15%, 100% 50%, 60% 85%, 0% 85%);
-  box-shadow: 0 0 10px rgba(245,158,11,0.65), 0 0 20px rgba(245,158,11,0.30);
+  box-shadow: 0 0 10px rgba(245,158,11,0.55), 0 0 20px rgba(245,158,11,0.25);
 }
 
 .bp-node--active .bp-dot {
-  background: #4f9ee8;
-  border-color: #7bb8f5;
-  box-shadow: 0 0 8px rgba(79,158,232,0.55);
+  background: #4361ee;
+  border-color: #6d8bf5;
+  box-shadow: 0 0 8px rgba(67,97,238,0.40);
 }
 
 /* Pin out - flèche dans l'autre sens */

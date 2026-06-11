@@ -164,8 +164,8 @@ function migrate(db: Database.Database) {
 function seedChromatectGame(db: Database.Database) {
   const GAME_NAME = 'ChromaDetect - CS-160';
   // Gameplay limpide en 2 boutons, 100% blocs implémentés par le runtime /jeux :
-  //   🎨 « Nouvelle couleur mystère » → salle orange/verte/bleue (aléatoire)
-  //   📷 « Mesurer avec le CS-160 »  → mesure RÉELLE, comparaison à la couleur
+  //   « Nouvelle couleur mystère » → salle orange/verte/bleue (aléatoire)
+  //   « Mesurer avec le CS-160 »   → mesure RÉELLE, comparaison à la couleur
   //                                    affichée, points proportionnels à la précision.
   const ORANGE = { color: '#ff8800', x: 0.50, y: 0.41 };
   const VERT   = { color: '#00cc44', x: 0.30, y: 0.60 };
@@ -179,35 +179,38 @@ function seedChromatectGame(db: Database.Database) {
     icon: 'Target',
     difficulty: 2,
     description: 'Mesurez la couleur spectrale affichée sur les dalles avec le CS-160 et comparez au spectre cible. Plus vous êtes précis, plus vous marquez.',
+    // Espacement : un bloc fait ~290px de large et 150-260px de haut selon ses
+    // paramètres → pas horizontal de 380px et rangées espacées de 320px minimum
+    // pour une lecture aérée gauche→droite, haut→bas.
     nodes: [
-      // ─ Démarrage : la salle s'allume direct en orange (couleur n°1) ─
-      { id: 'n_begin',  kind: 'event_begin',  name: '▶ Démarrer',           enabled: true, params: {},                                           pos: { x: 60,   y: 60 } },
-      { id: 'n_snd0',   kind: 'play_sound',   name: '🔊 Son départ',         enabled: true, params: { sound: 'start' },                           pos: { x: 320,  y: 60 } },
-      { id: 'n_reset',  kind: 'score_reset',  name: 'Score à 0',            enabled: true, params: {},                                           pos: { x: 580,  y: 60 } },
-      { id: 'n_setc1',  kind: 'variable_set', name: 'Couleur n°1 (orange)', enabled: true, params: { name: 'couleur_num', value: 1, op: 'set' }, pos: { x: 840,  y: 60 } },
-      { id: 'n_fill0',  kind: 'fill',         name: '💡 Salle orange',       enabled: true, params: { color: ORANGE.color, intensity: 0.9 },      pos: { x: 1100, y: 60 } },
-      // ─ Bouton « Nouvelle couleur mystère » ─
-      { id: 'n_clkn',   kind: 'on_ui_click',  name: '🎨 Btn nouvelle couleur', enabled: true, params: { buttonId: 'nouvelle' },                   pos: { x: 60,   y: 300 } },
-      { id: 'n_sndc',   kind: 'play_sound',   name: '🔊 Clic',               enabled: true, params: { sound: 'click' },                           pos: { x: 320,  y: 300 } },
-      { id: 'n_rand',   kind: 'random_int',   name: '🎲 Tirage 1-3',         enabled: true, params: { min: 1, max: 3, varName: 'couleur_num' },   pos: { x: 580,  y: 300 } },
-      { id: 'n_ifc1',   kind: 'if',           name: 'Si n°1 ?',             enabled: true, params: { varName: 'couleur_num', op: 'eq', value: 1 }, pos: { x: 840,  y: 300 } },
-      { id: 'n_fillo',  kind: 'fill',         name: '🟠 Salle orange',       enabled: true, params: { color: ORANGE.color, intensity: 0.9 },      pos: { x: 1100, y: 240 } },
-      { id: 'n_ifc2',   kind: 'if',           name: 'Si n°2 ?',             enabled: true, params: { varName: 'couleur_num', op: 'eq', value: 2 }, pos: { x: 1100, y: 370 } },
-      { id: 'n_fillv',  kind: 'fill',         name: '🟢 Salle verte',        enabled: true, params: { color: VERT.color, intensity: 0.9 },        pos: { x: 1360, y: 310 } },
-      { id: 'n_fillb',  kind: 'fill',         name: '🔵 Salle bleue',        enabled: true, params: { color: BLEU.color, intensity: 0.9 },        pos: { x: 1360, y: 440 } },
-      // ─ Bouton « Mesurer » : mesure réelle + comparaison à la couleur active ─
-      { id: 'n_clkm',   kind: 'on_ui_click',  name: '📷 Btn mesurer',        enabled: true, params: { buttonId: 'mesurer' },                      pos: { x: 60,   y: 620 } },
-      { id: 'n_sndt',   kind: 'play_sound',   name: '🔊 Tic',                enabled: true, params: { sound: 'tick' },                            pos: { x: 320,  y: 620 } },
-      { id: 'n_meas',   kind: 'measure_start', name: '📷 Mesure CS-160',     enabled: true, params: { varX: 'meas_x', varY: 'meas_y', varLv: 'meas_lv', timeoutSec: 25 }, pos: { x: 580, y: 620 } },
-      { id: 'n_ifok',   kind: 'if',           name: 'Si mesure OK',         enabled: true, params: { varName: 'meas_ok', op: 'eq', value: 1 },   pos: { x: 840,  y: 620 } },
-      { id: 'n_mifc1',  kind: 'if',           name: 'Couleur n°1 ?',        enabled: true, params: { varName: 'couleur_num', op: 'eq', value: 1 }, pos: { x: 1100, y: 560 } },
-      { id: 'n_cmpo',   kind: 'measure_compare', name: '🎯 vs orange',       enabled: true, params: { targetX: ORANGE.x, targetY: ORANGE.y, toleranceDeltaE: TOL, maxPoints: PTS }, pos: { x: 1360, y: 500 } },
-      { id: 'n_mifc2',  kind: 'if',           name: 'Couleur n°2 ?',        enabled: true, params: { varName: 'couleur_num', op: 'eq', value: 2 }, pos: { x: 1360, y: 630 } },
-      { id: 'n_cmpv',   kind: 'measure_compare', name: '🎯 vs vert',         enabled: true, params: { targetX: VERT.x, targetY: VERT.y, toleranceDeltaE: TOL, maxPoints: PTS }, pos: { x: 1620, y: 570 } },
-      { id: 'n_cmpb',   kind: 'measure_compare', name: '🎯 vs bleu',         enabled: true, params: { targetX: BLEU.x, targetY: BLEU.y, toleranceDeltaE: TOL, maxPoints: PTS }, pos: { x: 1620, y: 700 } },
-      { id: 'n_snds',   kind: 'play_sound',   name: '🪙 Son points',         enabled: true, params: { sound: 'score' },                           pos: { x: 1880, y: 620 } },
-      { id: 'n_vib',    kind: 'vibrate',      name: '📳 Vibration',          enabled: true, params: { durationMs: 150 },                          pos: { x: 2140, y: 620 } },
-      { id: 'n_snde',   kind: 'play_sound',   name: '⚠ Erreur mesure',      enabled: true, params: { sound: 'error' },                           pos: { x: 1100, y: 760 } },
+      // ─ Rangée 1 · Démarrage : la salle s'allume direct en orange (couleur n°1) ─
+      { id: 'n_begin',  kind: 'event_begin',  name: 'Démarrer',             enabled: true, params: {},                                           pos: { x: 60,   y: 60 } },
+      { id: 'n_snd0',   kind: 'play_sound',   name: 'Son départ',           enabled: true, params: { sound: 'start' },                           pos: { x: 440,  y: 60 } },
+      { id: 'n_reset',  kind: 'score_reset',  name: 'Score à 0',            enabled: true, params: {},                                           pos: { x: 820,  y: 60 } },
+      { id: 'n_setc1',  kind: 'variable_set', name: 'Couleur n°1 (orange)', enabled: true, params: { name: 'couleur_num', value: 1, op: 'set' }, pos: { x: 1200, y: 60 } },
+      { id: 'n_fill0',  kind: 'fill',         name: 'Salle orange',         enabled: true, params: { color: ORANGE.color, intensity: 0.9 },      pos: { x: 1580, y: 60 } },
+      // ─ Rangée 2 · Bouton « Nouvelle couleur mystère » ─
+      { id: 'n_clkn',   kind: 'on_ui_click',  name: 'Bouton nouvelle couleur', enabled: true, params: { buttonId: 'nouvelle' },                  pos: { x: 60,   y: 460 } },
+      { id: 'n_sndc',   kind: 'play_sound',   name: 'Son clic',             enabled: true, params: { sound: 'click' },                           pos: { x: 440,  y: 460 } },
+      { id: 'n_rand',   kind: 'random_int',   name: 'Tirage 1 à 3',         enabled: true, params: { min: 1, max: 3, varName: 'couleur_num' },   pos: { x: 820,  y: 460 } },
+      { id: 'n_ifc1',   kind: 'if',           name: 'Si couleur n°1',       enabled: true, params: { varName: 'couleur_num', op: 'eq', value: 1 }, pos: { x: 1200, y: 460 } },
+      { id: 'n_fillo',  kind: 'fill',         name: 'Salle orange',         enabled: true, params: { color: ORANGE.color, intensity: 0.9 },      pos: { x: 1580, y: 360 } },
+      { id: 'n_ifc2',   kind: 'if',           name: 'Si couleur n°2',       enabled: true, params: { varName: 'couleur_num', op: 'eq', value: 2 }, pos: { x: 1580, y: 620 } },
+      { id: 'n_fillv',  kind: 'fill',         name: 'Salle verte',          enabled: true, params: { color: VERT.color, intensity: 0.9 },        pos: { x: 1960, y: 520 } },
+      { id: 'n_fillb',  kind: 'fill',         name: 'Salle bleue',          enabled: true, params: { color: BLEU.color, intensity: 0.9 },        pos: { x: 1960, y: 800 } },
+      // ─ Rangée 3 · Bouton « Mesurer » : mesure réelle + comparaison à la couleur active ─
+      { id: 'n_clkm',   kind: 'on_ui_click',  name: 'Bouton mesurer',       enabled: true, params: { buttonId: 'mesurer' },                      pos: { x: 60,   y: 1080 } },
+      { id: 'n_sndt',   kind: 'play_sound',   name: 'Son tic',              enabled: true, params: { sound: 'tick' },                            pos: { x: 440,  y: 1080 } },
+      { id: 'n_meas',   kind: 'measure_start', name: 'Mesure CS-160',       enabled: true, params: { varX: 'meas_x', varY: 'meas_y', varLv: 'meas_lv', timeoutSec: 25 }, pos: { x: 820, y: 1080 } },
+      { id: 'n_ifok',   kind: 'if',           name: 'Si mesure OK',         enabled: true, params: { varName: 'meas_ok', op: 'eq', value: 1 },   pos: { x: 1200, y: 1080 } },
+      { id: 'n_mifc1',  kind: 'if',           name: 'Si couleur n°1',       enabled: true, params: { varName: 'couleur_num', op: 'eq', value: 1 }, pos: { x: 1580, y: 980 } },
+      { id: 'n_cmpo',   kind: 'measure_compare', name: 'Comparer à orange', enabled: true, params: { targetX: ORANGE.x, targetY: ORANGE.y, toleranceDeltaE: TOL, maxPoints: PTS }, pos: { x: 1960, y: 1080 } },
+      { id: 'n_mifc2',  kind: 'if',           name: 'Si couleur n°2',       enabled: true, params: { varName: 'couleur_num', op: 'eq', value: 2 }, pos: { x: 1960, y: 1360 } },
+      { id: 'n_cmpv',   kind: 'measure_compare', name: 'Comparer à vert',   enabled: true, params: { targetX: VERT.x, targetY: VERT.y, toleranceDeltaE: TOL, maxPoints: PTS }, pos: { x: 2340, y: 1260 } },
+      { id: 'n_cmpb',   kind: 'measure_compare', name: 'Comparer à bleu',   enabled: true, params: { targetX: BLEU.x, targetY: BLEU.y, toleranceDeltaE: TOL, maxPoints: PTS }, pos: { x: 2340, y: 1540 } },
+      { id: 'n_snds',   kind: 'play_sound',   name: 'Son points',           enabled: true, params: { sound: 'score' },                           pos: { x: 2720, y: 1080 } },
+      { id: 'n_vib',    kind: 'vibrate',      name: 'Vibration',            enabled: true, params: { durationMs: 150 },                          pos: { x: 3100, y: 1080 } },
+      { id: 'n_snde',   kind: 'play_sound',   name: 'Son erreur mesure',    enabled: true, params: { sound: 'error' },                           pos: { x: 1580, y: 1320 } },
     ],
     edges: [
       { id: 'e1',  from: 'n_begin', to: 'n_snd0' },
@@ -239,9 +242,9 @@ function seedChromatectGame(db: Database.Database) {
     uiLayout: [
       { id: 'u_title',  kind: 'title_banner',  x: 20,  y: 14,  width: 480, height: 50, text: 'ChromaDetect - CS-160' },
       { id: 'u_msg',    kind: 'message_box',   x: 20,  y: 76,  width: 480, height: 84, bgColor: '#7c3aed',
-        text: '1️⃣ Allume une couleur mystère · 2️⃣ Pointe le CS-160 vers une dalle · 3️⃣ Mesure : plus tu es précis, plus tu marques !' },
-      { id: 'u_btn1',   kind: 'button',        x: 20,  y: 176, width: 480, height: 52, text: '🎨 1. Nouvelle couleur mystère', eventId: 'nouvelle', bgColor: '#f97316', textColor: '#ffffff', fontSize: 16 },
-      { id: 'u_btn2',   kind: 'button',        x: 20,  y: 240, width: 480, height: 52, text: '📷 2. Mesurer avec le CS-160',   eventId: 'mesurer',  bgColor: '#4361ee', textColor: '#ffffff', fontSize: 16 },
+        text: '1. Allume une couleur mystère · 2. Pointe le CS-160 vers une dalle · 3. Mesure : plus tu es précis, plus tu marques !' },
+      { id: 'u_btn1',   kind: 'button',        x: 20,  y: 176, width: 480, height: 52, text: '1. Nouvelle couleur mystère', eventId: 'nouvelle', bgColor: '#f97316', textColor: '#ffffff', fontSize: 16 },
+      { id: 'u_btn2',   kind: 'button',        x: 20,  y: 240, width: 480, height: 52, text: '2. Mesurer avec le CS-160',   eventId: 'mesurer',  bgColor: '#4361ee', textColor: '#ffffff', fontSize: 16 },
       { id: 'u_score',  kind: 'score_display', x: 20,  y: 308, width: 150, height: 70, text: 'Score',    varBind: 'score' },
       { id: 'u_mx',     kind: 'score_display', x: 186, y: 308, width: 150, height: 70, text: 'x mesuré', varBind: 'meas_x' },
       { id: 'u_my',     kind: 'score_display', x: 352, y: 308, width: 148, height: 70, text: 'y mesuré', varBind: 'meas_y' },
@@ -277,17 +280,18 @@ function seedLibreRGBGame(db: Database.Database) {
     accentColor: '#4361ee',
     icon: 'Palette',
     description: 'Explorez librement les couleurs : 3 curseurs R/G/B allument les dalles et le diagramme CIE 1931 se met à jour en temps réel.',
+    // Pas horizontal de 380px (bloc ~290px de large) → lecture aérée.
     nodes: [
       // ─ Déclencheur ─────────────────────────────────────────────────────────
-      { id: 'n_start',   kind: 'event_begin',          name: '▶ Démarrer',            enabled: true,  params: {}, pos: { x: 60,  y: 160 } },
+      { id: 'n_start',   kind: 'event_begin',          name: 'Démarrer',            enabled: true,  params: {}, pos: { x: 60,  y: 160 } },
       // ─ Boucle temps réel (50 ms) ───────────────────────────────────────────
-      { id: 'n_tick',    kind: 'on_tick',               name: '⏱ Tick 50ms',           enabled: true,  params: { intervalMs: 50 }, pos: { x: 280, y: 160 } },
+      { id: 'n_tick',    kind: 'on_tick',               name: 'Tick 50 ms',          enabled: true,  params: { intervalMs: 50 }, pos: { x: 440, y: 160 } },
       // ─ Lecture sliders joueur ──────────────────────────────────────────────
-      { id: 'n_rgb',     kind: 'get_player_rgb',        name: '🎨 Lire R/G/B joueur',  enabled: true,  params: { varR: 'r', varG: 'g', varB: 'b', varColor: 'couleur' }, pos: { x: 520, y: 160 } },
+      { id: 'n_rgb',     kind: 'get_player_rgb',        name: 'Lire R/G/B joueur',   enabled: true,  params: { varR: 'r', varG: 'g', varB: 'b', varColor: 'couleur' }, pos: { x: 820, y: 160 } },
       // ─ Envoi aux dalles ────────────────────────────────────────────────────
-      { id: 'n_send',    kind: 'show_target_on_plates', name: '💡 Allumer les dalles', enabled: true,  params: { varName: 'couleur', plates: 'all', intensity: 0.90 }, pos: { x: 760, y: 160 } },
+      { id: 'n_send',    kind: 'show_target_on_plates', name: 'Allumer les dalles',  enabled: true,  params: { varName: 'couleur', plates: 'all', intensity: 0.90 }, pos: { x: 1200, y: 160 } },
       // ─ Affichage CIE (optionnel – déclenchable manuellement) ───────────────
-      { id: 'n_cie',     kind: 'measure_show_cie',      name: '📊 Diagramme CIE',      enabled: true,  params: { showTarget: false, showResult: true }, pos: { x: 760, y: 320 } },
+      { id: 'n_cie',     kind: 'measure_show_cie',      name: 'Diagramme CIE',       enabled: true,  params: { showTarget: false, showResult: true }, pos: { x: 1580, y: 160 } },
     ],
     edges: [
       { id: 'e1', from: 'n_start',  to: 'n_tick' },
