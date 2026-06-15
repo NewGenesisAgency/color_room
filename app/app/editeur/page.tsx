@@ -853,6 +853,11 @@ function hslToRgb(h: number, s: number, l: number): { r: number; g: number; b: n
   return { r: Math.round(f(0) * 255), g: Math.round(f(8) * 255), b: Math.round(f(4) * 255) };
 }
 
+/** Nœuds qui dessinent sur les dalles (rendus par applyRenderNode). */
+const RENDER_NODE_KINDS: ReadonlySet<string> = new Set([
+  'fill', 'pulse', 'tile', 'anim_fade', 'anim_strobe', 'anim_rainbow', 'anim_wave',
+]);
+
 function applyRenderNode(tiles: TileState[], node: EditorNode, tSeconds: number) {
   if (node.kind === 'fill') {
     const color = getColor(node.params, 'color', '#6d28ff');
@@ -876,9 +881,11 @@ function applyRenderNode(tiles: TileState[], node: EditorNode, tSeconds: number)
     const fromIntensity = clamp01(getNum(node.params, 'fromIntensity', legacyBase));
     const toIntensity = clamp01(getNum(node.params, 'toIntensity', clamp01(legacyBase + legacyAmp)));
 
-    const speed = Math.max(0.01, getNum(node.params, 'speed', 0.9));
+    const speed = Math.max(0.01, getNum(node.params, 'speed', 0.6));
     const phase = getNum(node.params, 'phase', 0);
-    const t01 = clamp01(0.5 + 0.5 * Math.sin(tSeconds * speed * 2 * Math.PI + phase));
+    // Fréquence volontairement douce (×π et non ×2π) : la pulsation est ~2x plus
+    // lente pour une même valeur de "speed" → respiration plus agréable à l'œil.
+    const t01 = clamp01(0.5 + 0.5 * Math.sin(tSeconds * speed * Math.PI + phase));
     const intensity = clamp01(lerp(fromIntensity, toIntensity, t01));
     const color = lerpColor(baseColor, targetColor, t01);
 
@@ -896,6 +903,68 @@ function applyRenderNode(tiles: TileState[], node: EditorNode, tSeconds: number)
     const intensity = clamp01(getNum(node.params, 'intensity', 0.85));
     tiles[tileIndex] = { color, intensity };
   }
+
+  // ── Animations (fonctions du temps : rendues en boucle dans l'aperçu) ────────
+  if (node.kind === 'anim_fade') {
+    const color = getColor(node.params, 'color', '#ffffff');
+    const from = clamp01(getNum(node.params, 'fromIntensity', 0));
+    const to = clamp01(getNum(node.params, 'toIntensity', 1));
+    const durMs = Math.max(100, getNum(node.params, 'durationMs', 1000));
+    // Aller-retour doux (ping-pong) sur la durée.
+    const p = ((tSeconds * 1000) % durMs) / durMs;
+    const tri = p < 0.5 ? p * 2 : (1 - p) * 2;
+    const intensity = clamp01(lerp(from, to, tri));
+    for (let i = 0; i < tiles.length; i++) tiles[i] = { color, intensity };
+  }
+
+  if (node.kind === 'anim_strobe') {
+    const color = getColor(node.params, 'color', '#ffffff');
+    const hz = Math.max(0.5, getNum(node.params, 'hz', 4));
+    const on = Math.floor(tSeconds * hz * 2) % 2 === 0;
+    const intensity = on ? 1 : 0;
+    for (let i = 0; i < tiles.length; i++) tiles[i] = { color, intensity };
+  }
+
+  if (node.kind === 'anim_rainbow') {
+    const speed = Math.max(0.05, getNum(node.params, 'speed', 1));
+    const cols = 6; // grille 6 colonnes
+    for (let i = 0; i < tiles.length; i++) {
+      const col = i % cols;
+      const hue = (((tSeconds * speed * 60) + col * (360 / cols)) % 360 + 360) % 360;
+      tiles[i] = { color: hslToHex(hue, 0.9, 0.55), intensity: 0.9 };
+    }
+  }
+
+  if (node.kind === 'anim_wave') {
+    const color = getColor(node.params, 'color', '#00d7ff');
+    const dir = String(node.params.direction ?? 'left');
+    const speed = Math.max(0.05, getNum(node.params, 'speed', 1));
+    const cols = 6;
+    const head = (tSeconds * speed * 3) % cols;
+    for (let i = 0; i < tiles.length; i++) {
+      let col = i % cols;
+      if (dir === 'right') col = cols - 1 - col;
+      const dist = Math.abs(col - head);
+      const intensity = clamp01(1 - dist / 2); // bande lumineuse qui se déplace
+      if (intensity > tiles[i].intensity) tiles[i] = { color, intensity };
+    }
+  }
+}
+
+/** Convertit une teinte HSL (h:0-360, s/l:0-1) en couleur hex #rrggbb. */
+function hslToHex(h: number, s: number, l: number): string {
+  const c = (1 - Math.abs(2 * l - 1)) * s;
+  const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+  const m = l - c / 2;
+  let r = 0, g = 0, b = 0;
+  if (h < 60) { r = c; g = x; }
+  else if (h < 120) { r = x; g = c; }
+  else if (h < 180) { g = c; b = x; }
+  else if (h < 240) { g = x; b = c; }
+  else if (h < 300) { r = x; b = c; }
+  else { r = c; b = x; }
+  const to = (v: number) => Math.round((v + m) * 255).toString(16).padStart(2, '0');
+  return `#${to(r)}${to(g)}${to(b)}`;
 }
 
 function computeTiles(game: GameDoc, tSeconds: number): TileState[] {
@@ -940,9 +1009,12 @@ function computeTiles(game: GameDoc, tSeconds: number): TileState[] {
       } else if (cursor.kind === 'fill') {
         const seconds = Math.max(0.01, getNum(cursor.params, 'seconds', 1));
         segments.push({ nodeId: cursor.id, duration: seconds });
-      } else if (cursor.kind === 'pulse' || cursor.kind === 'tile') {
-        // Durée par défaut courte si dans une séquence.
-        segments.push({ nodeId: cursor.id, duration: 1 });
+      } else if (cursor.kind === 'pulse' || cursor.kind === 'tile'
+          || cursor.kind === 'anim_fade' || cursor.kind === 'anim_strobe'
+          || cursor.kind === 'anim_rainbow' || cursor.kind === 'anim_wave') {
+        // Bloc de rendu animé : durée = durationMs si présent, sinon 1 s.
+        const durMs = getNum(cursor.params, 'durationMs', 0);
+        segments.push({ nodeId: cursor.id, duration: durMs > 0 ? durMs / 1000 : 1 });
       }
     }
 
@@ -955,7 +1027,7 @@ function computeTiles(game: GameDoc, tSeconds: number): TileState[] {
     // Fallback: apply all enabled render nodes if no valid timeline
     for (const node of game.nodes) {
       if (!node.enabled) continue;
-      if (node.kind === 'fill' || node.kind === 'pulse' || node.kind === 'tile') {
+      if (RENDER_NODE_KINDS.has(node.kind)) {
         applyRenderNode(tiles, node, tSeconds);
       }
     }
@@ -2174,6 +2246,33 @@ export default function EditeurPage() {
           for (let i = 0; i < tiles.length; i++) tiles[i] = { color: '#000000', intensity: 0 };
           break;
         }
+        // ── Multijoueur (aperçu solo : simulé localement) ───────────────────────
+        case 'mp_session': {
+          // En aperçu, on simule une session : code de démo + 1 joueur (l'éditeur).
+          if (vars.mp_code == null) vars.mp_code = 'DEMO';
+          vars.mp_players = Math.max(1, Number(vars.mp_players ?? 1));
+          break;
+        }
+        case 'mp_wait_players': {
+          // En aperçu solo, on considère les joueurs présents → on continue.
+          vars.mp_players = Math.max(Number(vars.mp_players ?? 1), Math.round(getNum(node.params, 'minPlayers', 2)));
+          break;
+        }
+        case 'mp_broadcast': {
+          // Diffuse une couleur sur toutes les dalles (visible en aperçu).
+          const color = getColor(node.params, 'color', '#00d7ff');
+          const intensity = clamp01(getNum(node.params, 'intensity', 0.8));
+          for (let i = 0; i < tiles.length; i++) tiles[i] = { color, intensity };
+          break;
+        }
+        case 'mp_player_input': {
+          // En aperçu, l'action d'un joueur est neutre (0) tant qu'aucun vrai
+          // joueur n'est connecté ; on initialise la variable de sortie.
+          const seat = Math.max(1, Math.round(getNum(node.params, 'seat', 1)));
+          const outVar = String(node.params.outVar ?? `mp_input_${seat}`);
+          if (vars[outVar] == null) vars[outVar] = 0;
+          break;
+        }
         case 'tile':
         case 'tile_set': {
           const tileIndex = Math.max(0, Math.min(41, Math.round(getNum(node.params, 'tileIndex', 0))));
@@ -3073,7 +3172,21 @@ export default function EditeurPage() {
     return computeTiles(activeGame, t);
   }, [activeGame, t]);
 
-  const tiles = editorTiles;
+  // Aperçu DIRECT du nœud sélectionné : dès qu'on édite un bloc de rendu
+  // (Remplissage / Pulsation / Dalle), on l'affiche tout de suite sur la 3D,
+  // même s'il n'est pas encore relié à "Démarrer". -> retour visuel immédiat.
+  const selectedPreviewTiles = useMemo(() => {
+    if (isPlaying || !activeGame || !editor.selectedNodeId) return null;
+    const node = activeGame.nodes.find((n) => n.id === editor.selectedNodeId);
+    if (!node || !node.enabled) return null;
+    if (!RENDER_NODE_KINDS.has(node.kind)) return null;
+    const tc = Math.max(1, Math.round(Number(activeGame.tileCount ?? 42)));
+    const arr: TileState[] = Array.from({ length: tc }, () => ({ color: '#000000', intensity: 0 }));
+    applyRenderNode(arr, node, t);
+    return arr;
+  }, [isPlaying, activeGame, editor.selectedNodeId, t]);
+
+  const tiles = selectedPreviewTiles ?? editorTiles;
 
   // Send tile changes to hardware (same logic as /jeux)
   useEffect(() => {
@@ -3124,9 +3237,10 @@ export default function EditeurPage() {
       const fromIntensity = clamp01(getNum(selectedNode.params, 'fromIntensity', legacyBase));
       const toIntensity = clamp01(getNum(selectedNode.params, 'toIntensity', clamp01(legacyBase + legacyAmp)));
       
-      const speed = Math.max(0.01, getNum(selectedNode.params, 'speed', 0.9));
+      const speed = Math.max(0.01, getNum(selectedNode.params, 'speed', 0.6));
       const phase = getNum(selectedNode.params, 'phase', 0);
-      const t01 = clamp01(0.5 + 0.5 * Math.sin(t * speed * 2 * Math.PI + phase));
+      // Pulsation plus lente (×π) — cohérent avec applyRenderNode.
+      const t01 = clamp01(0.5 + 0.5 * Math.sin(t * speed * Math.PI + phase));
       
       previewColor = lerpColor(baseColor, targetColor, t01);
       previewIntensity = clamp01(lerp(fromIntensity, toIntensity, t01));
