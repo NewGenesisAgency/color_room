@@ -15,6 +15,7 @@ import type { ReactNode } from 'react';
 import './globals.css';
 import 'reactflow/dist/style.css';
 import NavigationMenu from './_components/NavigationMenu';
+import VersionBanner from './_components/VersionBanner';
 
 /**
  * @brief Métadonnées SEO globales appliquées à l'ensemble du site.
@@ -72,6 +73,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="fr">
       <body style={{ margin: 0 }}>
+        <VersionBanner />
         <NavigationMenu />
         {children}
       </body>
