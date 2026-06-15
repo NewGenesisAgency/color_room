@@ -2812,12 +2812,23 @@ export default function JeuxPage() {
       }
 
       // ── tile_set: set individual tile color ──
-      if (node.kind === 'tile_set') {
-        const tileIndex = Math.max(0, Math.min(41, Math.round(getNum(params, 'tileIndex', 0))));
+      if (node.kind === 'tile_set' || node.kind === 'tile') {
+        // tileIndex accepte un nombre OU un nom de variable (ex "targetTile")
+        // → robuste quand l'IA met une variable dans tile_set au lieu de tile_set_var.
+        const rawIdx = params.tileIndex;
+        let idxNum: number;
+        if (typeof rawIdx === 'number') idxNum = rawIdx;
+        else {
+          const s = String(rawIdx ?? '0').trim();
+          idxNum = /^[-+]?\d+$/.test(s) ? Number(s) : Number(hudVarsRef.current[s] ?? 0);
+        }
+        const tileIndex = Math.max(0, Math.min(41, Math.round(Number.isFinite(idxNum) ? idxNum : 0)));
         const color = getColor(params, 'color', '#ffffff');
         const rawInt = typeof params.intensity === 'number' ? params.intensity : 1;
         const intensity = intensityToMasterPercent(rawInt, masterIntensity);
         setPlateColor(tileIndex, color, intensity > 0);
+        const pid = PLATE_ID_BY_INDEX[tileIndex];
+        if (pid) sendRgbToPlate(hexToRgb255(color), intensity, pid);
         const nextId = g.out.get(node.id)?.[0];
         if (nextId) walk(nextId);
         return;
