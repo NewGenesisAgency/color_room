@@ -2,12 +2,15 @@
 
 /**
  * @file app/_components/TetrisGame.tsx
- * @brief Mini-jeu "Tetris" joué sur la grille de dalles (6 colonnes × 7 lignes).
+ * @brief Mini-jeu "Tetris Lumière" (color-match) joué sur la grille de dalles (6×7).
  *
- * Implémente un Tetris (7 pièces standard, voir {@link PIECES}) sur une petite
- * grille adaptée aux dalles : rotation, déplacements, descente accélérée et hard
- * drop, lignes complétées, combos et niveaux (vitesse croissante selon la
- * difficulté). Le contrôle se fait au clavier ou via le pavé {@link TouchControls}.
+ * Variante color-match adaptée aux dalles : on empile de PETITES pièces (1 ou 2
+ * cases, voir {@link SHAPES}) d'une couleur de la palette {@link PALETTE}. Dès
+ * qu'au moins {@link MATCH} cases de la même couleur sont connectées, le groupe
+ * fusionne et disparaît, puis les cases du dessus tombent (gravité), ce qui peut
+ * enchaîner des combos. Un Tetris classique (pièces de 4 cases) serait impossible
+ * à gagner sur une grille 6×7 : ce mode est conçu pour être jouable et gagnable.
+ * Le contrôle se fait au clavier ou via le pavé {@link TouchControls}.
  * À la différence des autres jeux, ce composant ne reçoit pas {@link GameTileProps}
  * mais des props dédiées : `params` ({@link TetrisParams} : vitesse/difficulté),
  * `isPlaying`, et `onSnapshot` qui pousse l'état courant ({@link TetrisSnapshot})
@@ -28,16 +31,23 @@ const TETRIS_TOUCH: TouchKey[] = [
   { key: ' ',          slot: 'a',     label: <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><ChevronsDown size={18} /> Drop</span>, accent: '#4361ee' },
 ];
 
-// ─── Tetrominos (7 pièces standard + 2 bonus) ────────────────────────────────
-const PIECES: { shape: number[][]; color: string }[] = [
-  { color: '#00c8ff', shape: [[1, 1, 1, 1]] },                          // I - cyan
-  { color: '#ffd600', shape: [[1, 1], [1, 1]] },                        // O - jaune
-  { color: '#b829dd', shape: [[0, 1, 0], [1, 1, 1]] },                  // T - violet
-  { color: '#22c55e', shape: [[0, 1, 1], [1, 1, 0]] },                  // S - vert
-  { color: '#ef4444', shape: [[1, 1, 0], [0, 1, 1]] },                  // Z - rouge
-  { color: '#ff8c00', shape: [[1, 0], [1, 0], [1, 1]] },                // L - orange
-  { color: '#4361ee', shape: [[0, 1], [0, 1], [1, 1]] },                // J - bleu
+// ─── Pièces : MAX 2 carreaux (mono-couleur) ──────────────────────────────────
+// Le jeu n'est plus un Tetris classique (impossible à gagner sur 6×7 avec des
+// pièces de 4 cases) mais un "color-match" façon Puyo : on empile de petites
+// pièces colorées et tout groupe d'AU MOINS 3 cases de la même couleur reliées
+// (haut/bas/gauche/droite) fusionne et disparaît. Les cases du dessus tombent
+// alors (gravité), ce qui peut déclencher des combos en chaîne.
+const SHAPES: number[][][] = [
+  [[1]],          // une case
+  [[1, 1]],       // domino horizontal
+  [[1], [1]],     // domino vertical
 ];
+
+// Palette volontairement courte (4 couleurs) pour que les fusions soient faciles.
+const PALETTE = ['#ef4444', '#22c55e', '#4361ee', '#ffd600']; // rouge, vert, bleu, jaune
+
+/** Nombre minimum de cases connectées de même couleur pour qu'un groupe disparaisse. */
+const MATCH = 3;
 
 const COLS = 6;
 const ROWS = 7;
@@ -46,34 +56,27 @@ const GAP = 5;
 const OVER_CLR = '#ff2020';
 
 const TETRIS_DIFF = {
-  facile:    { baseSpeed: 1300, linesPerLevel: 12 },
-  moyen:     { baseSpeed: 900,  linesPerLevel: 10 },
-  difficile: { baseSpeed: 600,  linesPerLevel: 8  },
-  expert:    { baseSpeed: 350,  linesPerLevel: 6  },
+  facile:    { baseSpeed: 1500, linesPerLevel: 14 },
+  moyen:     { baseSpeed: 1100, linesPerLevel: 12 },
+  difficile: { baseSpeed: 800,  linesPerLevel: 10 },
+  expert:    { baseSpeed: 550,  linesPerLevel: 8  },
 } satisfies Record<DifficultyLevel, { baseSpeed: number; linesPerLevel: number }>;
 
 type Cell = string | null;
 type Grid = Cell[][];
 type Piece = { shape: number[][]; color: string; x: number; y: number };
+/** Descripteur d'une pièce à venir : forme + couleur (tirées au hasard). */
+type PieceDesc = { shapeIdx: number; color: string };
 
 export type TetrisSnapshot = { grid: Grid; piece: Piece | null; score: number; gameOver: boolean };
 export type TetrisParams = { speed?: number; difficulty?: DifficultyLevel };
 
-// ─── 7-bag randomizer ────────────────────────────────────────────────────────
-// Closure : évite les class private fields qui posent problème avec SWC/Babel.
-// Garantit qu'on voit chaque pièce exactement une fois par cycle de 7.
-function makeBag(): () => number {
-  let pool: number[] = [];
-  function refill() {
-    pool = [0, 1, 2, 3, 4, 5, 6];
-    for (let i = pool.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      const tmp = pool[i]; pool[i] = pool[j]; pool[j] = tmp;
-    }
-  }
-  return function nextIdx(): number {
-    if (pool.length === 0) refill();
-    return pool.pop()!;
+// ─── Tirage des pièces ───────────────────────────────────────────────────────
+/** Tire une pièce au hasard : une forme (1 ou 2 cases) + une couleur de la palette. */
+function makeDesc(): PieceDesc {
+  return {
+    shapeIdx: Math.floor(Math.random() * SHAPES.length),
+    color: PALETTE[Math.floor(Math.random() * PALETTE.length)],
   };
 }
 
@@ -82,9 +85,9 @@ function emptyGrid(): Grid {
   return Array.from({ length: ROWS }, () => Array(COLS).fill(null));
 }
 
-function pieceFromIdx(idx: number): Piece {
-  const p = PIECES[idx];
-  return { ...p, x: Math.floor((COLS - p.shape[0].length) / 2), y: 0 };
+function pieceFromDesc(d: PieceDesc): Piece {
+  const shape = SHAPES[d.shapeIdx];
+  return { shape, color: d.color, x: Math.floor((COLS - shape[0].length) / 2), y: 0 };
 }
 
 function rotateCW(s: number[][]): number[][] {
@@ -120,11 +123,69 @@ function lockPiece(grid: Grid, p: Piece): Grid {
   return g;
 }
 
-function clearLines(grid: Grid): { grid: Grid; cleared: number } {
-  const kept = grid.filter(row => row.some(c => c === null));
-  const cleared = ROWS - kept.length;
-  while (kept.length < ROWS) kept.unshift(Array(COLS).fill(null));
-  return { grid: kept, cleared };
+/** Fait tomber chaque colonne (gravité Puyo) : les cases pleines glissent en bas. */
+function applyGravity(grid: Grid): Grid {
+  const g = emptyGrid();
+  for (let c = 0; c < COLS; c++) {
+    const stack: Cell[] = [];
+    for (let r = ROWS - 1; r >= 0; r--) if (grid[r][c]) stack.push(grid[r][c]);
+    for (let i = 0; i < stack.length; i++) g[ROWS - 1 - i][c] = stack[i];
+  }
+  return g;
+}
+
+/** Marque toutes les cases appartenant à un groupe de même couleur ≥ MATCH (flood-fill 4-voisins). */
+function findMatches(grid: Grid): boolean[][] {
+  const mark = Array.from({ length: ROWS }, () => Array(COLS).fill(false));
+  const seen = Array.from({ length: ROWS }, () => Array(COLS).fill(false));
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      const color = grid[r][c];
+      if (!color || seen[r][c]) continue;
+      // BFS sur les cases voisines de même couleur
+      const group: [number, number][] = [];
+      const stack: [number, number][] = [[r, c]];
+      seen[r][c] = true;
+      while (stack.length) {
+        const [y, x] = stack.pop()!;
+        group.push([y, x]);
+        const neigh: [number, number][] = [[y - 1, x], [y + 1, x], [y, x - 1], [y, x + 1]];
+        for (const [ny, nx] of neigh) {
+          if (ny < 0 || ny >= ROWS || nx < 0 || nx >= COLS) continue;
+          if (seen[ny][nx] || grid[ny][nx] !== color) continue;
+          seen[ny][nx] = true;
+          stack.push([ny, nx]);
+        }
+      }
+      if (group.length >= MATCH) for (const [gy, gx] of group) mark[gy][gx] = true;
+    }
+  }
+  return mark;
+}
+
+/**
+ * Résout les fusions en chaîne après le verrouillage d'une pièce :
+ * tant qu'il existe un groupe de ≥ MATCH cases de même couleur, on le retire,
+ * on applique la gravité, et on recommence (combos). Renvoie le nouveau plateau,
+ * le nombre total de cases effacées et le nombre de chaînes déclenchées.
+ */
+function resolveMatches(grid: Grid): { grid: Grid; cleared: number; chains: number } {
+  let g = applyGravity(grid);
+  let cleared = 0;
+  let chains = 0;
+  // Garde-fou : 42 cases max => jamais plus de quelques chaînes, on borne à 20.
+  for (let guard = 0; guard < 20; guard++) {
+    const mark = findMatches(g);
+    let removed = 0;
+    for (let r = 0; r < ROWS; r++)
+      for (let c = 0; c < COLS; c++)
+        if (mark[r][c]) { g[r][c] = null; removed++; }
+    if (removed === 0) break;
+    cleared += removed;
+    chains++;
+    g = applyGravity(g);
+  }
+  return { grid: g, cleared, chains };
 }
 
 function ghostPiece(grid: Grid, p: Piece): Piece {
@@ -145,16 +206,15 @@ function tryRotate(grid: Grid, p: Piece, cw: boolean): Piece | null {
   return null;
 }
 
-// ─── Scoring (système Tetris guideline) ───────────────────────────────────────
-const LINE_PTS = [0, 50, 150, 350, 700]; // 0, 1, 2, 3, 4 lignes
-const COMBO_BONUS = 50;                    // bonus par combo consécutif
-const HARD_DROP_PTS = 2;                   // 2 pts par cellule en hard drop
-const SOFT_DROP_PTS = 1;                   // 1 pt par cellule en soft drop
+// ─── Scoring (color-match) ─────────────────────────────────────────────────────
+const CELL_PTS = 10;        // points par case effacée
+const HARD_DROP_PTS = 2;    // 2 pts par cellule en hard drop
+const SOFT_DROP_PTS = 1;    // 1 pt par cellule en soft drop
 
 // ─── Vitesse par niveau (en ms) ───────────────────────────────────────────────
-// Commence à 900ms, beaucoup plus doux qu'avant (600ms), plafond à 150ms
+// Chute plus douce (les pièces sont petites) : -45 ms par niveau, plancher 220 ms.
 function speedForLevel(level: number, base: number): number {
-  return Math.max(150, base - (level - 1) * 55);
+  return Math.max(220, base - (level - 1) * 45);
 }
 
 // ─── Mutable game state ───────────────────────────────────────────────────────
@@ -163,23 +223,20 @@ type GS = {
   piece: Piece | null;
   hold: Piece | null;
   holdUsed: boolean;
-  queue: number[];          // 3 pièces suivantes (indices PIECES)
-  nextIdx: () => number;    // 7-bag closure
+  queue: PieceDesc[];       // 3 pièces suivantes (forme + couleur)
   score: number;
-  lines: number;
+  lines: number;            // total de cases effacées (sert au niveau)
   combo: number;
   over: boolean;
 };
 
 function initGS(): GS {
-  const nextIdx = makeBag();
   return {
     grid: emptyGrid(),
     piece: null,
     hold: null,
     holdUsed: false,
-    queue: [nextIdx(), nextIdx(), nextIdx()],
-    nextIdx,
+    queue: [makeDesc(), makeDesc(), makeDesc()],
     score: 0,
     lines: 0,
     combo: 0,
@@ -188,9 +245,9 @@ function initGS(): GS {
 }
 
 function spawnNext(s: GS): boolean {
-  const idx = s.queue.shift()!;
-  s.queue.push(s.nextIdx());
-  const spawned = pieceFromIdx(idx);
+  const desc = s.queue.shift()!;
+  s.queue.push(makeDesc());
+  const spawned = pieceFromDesc(desc);
   if (collides(s.grid, spawned)) {
     s.piece = null;
     s.over = true;
@@ -205,13 +262,13 @@ function spawnNext(s: GS): boolean {
 function lockAndClear(s: GS): void {
   if (!s.piece) return;
   const locked = lockPiece(s.grid, s.piece);
-  const { grid: cleared, cleared: n } = clearLines(locked);
-  s.grid = cleared;
-  if (n > 0) {
+  const { grid, cleared, chains } = resolveMatches(locked);
+  s.grid = grid;
+  if (cleared > 0) {
     s.combo++;
-    const pts = (LINE_PTS[n] ?? 800) + (s.combo - 1) * COMBO_BONUS;
-    s.score += pts;
-    s.lines += n;
+    // Points = cases effacées × valeur × multiplicateur de chaîne (combos en cascade).
+    s.score += cleared * CELL_PTS * Math.max(1, chains);
+    s.lines += cleared;
   } else {
     s.combo = 0;
   }
@@ -245,8 +302,16 @@ export default function TetrisGame({
 
   const tick = () => setRender(n => n + 1);
 
+  // Perf tablette : on ne pousse un snapshot (qui repeint les 42 dalles 3D) que
+  // si l'affichage a RÉELLEMENT changé. On compare une signature légère
+  // (plateau + position/forme de la pièce) à la précédente.
+  const lastSigRef = useRef<string>('');
   function snap() {
     const s = gs.current;
+    const p = s.piece;
+    const sig = `${s.over ? 'X' : ''}|${p ? `${p.x},${p.y},${p.color},${p.shape.length}x${p.shape[0].length}` : '-'}|${s.grid.map(r => r.map(c => c ?? '.').join('')).join('')}`;
+    if (sig === lastSigRef.current) return; // rien de visible n'a changé → on n'embête pas la 3D
+    lastSigRef.current = sig;
     onSnapshot?.({ grid: s.grid, piece: s.piece, score: s.score, gameOver: s.over });
   }
 
@@ -368,8 +433,6 @@ export default function TetrisGame({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isPlaying, startKey]);
 
-  useEffect(() => { snap(); });
-
   // ─── Build display grid ──────────────────────────────────────────────────────
   const s = gs.current;
   const display: Cell[][] = s.grid.map(r => [...r]);
@@ -403,6 +466,9 @@ export default function TetrisGame({
     }}>
       <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: '0.2em', color: '#06d6a0', textTransform: 'uppercase' }}>
         Tetris Lumière
+      </div>
+      <div style={{ fontSize: 11, color: '#64748b', marginTop: -12, textAlign: 'center', maxWidth: 360 }}>
+        Aligne au moins 3 dalles de la même couleur (côte à côte) pour les faire disparaître. Combos en cascade !
       </div>
 
       <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start' }}>
@@ -438,7 +504,7 @@ export default function TetrisGame({
           <div style={panelBox}>
             <div style={panelLabel}>Niveau</div>
             <div style={{ ...panelValue, color: '#06d6a0' }}>{level}</div>
-            <div style={{ ...panelLabel, marginTop: 8 }}>Lignes</div>
+            <div style={{ ...panelLabel, marginTop: 8 }}>Cases</div>
             <div style={{ ...panelValue, fontSize: 18, color: '#cbd5e1' }}>{s.lines}</div>
             {(params?.difficulty && params.difficulty !== 'moyen') && (
               <div style={{ marginTop: 6, display:'inline-flex', alignItems:'center', gap:4, padding:'2px 8px', borderRadius:20, fontSize:10, fontWeight:800, background:`${DIFF_LABELS[params.difficulty].color}22`, color:DIFF_LABELS[params.difficulty].color, border:`1px solid ${DIFF_LABELS[params.difficulty].color}44` }}>
@@ -505,8 +571,8 @@ export default function TetrisGame({
         {/* Queue des 3 pièces suivantes */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10, width: 80 }}>
           <div style={{ ...panelLabel, textAlign: 'center', marginBottom: 4 }}>Suivant</div>
-          {s.queue.map((idx, qi) => {
-            const p = PIECES[idx];
+          {s.queue.map((desc, qi) => {
+            const shape = SHAPES[desc.shapeIdx];
             return (
               <div key={qi} style={{
                 ...panelBox,
@@ -517,14 +583,14 @@ export default function TetrisGame({
               }}>
                 <div style={{
                   display: 'grid',
-                  gridTemplateColumns: `repeat(${p.shape[0].length}, 16px)`,
+                  gridTemplateColumns: `repeat(${shape[0].length}, 16px)`,
                   gap: 2,
                 }}>
-                  {p.shape.flat().map((v, i) => (
+                  {shape.flat().map((v, i) => (
                     <div key={i} style={{
                       width: 16, height: 16, borderRadius: 3,
-                      background: v ? p.color : 'transparent',
-                      boxShadow: v ? `0 0 5px ${p.color}80` : 'none',
+                      background: v ? desc.color : 'transparent',
+                      boxShadow: v ? `0 0 5px ${desc.color}80` : 'none',
                     }} />
                   ))}
                 </div>
@@ -554,7 +620,7 @@ export default function TetrisGame({
           textAlign: 'center',
         }}>
           <div style={{ fontSize: 20, fontWeight: 900, color: '#ef4444', letterSpacing: '0.05em' }}>GAME OVER</div>
-          <div style={{ fontSize: 14, color: '#94a3b8', marginTop: 4 }}>Score : {s.score} · Niveau {level} · {s.lines} lignes</div>
+          <div style={{ fontSize: 14, color: '#94a3b8', marginTop: 4 }}>Score : {s.score} · Niveau {level} · {s.lines} cases</div>
           <button onClick={restart} style={{
             marginTop: 12, padding: '10px 28px', borderRadius: 8,
             background: 'linear-gradient(135deg,#ef4444,#b91c1c)', color: '#fff', border: 'none',
