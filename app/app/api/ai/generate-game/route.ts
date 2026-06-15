@@ -54,9 +54,11 @@ const NODE_KINDS = [
   'game_tetris', 'game_simon', 'game_memory', 'game_spectrum', 'game_snake', 'game_puissance4',
 ] as const;
 
+// NB : 'plate_grid' est volontairement ABSENT - on n'autorise jamais l'IA à
+// dessiner une représentation des dalles dans l'UI (la vue 3D le fait déjà).
 const UI_KINDS = [
   'button', 'label', 'slider', 'rgb_sliders', 'score_display', 'timer_display', 'round_badge',
-  'color_swatch', 'progress_bar', 'cie_diagram', 'dpad', 'plate_grid', 'shape_rect', 'shape_circle',
+  'color_swatch', 'progress_bar', 'cie_diagram', 'dpad', 'shape_rect', 'shape_circle',
   'image', 'divider', 'heart_life', 'gauge_ring', 'players_list', 'turn_indicator', 'leaderboard',
   'button_grid', 'sprite', 'svg_icon', 'message_box', 'title_banner',
 ] as const;
@@ -120,16 +122,26 @@ RÈGLES :
      - branche vrai : add_score {amount:1} → play_sound {sound:"correct"} → clear_tiles → random_int {min:0,max:${tileCount - 1},varName:"targetTile"} → tile_set_var {indexVar:"targetTile",defaultColor:"#22d3ee",intensity:0.85}
      - branche faux : play_sound {sound:"wrong"} → vibrate {durationMs:120}
   3. on_countdown_end {varName:"countdown"} → play_sound {sound:"win"} → clear_tiles
-  L'UI DOIT contenir : title_banner + score_display(varBind:"score") + timer_display(varBind:"countdown") + plate_grid (sinon le joueur ne voit pas les ${tileCount} dalles sur sa tablette).
-- L'UI est posée sur un canvas 860×500. Place les composants sans chevauchement. CHAQUE jeu doit contenir AU MINIMUM : un title_banner (titre du jeu), un score_display si un score existe, un timer_display si un compte a rebours existe, ET un plate_grid si on interagit avec les dalles (sinon le joueur ne peut pas cliquer dessus depuis la tablette).
+  L'UI DOIT contenir : title_banner + score_display(varBind:"score") + timer_display(varBind:"countdown"). JAMAIS de plate_grid (voir règle ci-dessous).
+- ⛔ RÈGLE ABSOLUE SUR L'UI - NE JAMAIS REPRÉSENTER LA COLOR ROOM : l'écran de jeu affiche DÉJÀ une vue 3D temps réel des ${tileCount} dalles, sur laquelle le joueur clique directement. Donc dans l'UI Designer tu ne dois JAMAIS ajouter de composant "plate_grid", ni aucune grille/damier/carré qui imite les dalles, ni aucune mini-carte de la salle. Ce serait un doublon inutile. L'UI Designer sert UNIQUEMENT au HUD par-dessus la 3D : titre, score, minuteur, boutons, sliders de difficulté, messages, jauges, icônes de feedback. JAMAIS la salle elle-même. Cette règle s'applique à TOUS les jeux sans exception.
+- L'UI est posée sur un canvas 860×500 transparent SUPERPOSÉ à la vue 3D. Garde-la AÉRÉE et sur les bords (haut pour le titre/score/timer, bas pour les messages/boutons), en laissant le CENTRE LIBRE pour qu'on voie la salle 3D derrière. CHAQUE jeu doit contenir AU MINIMUM : un title_banner (titre), un score_display si un score existe, un timer_display si un compte à rebours existe. Le joueur interagit avec les dalles via la 3D (évènements on_plate_click / on_tile_click), PAS via l'UI.
 - Lie les affichages à des variables via "varBind" (ex: un score_display avec varBind "score").
 - Icônes : "sprite" (icône Lucide via "icon", ex Trophy, Star, Heart, Check, X, Zap, Crown, ThumbsUp) ou "svg_icon" (SVG perso). Pour sprite/svg_icon, "varBind" sert de visibilité : l'icône n'apparaît que si la variable est non nulle (ex. afficher un Trophy avec varBind "gagne"). Couleur via "bgColor".
 - Relie les boutons à la logique via "eventId" et un nœud "on_ui_click" {buttonId} correspondant.
 - Sois COHÉRENT : chaque eventId d'UI doit avoir son nœud on_ui_click; chaque variable affichée doit être écrite par la logique.
 - Si un "JEU ACTUEL" est fourni, MODIFIE-le selon la demande et renvoie le jeu COMPLET mis à jour (jamais un diff ni un fragment). Conserve ce qui n'est pas concerné.
 
+RECETTES AVANCÉES (à appliquer quand la demande les évoque) :
+- DEUX SALLES : la grille de ${tileCount} dalles se divise en deux moitiés. Salle GAUCHE = dalles 0 à ${Math.floor(tileCount / 2) - 1}, salle DROITE = dalles ${Math.floor(tileCount / 2)} à ${tileCount - 1}. Pour "jouer sur 1 salle ou 2", crée une variable "rooms" (1 ou 2) réglable AVANT le début et borne les random_int en conséquence (ex. si rooms=1 → max ${Math.floor(tileCount / 2) - 1}, si rooms=2 → max ${tileCount - 1}).
+- DIFFICULTÉ CONFIGURABLE : avant de lancer, propose des boutons UI (button + on_ui_click) ou des labels pour régler une variable "difficulty" (1=facile…3=difficile) et/ou "speed". La difficulté influe sur : la vitesse (durée du compte à rebours, intervalle on_timer), le malus de points, le nombre de dalles simultanées, la profondeur de l'IA adverse. Mets event_begin → écran de config (titre + boutons difficulté + bouton "Démarrer"), et c'est le bouton Démarrer (on_ui_click) qui lance vraiment la partie.
+- SCORE DÉGRESSIF AU TEMPS : pour "gagner des points selon la rapidité (max 50)", au moment où la cible apparaît stocke le temps (time_seconds → varName "t0"). Au clic correct, calcule l'écart (time_seconds → "t1", math_sub t1-t0 → "dt"), puis points = clamp( 50 - dt*facteur ) via math_mul + math_sub + math_max 0. add_score de ce résultat (utilise score_set/variable puis add_score, ou math puis add_score{amount}).
+- CIBLE VERTE vs ROUGE (piège) : allume DEUX dalles aléatoires distinctes, une verte (bonne, defaultColor "#22c55e") et une rouge (piège, "#ef4444"). on_plate_click → compare_eq(clickedTile, greenTile) : si vrai → points selon rapidité + son "correct" ; compare_eq(clickedTile, redTile) : si vrai → malus selon difficulté (variable_set score op:"sub", montant = difficulty*5) + son "wrong" + vibrate. Garantis greenTile ≠ redTile (re-tire si égal).
+- JEU AU TOUR PAR TOUR (morpion, etc.) avec 3 MODES : prévois une variable "mode" réglée avant la partie via boutons UI : "multi" (multijoueur réseau via mp_session/mp_broadcast/mp_player_input), "duo" (1 contre 1 chacun son tour sur le même appareil : alterne une variable "joueurActuel" 1↔2 à chaque coup), "ia" (contre l'ordinateur). Pour le mode IA, l'adversaire DOIT être un bloc script_python qui implémente un minimax (comme l'IA du Puissance 4) dont la PROFONDEUR/force dépend de "difficulty" : difficulty 1 = coups aléatoires ou profondeur 1, difficulty 2 = profondeur 3-4, difficulty 3 = minimax complet (imbattable). Le script lit la grille (variable/tableau d'état), calcule le meilleur coup et le joue (tile_set_var sur la dalle choisie + met à jour l'état). C'est la SEULE façon d'avoir une IA forte : les blocs seuls ne suffisent pas, le minimax va dans un script_python.
+- GRILLE LOGIQUE (morpion 3×3, etc.) : représente le plateau avec array_create/grid_create (9 cases pour un morpion) et synchronise vers les dalles physiques via tiles_from_array/grid_sync_tiles. Pour un morpion "sur le mur du fond", mappe les 9 cases sur 9 dalles formant un carré 3×3 (l'utilisateur précise lesquelles ; sinon prends les 9 premières dalles de chaque salle). Vérifie la victoire avec grid_check_4_in_row adapté (3 alignées) ou une logique compare/if.
+
 EXEMPLE COMPLET de Color Speed (jeu pédagogique simple - copie cette structure) :
-{"name":"Tape la dalle","icon":"Zap","difficulty":2,"description":"Clique la dalle qui s'allume.","bgColor":"#0d1119","accentColor":"#22d3ee","nodes":[{"kind":"event_begin","name":"Démarrer","params":{},"x":80,"y":80},{"kind":"variable_set","name":"Score 0","params":{"name":"score","value":0,"op":"set"},"x":320,"y":80},{"kind":"random_int","name":"Cible aléa.","params":{"min":0,"max":${tileCount - 1},"varName":"targetTile"},"x":560,"y":80},{"kind":"tile_set_var","name":"Allumer cible","params":{"indexVar":"targetTile","defaultColor":"#22d3ee","intensity":0.85},"x":800,"y":80},{"kind":"countdown_start","name":"30s","params":{"seconds":30,"varName":"countdown"},"x":1040,"y":80},{"kind":"on_plate_click","name":"Clic dalle","params":{},"x":80,"y":260},{"kind":"compare_eq","name":"Bonne dalle ?","params":{"a":"clickedTile","b":"targetTile","out":"hit"},"x":320,"y":260},{"kind":"if","name":"Si juste","params":{"varName":"hit","op":"eq","value":1},"x":560,"y":260},{"kind":"add_score","name":"+1","params":{"amount":1},"x":800,"y":220},{"kind":"play_sound","name":"correct","params":{"sound":"correct"},"x":1040,"y":220},{"kind":"clear_tiles","name":"Éteindre","params":{},"x":1280,"y":220},{"kind":"random_int","name":"Nouvelle cible","params":{"min":0,"max":${tileCount - 1},"varName":"targetTile"},"x":1520,"y":220},{"kind":"tile_set_var","name":"Rallumer","params":{"indexVar":"targetTile","defaultColor":"#22d3ee","intensity":0.85},"x":1760,"y":220},{"kind":"play_sound","name":"wrong","params":{"sound":"wrong"},"x":800,"y":340},{"kind":"vibrate","name":"vib","params":{"durationMs":120},"x":1040,"y":340},{"kind":"on_countdown_end","name":"Fin","params":{"varName":"countdown"},"x":80,"y":460},{"kind":"play_sound","name":"win","params":{"sound":"win"},"x":320,"y":460},{"kind":"clear_tiles","name":"clear","params":{},"x":560,"y":460}],"edges":[[0,1],[1,2],[2,3],[3,4],[5,6],[6,7],[7,8],[8,9],[9,10],[10,11],[11,12],[7,13],[13,14],[15,16],[16,17]],"ui":[{"kind":"title_banner","x":20,"y":16,"width":820,"height":56,"text":"Tape la dalle"},{"kind":"score_display","x":20,"y":84,"width":220,"height":88,"varBind":"score","text":"Score"},{"kind":"timer_display","x":260,"y":84,"width":220,"height":88,"varBind":"countdown","text":"Temps"},{"kind":"plate_grid","x":500,"y":84,"width":340,"height":400,"gridCols":6}]}
+{"name":"Tape la dalle","icon":"Zap","difficulty":2,"description":"Clique la dalle qui s'allume.","bgColor":"#0d1119","accentColor":"#22d3ee","nodes":[{"kind":"event_begin","name":"Démarrer","params":{},"x":80,"y":80},{"kind":"variable_set","name":"Score 0","params":{"name":"score","value":0,"op":"set"},"x":320,"y":80},{"kind":"random_int","name":"Cible aléa.","params":{"min":0,"max":${tileCount - 1},"varName":"targetTile"},"x":560,"y":80},{"kind":"tile_set_var","name":"Allumer cible","params":{"indexVar":"targetTile","defaultColor":"#22d3ee","intensity":0.85},"x":800,"y":80},{"kind":"countdown_start","name":"30s","params":{"seconds":30,"varName":"countdown"},"x":1040,"y":80},{"kind":"on_plate_click","name":"Clic dalle","params":{},"x":80,"y":260},{"kind":"compare_eq","name":"Bonne dalle ?","params":{"a":"clickedTile","b":"targetTile","out":"hit"},"x":320,"y":260},{"kind":"if","name":"Si juste","params":{"varName":"hit","op":"eq","value":1},"x":560,"y":260},{"kind":"add_score","name":"+1","params":{"amount":1},"x":800,"y":220},{"kind":"play_sound","name":"correct","params":{"sound":"correct"},"x":1040,"y":220},{"kind":"clear_tiles","name":"Éteindre","params":{},"x":1280,"y":220},{"kind":"random_int","name":"Nouvelle cible","params":{"min":0,"max":${tileCount - 1},"varName":"targetTile"},"x":1520,"y":220},{"kind":"tile_set_var","name":"Rallumer","params":{"indexVar":"targetTile","defaultColor":"#22d3ee","intensity":0.85},"x":1760,"y":220},{"kind":"play_sound","name":"wrong","params":{"sound":"wrong"},"x":800,"y":340},{"kind":"vibrate","name":"vib","params":{"durationMs":120},"x":1040,"y":340},{"kind":"on_countdown_end","name":"Fin","params":{"varName":"countdown"},"x":80,"y":460},{"kind":"play_sound","name":"win","params":{"sound":"win"},"x":320,"y":460},{"kind":"clear_tiles","name":"clear","params":{},"x":560,"y":460}],"edges":[[0,1],[1,2],[2,3],[3,4],[5,6],[6,7],[7,8],[8,9],[9,10],[10,11],[11,12],[7,13],[13,14],[15,16],[16,17]],"ui":[{"kind":"title_banner","x":20,"y":16,"width":820,"height":56,"text":"Tape la dalle"},{"kind":"score_display","x":20,"y":84,"width":220,"height":88,"varBind":"score","text":"Score"},{"kind":"timer_display","x":600,"y":84,"width":220,"height":88,"varBind":"countdown","text":"Temps"}]}
+(Remarque : AUCUN plate_grid dans l'UI - le joueur clique les dalles sur la vue 3D. Le titre est en haut, le score à gauche, le timer à droite, le centre reste vide pour voir la salle 3D.)
 
 REMARQUE : la branche FAUSSE du "if" (index 7) pointe vers play_sound "wrong" puis vibrate (edges [7,13],[13,14]). La branche VRAIE pointe vers add_score (edge [7,8]). Quand if a 2 sorties, la 1re est vrai, la 2e est faux.
 RÈGLE D'OR : Si tu veux allumer une dalle dont l'index est stocké dans une VARIABLE, utilise OBLIGATOIREMENT tile_set_var {indexVar:"nomVar",defaultColor:"#xxx",intensity:0.x}. tile_set ne fonctionne qu'avec un nombre littéral.
@@ -199,6 +211,9 @@ function sanitize(raw: GameJson, tileCount: number) {
 
   const ui = (Array.isArray(raw.ui) ? raw.ui : [])
     .filter((c) => c && typeof c.kind === 'string' && uiKindSet.has(c.kind as string))
+    // ⛔ On retire toute représentation de la salle dans l'UI : la vue 3D est
+    // déjà affichée à l'écran de jeu. plate_grid serait un doublon trompeur.
+    .filter((c) => c.kind !== 'plate_grid')
     .slice(0, 40)
     .map((c) => ({
       kind: String(c.kind),
@@ -219,34 +234,28 @@ function sanitize(raw: GameJson, tileCount: number) {
       ...(typeof c.svg === 'string' ? { svg: c.svg.slice(0, 4000) } : {}),
     }));
 
-  // ── Auto-injection des composants UI essentiels manquants ────────────────
-  // Si l'IA a oublie un composant indispensable, on l'ajoute pour garantir un
-  // jeu jouable depuis la tablette. Critere : si le jeu a des on_plate_click /
-  // on_tile_click mais pas de plate_grid → on ajoute ; si add_score mais pas
-  // de score_display → on ajoute ; etc.
-  const usesPlateClick = nodes.some((n) => n.kind === 'on_plate_click' || n.kind === 'on_tile_click' || n.kind === 'on_click');
+  // ── Auto-injection des composants HUD essentiels manquants ───────────────
+  // On garantit un HUD minimal lisible PAR-DESSUS la vue 3D. On n'injecte
+  // JAMAIS de plate_grid : la salle est déjà visible en 3D, le joueur clique
+  // directement les dalles (évènements on_plate_click / on_tile_click).
   const usesScore = nodes.some((n) => n.kind === 'add_score' || n.kind === 'score_set' || n.kind === 'get_score' || n.kind === 'score_reset');
   const usesCountdown = nodes.some((n) => n.kind === 'countdown_start' || n.kind === 'on_countdown_end');
   const hasKind = (k: string) => ui.some((c) => c.kind === k);
 
   const gameName = typeof raw.name === 'string' && raw.name.trim() ? raw.name.trim().slice(0, 60) : 'Jeu IA';
 
-  // 1. title_banner toujours utile : il identifie le jeu sur la tablette.
+  // 1. title_banner toujours utile : il identifie le jeu (bandeau du haut).
   if (!hasKind('title_banner')) {
     ui.unshift({ kind: 'title_banner', x: 20, y: 16, width: 820, height: 56, text: gameName });
   }
-  // 2. score_display obligatoire si le jeu manipule un score.
+  // 2. score_display si le jeu manipule un score (coin haut-gauche).
   if (usesScore && !hasKind('score_display')) {
     ui.push({ kind: 'score_display', x: 20, y: 84, width: 220, height: 88, varBind: 'score', text: 'Score' });
   }
-  // 3. timer_display obligatoire si le jeu a un compte a rebours.
+  // 3. timer_display si le jeu a un compte a rebours (coin haut-droit, on
+  // laisse le centre libre pour voir la 3D).
   if (usesCountdown && !hasKind('timer_display')) {
-    ui.push({ kind: 'timer_display', x: 260, y: 84, width: 220, height: 88, varBind: 'time', text: 'Temps' });
-  }
-  // 4. plate_grid OBLIGATOIRE si le jeu attend des clics dalle : sans ce
-  // composant le joueur ne peut PAS interagir depuis la tablette.
-  if (usesPlateClick && !hasKind('plate_grid')) {
-    ui.push({ kind: 'plate_grid', x: 500, y: 84, width: 340, height: 400, gridCols: 6 });
+    ui.push({ kind: 'timer_display', x: 600, y: 84, width: 220, height: 88, varBind: 'countdown', text: 'Temps' });
   }
 
   return {
@@ -295,17 +304,17 @@ function systemInstructionLite(tileCount: number): string {
 Si la demande est un jeu video AAA (Forza, GTA, CoD, Fortnite, FPS, course, monde ouvert, RPG 3D) renvoie {"refuse":true,"reason":"texte"} et rien d'autre.
 Sinon Format strict: {"name":str,"icon":"Zap","difficulty":2,"description":str,"bgColor":"#0d1119","accentColor":"#22d3ee","nodes":[{"kind":K,"name":str,"params":{},"x":n,"y":n}],"edges":[[from,to]],"ui":[{"kind":U,"x":n,"y":n,"width":n,"height":n,"text"?:str,"varBind"?:str}]}
 K possibles: event_begin, variable_set{name,value,op:"set"|"add"}, random_int{min,max,varName}, add_score{amount}, if{varName,op:"gt"|"lt"|"eq",value}, compare_eq{a,b,out}, fill{color,intensity}, tile_set{tileIndex,color,intensity}, clear_tiles, pulse{baseColor,targetColor,speed}, on_plate_click, on_tile_click{tileIndex}, on_timer{intervalMs}, on_key{key}, on_countdown_end, countdown_start{seconds}, wait{seconds}, play_sound{sound}, vibrate{durationMs}.
-U possibles: title_banner, label, score_display{varBind}, timer_display{varBind}, button{eventId}, color_swatch, progress_bar{varBind}, rgb_sliders, plate_grid{gridCols}, message_box.
+U possibles: title_banner, label, score_display{varBind}, timer_display{varBind}, button{eventId}, color_swatch, progress_bar{varBind}, rgb_sliders, message_box.
 Variable runtime \`clickedTile\` = index de la derniere dalle cliquee (sur on_plate_click).
 sons: click, correct, wrong, win, lose, coin, levelup.
 REGLES :
 - Commence TOUJOURS par event_begin (index 0).
 - Lie l'UI aux variables via varBind (ex score_display varBind:"score").
-- Si jeu interactif a dalles : l'UI DOIT contenir plate_grid + title_banner + score_display (sans plate_grid le joueur ne peut PAS cliquer sur les dalles).
+- ⛔ JAMAIS de plate_grid ni de grille/damier dans l'UI : la vue 3D des dalles est deja affichee, le joueur clique dessus directement (evenement on_plate_click). L'UI = seulement HUD (titre, score, timer, boutons) sur les bords, centre vide.
 - Reste SIMPLE, EDUCATIF, JOUABLE.
 REGLE D'OR : pour allumer une dalle avec un index variable, utilise tile_set_var {indexVar:"nomVar",defaultColor:"#xxx",intensity:0.x} (pas tile_set qui ne marche qu'avec un index littéral).
 EXEMPLE Color Speed (copie cette structure exacte) :
-{"name":"Tape la dalle","icon":"Zap","difficulty":2,"description":"Clique la dalle qui s'allume.","bgColor":"#0d1119","accentColor":"#22d3ee","nodes":[{"kind":"event_begin","name":"Demarrer","params":{},"x":80,"y":80},{"kind":"variable_set","name":"Score","params":{"name":"score","value":0,"op":"set"},"x":320,"y":80},{"kind":"random_int","name":"Cible","params":{"min":0,"max":${tileCount - 1},"varName":"targetTile"},"x":560,"y":80},{"kind":"tile_set_var","name":"Allumer","params":{"indexVar":"targetTile","defaultColor":"#22d3ee","intensity":0.85},"x":800,"y":80},{"kind":"countdown_start","name":"30s","params":{"seconds":30,"varName":"countdown"},"x":1040,"y":80},{"kind":"on_plate_click","name":"Clic","params":{},"x":80,"y":260},{"kind":"compare_eq","name":"Bon ?","params":{"a":"clickedTile","b":"targetTile","out":"hit"},"x":320,"y":260},{"kind":"if","name":"Si juste","params":{"varName":"hit","op":"eq","value":1},"x":560,"y":260},{"kind":"add_score","name":"+1","params":{"amount":1},"x":800,"y":220},{"kind":"play_sound","name":"correct","params":{"sound":"correct"},"x":1040,"y":220},{"kind":"clear_tiles","name":"Eteindre","params":{},"x":1280,"y":220},{"kind":"random_int","name":"Nouvelle","params":{"min":0,"max":${tileCount - 1},"varName":"targetTile"},"x":1520,"y":220},{"kind":"tile_set_var","name":"Rallumer","params":{"indexVar":"targetTile","defaultColor":"#22d3ee","intensity":0.85},"x":1760,"y":220},{"kind":"play_sound","name":"wrong","params":{"sound":"wrong"},"x":800,"y":340},{"kind":"on_countdown_end","name":"Fin","params":{"varName":"countdown"},"x":80,"y":480},{"kind":"play_sound","name":"win","params":{"sound":"win"},"x":320,"y":480}],"edges":[[0,1],[1,2],[2,3],[3,4],[5,6],[6,7],[7,8],[8,9],[9,10],[10,11],[11,12],[7,13],[14,15]],"ui":[{"kind":"title_banner","x":20,"y":16,"width":820,"height":56,"text":"Tape la dalle"},{"kind":"score_display","x":20,"y":84,"width":220,"height":88,"varBind":"score","text":"Score"},{"kind":"timer_display","x":260,"y":84,"width":220,"height":88,"varBind":"countdown","text":"Temps"},{"kind":"plate_grid","x":500,"y":84,"width":340,"height":400,"gridCols":6}]}`;
+{"name":"Tape la dalle","icon":"Zap","difficulty":2,"description":"Clique la dalle qui s'allume.","bgColor":"#0d1119","accentColor":"#22d3ee","nodes":[{"kind":"event_begin","name":"Demarrer","params":{},"x":80,"y":80},{"kind":"variable_set","name":"Score","params":{"name":"score","value":0,"op":"set"},"x":320,"y":80},{"kind":"random_int","name":"Cible","params":{"min":0,"max":${tileCount - 1},"varName":"targetTile"},"x":560,"y":80},{"kind":"tile_set_var","name":"Allumer","params":{"indexVar":"targetTile","defaultColor":"#22d3ee","intensity":0.85},"x":800,"y":80},{"kind":"countdown_start","name":"30s","params":{"seconds":30,"varName":"countdown"},"x":1040,"y":80},{"kind":"on_plate_click","name":"Clic","params":{},"x":80,"y":260},{"kind":"compare_eq","name":"Bon ?","params":{"a":"clickedTile","b":"targetTile","out":"hit"},"x":320,"y":260},{"kind":"if","name":"Si juste","params":{"varName":"hit","op":"eq","value":1},"x":560,"y":260},{"kind":"add_score","name":"+1","params":{"amount":1},"x":800,"y":220},{"kind":"play_sound","name":"correct","params":{"sound":"correct"},"x":1040,"y":220},{"kind":"clear_tiles","name":"Eteindre","params":{},"x":1280,"y":220},{"kind":"random_int","name":"Nouvelle","params":{"min":0,"max":${tileCount - 1},"varName":"targetTile"},"x":1520,"y":220},{"kind":"tile_set_var","name":"Rallumer","params":{"indexVar":"targetTile","defaultColor":"#22d3ee","intensity":0.85},"x":1760,"y":220},{"kind":"play_sound","name":"wrong","params":{"sound":"wrong"},"x":800,"y":340},{"kind":"on_countdown_end","name":"Fin","params":{"varName":"countdown"},"x":80,"y":480},{"kind":"play_sound","name":"win","params":{"sound":"win"},"x":320,"y":480}],"edges":[[0,1],[1,2],[2,3],[3,4],[5,6],[6,7],[7,8],[8,9],[9,10],[10,11],[11,12],[7,13],[14,15]],"ui":[{"kind":"title_banner","x":20,"y":16,"width":820,"height":56,"text":"Tape la dalle"},{"kind":"score_display","x":20,"y":84,"width":220,"height":88,"varBind":"score","text":"Score"},{"kind":"timer_display","x":600,"y":84,"width":220,"height":88,"varBind":"countdown","text":"Temps"}]}`;
 }
 
 // Appel d'un modèle local via Ollama (hors-ligne). format:json force une sortie JSON.
