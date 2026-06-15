@@ -207,6 +207,7 @@ export default function Room3D({ plateColors, plateActive, onPlateClick, height 
   }
 
   const [view, setView] = useState<RV>('overview');
+  const [webglFailed, setWebglFailed] = useState(false); // contexte WebGL indisponible
   const viewRef  = useRef<RV>('overview');
   const pivotRef = useRef<THREE.Group | null>(null);
   const camRef   = useRef<THREE.PerspectiveCamera | null>(null);
@@ -246,7 +247,17 @@ export default function Room3D({ plateColors, plateActive, onPlateClick, height 
     const H = height;
 
     // ── Renderer ──────────────────────────────────────────────────
-    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+    // Création protégée : le navigateur limite le nombre de contextes WebGL
+    // (~16). Si le contexte ne peut pas être créé (trop de contextes, perte de
+    // contexte bloquée…), on affiche un repli au lieu de planter la page.
+    let renderer: THREE.WebGLRenderer;
+    try {
+      renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance', failIfMajorPerformanceCaveat: false });
+    } catch (e) {
+      console.warn('[Room3D] WebGL indisponible :', e);
+      setWebglFailed(true);
+      return;
+    }
     // Cap à 1.5 : sur tablette (écrans Retina dpr=2/3) ça divise par ~2-4 le
     // nombre de pixels à dessiner → bien plus fluide, différence visuelle minime.
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
@@ -520,10 +531,30 @@ export default function Room3D({ plateColors, plateActive, onPlateClick, height 
       gsap.killTweensOf(pivot.position);
       glowTex.dispose();
       wallTex.dispose();
+      // IMPORTANT : libère explicitement le contexte WebGL (sinon il reste
+      // alloué jusqu'au GC et on atteint vite la limite du navigateur ~16 →
+      // "context could not be created / context loss blocked").
+      try { renderer.forceContextLoss(); } catch { /* ignore */ }
       renderer.dispose();
       if (mount.contains(renderer.domElement)) mount.removeChild(renderer.domElement);
     };
   }, [height]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (webglFailed) {
+    return (
+      <div style={{ position: 'relative', width: '100%', height, background: '#0b0f1c', borderRadius: 14, overflow: 'hidden', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10, textAlign: 'center', padding: 24, boxSizing: 'border-box' }}>
+        <div style={{ fontSize: 32, opacity: 0.5 }}>🧊</div>
+        <div style={{ fontSize: 15, fontWeight: 800, color: '#e2e8f0' }}>Vue 3D indisponible</div>
+        <div style={{ fontSize: 12.5, color: '#94a3b8', maxWidth: 320, lineHeight: 1.5 }}>
+          Le navigateur a bloqué la 3D (trop de vues ouvertes). Recharge la page (Ctrl/Cmd + R) pour la réafficher. Le jeu reste pilotable sur les dalles de la Color Room.
+        </div>
+        <button onClick={() => { if (typeof window !== 'undefined') window.location.reload(); }}
+          style={{ marginTop: 6, padding: '9px 18px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.18)', background: 'rgba(255,255,255,0.08)', color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
+          Recharger
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div style={{ position: 'relative', width: '100%', height, background: '#fff', borderRadius: 14, overflow: 'hidden' }}>
