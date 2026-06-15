@@ -98,6 +98,7 @@ import {
   Trophy,
   XCircle,
   Zap,
+  SunDim,
   Grid,
   Crosshair,
   Search,
@@ -1011,7 +1012,7 @@ export default function JeuxPage() {
 
   const [instrument, setInstrument] = useState({
     colorTemp: '-',
-    cri: '-',
+    attenuation: '-',
     power: '-',
     apiLatency: '-',
   });
@@ -2000,12 +2001,42 @@ export default function JeuxPage() {
       const tempK = tempKFromRgb > 0 ? tempKFromRgb : inferColorTempK(rBand, gBand, bBand);
       // Spectre RÉEL émis (champ `spectre` de /state/plaque/{id}/all) si présent.
       const hasRealSpectre = Array.isArray(spectreFromApi) && spectreFromApi.length > 0;
-      const criEst = inferCriFromSpectre(spectreFromApi || [], { r: rBand, g: gBand, b: bBand });
 
       // On préfère les vraies valeurs de l'API si elles existent ; sinon on estime (préfixe ≈).
       const apiPower = payloadObj ? (payloadObj.power ?? payloadObj.puissance ?? payloadObj.watt) : null;
-      const apiCri   = payloadObj ? (payloadObj.cri ?? payloadObj.irc) : null;
       const apiCct   = payloadObj ? (payloadObj.cct ?? payloadObj.colorTemp ?? payloadObj.temperature) : null;
+
+      // ── Atténuation (gradation des dalles), affichée en % ────────────────────
+      // Lue depuis l'API Supervision. On accepte plusieurs noms de champ possibles
+      // (en %, en 0..1, ou en volts 0-10V) puis on convertit toujours en %.
+      const firstNum = (...vals: unknown[]): number | null => {
+        for (const v of vals) { const n = Number(v); if (v != null && Number.isFinite(n)) return n; }
+        return null;
+      };
+      const attenPctRaw = payloadObj ? firstNum(
+        payloadObj.attenuation, payloadObj['atténuation'], payloadObj.attenuationPercent,
+        payloadObj.attenuation_pct, payloadObj.gradation, payloadObj.dimming,
+        payloadObj.dim, payloadObj.niveau, payloadObj.level,
+      ) : null;
+      const attenVoltRaw = payloadObj ? firstNum(
+        payloadObj.attenuationV, payloadObj.attenuation_v, payloadObj.tension,
+        payloadObj.voltage, payloadObj.volts,
+      ) : null;
+      let attenuationStr = '-';
+      if (attenPctRaw != null) {
+        // 0..1 → on multiplie par 100 ; sinon on suppose déjà des % (borné 0-100).
+        const pct = attenPctRaw <= 1 ? attenPctRaw * 100 : attenPctRaw;
+        attenuationStr = `${Math.round(Math.max(0, Math.min(100, pct)))}%`;
+      } else if (attenVoltRaw != null) {
+        // Driver 0-10 V → pourcentage.
+        attenuationStr = `${Math.round(Math.max(0, Math.min(100, (attenVoltRaw / 10) * 100)))}%`;
+      } else if (payloadObj && used.length > 0) {
+        // Estimation (≈) : atténuation = 100 % − intensité moyenne des canaux.
+        const maxv = Math.max(...used);
+        const scale = maxv <= 1 ? 1 : maxv <= 100 ? 100 : 255; // détecte l'échelle 0-1 / 0-100 / 0-255
+        const meanPct = (used.reduce((a, b) => a + b, 0) / used.length / scale) * 100;
+        attenuationStr = `≈${Math.round(Math.max(0, Math.min(100, 100 - meanPct)))}%`;
+      }
 
       // Connexion + courbe spectrale réelles (lues depuis la supervision)
       setApiUp(payloadObj != null);
@@ -2014,9 +2045,8 @@ export default function JeuxPage() {
 
       setInstrument({
         colorTemp: apiCct != null ? `${Math.round(Number(apiCct))}K` : (tempK > 0 ? `${tempK}K` : '-'),
-        // IRC calculé à partir du spectre RÉEL = valeur légitime (pas de ≈) ;
-        // sinon estimation depuis la couleur (≈).
-        cri: apiCri != null ? `${apiCri}` : (hasRealSpectre ? `${criEst}` : `≈${criEst}`),
+        // Atténuation (gradation) lue depuis l'API Supervision, en % (≈ si estimée).
+        attenuation: attenuationStr,
         // La supervision n'expose pas la puissance électrique → estimation (≈).
         power: apiPower != null ? `${apiPower}W` : `≈${Math.floor(sum * 3)}W`,
         apiLatency,
@@ -6253,9 +6283,9 @@ export default function JeuxPage() {
                   </div>
                   <div className="instrument-reading">
                     <span style={{ display: 'inline-flex', gap: 8, alignItems: 'center' }}>
-                      <Zap size={16} /> IRC
+                      <SunDim size={16} /> Atténuation
                     </span>
-                    <span>{instrument.cri}</span>
+                    <span>{instrument.attenuation}</span>
                   </div>
                   <div className="instrument-reading">
                     <span style={{ display: 'inline-flex', gap: 8, alignItems: 'center' }}>
