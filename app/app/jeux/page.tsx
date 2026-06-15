@@ -69,7 +69,9 @@ import {
   AlertTriangle,
   Award,
   Brain,
+  Check,
   CheckCircle2,
+  Copy,
   Eye,
   DoorOpen,
   Flame,
@@ -1036,6 +1038,12 @@ export default function JeuxPage() {
   const [mpSessionId, setMpSessionId] = useState<string>('');
   const [mpStatus, setMpStatus] = useState<'active' | 'finished' | ''>('');
   const [mpPlayers, setMpPlayers] = useState<Array<{ seat: MpSeat; name: string }>>([]);
+  // Mode "1 joueur/plaque" : l'animateur (tablette) peut AUSSI jouer sa propre plaque.
+  const [platesSelfToken, setPlatesSelfToken] = useState<string>('');
+  const [platesSelfSeat, setPlatesSelfSeat] = useState<number | null>(null);
+  const [platesSelfColor, setPlatesSelfColor] = useState<string>('#22d3ee');
+  const [platesJoining, setPlatesJoining] = useState<boolean>(false);
+  const [platesUrlCopied, setPlatesUrlCopied] = useState<boolean>(false);
   // Puissance 4 multijoueur (2 téléphones) : salle + état affiché sur les dalles
   const [mpValue, setMpValue] = useState<number>(0);
   const [mpAutoFollow, setMpAutoFollow] = useState<boolean>(true);
@@ -4118,6 +4126,54 @@ export default function JeuxPage() {
 
   const [escapeError, setEscapeError] = useState<string>('');
 
+  // ── Mode "1 joueur/plaque" : l'animateur rejoint la partie depuis la tablette ──
+  /** Rejoint la session active (comme /jouer) pour que l'animateur pilote SA plaque. */
+  async function platesJoinAsHost() {
+    if (platesSelfToken || platesJoining) return;
+    setPlatesJoining(true);
+    try {
+      const res = await fetch('/api/multiplayer/join', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ name: 'Animateur' }),
+      });
+      const d = await res.json();
+      if (d?.ok) {
+        setPlatesSelfToken(String(d.token));
+        setPlatesSelfSeat(Number(d.seat));
+        platesSubmitColor(platesSelfColor, String(d.token));
+      } else {
+        setMessage(d?.error || 'Impossible de rejoindre la partie.');
+      }
+    } catch {
+      setMessage('Erreur réseau : impossible de rejoindre.');
+    } finally {
+      setPlatesJoining(false);
+    }
+  }
+
+  /** Envoie la couleur choisie par l'animateur sur SA plaque (RGB encodé 0xRRGGBB). */
+  function platesSubmitColor(hex: string, tokenOverride?: string) {
+    const token = tokenOverride || platesSelfToken;
+    if (!token) return;
+    const { r, g, b } = hexToRgb255(hex);
+    const value = ((r & 255) << 16) | ((g & 255) << 8) | (b & 255);
+    void fetch('/api/multiplayer/submit', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ token, value }),
+    }).catch(() => { /* best-effort */ });
+  }
+
+  function onPlatesColor(hex: string) {
+    setPlatesSelfColor(hex);
+    platesSubmitColor(hex);
+  }
+
+  /** Copie l'adresse à taper sur les téléphones dans le presse-papiers. */
+  function copyPlatesUrl() {
+    const url = (typeof window !== 'undefined' ? window.location.origin : '') + '/jouer';
+    try { void navigator.clipboard?.writeText(url); setPlatesUrlCopied(true); window.setTimeout(() => setPlatesUrlCopied(false), 1500); } catch { /* ignore */ }
+  }
+
   function checkEscapeProgress() {
     // Énigme 1: plaques impaires actives (1,3,5,7,9 -> index 0,2,4,6,8)
     if (escapeProgress === 0) {
@@ -4952,7 +5008,8 @@ export default function JeuxPage() {
                       setActiveBuiltinGame(null); setSimonActive(false); setSpectreActive(false);
                       setCurrentGame('multiplayer-plates');
                       setGameActive(true);
-                      setMessage('Multijoueur plaques - les joueurs rejoignent sur la page /jouer de leur téléphone');
+                      setPlatesSelfToken(''); setPlatesSelfSeat(null); setPlatesSelfColor('#22d3ee');
+                      setMessage('Multijoueur plaques - rejoins sur /jouer, ou joue directement depuis cette tablette');
                     },
                   };
 
@@ -5086,20 +5143,59 @@ export default function JeuxPage() {
               />
 
               <div>
-                {gameActive && currentGame === 'multiplayer-plates' && (
+                {gameActive && currentGame === 'multiplayer-plates' && (() => {
+                  const joinUrl = (typeof window !== 'undefined' ? window.location.origin : '') + '/jouer';
+                  const PRESET_COLORS = ['#ef4444', '#f59e0b', '#eab308', '#22c55e', '#06b6d4', '#3b82f6', '#8b5cf6', '#ec4899', '#ffffff'];
+                  return (
                   <div className="glass" style={{ padding: 20, borderRadius: 18, marginTop: 12, textAlign: 'center' }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 6 }}>
                       <Users size={20} color="#3b82f6" />
                       <strong style={{ fontSize: 18 }}>1 joueur = 1 plaque</strong>
                     </div>
-                    <p style={{ fontSize: 13, opacity: 0.75, margin: '0 0 14px' }}>Chaque joueur scanne ce QR (ou ouvre <code>/jouer</code>) et choisit une couleur : sa plaque s&apos;allume dans la Color Room.</p>
+                    <p style={{ fontSize: 13, opacity: 0.75, margin: '0 0 14px' }}>Chaque joueur rejoint depuis son téléphone : il scanne le QR <strong>ou</strong> tape l&apos;adresse ci-dessous dans son navigateur. Pas de code à retenir, l&apos;adresse suffit.</p>
                     <div style={{ display: 'inline-block', background: '#fff', padding: 10, borderRadius: 14 }}>
-                      <QrCode value={(typeof window !== 'undefined' ? window.location.origin : '') + '/jouer'} size={180} />
+                      <QrCode value={joinUrl} size={180} />
                     </div>
-                    <div style={{ marginTop: 12, fontSize: 15, fontWeight: 800 }}>{mpPlayers.length} joueur{mpPlayers.length > 1 ? 's' : ''} connecté{mpPlayers.length > 1 ? 's' : ''}</div>
-                    <div style={{ marginTop: 4, fontSize: 12, opacity: 0.6, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}><Eye size={13} /> Regarde les dalles de la Color Room, pas l&apos;écran.</div>
+
+                    {/* Adresse à taper manuellement (alternative au QR) */}
+                    <div style={{ marginTop: 14 }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', opacity: 0.55, marginBottom: 6 }}>Adresse à entrer sur le téléphone</div>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, flexWrap: 'wrap' }}>
+                        <code style={{ fontSize: 16, fontWeight: 800, padding: '8px 14px', borderRadius: 10, background: 'rgba(59,130,246,0.12)', border: '1px solid rgba(59,130,246,0.3)', color: '#bfdbfe', userSelect: 'all' }}>{joinUrl}</code>
+                        <button onClick={copyPlatesUrl} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 12px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.18)', background: 'rgba(255,255,255,0.08)', color: '#fff', cursor: 'pointer', fontWeight: 700, fontSize: 13 }}>
+                          {platesUrlCopied ? <><Check size={14} /> Copié</> : <><Copy size={14} /> Copier</>}
+                        </button>
+                      </div>
+                      <div style={{ fontSize: 11, opacity: 0.5, marginTop: 6 }}>Astuce : tous les téléphones doivent être sur le même Wi-Fi que la salle.</div>
+                    </div>
+
+                    <div style={{ marginTop: 14, fontSize: 15, fontWeight: 800 }}>{mpPlayers.length} joueur{mpPlayers.length > 1 ? 's' : ''} connecté{mpPlayers.length > 1 ? 's' : ''}</div>
+
+                    {/* L'animateur (cette tablette) peut AUSSI jouer sa propre plaque */}
+                    <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid rgba(255,255,255,0.12)' }}>
+                      {!platesSelfToken ? (
+                        <button onClick={() => void platesJoinAsHost()} disabled={platesJoining} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '12px 20px', borderRadius: 12, border: 'none', cursor: platesJoining ? 'wait' : 'pointer', fontWeight: 800, fontSize: 15, color: '#fff', background: 'linear-gradient(135deg,#06d6a0,#3b82f6)', boxShadow: '0 6px 18px rgba(59,130,246,0.4)' }}>
+                          <Gamepad2 size={17} /> {platesJoining ? 'Connexion…' : 'Je joue aussi sur cette tablette'}
+                        </button>
+                      ) : (
+                        <div>
+                          <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 10 }}>Tu pilotes la plaque <span style={{ color: '#22d3ee' }}>#{platesSelfSeat ?? '?'}</span> — choisis ta couleur :</div>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, flexWrap: 'wrap' }}>
+                            {PRESET_COLORS.map((col) => (
+                              <button key={col} onClick={() => onPlatesColor(col)} title={col}
+                                style={{ width: 38, height: 38, borderRadius: 10, cursor: 'pointer', background: col, border: platesSelfColor.toLowerCase() === col.toLowerCase() ? '3px solid #fff' : '2px solid rgba(255,255,255,0.25)', boxShadow: platesSelfColor.toLowerCase() === col.toLowerCase() ? `0 0 14px ${col}` : 'none' }} />
+                            ))}
+                            <input type="color" value={platesSelfColor} onChange={(e) => onPlatesColor(e.target.value)} title="Couleur personnalisée"
+                              style={{ width: 44, height: 38, borderRadius: 10, border: '2px solid rgba(255,255,255,0.25)', background: 'transparent', cursor: 'pointer', padding: 0 }} />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    <div style={{ marginTop: 12, fontSize: 12, opacity: 0.6, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}><Eye size={13} /> Regarde les dalles de la Color Room, pas l&apos;écran.</div>
                   </div>
-                )}
+                  );
+                })()}
                 {gameActive && customRun ? (
                   <div className="glass" style={{ padding: 14, borderRadius: 18, marginBottom: 12 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
