@@ -1100,7 +1100,9 @@ export default function JeuxPage() {
   const [spectreActive, setSpectreActive] = useState<boolean>(false);
   const [spectreJoinCode, setSpectreJoinCode] = useState<string>('');
   const [simonSequence, setSimonSequence] = useState<number[]>([]);
+  const simonSequenceRef = useRef<number[]>([]);        // miroir synchrone (anti-stale closure)
   const [simonPlayerInput, setSimonPlayerInput] = useState<number[]>([]);
+  const simonPlayerInputRef = useRef<number[]>([]);     // miroir synchrone (anti-race clics rapides)
   const [simonLevel, setSimonLevel] = useState<number>(1);
   const simonLevelRef = useRef<number>(1); // Track current level for timing calculations
   const scoreSubmitLastRef = useRef<Record<string, number>>({});
@@ -3830,9 +3832,9 @@ export default function JeuxPage() {
       simonTimerRef.current = 0;
     }
     setSimonActive(false);
-    setSimonSequence([]);
-    setSimonPlayerInput([]);
-    setSimonLevel(1);
+    setSimonSequence([]); simonSequenceRef.current = [];
+    setSimonPlayerInput([]); simonPlayerInputRef.current = [];
+    setSimonLevel(0); simonLevelRef.current = 0;
     setSimonPhase('showing');
     setSimonLitPlate(null);
     setSimonScore(0);
@@ -3881,10 +3883,10 @@ export default function JeuxPage() {
     
     stopSimonGame();
     setSimonActive(true);
-    setSimonSequence([]);
-    setSimonPlayerInput([]);
-    setSimonLevel(1);
-    simonLevelRef.current = 1; // Reset level ref
+    setSimonSequence([]); simonSequenceRef.current = [];
+    setSimonPlayerInput([]); simonPlayerInputRef.current = [];
+    setSimonLevel(0);
+    simonLevelRef.current = 0; // niveau 0 → 1er tour deviendra "Niveau 1"
     setSimonScore(0);
     setSimonPhase('showing');
     setMessage('Simon: Préparez-vous!');
@@ -3925,31 +3927,27 @@ export default function JeuxPage() {
       simonTimerRef.current = 0;
     }
     
-    setSimonSequence(prev => {
-      const nextPlate = Math.floor(Math.random() * 4);
-      const newSequence = [...prev, nextPlate];
-      
-      // Small delay before showing sequence
+    // Niveau +1 (ref synchrone pour les messages/timings)
+    const newLevel = simonLevelRef.current + 1;
+    simonLevelRef.current = newLevel;
+    setSimonLevel(newLevel);
+
+    const nextPlate = Math.floor(Math.random() * 4);
+    const newSequence = [...simonSequenceRef.current, nextPlate];
+    simonSequenceRef.current = newSequence;
+    setSimonSequence(newSequence);
+
+    // Réinitialise l'entrée du joueur (state + ref)
+    setSimonPlayerInput([]); simonPlayerInputRef.current = [];
+
+    // Petit délai avant d'afficher la séquence
+    window.setTimeout(() => {
+      setSimonPhase('showing');
+      setMessage(`Niveau ${newLevel} - Observez ${newSequence.length} coups...`);
       window.setTimeout(() => {
-        setSimonPlayerInput([]);
-        setSimonPhase('showing');
-        setMessage(`Niveau ${simonLevelRef.current + 1} - Observez ${newSequence.length} coups...`);
-        
-        // Show sequence after brief pause
-        window.setTimeout(() => {
-          showSimonSequence(newSequence, 0);
-        }, 400);
-      }, 300);
-      
-      return newSequence;
-    });
-    
-    // Update level ref immediately for timing calculations
-    setSimonLevel(prev => {
-      const newLevel = prev + 1;
-      simonLevelRef.current = newLevel;
-      return newLevel;
-    });
+        showSimonSequence(newSequence, 0);
+      }, 400);
+    }, 300);
   }
 
   // Envoie une couleur à une dalle. Passe par scheduleSetCanal : déduplication
@@ -4045,76 +4043,65 @@ export default function JeuxPage() {
     const simonPlateIndex = SIMON_PLATES.indexOf(plateIndex);
     if (simonPlateIndex === -1) return;
 
+    // ── Validation SYNCHRONE via refs (robuste aux clics rapides) ────────────
+    const seq = simonSequenceRef.current;
+    const newInput = [...simonPlayerInputRef.current, simonPlateIndex];
+    // Garde : on ignore tout clic au-delà de la longueur attendue
+    // (évite le faux "Game Over" si on reclique pendant la transition de niveau).
+    if (newInput.length > seq.length) return;
+    simonPlayerInputRef.current = newInput;
+    setSimonPlayerInput(newInput);
+    const expected = seq[newInput.length - 1];
+    const correct = simonPlateIndex === expected;
+
     const color = SIMON_COLORS[simonPlateIndex];
     const plateId = PLATE_ID_BY_INDEX[plateIndex] ?? 1;
     const rgb = hexToRgb255(color);
 
-    // Visual feedback - brighter and longer
+    // Retour visuel + sonore de la touche
     setPlateColor(plateIndex, color, true);
     void sendColorToPlateImmediate(rgb, 100, plateId);
     playTone(SIMON_FREQUENCIES[simonPlateIndex], 300);
-
-    // Keep lit for feedback
     await new Promise(r => setTimeout(r, 250));
-    
     setPlateColor(plateIndex, '#000000', true);
     void turnOffPlateImmediate(plateId);
 
-    // Check input
-    const newInput = [...simonPlayerInput, simonPlateIndex];
-    setSimonPlayerInput(newInput);
-
-    // Validate against sequence
-    const expected = simonSequence[newInput.length - 1];
-    if (simonPlateIndex !== expected) {
-      // Wrong! Play error sound
+    if (!correct) {
+      // Mauvaise touche → flash rouge + game over
+      setSimonPhase('gameover');
       playErrorSound();
-      
-      // Flash red on wrong plate
       setPlateColor(plateIndex, '#ff0000', true);
       void sendColorToPlateImmediate({ r: 255, g: 0, b: 0 }, 100, plateId);
-      
       await new Promise(r => setTimeout(r, 300));
       void turnOffPlateImmediate(plateId);
-      
-      // Show game over animation
       await animateAllPlates('#ff0000', 200, 2);
-      
-      setSimonPhase('gameover');
-      const finalScore = simonScore + (simonLevel * 10);
+
+      const lvl = simonLevelRef.current;
+      const finalScore = simonScore + lvl * 10;
       setMessage(`Game Over! Score: ${finalScore}`);
-      award(finalScore, `Simon terminé! Niveau ${simonLevel} - +${finalScore} points.`);
-      
-      // Update high score
-      if (finalScore > simonHighScore) {
-        setSimonHighScore(finalScore);
-      }
-      
-      // Show game over popup
-      showGameOverPopup('Simon Memory', finalScore, `Niveau ${simonLevel} atteint`);
+      award(finalScore, `Simon terminé! Niveau ${lvl} - +${finalScore} points.`);
+      if (finalScore > simonHighScore) setSimonHighScore(finalScore);
+      showGameOverPopup('Simon Memory', finalScore, `Niveau ${lvl} atteint`);
       return;
     }
 
-    // Correct input - add points
+    // Bonne touche → points
     setSimonScore(prev => prev + 5);
 
-    // Check if sequence complete
-    if (newInput.length === simonSequence.length) {
-      // Level complete! Play win sound
+    // Séquence complète → niveau réussi
+    if (newInput.length === seq.length) {
+      // Bloque tout clic supplémentaire pendant la transition (anti faux game over)
+      setSimonPhase('showing');
       playWinSound();
-      
-      // Success animation
       await animateAllPlates('#00ff00', 150, 2);
-      
-      const bonus = simonLevel * 15;
-      const newScore = simonScore + bonus + (simonLevel * 10);
-      setSimonScore(newScore);
-      awardPoints(bonus, `Niveau ${simonLevel} réussi! +${bonus} points.`);
-      
-      setSimonLevel(simonLevel + 1);
-      setMessage(`Niveau ${simonLevel + 1}...`);
 
-      // Next level after delay
+      const lvl = simonLevelRef.current;
+      const bonus = lvl * 15;
+      setSimonScore(prev => prev + bonus + lvl * 10);
+      awardPoints(bonus, `Niveau ${lvl} réussi! +${bonus} points.`);
+      setMessage(`Niveau ${lvl} réussi !`);
+
+      // Niveau suivant (simonNextLevel gère l'incrément de niveau)
       window.setTimeout(() => {
         simonNextLevel();
       }, 1200);
@@ -5255,7 +5242,7 @@ export default function JeuxPage() {
                       <div style={{ display: 'flex', gap: 16 }}>
                         <div style={{ background: 'rgba(255,255,255,0.07)', borderRadius: 10, padding: '6px 14px', textAlign: 'center' }}>
                           <div style={{ fontSize: 10, color: '#888', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Niveau</div>
-                          <div style={{ fontSize: 22, fontWeight: 900, color: '#ef476f' }}>{simonLevel}</div>
+                          <div style={{ fontSize: 22, fontWeight: 900, color: '#ef476f' }}>{Math.max(1, simonLevel)}</div>
                         </div>
                         <div style={{ background: 'rgba(255,255,255,0.07)', borderRadius: 10, padding: '6px 14px', textAlign: 'center' }}>
                           <div style={{ fontSize: 10, color: '#888', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Score</div>
