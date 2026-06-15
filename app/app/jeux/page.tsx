@@ -3791,25 +3791,30 @@ export default function JeuxPage() {
     }
   }
 
-  function playTone(frequency: number, duration: number) {
+  /**
+   * Joue un bip court. `durationMs` est en MILLISECONDES (et borné à 1 s) :
+   * BUG corrigé — les appelants passaient des ms alors que l'API attendait des
+   * secondes, ce qui produisait des sons de plusieurs minutes (« son infini »).
+   */
+  function playTone(frequency: number, durationMs: number) {
     initAudio();
     const ctx = audioCtxRef.current;
     if (!ctx) return;
-    
+    if (ctx.state === 'suspended') { void ctx.resume().catch(() => {}); }
+
+    // ms -> s, borné entre 50 ms et 1 s (jamais de bip interminable).
+    const dur = Math.max(0.05, Math.min(1, durationMs / 1000));
+
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
-    
     osc.connect(gain);
     gain.connect(ctx.destination);
-    
     osc.frequency.value = frequency;
     osc.type = 'sine';
-    
     gain.gain.setValueAtTime(0.3, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + duration);
-    
+    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + dur);
     osc.start(ctx.currentTime);
-    osc.stop(ctx.currentTime + duration);
+    osc.stop(ctx.currentTime + dur);
   }
 
   function playErrorSound() {
@@ -3841,7 +3846,7 @@ export default function JeuxPage() {
     
     const freqs = [523.25, 659.25, 783.99, 1046.50];
     freqs.forEach((f, i) => {
-      setTimeout(() => playTone(f, 0.15), i * 100);
+      setTimeout(() => playTone(f, 150), i * 100); // 150 ms par note (arpège de victoire)
     });
   }
 
