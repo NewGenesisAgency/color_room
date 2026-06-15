@@ -15,7 +15,6 @@
 
 import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
-import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js';
 import gsap from 'gsap';
 import { LogIn, ArrowLeft } from 'lucide-react';
 
@@ -248,7 +247,9 @@ export default function Room3D({ plateColors, plateActive, onPlateClick, height 
 
     // ── Renderer ──────────────────────────────────────────────────
     const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    // Cap à 1.5 : sur tablette (écrans Retina dpr=2/3) ça divise par ~2-4 le
+    // nombre de pixels à dessiner → bien plus fluide, différence visuelle minime.
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
     renderer.setSize(W, H);
     renderer.setClearColor(0xffffff);
     renderer.shadowMap.enabled = true;
@@ -270,15 +271,12 @@ export default function Room3D({ plateColors, plateActive, onPlateClick, height 
     scene.add(pivot);
     pivotRef.current = pivot;
 
-    // ── HDR environment - async, doesn't block first frame ────────
-    let hdrTex: THREE.Texture | null = null;
-    new RGBELoader().load('/env.hdr', (tex) => {
-      tex.mapping = THREE.EquirectangularReflectionMapping;
-      scene.environment = tex;
-      hdrTex = tex;
-    });
-
-    // ── Textures ──────────────────────────────────────────────────
+    // ── Textures (minimales) ──────────────────────────────────────
+    // Optimisation : on ne charge PLUS env.hdr (708 Ko) ni floor.png (2,2 Mo)
+    // qui rendaient la scène noire le temps du téléchargement (surtout tablette).
+    // Seule la texture de mur (48 Ko) est conservée ; le sol est une couleur unie.
+    // Tous les matériaux ont une couleur de base → la pièce s'affiche INSTANTANÉMENT
+    // (jamais de noir), la texture du mur vient se poser dessus une fois chargée.
     const tl = new THREE.TextureLoader();
     const maxAniso = Math.min(renderer.capabilities.getMaxAnisotropy(), 4);
 
@@ -291,10 +289,8 @@ export default function Room3D({ plateColors, plateActive, onPlateClick, height 
       return t;
     }
 
-    // Wall texture repeated ~2×2 per room panel
+    // Seule texture conservée : le mur (légère, 48 Ko).
     const wallTex = loadTex('/textures/wall.jpg', 4, 3);
-    // Floor texture - 4×4 repeat as requested
-    const floorTex = loadTex('/textures/floor.png', 4, 4);
 
     // ── Glow halo texture ─────────────────────────────────────────
     const gc = document.createElement('canvas');
@@ -321,12 +317,13 @@ export default function Room3D({ plateColors, plateActive, onPlateClick, height 
 
     // ── Materials ─────────────────────────────────────────────────
     const wMat = new THREE.MeshStandardMaterial({
-      map: wallTex, roughness: 0.88, metalness: 0.0,
-      envMapIntensity: 0.15, side: THREE.DoubleSide,
+      color: 0xece9e4,          // couleur de base : visible immédiatement (jamais noir)
+      map: wallTex, roughness: 0.9, metalness: 0.0,
+      side: THREE.DoubleSide,
     });
     const fMat = new THREE.MeshStandardMaterial({
-      map: floorTex, roughness: 0.55, metalness: 0.0,
-      envMapIntensity: 0.30,
+      color: 0xf0eeea,          // sol en couleur unie (plus de PNG 2,2 Mo)
+      roughness: 0.6, metalness: 0.0,
     });
     const pMat = new THREE.MeshStandardMaterial({
       color: 0x080808, roughness: 0.08, metalness: 0.85,
@@ -523,8 +520,6 @@ export default function Room3D({ plateColors, plateActive, onPlateClick, height 
       gsap.killTweensOf(pivot.position);
       glowTex.dispose();
       wallTex.dispose();
-      floorTex.dispose();
-      hdrTex?.dispose();
       renderer.dispose();
       if (mount.contains(renderer.domElement)) mount.removeChild(renderer.domElement);
     };

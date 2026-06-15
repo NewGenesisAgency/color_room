@@ -5018,7 +5018,7 @@ export default function JeuxPage() {
                             onClick={() => pickGame(c)}
                             role="button" tabIndex={0}
                           >
-                            <div className="game-icon" style={{ background: c.iconBg }}>
+                            <div className="game-icon" style={{ background: c.iconBg, ['--g-glow' as string]: `${c.accent}55` } as React.CSSProperties}>
                               <c.Icon size={20} color={c.iconColor} />
                             </div>
                             <div style={{ flex: 1, minWidth: 0 }}>

@@ -683,6 +683,7 @@
 
 /* ---- Game card icon ---- */
 .jeux .game-icon {
+  --g-glow: rgba(67, 97, 238, 0.33);   /* halo coloré, surchargé en inline par jeu */
   position: relative;
   width: 44px;
   height: 44px;
@@ -692,24 +693,20 @@
   flex-shrink: 0;
   overflow: hidden;
   isolation: isolate;
-  /* Liquid glass : reflet interne en haut, fin liseré clair, ombre colorée douce */
+  /* Liquid glass : halo coloré diffus + reflet interne haut + anneau blanc net */
   box-shadow:
+    0 4px 14px var(--g-glow),
     inset 0 1px 0 rgba(255, 255, 255, 0.55),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.18),
-    0 4px 12px rgba(15, 23, 42, 0.22);
-  backdrop-filter: blur(6px) saturate(135%);
-  -webkit-backdrop-filter: blur(6px) saturate(135%);
+    0 0 0 2px rgba(255, 255, 255, 0.85);
   transition: transform 180ms cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 180ms ease;
 }
 
-/* Glaçure : highlight diagonal vitreux qui glisse sur le dégradé de fond */
+/* Glaçure : reflet diagonal vitreux (comme l'avatar Crown) */
 .jeux .game-icon::after {
   content: '';
   position: absolute;
   inset: 0;
-  background:
-    radial-gradient(120% 80% at 28% 0%, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0) 60%),
-    linear-gradient(150deg, rgba(255, 255, 255, 0.30) 0%, rgba(255, 255, 255, 0) 42%);
+  background: linear-gradient(150deg, rgba(255, 255, 255, 0.45) 0%, rgba(255, 255, 255, 0) 48%);
   pointer-events: none;
   z-index: 1;
 }
@@ -719,11 +716,11 @@
 
 /* Légère réaction quand on survole la carte de jeu */
 .jeux .game-card:hover .game-icon {
-  transform: translateY(-1px) scale(1.04);
+  transform: translateY(-1px) scale(1.05);
   box-shadow:
+    0 8px 22px var(--g-glow),
     inset 0 1px 0 rgba(255, 255, 255, 0.65),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.22),
-    0 8px 20px rgba(15, 23, 42, 0.30);
+    0 0 0 2px rgba(255, 255, 255, 0.95);
 }
 
 /* ---- Play button ---- */

@@ -781,6 +781,12 @@ function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * t;
 }
 
+/** Mélange deux couleurs hex selon un ratio 0..1 (t=0 → a, t=1 → b). */
+function mixHex(a: string, b: string, t: number): string {
+  const pa = hexToRgb(a), pb = hexToRgb(b);
+  return rgbToHex(lerp(pa.r, pb.r, t), lerp(pa.g, pb.g, t), lerp(pa.b, pb.b, t));
+}
+
 function lerpColor(a: string, b: string, t: number): string {
   const ra = hexToRgb(a);
   const rb = hexToRgb(b);
@@ -5342,6 +5348,7 @@ export default function EditeurPage() {
                 )}
                 {games.map((g) => {
                   const GIcon = GAME_ICON_MAP[g.icon ?? 'Lightbulb'] ?? Lightbulb;
+                  const accent = g.accentColor || '#7c3aed';
                   return (
                     <button
                       key={g.id}
@@ -5350,9 +5357,18 @@ export default function EditeurPage() {
                         commit((cur) => ({ ...cur, activeGameId: g.id, selectedNodeId: g.nodes[0]?.id ?? null }));
                         setStatus('Jeu sélectionné');
                       }}
-                      style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 10 }}
+                      style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '8px 10px', borderRadius: 10 }}
                     >
-                        <GIcon size={14} style={{ opacity: 0.6, flexShrink: 0 }} />
+                        {/* Pastille liquid glass (même style que l'avatar Crown / les cartes /jeux) */}
+                        <span style={{
+                          position: 'relative', display: 'inline-grid', placeItems: 'center',
+                          width: 30, height: 30, borderRadius: 9, flexShrink: 0, overflow: 'hidden',
+                          background: `linear-gradient(135deg, ${accent} 0%, ${mixHex(accent, '#ffffff', 0.25)} 100%)`,
+                          boxShadow: `0 3px 10px ${accent}55, inset 0 1px 0 rgba(255,255,255,0.55), 0 0 0 1.5px rgba(255,255,255,0.85)`,
+                        }}>
+                          <span style={{ position: 'absolute', inset: 0, background: 'linear-gradient(150deg, rgba(255,255,255,0.45) 0%, rgba(255,255,255,0) 48%)', pointerEvents: 'none' }} />
+                          <GIcon size={15} color="#fff" style={{ position: 'relative', zIndex: 1, flexShrink: 0 }} />
+                        </span>
                         <span className="list__title" style={{ flex: 1 }}>{g.name}</span>
                         <span className="list__meta" style={{ fontSize: 10 }}>{g.nodes.length}n · {g.tileCount ?? 42}d</span>
                     </button>
