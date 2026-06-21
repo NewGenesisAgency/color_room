@@ -70,14 +70,15 @@ h1,h2,h3,.disp,.big,.num,.lab,.toc .n{font-family:"Bricolage Grotesque","Inter",
 .body{flex:1;padding:22px 46px 40px;display:flex;gap:30px;min-height:0}
 .col{flex:1;min-width:0}
 ul{list-style:none;display:flex;flex-direction:column;gap:12px}
-li{font-size:16.5px;line-height:1.4;color:var(--ink2);display:flex;gap:11px;align-items:flex-start}
-li::before{content:"";width:7px;height:7px;border-radius:2px;background:var(--accent);margin-top:8px;flex-shrink:0}
+li{font-size:16.5px;line-height:1.45;color:var(--ink2);position:relative;padding-left:18px}
+li::before{content:"";position:absolute;left:0;top:9px;width:7px;height:7px;border-radius:2px;background:var(--accent)}
 li.sub{font-size:14.5px;color:var(--muted);margin-left:18px}
-li.sub::before{width:5px;height:5px;background:var(--muted)}
+li.sub::before{width:5px;height:5px;background:var(--muted);top:8px}
 b{color:var(--ink);font-weight:650}
 code{font-family:"Inter",Arial,sans-serif;font-size:.9em;font-weight:600;background:#f3f1ff;color:#5a43d6;padding:1px 7px;border-radius:6px}
 .pageno{position:absolute;bottom:16px;right:20px;font-size:11.5px;color:#aeb6c6;font-weight:500}
-.diagram{max-height:100%;max-width:100%;width:auto;display:block;margin:auto;border:1px solid var(--line);border-radius:10px;background:#fff}
+.diagram{max-height:100%;max-width:100%;width:auto;display:block;margin:auto;border:none;border-radius:8px;background:#fff}
+.dcard{background:#fff;border:1px solid var(--line);border-radius:16px;padding:16px;display:flex;align-items:center;justify-content:center;width:100%;height:100%;box-shadow:0 10px 28px rgba(17,19,26,.07)}
 .shot{width:100%;border-radius:12px;border:1px solid var(--line);box-shadow:0 10px 30px rgba(17,19,26,.12);display:block}
 .photo{border-radius:14px;border:1px solid rgba(255,255,255,.7);display:block;object-fit:cover;
     box-shadow:0 14px 38px rgba(17,19,26,.16),inset 0 1px 0 rgba(255,255,255,.4)}
@@ -189,9 +190,16 @@ def code_slide(kick,title,icon,bullets,filelabel,pre,ghpath,lines):
         f'<div class="body"><div class="col" style="flex:0 0 38%;display:flex;flex-direction:column;justify-content:center">{bullets}{src}</div>'
         f'<div class="col" style="flex:1;display:flex;align-items:center">{codecard}</div></div>')
 
-def diagram(kick,title,img,icon,me=False):
+def diagram(kick,title,img,icon,me=False,notes=None):
+    if not notes:
+        return slide(head(kick,title,icon,me)+
+            f'<div class="body" style="padding:16px 40px 34px;align-items:center;justify-content:center"><div class="dcard">'
+            f'<img class="diagram" src="{img}"></div></div>')
     return slide(head(kick,title,icon,me)+
-        f'<div class="body" style="padding:16px 40px 34px;align-items:center;justify-content:center"><img class="diagram" src="{img}"></div>')
+        f'<div class="body"><div class="col" style="flex:0 0 36%;display:flex;flex-direction:column;justify-content:center">{notes}</div>'
+        f'<div class="media"><div class="dcard"><img class="diagram" src="{img}"></div></div></div>')
+
+def nl(*items): return "<ul>"+"".join(f"<li>{x}</li>" for x in items)+"</ul>"
 
 def media_slide(kick,title,bullets,img,icon,me=True,ratio="0 0 40%"):
     return slide(head(kick,title,icon,me)+
@@ -265,7 +273,11 @@ S.append(slide(head("Le besoin","Problématique et objectifs","puzzle")+
    </div></div>'''))
 
 # 6 USE CASES
-S.append(diagram("Acteurs et fonctions attendues","Diagramme de cas d'utilisation",IMG['uc'],"users"))
+S.append(diagram("Acteurs et fonctions attendues","Diagramme de cas d'utilisation",IMG['uc'],"users",
+ notes=nl("Deux acteurs : <b>Enseignant</b> (crée et génère des jeux) et <b>Apprenant</b> (joue)",
+   "Les deux peuvent <b>Mesurer</b> avec le colorimètre CS-160",
+   "<i>Créer un jeu</i> <b>inclut</b> <i>Générer par IA</i>",
+   "<i>Jouer</i> et <i>Mesurer</i> <b>incluent</b> <i>Allumer les dalles</i>")))
 
 # 7 EQUIPE
 S.append(slide(head("8 étudiants · sous-équipes JavaScript et Python","Équipe et répartition","users",me=True)+
@@ -292,7 +304,11 @@ S.append(slide(head("Vue d'ensemble · diagramme de composants","Architecture lo
    <div class="media"><img class="diagram" src="{IMG['comp']}"></div></div>'''))
 
 # 9 CLASSES
-S.append(diagram("Conception orientée objet","Diagramme de classes",IMG['cls'],"boxes",me=True))
+S.append(diagram("Conception orientée objet","Diagramme de classes",IMG['cls'],"boxes",me=True,
+ notes=nl("Entités métier modélisées et <b>typées en TypeScript</b>",
+   "Utilisateur, Classe, Jeu, Score, Session…",
+   "Relations <b>1-N</b> (une classe regroupe plusieurs apprenants)",
+   "Vue <b>objet</b> du domaine, complémentaire du modèle relationnel")))
 
 # 10 CHOIX TECHNIQUES
 S.append(slide(head("React / Next.js / TypeScript vs JS + Node-RED","Choix techniques","code-xml",me=True)+
@@ -392,7 +408,11 @@ S.append(code_slide("Extrait de code · sécurité","Hachage des mots de passe (
  "lib/auth.ts","L19-L23"))
 
 # 16 SEQ AUTH
-S.append(diagram("Séquence · connexion","Authentification (PBKDF2 + cookie)",IMG['sauth'],"lock",me=True))
+S.append(diagram("Séquence · connexion","Authentification (PBKDF2 + cookie)",IMG['sauth'],"lock",me=True,
+ notes=nl("L'apprenant saisit identifiant + mot de passe",
+   "L'API recalcule le hash via <b>verifyPassword</b> (PBKDF2)",
+   "Si valide, création d'une <b>session</b> (token aléatoire)",
+   "Renvoi d'un cookie <b>HttpOnly + SameSite</b> (30 j glissants)")))
 
 # 17 GESTION
 S.append(media_slide("Ma partie · gestion","Comptes, classes, scores et tableau de bord",
@@ -409,10 +429,18 @@ S.append(media_slide("Ma partie · jeux solo","Les jeux et le pilotage des dalle
    <li class="sub">CHANNEL_PROFILES calés sur la longueur d'onde réelle</li></ul>''',IMG['cs'],"gamepad-2",ratio="0 0 40%"))
 
 # 19 SEQ JEU
-S.append(diagram("Séquence · exécution d'un jeu","Du clic joueur aux dalles",IMG['sjeu'],"gamepad-2",me=True))
+S.append(diagram("Séquence · exécution d'un jeu","Du clic joueur aux dalles",IMG['sjeu'],"gamepad-2",me=True,
+ notes=nl("Le joueur lance une partie depuis le catalogue",
+   "Le <b>runtime</b> parcourt le graphe de nœuds du jeu",
+   "Chaque nœud couleur appelle <b>/api/supervision</b>",
+   "Les <b>dalles</b> s'allument ; le score remonte à l'écran")))
 
 # 20 ETATS JEU
-S.append(diagram("Diagramme d'états","Cycle de vie d'une partie",IMG['ej'],"gamepad-2",me=True))
+S.append(diagram("Diagramme d'états","Cycle de vie d'une partie",IMG['ej'],"gamepad-2",me=True,
+ notes=nl("États : <b>Prête</b> → <b>En cours</b> → <b>Terminée</b>",
+   "Transitions : démarrer, jouer un coup, fin de partie",
+   "Calcul et enregistrement du <b>score</b> en fin de partie",
+   "Réinitialisation pour <b>rejouer</b>")))
 
 # 21 P4 IA
 S.append(media_slide("Ma partie · intelligence artificielle","Puissance 4 et son IA minimax",
@@ -446,7 +474,11 @@ S.append(media_slide("Ma partie · jeux en réseau","Les jeux multijoueur",
    <li><b>Heartbeat</b> de présence · jetons <b>UUID</b> · hôte = siège 1</li></ul>''',IMG['multi'],"users",ratio="0 0 48%"))
 
 # 23 SEQ MP
-S.append(diagram("Séquence · multijoueur","État partagé et interrogation périodique",IMG['smp'],"share-2",me=True))
+S.append(diagram("Séquence · multijoueur","État partagé et interrogation périodique",IMG['smp'],"share-2",me=True,
+ notes=nl("L'hôte crée une session et obtient un <b>code</b>",
+   "Les invités rejoignent en saisissant ce code",
+   "L'état est <b>persisté en base</b> (state_json)",
+   "Chaque client interroge <b>/state</b> en <b>polling</b> → écrans synchronisés")))
 
 # 24 MESURE
 S.append(media_slide("Ma partie · physique de la lumière","Mesure colorimétrique et chromaticité",
@@ -456,13 +488,25 @@ S.append(media_slide("Ma partie · physique de la lumière","Mesure colorimétri
    <li>32 canaux = <b>24 spectres étroits</b> (proche UV → proche IR) + <b>8 blancs</b></li></ul>''',IMG['chroma'],"palette",ratio="0 0 42%"))
 
 # 25 SEQ CS160
-S.append(diagram("Séquence · mesure","Pilotage du colorimètre CS-160",IMG['scs'],"palette",me=True))
+S.append(diagram("Séquence · mesure","Pilotage du colorimètre CS-160",IMG['scs'],"palette",me=True,
+ notes=nl("Connexion au CS-160 via le <b>pont .NET</b> (/api/CS160)",
+   "Allumage de la <b>dalle cible</b> à mesurer",
+   "Mesure : <b>tristimulus XYZ</b>, <b>Lv</b>, chromaticité <b>(x, y)</b>",
+   "Tracé du point sur le <b>diagramme CIE 1931</b>")))
 
 # 26 ETATS CS160
-S.append(diagram("Diagramme d'états","Cycle de mesure du CS-160",IMG['ecs'],"palette",me=True))
+S.append(diagram("Diagramme d'états","Cycle de mesure du CS-160",IMG['ecs'],"palette",me=True,
+ notes=nl("États : <b>Déconnecté</b> → <b>Connecté</b>",
+   "<b>Mesure en cours</b> → <b>Résultat</b> disponible",
+   "Gestion des <b>erreurs</b> (timeout, appareil absent)",
+   "Retour à l'état prêt pour une nouvelle mesure")))
 
 # 27 ACTIVITE REMAP
-S.append(diagram("Diagramme d'activité","Remappage des canaux LED",IMG['remap'],"share-2",me=True))
+S.append(diagram("Diagramme d'activité","Remappage des canaux LED",IMG['remap'],"share-2",me=True,
+ notes=nl("Entrée : une couleur <b>RGB</b> demandée par le jeu",
+   "Conversion vers les <b>32 canaux</b> de la plaque",
+   "Application des <b>profils</b> (longueur d'onde réelle)",
+   "Envoi de la trame au matériel (proxy supervision)")))
 
 # 28 DOC
 S.append(media_slide("Ma partie · qualité","Documentation et robustesse",
