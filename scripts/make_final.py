@@ -23,7 +23,7 @@ IMG={
  "erd":uml("ERD"),"sauth":uml("Seq_Auth"),"sjeu":uml("Seq_Jeu"),"scs":uml("Seq_CS160"),
  "smp":uml("Seq_MP"),"ej":uml("Etats_Jeu"),"ecs":uml("Etats_CS160"),"remap":uml("Activite_Remap"),
 }
-LOGOS={n:logo(n) for n in ["react","nextdotjs","typescript","sqlite","docker","threedotjs","nodedotjs","raspberrypi","javascript","nodered","greensock","lucide","ollama"]}
+LOGOS={n:logo(n) for n in ["react","nextdotjs","typescript","sqlite","docker","threedotjs","nodedotjs","raspberrypi","javascript","nodered","css","lucide","ollama"]}
 PHO={"lumen":photo("lumen.jpg"),"map":photo("map.jpg"),"plaque":photo("plaque.jpg"),"gantt":photo("gantt.png"),
      "colorroom":photo("colorroom.jpg"),"labcouleur":photo("labcouleur.jpg"),"supervision":photo("supervision.jpg")}
 
@@ -210,6 +210,11 @@ code{font-family:"Inter",Arial,sans-serif;font-size:.9em;font-weight:600;backgro
 .varc .vt .ic{width:18px;height:18px;color:var(--accent)}
 .varc p{font-size:12px;color:var(--muted);margin-top:5px;line-height:1.4}
 .varc code{font-size:10.5px}
+.codetrio{display:flex;gap:12px;width:100%;margin-top:4px}
+.codetrio .mc{flex:1;background:#0e1018;border:1px solid #1b1f2c;border-radius:11px;overflow:hidden}
+.codetrio .mc .mch{font-size:11px;font-weight:700;color:#aeb9d6;padding:7px 12px 0;letter-spacing:.02em}
+.codetrio .mc pre{margin:0;padding:7px 12px 11px;font-family:"Inter",Arial,sans-serif;font-size:10.5px;line-height:1.55;color:#d6def0;white-space:pre-wrap;word-break:break-word}
+.codetrio .mc .kw{color:#c792ea} .codetrio .mc .st{color:#86e0ad} .codetrio .mc .cm{color:#737d92} .codetrio .mc .fn{color:#82aaff} .codetrio .mc .nb{color:#f7c668}
 /* tableau comparatif Node-RED vs stack retenue */
 .cmptbl{display:grid;grid-template-columns:0.82fr 1.1fr 1.1fr;gap:10px;width:100%;align-self:center}
 .cmph{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;padding:13px 10px;border-radius:14px;
@@ -494,10 +499,10 @@ S.append(slide(head("Technologies mises en œuvre","La pile technique","boxes",m
  tech("typescript","TypeScript","5.5 · strict")+tech("nodedotjs","Node.js","runtime serveur")+
  tech("sqlite","SQLite","better-sqlite3 11.5")+tech("threedotjs","Three.js","0.160 · vue 3D")+
  tech("docker","Docker","multi-stage arm64")+tech("raspberrypi","Raspberry Pi","5 · cible")+
- tech("greensock","GSAP","animations 3D")+tech("lucide","Lucide","icônes")+
- tech("ollama","Ollama","IA locale (éditeur)")+
+ tech("css","CSS","langage de style")+tech("lucide","Lucide","icônes")+
+ tech("ollama","Ollama","exécution de modèles IA en local")+
  '</div>'
- '<div style="text-align:center;margin-top:14px;font-size:12.5px;color:var(--muted)">CSS <b>maison</b> (variables + design system, sans framework) · tests <b>Playwright</b></div>'
+ '<div style="text-align:center;margin-top:14px;font-size:12.5px;color:var(--muted)">Tests automatisés avec <b>Playwright</b></div>'
  '</div>'))
 
 # 12 RESEAU
@@ -578,7 +583,23 @@ S.append(slide(head("Typologie des variables et de la persistance","Gestion de l
  +varc("lock","Environnement","<code>process.env</code> : secrets (clé, mot de passe admin) via <code>.env</code>, hors Git.")
  +varc("share-2","Réactive","<code>useState</code> : déclenche le re-rendu de l'interface à chaque changement.")
  +varc("network","Concurrente","Sémaphore <code>HW_CONCURRENCY=2</code> : sérialise les accès au matériel. <code>batch</code>")
- +'</div><div style="font-size:13px;color:var(--muted)">Code détaillé des variables transactionnelle, atomique et volatile : <b>voir en annexes</b>.</div></div>'))
+ +'</div><div class="codetrio">'
+ '<div class="mc"><div class="mch">Transactionnelle</div><pre>'
+ '<span class="cm">// tout-ou-rien (ACID)</span>\n'
+ '<span class="kw">const</span> tx = db.<span class="fn">transaction</span>(() =&gt; {\n'
+ '  insertUser.<span class="fn">run</span>(...);  <span class="cm">// + adhésion classe</span>\n'
+ '});\n'
+ '<span class="fn">tx</span>();   <span class="cm">// BEGIN … COMMIT / ROLLBACK</span></pre></div>'
+ '<div class="mc"><div class="mch">Atomique</div><pre>'
+ '<span class="kw">let</span> hwInFlight = <span class="nb">0</span>;     <span class="cm">// compteur</span>\n'
+ '<span class="kw">if</span> (hwInFlight &lt; <span class="nb">2</span>)       <span class="cm">// 2 slots max</span>\n'
+ '  hwInFlight++;          <span class="cm">// accès matériel</span>\n'
+ '<span class="kw">else await</span> <span class="fn">waitQueue</span>();  <span class="cm">// sinon : file</span></pre></div>'
+ '<div class="mc"><div class="mch">Volatile</div><pre>'
+ '<span class="kw">const</span> [score, setScore] = <span class="fn">useState</span>(<span class="nb">0</span>); <span class="cm">// réactif</span>\n'
+ '<span class="kw">const</span> comboRef = <span class="fn">useRef</span>(<span class="nb">0</span>);  <span class="cm">// pur, sans re-render</span>\n'
+ 'comboRef.current++;          <span class="cm">// mutation directe</span></pre></div>'
+ '</div></div>'))
 
 # 16 SEQ AUTH
 S.append(diagram("Séquence · connexion","Authentification (PBKDF2 + cookie)",IMG['sauth'],"lock",me=True,
@@ -620,13 +641,13 @@ S.append(media_slide("Ma partie · intelligence artificielle","Puissance 4 et so
  '''<ul><li>Grille 6 colonnes × 7 lignes (42 cases) ; 2 joueurs ou contre l'ordinateur</li>
    <li>IA <b>hors-ligne</b> : <b>minimax</b> + <b>élagage alpha-bêta</b>, anti-piège</li>
    <li>Heuristique par <b>fenêtres de 4</b> (défense pondérée &gt; attaque) + poids central</li>
-   <li><b>5 niveaux</b> : profondeur <b>1 / 2 / 5 / 9 / 12</b> + bruit décroissant</li></ul>''',IMG['p4'],"bot",ratio="0 0 44%"))
+   <li><b>5 niveaux</b> de difficulté, réglés par <code>depth</code> et <code>noise</code></li></ul>''',IMG['p4'],"bot",ratio="0 0 44%"))
 
 # 21b CODE minimax
 S.append(code_slide("Extrait de code · IA","Évaluation minimax (alpha-bêta)","bot",
  '''<ul><li>Chaque fenêtre de 4 cases est notée du point de vue de l'IA</li>
    <li><b>Défense &gt; attaque</b> : un alignement adverse de 3 vaut -170, le mien +130</li>
-   <li>Victoire = <code>WIN_SCORE</code> (1 000 000) ; recherche bornée en profondeur</li></ul>''',
+   <li>Victoire = <code>WIN_SCORE</code> (1 000 000) ; difficulté via <code>depth</code> et <code>noise</code></li></ul>''',
  "app/app/_components/GamePuissance4.tsx",
  '''<span class="cm">// Note d'une fenêtre de 4 (défense &gt; attaque)</span>
 <span class="kw">function</span> <span class="fn">scoreWindow</span>(me, opp) {
@@ -636,7 +657,7 @@ S.append(code_slide("Extrait de code · IA","Évaluation minimax (alpha-bêta)",
   <span class="kw">if</span> (opp===<span class="nb">3</span>) <span class="kw">return</span> -<span class="nb">170</span>;    <span class="cm">// bloque la menace</span>
   ...
 }
-<span class="cm">// minimax + alpha-bêta · profondeur 1 → 12</span>''',
+<span class="cm">// minimax + alpha-bêta · réglé par depth et noise</span>''',
  "app/app/_components/GamePuissance4.tsx","L118-L129"))
 
 # 22 MULTIJOUEUR
