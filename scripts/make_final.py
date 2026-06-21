@@ -24,7 +24,8 @@ IMG={
  "smp":uml("Seq_MP"),"ej":uml("Etats_Jeu"),"ecs":uml("Etats_CS160"),"remap":uml("Activite_Remap"),
 }
 LOGOS={n:logo(n) for n in ["react","nextdotjs","typescript","sqlite","docker","threedotjs","nodedotjs","raspberrypi","javascript","nodered"]}
-PHO={"lumen":photo("lumen.jpg"),"map":photo("map.jpg"),"plaque":photo("plaque.jpg"),"gantt":photo("gantt.png")}
+PHO={"lumen":photo("lumen.jpg"),"map":photo("map.jpg"),"plaque":photo("plaque.jpg"),"gantt":photo("gantt.png"),
+     "colorroom":photo("colorroom.jpg"),"labcouleur":photo("labcouleur.jpg"),"supervision":photo("supervision.jpg")}
 
 # --- Sprite Lucide (icones officielles, ISC) ---
 def luc_inner(name):
@@ -321,24 +322,47 @@ S.append(slide(head("Le projet et son commanditaire","Contexte et partenaire","t
    <li>Commanditaire : laboratoire de recherche <b>ENTPE / LTDS</b>, équipe <b>BPMNP</b></li>
    <li>ColorRoom hébergée à <b>LUMEN – La Cité de la Lumière</b> (Lyon Confluence)</li>
    <li>Équipement scientifique : <b>2 cellules jumelles</b> d'analyse des effets colorés</li>
-   <li>Éclairages à <b>spectres précis</b> et hautes intensités</li>
-   <li class="sub">Contacts : M. Labayrade, M. Vella · Professeur : M. Delbosc</li></ul></div>
+   <li class="sub">Contacts : M. Labayrade, M. Vella · Professeur : M. Delbosc</li></ul>
+   <div style="margin-top:10px;font-size:11px;color:var(--muted);line-height:1.6">
+     <b>ENTPE</b> (École Nationale des Travaux Publics de l'État) · <b>LTDS</b> (Lab. de Tribologie et Dynamique des Systèmes)<br>
+     <b>BPMNP</b> (Bio-ingénierie, Perception, Mécanique Numérique) · <b>LUMEN</b> (Cité de la Lumière)
+   </div></div>
    <div class="media"><div class="photostack">
      <div><img class="photo" src="{PHO['lumen']}" style="width:100%;height:212px"><div class="cap">{ic("target")} LUMEN · Cité de la Lumière (Lyon Confluence)</div></div>
      <div><img class="photo" src="{PHO['map']}" style="width:100%;height:150px"><div class="cap">{ic("map-pin")} Implantation : LUMEN (Confluence) &amp; ENTPE (agglomération lyonnaise)</div></div>
    </div></div></div>'''))
 
-# 4 SYSTEME (vraie photo de la plaque + stats + RS-485)
-S.append(slide(head("Une installation lumineuse unique","Le système ColorRoom","cpu")+
+# 3b LA COLORROOM (vraies photos : cellules murs + plafond)
+S.append(media_slide("L'équipement existant : la ColorRoom","Deux cellules jumelles à visualiser",
+ f'''<ul><li><b>2 cellules jumelles</b> (2 salles d'analyse identiques)</li>
+   <li>Chaque cellule est tapissée de plaques sur les <b>murs</b> ET le <b>plafond</b></li>
+   <li><b>42 plaques</b> au total (<b>21 par cellule</b>) pilotées indépendamment</li>
+   <li>Permet de recréer des <b>ambiances lumineuses</b> à spectres précis</li>
+   <li class="sub">Photo réelle : panneaux allumés sur murs et plafond</li></ul>
+   <div style="margin-top:10px"><img class="photo" src="{PHO['labcouleur']}" style="width:100%;max-height:150px;object-fit:cover">
+   <div class="cap">{ic("target")} Laboratoire de la couleur · Campus Lumière</div></div>''',
+ PHO['colorroom'],"cpu",me=False,ratio="0 0 40%"))
+
+# 4 PLAQUE LUMINEUSE (photo + dimensions + specs)
+S.append(slide(head("La plaque lumineuse","Dimensions et caractéristiques","cpu")+
  f'''<div class="body"><div class="col" style="flex:0 0 34%;display:flex;flex-direction:column;justify-content:center">
-   <img class="photo" src="{PHO['plaque']}" style="width:100%;height:330px">
-   <div class="cap">{ic("zap")} LED en bandes sur les bords d'une plaque · 2360 LED, ~300 W</div></div>
+   <img class="photo" src="{PHO['plaque']}" style="width:100%;height:300px">
+   <div class="cap">{ic("zap")} LED en bandes sur les bords · dimensions <b>80 × 80 cm</b>, épaisseur ~<b>23 cm</b></div></div>
    <div class="col" style="flex:1"><div class="stats" style="grid-template-columns:repeat(2,1fr);gap:13px">
    <div class="stat"><div class="si">'''+ic("cpu")+'''</div><div class="num">42</div><div class="lbl">plaques (21 par cellule)</div></div>
    <div class="stat"><div class="si">'''+ic("palette")+'''</div><div class="num">32</div><div class="lbl">canaux = 24 spectres étroits + 8 blancs</div></div>
    <div class="stat"><div class="si">'''+ic("zap")+'''</div><div class="num">2360</div><div class="lbl">LED par plaque (~300 W max)</div></div>
-   <div class="stat"><div class="si">'''+ic("share-2")+'''</div><div class="num">RS-485</div><div class="lbl">bus de pilotage des dalles</div></div>
- </div></div></div>'''))
+   <div class="stat"><div class="si">'''+ic("boxes")+'''</div><div class="num">80×80</div><div class="lbl">cm par plaque (ép. ~23 cm)</div></div>
+ </div>
+ <div style="margin-top:13px;font-size:13px;color:var(--ink2);line-height:1.5">Pilotage en <b>RS-485</b> · spectre du <b>proche UV au proche IR</b> ; chaque plaque produit couleurs et intensités variées.</div></div></div>'''))
+
+# 4b APPLICATION DE SUPERVISION ACTUELLE
+S.append(media_slide("L'existant : l'application de supervision","Pourquoi un nouveau logiciel ?",
+ f'''<ul><li>Logiciel actuel <b>réservé aux chercheurs</b> de l'ENTPE</li>
+   <li>Pilotage brut : grille des plaques, <b>32 sliders</b> de canaux, courbe de <b>spectre</b></li>
+   <li><b>Trop complexe</b> pour une initiation : aucune dimension pédagogique</li>
+   <li class="sub">D'où ColorRoomGames : une couche <b>simple et ludique</b> par-dessus le matériel</li></ul>''',
+ PHO['supervision'],"flask-conical",me=False,ratio="0 0 38%"))
 
 # 5 PROBLEMATIQUE
 def frow(icon,text,b=False):
@@ -393,6 +417,7 @@ S.append(slide(head("Gestion de projet · méthode et outils","Agile, suivi clie
  '<div class="split">'
  f'<div class="col"><div class="lab a">{ic("target")}Méthode &amp; suivi</div><div class="feat">'
  +frow2("flask-conical","Démarche <b>agile</b> : développement <b>incrémental</b>, livraisons régulières, ajustements")
+ +frow2("layout-dashboard","Suivi des tâches via un <b>tableau Kanban</b> (À faire / En cours / Terminé)")
  +frow2("users","Échanges réguliers avec le <b>client M. Labayrade</b> (directeur du labo <b>BPMNP</b>)")
  +frow2("file-text","<b>Documentation</b> du projet rédigée par moi (guide technique, 15 diagrammes UML, notice)")
  +'</div></div>'
