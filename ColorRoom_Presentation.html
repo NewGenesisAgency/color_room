@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ColorRoom · Présentation BTS CIEL IR</title>
+<title>ColorRoom · Projet E6-2 · Téo Trompier (E2)</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -15,32 +15,30 @@
   }
   *{box-sizing:border-box;margin:0;padding:0;}
   body{background:linear-gradient(160deg,#10142a,#1b2235);
-       font-family:"Inter","Segoe UI",system-ui,-apple-system,sans-serif;
+       font-family:"Inter","Segoe UI",system-ui,sans-serif;
        padding:34px 0 70px;color:var(--slate);-webkit-font-smoothing:antialiased;}
   .deck{display:flex;flex-direction:column;align-items:center;gap:30px;}
   .slide{width:min(1180px,95vw);aspect-ratio:16/9;border-radius:22px;overflow:hidden;
          position:relative;box-shadow:0 30px 70px rgba(0,0,0,.5),0 0 0 1px rgba(255,255,255,.04);
-         background:#fbfcfe;padding:0;display:flex;flex-direction:column;}
+         background:#fbfcfe;display:flex;flex-direction:column;}
   .slide.dark{background:linear-gradient(155deg,#0f172a,#15203a);color:#fff;}
-  /* numero de diapo */
   .pageno{position:absolute;bottom:14px;right:18px;font-size:12px;color:var(--grey);opacity:.7;}
   .slide.dark .pageno{color:#7c8aa5;}
-  /* bandeau d'en-tete */
-  .head{background:var(--dark);color:#fff;padding:16px 26px 14px;display:flex;align-items:center;
+  .head{background:var(--dark);color:#fff;padding:15px 26px 13px;display:flex;align-items:center;
         gap:16px;border-bottom:4px solid var(--violet);}
   .head .num{width:42px;height:42px;border-radius:50%;background:var(--violet);color:#fff;
-        font-weight:800;font-size:20px;display:grid;place-items:center;flex-shrink:0;}
-  .head .kick{font-size:12px;font-weight:800;letter-spacing:.08em;color:var(--green);text-transform:uppercase;}
-  .head h2{font-size:25px;font-weight:800;line-height:1.1;}
-  .head .hicon{margin-left:auto;}
-  .body{flex:1;padding:26px 30px;display:flex;gap:26px;}
+        font-weight:800;font-size:19px;display:grid;place-items:center;flex-shrink:0;}
+  .head .kick{font-size:11.5px;font-weight:800;letter-spacing:.07em;color:var(--green);text-transform:uppercase;}
+  .head h2{font-size:24px;font-weight:800;line-height:1.1;}
+  .head .me{margin-left:auto;font-size:11px;font-weight:800;color:#fff;background:var(--violet);
+        border-radius:20px;padding:5px 12px;letter-spacing:.04em;}
+  .body{flex:1;padding:24px 30px;display:flex;gap:26px;}
   .col{flex:1;}
-  ul{list-style:none;display:flex;flex-direction:column;gap:11px;}
-  li{font-size:17px;line-height:1.35;display:flex;gap:9px;align-items:flex-start;}
+  ul{list-style:none;display:flex;flex-direction:column;gap:10px;}
+  li{font-size:16.5px;line-height:1.35;display:flex;gap:9px;align-items:flex-start;}
   li::before{content:"▸";color:var(--violet);font-weight:800;flex-shrink:0;}
-  li.sub{font-size:15px;color:var(--grey);margin-left:22px;}
+  li.sub{font-size:14.5px;color:var(--grey);margin-left:22px;}
   li.sub::before{content:"•";color:var(--grey);}
-  /* badge icone */
   .badge{display:inline-grid;place-items:center;border-radius:24%;flex-shrink:0;position:relative;overflow:hidden;
          background:linear-gradient(135deg,var(--c),color-mix(in srgb,var(--c),#fff 28%));
          box-shadow:0 4px 12px color-mix(in srgb,var(--c),transparent 65%),inset 0 1px 0 rgba(255,255,255,.5);}
@@ -48,81 +46,56 @@
   .badge svg{width:60%;height:60%;stroke:#fff;stroke-width:2;fill:none;
              stroke-linecap:round;stroke-linejoin:round;position:relative;z-index:1;}
   .badge svg .fill{fill:#fff;stroke:none;}
-  /* cartes */
-  .cards{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;width:100%;}
-  .fcard{background:var(--light);border:1.5px solid var(--c);border-radius:16px;padding:16px;display:flex;gap:12px;align-items:flex-start;}
+  .cards{display:grid;grid-template-columns:repeat(3,1fr);gap:15px;width:100%;}
+  .fcard{background:var(--light);border:1.5px solid var(--c);border-radius:16px;padding:15px;display:flex;gap:12px;align-items:flex-start;}
   .slide.dark .fcard{background:#172138;}
-  .fcard .badge{width:54px;height:54px;}
-  .fcard h3{font-size:16px;color:var(--c);margin-bottom:5px;}
-  .fcard p{font-size:13px;color:var(--grey);line-height:1.3;}
-  /* titre */
-  .title-wrap{flex:1;display:flex;flex-direction:column;justify-content:center;padding:0 60px;position:relative;}
-  .stripes{position:absolute;left:0;right:0;height:9px;display:flex;}
+  .fcard .badge{width:50px;height:50px;}
+  .fcard h3{font-size:15.5px;color:var(--c);margin-bottom:4px;}
+  .fcard p{font-size:12.5px;color:var(--grey);line-height:1.3;}
+  .title-wrap h1{font-size:62px;font-weight:900;color:#fff;line-height:1;margin:6px 0;letter-spacing:-.02em;}
+  .stripes{display:flex;border-radius:6px;overflow:hidden;}
   .stripes i{flex:1;height:9px;}
-  .title-wrap h1{font-size:64px;font-weight:800;color:#fff;line-height:1;margin:6px 0;}
-  .title-wrap .kick{color:var(--green);font-weight:800;letter-spacing:.06em;font-size:14px;}
-  .title-wrap .sub{color:#cbd5e1;font-size:21px;margin-top:8px;}
-  .title-wrap .sub small{color:var(--grey);font-size:15px;}
-  .title-wrap .by{margin-top:26px;color:#fff;font-size:16px;}
-  .title-wrap .by span{color:var(--grey);font-weight:400;}
-  /* grille LED */
-  .ledgrid{display:grid;grid-template-columns:repeat(6,1fr);grid-template-rows:repeat(7,1fr);
-           gap:8px;background:var(--dark);padding:14px;border-radius:14px;aspect-ratio:6/7;height:100%;}
-  .ledgrid i{border-radius:22%;position:relative;overflow:hidden;}
-  .ledgrid i::after{content:"";position:absolute;inset:0;background:linear-gradient(150deg,rgba(255,255,255,.4),transparent 50%);}
-  /* chiffres */
   .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;width:100%;align-self:center;}
   .stat{background:linear-gradient(160deg,#18233e,#141c30);border:1px solid rgba(255,255,255,.06);
-        border-radius:18px;padding:20px 22px;display:flex;flex-direction:column;gap:6px;min-height:148px;justify-content:center;}
-  .stat .badge{width:50px;height:50px;margin-bottom:6px;}
-  .stat .num{font-size:44px;font-weight:900;color:#fff;line-height:1;letter-spacing:-.02em;}
-  .stat .lbl{font-size:13.5px;color:#9fb0c9;font-weight:500;}
-  /* pipeline archi */
-  .flow{display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap;width:100%;}
-  .node{border-radius:14px;color:#fff;padding:14px 16px;text-align:center;min-width:120px;}
-  .node b{display:block;font-size:15px;}
-  .node small{font-size:10.5px;color:#e2e8f0;}
-  .arr{color:var(--grey);font-size:24px;font-weight:800;}
-  /* encadres */
-  .quote{background:var(--violet);color:#fff;border-radius:14px;padding:16px 20px;font-weight:700;font-size:17px;line-height:1.35;}
-  .band{border-radius:12px;color:#fff;font-weight:800;font-size:15px;padding:10px 14px;margin-bottom:12px;}
-  .codecard{background:var(--dark);border-radius:14px;padding:18px 20px;color:#cbd5e1;font-family:"Consolas",monospace;font-size:14px;line-height:1.7;}
+        border-radius:18px;padding:18px 20px;display:flex;flex-direction:column;gap:5px;min-height:140px;justify-content:center;}
+  .stat .badge{width:46px;height:46px;margin-bottom:5px;}
+  .stat .num{font-size:38px;font-weight:900;color:#fff;line-height:1;letter-spacing:-.02em;}
+  .stat .lbl{font-size:13px;color:#9fb0c9;font-weight:500;}
+  .flow{display:flex;align-items:center;justify-content:center;gap:7px;flex-wrap:wrap;width:100%;}
+  .node{border-radius:14px;color:#fff;padding:13px 15px;text-align:center;min-width:115px;}
+  .node b{display:block;font-size:14px;}
+  .node small{font-size:10px;color:#e2e8f0;}
+  .arr{color:var(--grey);font-size:22px;font-weight:800;}
+  .quote{background:var(--violet);color:#fff;border-radius:14px;padding:15px 20px;font-weight:700;font-size:16.5px;line-height:1.35;}
+  .band{border-radius:12px;color:#fff;font-weight:800;font-size:14.5px;padding:9px 14px;margin-bottom:11px;}
+  .codecard{background:var(--dark);border-radius:14px;padding:16px 18px;color:#cbd5e1;font-family:"Consolas",monospace;font-size:13px;line-height:1.7;}
   .codecard .c{color:var(--green);font-weight:700;}
   .codecard .w{color:#fff;}
-  /* mesure / cie */
-  .cie{width:100%;max-width:360px;}
-  /* phones */
-  .phones{display:flex;gap:18px;align-items:center;justify-content:center;flex-wrap:wrap;}
-  .phone{width:120px;height:230px;background:var(--dark);border:3px solid var(--slate);border-radius:26px;
-         display:flex;align-items:center;justify-content:center;}
-  .phone .screen{width:78px;height:120px;border-radius:16px;position:relative;overflow:hidden;}
-  .phone .screen::after{content:"";position:absolute;inset:0;background:linear-gradient(150deg,rgba(255,255,255,.4),transparent 50%);}
-  /* solutions */
-  .fix{display:flex;gap:10px;align-items:stretch;margin-bottom:12px;}
-  .fix .pb{flex:1;background:#fee2e2;color:var(--red);border-radius:12px;padding:12px 14px;font-weight:700;font-size:14px;display:flex;align-items:center;}
-  .fix .ar{display:grid;place-items:center;color:var(--grey);font-size:22px;font-weight:800;}
-  .fix .so{flex:1;background:#dcfce7;color:#15803d;border-radius:12px;padding:12px 14px;font-weight:700;font-size:13px;display:flex;align-items:center;gap:8px;}
+  .roles{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;width:100%;}
+  .role{border-radius:14px;padding:13px 16px;background:var(--light);border-left:5px solid var(--c);}
+  .role.me{background:#efeaff;border-left-color:var(--violet);box-shadow:0 4px 14px rgba(124,58,237,.18);}
+  .role b{font-size:15px;color:var(--dark);}
+  .role span{font-size:12.5px;color:var(--grey);display:block;margin-top:2px;}
+  .role .tag{display:inline-block;font-size:10px;font-weight:800;color:#fff;background:var(--violet);border-radius:12px;padding:2px 8px;margin-left:6px;}
+  .cie{width:100%;max-width:330px;}
   .center{align-items:center;justify-content:center;text-align:center;flex-direction:column;}
-  .big-merci{font-size:46px;font-weight:800;color:#fff;}
-  .toc{display:grid;grid-template-columns:1fr 1fr;gap:14px 40px;width:100%;}
-  .toc .it{display:flex;gap:12px;align-items:center;font-size:18px;font-weight:700;color:var(--slate);}
-  .toc .badge{width:46px;height:46px;}
-  /* impression : 1 diapo par page */
-  @media print{
-    body{background:#fff;padding:0;}
-    .deck{gap:0;}
-    .slide{width:100%;aspect-ratio:auto;height:100vh;border-radius:0;box-shadow:none;page-break-after:always;}
-  }
+  .big{font-size:46px;font-weight:900;color:#fff;letter-spacing:-.02em;}
+  .toc{display:grid;grid-template-columns:1fr 1fr;gap:12px 40px;width:100%;}
+  .toc .it{display:flex;gap:12px;align-items:center;font-size:17px;font-weight:700;color:var(--slate);}
+  .toc .badge{width:42px;height:42px;}
+  .fix{display:flex;gap:10px;align-items:stretch;margin-bottom:11px;}
+  .fix .pb{flex:1;background:#fee2e2;color:var(--red);border-radius:12px;padding:11px 14px;font-weight:700;font-size:13.5px;display:flex;align-items:center;}
+  .fix .ar{display:grid;place-items:center;color:var(--grey);font-size:20px;font-weight:800;}
+  .fix .so{flex:1.1;background:#dcfce7;color:#15803d;border-radius:12px;padding:11px 14px;font-weight:700;font-size:13px;display:flex;align-items:center;gap:8px;}
+  @media print{body{background:#fff;padding:0;}.deck{gap:0;}
+    .slide{width:100%;aspect-ratio:auto;height:100vh;border-radius:0;box-shadow:none;page-break-after:always;}}
 </style>
 </head>
 <body>
-<!-- ════════ SPRITE SVG (glyphes) ════════ -->
-<svg style="display:none" xmlns="http://www.w3.org/2000/svg">
+<svg style="display:none">
   <symbol id="g-play" viewBox="0 0 24 24"><polygon class="fill" points="8,5 19,12 8,19"/></symbol>
   <symbol id="g-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle class="fill" cx="12" cy="12" r="1.4"/></symbol>
-  <symbol id="g-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="6"/><circle class="fill" cx="12" cy="12" r="2"/>
-    <g><line x1="12" y1="3" x2="12" y2="5.5"/><line x1="12" y1="18.5" x2="12" y2="21"/><line x1="3" y1="12" x2="5.5" y2="12"/><line x1="18.5" y1="12" x2="21" y2="12"/>
-    <line x1="5.6" y1="5.6" x2="7.4" y2="7.4"/><line x1="16.6" y1="16.6" x2="18.4" y2="18.4"/><line x1="18.4" y1="5.6" x2="16.6" y2="7.4"/><line x1="7.4" y1="16.6" x2="5.6" y2="18.4"/></g></symbol>
+  <symbol id="g-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="6"/><circle class="fill" cx="12" cy="12" r="2"/><g><line x1="12" y1="3" x2="12" y2="5.5"/><line x1="12" y1="18.5" x2="12" y2="21"/><line x1="3" y1="12" x2="5.5" y2="12"/><line x1="18.5" y1="12" x2="21" y2="12"/><line x1="5.6" y1="5.6" x2="7.4" y2="7.4"/><line x1="16.6" y1="16.6" x2="18.4" y2="18.4"/><line x1="18.4" y1="5.6" x2="16.6" y2="7.4"/><line x1="7.4" y1="16.6" x2="5.6" y2="18.4"/></g></symbol>
   <symbol id="g-network" viewBox="0 0 24 24"><line x1="12" y1="6.5" x2="6.5" y2="16"/><line x1="12" y1="6.5" x2="17.5" y2="16"/><line x1="6.5" y1="16" x2="17.5" y2="16"/><circle class="fill" cx="12" cy="6.5" r="2.2"/><circle class="fill" cx="6.5" cy="16" r="2.2"/><circle class="fill" cx="17.5" cy="16" r="2.2"/></symbol>
   <symbol id="g-code" viewBox="0 0 24 24"><polyline points="9,7 4.5,12 9,17"/><polyline points="15,7 19.5,12 15,17"/></symbol>
   <symbol id="g-puzzle" viewBox="0 0 24 24"><rect x="6.5" y="6.5" width="11" height="11" rx="1.4"/><circle class="fill" cx="12" cy="5.5" r="2"/><circle class="fill" cx="18.5" cy="12" r="2"/></symbol>
@@ -137,419 +110,431 @@
   <symbol id="g-bolt" viewBox="0 0 24 24"><polygon class="fill" points="13,4 7,13 11,13 10,20 17,10 13,10"/></symbol>
   <symbol id="g-check" viewBox="0 0 24 24"><polyline points="6,12.5 10,16.5 18,7.5" stroke-width="2.6"/></symbol>
   <symbol id="g-users" viewBox="0 0 24 24"><circle cx="9.5" cy="9" r="2.4"/><circle cx="15" cy="9" r="2.4"/><path d="M5.5 18 a4 4 0 0 1 8 0"/><path d="M12.5 18 a4 4 0 0 1 6.5 -3.2"/></symbol>
+  <symbol id="g-brain" viewBox="0 0 24 24"><path d="M9 5 a3 3 0 0 0 -3 3 a3 3 0 0 0 -1 5 a3 3 0 0 0 4 4 V5z"/><path d="M15 5 a3 3 0 0 1 3 3 a3 3 0 0 1 1 5 a3 3 0 0 1 -4 4 V5z"/></symbol>
+  <symbol id="g-db" viewBox="0 0 24 24"><ellipse cx="12" cy="6" rx="6.5" ry="2.6"/><path d="M5.5 6 V12 a6.5 2.6 0 0 0 13 0 V6"/><path d="M5.5 12 V18 a6.5 2.6 0 0 0 13 0 V12"/></symbol>
 </svg>
 
 <div class="deck">
 
 <!-- 1 TITRE -->
 <section class="slide dark">
-  <div class="title-wrap" style="flex-direction:row;padding:0;">
-    <div style="flex:1;padding:0 0 0 60px;display:flex;flex-direction:column;justify-content:center;">
-      <div class="kick">PROJET BTS CIEL · OPTION INFORMATIQUE &amp; RÉSEAUX</div>
-      <h1>ColorRoom</h1>
-      <div class="stripes" style="position:static;max-width:560px;margin:14px 0;border-radius:6px;overflow:hidden;">
-        <i style="background:var(--indigo)"></i><i style="background:var(--violet)"></i><i style="background:var(--pink)"></i>
-      </div>
-      <div class="sub">Serious games interactifs sur 42 dalles LED pilotées en réseau<br>
-        <small>Application web embarquée sur Raspberry Pi · pilotage et mesure de la lumière</small></div>
-      <div class="by">Présenté par : <span>[Ton Prénom NOM]</span><br>
-        <span style="font-size:14px">Session 2026 · Lycée Édouard Branly · LUMEN Campus Lumière · ENTPE / LTDS</span></div>
+  <div class="body" style="padding:0;align-items:stretch;">
+    <div style="flex:1.4;padding:0 0 0 58px;display:flex;flex-direction:column;justify-content:center;">
+      <div class="head" style="background:none;border:none;padding:0;display:block;"><span class="kick">BTS CIEL · OPTION A INFORMATIQUE & RÉSEAUX · ÉPREUVE E6-2 · SESSION 2026</span></div>
+      <h1 class="title-wrap-h1" style="font-size:62px;font-weight:900;color:#fff;line-height:1;margin:8px 0;letter-spacing:-.02em;">ColorRoom</h1>
+      <div class="stripes" style="max-width:520px;margin:10px 0 16px;"><i style="background:var(--indigo)"></i><i style="background:var(--violet)"></i><i style="background:var(--pink)"></i></div>
+      <div style="color:#cbd5e1;font-size:21px;font-weight:600;">Serious games pédagogiques sur les plaques lumineuses de la ColorRoom</div>
+      <div style="color:#8194ad;font-size:15px;margin-top:6px;">Application web embarquée sur Raspberry Pi · pilotage et mesure de la lumière</div>
+      <div style="margin-top:24px;color:#fff;font-size:17px;font-weight:700;">Téo Trompier <span style="color:var(--green)">· partie E2</span></div>
+      <div style="color:#8194ad;font-size:13.5px;margin-top:4px;">Équipe JavaScript · Lycée Édouard Branly, Lyon<br>Partenaires : LUMEN – La Cité de la Lumière · ENTPE / LTDS / BPMNP</div>
     </div>
-    <div style="width:330px;padding:24px;"><div class="ledgrid" id="led1"></div></div>
+    <div style="flex:1;background:linear-gradient(160deg,#141c30,#0c1322);display:grid;place-items:center;">
+      <div id="led1" style="display:grid;grid-template-columns:repeat(6,1fr);grid-template-rows:repeat(7,1fr);gap:7px;width:74%;aspect-ratio:6/7;"></div>
+    </div>
   </div>
-  <div class="pageno">1 / 21</div>
+  <div class="pageno">1 / 22</div>
 </section>
 
 <!-- 2 SOMMAIRE -->
 <section class="slide">
   <div class="body" style="flex-direction:column;">
-    <h2 style="font-size:32px;color:var(--dark);border-left:6px solid var(--violet);padding-left:14px;margin-bottom:8px;">Sommaire</h2>
+    <h2 style="font-size:30px;color:var(--dark);border-left:6px solid var(--violet);padding-left:14px;margin-bottom:6px;">Sommaire</h2>
     <div class="toc">
-      <div class="it"><span class="badge" style="--c:var(--indigo)"><svg><use href="#g-play"/></svg></span>1. Contexte et commanditaire</div>
-      <div class="it"><span class="badge" style="--c:var(--pink)"><svg><use href="#g-target"/></svg></span>2. Problématique et objectifs</div>
-      <div class="it"><span class="badge" style="--c:var(--slate)"><svg><use href="#g-gear"/></svg></span>3. Cahier des charges</div>
-      <div class="it"><span class="badge" style="--c:var(--cyan)"><svg><use href="#g-network"/></svg></span>4. Architecture et réseau</div>
-      <div class="it"><span class="badge" style="--c:var(--violet)"><svg><use href="#g-code"/></svg></span>5. Choix techniques et stack</div>
-      <div class="it"><span class="badge" style="--c:var(--violet)"><svg><use href="#g-puzzle"/></svg></span>6. Fonctionnalités du projet</div>
-      <div class="it"><span class="badge" style="--c:var(--pink)"><svg><use href="#g-robot"/></svg></span>7. Éditeur, IA et mesure</div>
-      <div class="it"><span class="badge" style="--c:var(--slate)"><svg><use href="#g-lock"/></svg></span>8. Sécurité</div>
-      <div class="it"><span class="badge" style="--c:var(--slate)"><svg><use href="#g-doc"/></svg></span>9. Gestion de projet</div>
-      <div class="it"><span class="badge" style="--c:var(--indigo)"><svg><use href="#g-chart"/></svg></span>10. Bilan et perspectives</div>
+      <div class="it"><span class="badge" style="--c:var(--indigo)"><svg><use href="#g-target"/></svg></span>1. Contexte, partenaire et système</div>
+      <div class="it"><span class="badge" style="--c:var(--pink)"><svg><use href="#g-gear"/></svg></span>2. Problématique et cahier des charges</div>
+      <div class="it"><span class="badge" style="--c:var(--cyan)"><svg><use href="#g-users"/></svg></span>3. Équipe et répartition (ma partie E2)</div>
+      <div class="it"><span class="badge" style="--c:var(--violet)"><svg><use href="#g-code"/></svg></span>4. Architecture et choix techniques</div>
+      <div class="it"><span class="badge" style="--c:var(--indigo)"><svg><use href="#g-container"/></svg></span>5. Réseau et déploiement</div>
+      <div class="it"><span class="badge" style="--c:var(--violet)"><svg><use href="#g-palette"/></svg></span>6. Interface, base de données, sécurité</div>
+      <div class="it"><span class="badge" style="--c:var(--green)"><svg><use href="#g-play"/></svg></span>7. Jeux solo, IA et multijoueur</div>
+      <div class="it"><span class="badge" style="--c:var(--amber)"><svg><use href="#g-palette"/></svg></span>8. Mesure colorimétrique et CIE</div>
+      <div class="it"><span class="badge" style="--c:var(--slate)"><svg><use href="#g-doc"/></svg></span>9. Documentation et robustesse</div>
+      <div class="it"><span class="badge" style="--c:var(--indigo)"><svg><use href="#g-chart"/></svg></span>10. Difficultés, bilan et démo</div>
     </div>
   </div>
-  <div class="pageno">2 / 21</div>
+  <div class="pageno">2 / 22</div>
 </section>
 
 <!-- 3 CONTEXTE -->
 <section class="slide">
-  <div class="head"><div class="num">1</div><div><div class="kick">Le projet</div><h2>Contexte et commanditaire</h2></div>
-    <span class="badge hicon" style="--c:var(--indigo);width:54px;height:54px"><svg><use href="#g-play"/></svg></span></div>
+  <div class="head"><div class="num">1</div><div><div class="kick">Le projet et son commanditaire</div><h2>Contexte et partenaire</h2></div></div>
   <div class="body">
     <div class="col"><ul>
-      <li>La ColorRoom : une salle de 42 dalles LED RVB pilotables une par une</li>
-      <li>Commanditaire : LUMEN Campus Lumière (Lyon), avec l'ENTPE et le laboratoire LTDS</li>
-      <li>But : des serious games pour sensibiliser à la couleur, la lumière et la perception</li>
-      <li class="sub">Public : étudiants, visiteurs, démonstrations pédagogiques</li>
-      <li>Le matériel existait : il fallait le logiciel pour l'animer et le rendre utile</li>
+      <li>Commanditaire : laboratoire de recherche <b>ENTPE / LTDS / équipe BPMNP</b></li>
+      <li>La <b>ColorRoom</b> est hébergée à <b>LUMEN – La Cité de la Lumière</b> (Lyon Confluence)</li>
+      <li>Équipement scientifique : <b>2 cellules jumelles</b> d'analyse des effets colorés</li>
+      <li>Reproduit des éclairages à spectres très précis et hautes intensités</li>
+      <li class="sub">Contacts : M. Labayrade, M. Vella · Professeur : M. Delbosc</li>
     </ul></div>
-    <div style="width:300px"><div class="ledgrid" id="led2"></div></div>
+    <div style="width:300px;display:grid;place-items:center;background:var(--dark);border-radius:16px;margin:4px 0;">
+      <div id="led2" style="display:grid;grid-template-columns:repeat(6,1fr);grid-template-rows:repeat(7,1fr);gap:6px;width:80%;aspect-ratio:6/7;"></div>
+    </div>
   </div>
-  <div class="pageno">3 / 21</div>
+  <div class="pageno">3 / 22</div>
 </section>
 
-<!-- 4 CHIFFRES -->
+<!-- 4 LE SYSTEME (chiffres) -->
 <section class="slide dark">
-  <div style="padding:18px 30px 6px"><div class="kick" style="color:var(--green);font-size:12px;font-weight:800;letter-spacing:.08em">EN BREF</div>
-    <h2 style="font-size:26px">Chiffres clés du projet</h2></div>
-  <div class="body" style="align-content:center;"><div class="stats">
-    <div class="stat"><span class="badge" style="--c:var(--indigo)"><svg><use href="#g-cube"/></svg></span><div><div class="num">42</div><div class="lbl">dalles LED RVB</div></div></div>
-    <div class="stat"><span class="badge" style="--c:var(--violet)"><svg><use href="#g-container"/></svg></span><div><div class="num">4</div><div class="lbl">conteneurs Docker</div></div></div>
-    <div class="stat"><span class="badge" style="--c:var(--pink)"><svg><use href="#g-puzzle"/></svg></span><div><div class="num">190</div><div class="lbl">blocs dans l'éditeur</div></div></div>
-    <div class="stat"><span class="badge" style="--c:var(--green)"><svg><use href="#g-robot"/></svg></span><div><div class="num">2</div><div class="lbl">moteurs d'IA (cloud + local)</div></div></div>
-    <div class="stat"><span class="badge" style="--c:var(--amber)"><svg><use href="#g-play"/></svg></span><div><div class="num">6</div><div class="lbl">jeux intégrés</div></div></div>
-    <div class="stat"><span class="badge" style="--c:var(--cyan)"><svg><use href="#g-network"/></svg></span><div><div class="num">1</div><div class="lbl">Raspberry Pi autonome</div></div></div>
+  <div style="padding:18px 30px 4px"><div class="kick" style="color:var(--green);font-size:11.5px;font-weight:800;letter-spacing:.07em">LE SYSTÈME COLORROOM</div>
+    <h2 style="font-size:24px">Une installation lumineuse unique</h2></div>
+  <div class="body" style="align-items:center;"><div class="stats">
+    <div class="stat"><span class="badge" style="--c:var(--indigo)"><svg><use href="#g-cube"/></svg></span><div class="num">42</div><div class="lbl">plaques lumineuses (dalles)</div></div>
+    <div class="stat"><span class="badge" style="--c:var(--violet)"><svg><use href="#g-palette"/></svg></span><div class="num">32</div><div class="lbl">canaux LED par dalle</div></div>
+    <div class="stat"><span class="badge" style="--c:var(--cyan)"><svg><use href="#g-bolt"/></svg></span><div class="num">404→780</div><div class="lbl">spectre couvert (nm)</div></div>
+    <div class="stat"><span class="badge" style="--c:var(--green)"><svg><use href="#g-network"/></svg></span><div class="num">2</div><div class="lbl">cellules jumelles</div></div>
+    <div class="stat"><span class="badge" style="--c:var(--amber)"><svg><use href="#g-container"/></svg></span><div class="num">1</div><div class="lbl">Raspberry Pi 5 autonome</div></div>
+    <div class="stat"><span class="badge" style="--c:var(--pink)"><svg><use href="#g-play"/></svg></span><div class="num">7+</div><div class="lbl">jeux éducatifs</div></div>
   </div></div>
-  <div class="pageno">4 / 21</div>
+  <div class="pageno">4 / 22</div>
 </section>
 
-<!-- 5 PROBLEMATIQUE -->
+<!-- 5 PROBLEMATIQUE + CDC -->
 <section class="slide">
-  <div class="head"><div class="num">2</div><div><div class="kick">Le besoin</div><h2>Problématique et objectifs</h2></div>
-    <span class="badge hicon" style="--c:var(--pink);width:54px;height:54px"><svg><use href="#g-target"/></svg></span></div>
-  <div class="body" style="flex-direction:column;">
-    <div class="quote">Comment piloter et mesurer la lumière de 42 dalles LED, tout en proposant des jeux éducatifs créables facilement, sur un système autonome et hors ligne ?</div>
-    <ul style="margin-top:6px">
-      <li><span class="badge" style="--c:var(--cyan);width:34px;height:34px"><svg><use href="#g-network"/></svg></span>Piloter les dalles en temps réel via le réseau (couleur, intensité)</li>
-      <li><span class="badge" style="--c:var(--amber);width:34px;height:34px"><svg><use href="#g-palette"/></svg></span>Mesurer réellement la lumière émise (colorimètre Konica CS-160)</li>
-      <li><span class="badge" style="--c:var(--violet);width:34px;height:34px"><svg><use href="#g-puzzle"/></svg></span>Offrir des jeux et un éditeur pour en créer sans coder</li>
-      <li><span class="badge" style="--c:var(--indigo);width:34px;height:34px"><svg><use href="#g-container"/></svg></span>Fonctionner 100 % en local sur Raspberry Pi</li>
-      <li><span class="badge" style="--c:var(--green);width:34px;height:34px"><svg><use href="#g-phone"/></svg></span>Multijoueur : chaque joueur pilote une dalle depuis son téléphone</li>
-    </ul>
+  <div class="head"><div class="num">2</div><div><div class="kick">Le besoin</div><h2>Problématique et cahier des charges</h2></div></div>
+  <div class="body" style="flex-direction:column;gap:14px;">
+    <div class="quote">Le logiciel de recherche de la ColorRoom est trop complexe pour l'initiation. Comment rendre la salle accessible à des apprenants, de façon ludique et pédagogique ?</div>
+    <div style="display:flex;gap:26px;">
+      <div class="col">
+        <div style="font-weight:800;color:var(--violet);margin-bottom:8px;">Objectif</div>
+        <ul><li>Une série de <b>serious games</b> pour découvrir la lumière et la couleur</li>
+          <li>Utilisable depuis un simple navigateur, sans installation côté client</li>
+          <li>Adaptable à une seule plaque lumineuse</li></ul>
+      </div>
+      <div class="col">
+        <div style="font-weight:800;color:var(--pink);margin-bottom:8px;">Contraintes</div>
+        <ul><li>Déploiement sur <b>Raspberry Pi 5 + SSD</b>, conteneurisation Docker imposée</li>
+          <li>Fonctionnement <b>hors-ligne</b> (réseau local)</li>
+          <li>Latence des plaques (~dizaines de ms) à compenser</li>
+          <li>Création de jeux <b>no-code</b> par l'enseignant</li></ul>
+      </div>
+    </div>
   </div>
-  <div class="pageno">5 / 21</div>
+  <div class="pageno">5 / 22</div>
 </section>
 
-<!-- 6 CAHIER DES CHARGES -->
+<!-- 6 EQUIPE / REPARTITION -->
 <section class="slide">
-  <div class="head"><div class="num">3</div><div><div class="kick">Cadre technique</div><h2>Cahier des charges et contraintes</h2></div>
-    <span class="badge hicon" style="--c:var(--slate);width:54px;height:54px"><svg><use href="#g-gear"/></svg></span></div>
-  <div class="body">
-    <div class="col">
-      <h3 style="color:var(--violet);font-size:18px;margin-bottom:10px;display:flex;gap:8px;align-items:center"><span class="badge" style="--c:var(--violet);width:30px;height:30px"><svg><use href="#g-puzzle"/></svg></span>Exigences fonctionnelles</h3>
-      <ul><li>Jeux jouables sur les dalles et la tablette</li><li>Éditeur low-code (blocs) + Python / JS</li>
-        <li>Mode multijoueur en réseau local</li><li>Mesure colorimétrique et diagramme CIE</li><li>Administration (comptes, classes, scores)</li></ul>
+  <div class="head"><div class="num">3</div><div><div class="kick">8 étudiants · 2 sous-équipes (JavaScript & Python)</div><h2>Équipe et répartition des tâches</h2></div><span class="me">MA PARTIE : E2</span></div>
+  <div class="body" style="flex-direction:column;gap:12px;">
+    <div class="roles">
+      <div class="role" style="--c:var(--indigo)"><b>E1 · Maxime Bonnevay</b><span>Infrastructure Pi & Docker, CI/CD, intégration colorimètre, sécurité, notice d'installation</span></div>
+      <div class="role me"><b>E2 · Téo Trompier <span class="tag">MOI</span></b><span>Base de données, API REST, UI/UX & design, jeux solo + multijoueur, proxy LED, documentation</span></div>
+      <div class="role" style="--c:var(--green)"><b>E3 · Ilyes Arbadji</b><span>Éditeur de jeux no-code (ReactFlow), catalogue de nœuds, moteur d'exécution, aperçu 3D</span></div>
+      <div class="role" style="--c:var(--amber)"><b>E4 · Hasan Akyuz</b><span>Tests de l'API, simulateur de plaques, Swagger/Postman, fiches de recette</span></div>
     </div>
-    <div class="col">
-      <h3 style="color:var(--pink);font-size:18px;margin-bottom:10px;display:flex;gap:8px;align-items:center"><span class="badge" style="--c:var(--pink);width:30px;height:30px"><svg><use href="#g-lock"/></svg></span>Contraintes techniques</h3>
-      <ul><li>Cible : Raspberry Pi (ressources limitées)</li><li>Fonctionnement hors ligne possible</li>
-        <li>API Supervision imposée pour les dalles</li><li>Colorimètre Konica Minolta CS-160 (SDK)</li><li>Déploiement reproductible et maintenable</li></ul>
+    <div style="font-size:13.5px;color:var(--grey);background:var(--light);border-radius:12px;padding:10px 14px;">
+      <b style="color:var(--slate)">Ma contribution (E2)</b> : tout le cœur de l'application web (données, interface, jeux et réseau) sur lequel s'appuient les autres parties (l'éditeur de E3 et les tests de E4).
     </div>
   </div>
-  <div class="pageno">6 / 21</div>
+  <div class="pageno">6 / 22</div>
 </section>
 
 <!-- 7 ARCHITECTURE -->
 <section class="slide">
-  <div class="head"><div class="num">4</div><div><div class="kick">Vue d'ensemble</div><h2>Architecture générale</h2></div>
-    <span class="badge hicon" style="--c:var(--cyan);width:54px;height:54px"><svg><use href="#g-network"/></svg></span></div>
+  <div class="head"><div class="num">4</div><div><div class="kick">Vue d'ensemble</div><h2>Architecture en couches</h2></div><span class="me">E2</span></div>
   <div class="body" style="flex-direction:column;justify-content:center;gap:18px;">
     <div class="flow">
-      <div class="node" style="background:var(--indigo)"><b>Tablette / PC</b><small>Navigateur</small></div><span class="arr">→</span>
-      <div class="node" style="background:var(--violet)"><b>App ColorRoom</b><small>Next.js · Docker · Pi</small></div><span class="arr">→</span>
-      <div class="node" style="background:var(--slate)"><b>API Supervision</b><small>HTTP local</small></div><span class="arr">→</span>
-      <div class="node" style="background:var(--green)"><b>42 dalles</b><small>LED RVB</small></div>
+      <div class="node" style="background:var(--indigo)"><b>Navigateur</b><small>Tablette / PC (Wi-Fi local)</small></div><span class="arr">→</span>
+      <div class="node" style="background:var(--violet)"><b>Next.js</b><small>UI React + routes API</small></div><span class="arr">→</span>
+      <div class="node" style="background:var(--slate)"><b>Couche lib/</b><small>auth · db · services</small></div><span class="arr">→</span>
+      <div class="node" style="background:var(--amber)"><b>SQLite</b><small>better-sqlite3</small></div>
     </div>
     <div class="flow">
-      <div class="node" style="background:var(--amber)"><b>SQLite</b><small>jeux · scores · users</small></div>
-      <div class="node" style="background:var(--pink)"><b>IA</b><small>Gemini ou Ollama</small></div>
-      <div class="node" style="background:var(--slate)"><b>CS-160</b><small>colorimètre USB</small></div>
+      <div class="node" style="background:var(--cyan)"><b>Proxy supervision</b><small>pilotage des 42 dalles</small></div>
+      <div class="node" style="background:var(--green)"><b>Pont CS-160</b><small>colorimètre (USB)</small></div>
+      <div class="node" style="background:var(--pink)"><b>Three.js</b><small>vue 3D de la salle</small></div>
     </div>
-    <p style="text-align:center;color:var(--grey);font-size:14px;max-width:900px;margin:0 auto;">Tout est conteneurisé (Docker Compose) et tourne en local sur le Pi. L'IA cloud (Gemini) est optionnelle : le local (Ollama) prend le relais hors ligne.</p>
+    <p style="text-align:center;color:var(--grey);font-size:14px;max-width:920px;margin:0 auto;">Un serveur unique conteneurisé (Docker) sur le Raspberry Pi 5 : le navigateur appelle les routes d'API Next.js, qui s'appuient sur SQLite et sur le matériel via des proxys. Tout fonctionne hors-ligne.</p>
   </div>
-  <div class="pageno">7 / 21</div>
+  <div class="pageno">7 / 22</div>
 </section>
 
-<!-- 8 CHOIX TECHNIQUES -->
+<!-- 8 CHOIX TECHNIQUES vs Node-RED -->
 <section class="slide">
-  <div class="head"><div class="num">5</div><div><div class="kick">La stack</div><h2>Choix techniques justifiés</h2></div>
-    <span class="badge hicon" style="--c:var(--violet);width:54px;height:54px"><svg><use href="#g-code"/></svg></span></div>
-  <div class="body" style="flex-direction:column;gap:10px;justify-content:center;">
-    <div class="trow" style="display:flex;gap:14px;align-items:center;background:#fff;border-radius:12px;padding:10px 14px;"><span class="badge" style="--c:var(--indigo);width:42px;height:42px"><svg><use href="#g-cube"/></svg></span><b style="color:var(--violet);width:280px">Next.js / React + TypeScript</b><span style="color:var(--slate)">Front et back dans un seul projet, typage strict, moins de bugs</span></div>
-    <div class="trow" style="display:flex;gap:14px;align-items:center;background:var(--card);border-radius:12px;padding:10px 14px;"><span class="badge" style="--c:var(--indigo);width:42px;height:42px"><svg><use href="#g-container"/></svg></span><b style="color:var(--violet);width:280px">SQLite (better-sqlite3)</b><span style="color:var(--slate)">Base embarquée, zéro serveur à installer, idéale sur Pi</span></div>
-    <div class="trow" style="display:flex;gap:14px;align-items:center;background:#fff;border-radius:12px;padding:10px 14px;"><span class="badge" style="--c:var(--slate);width:42px;height:42px"><svg><use href="#g-gear"/></svg></span><b style="color:var(--violet);width:280px">Docker Compose</b><span style="color:var(--slate)">Déploiement reproductible : une commande lance toute la stack</span></div>
-    <div class="trow" style="display:flex;gap:14px;align-items:center;background:var(--card);border-radius:12px;padding:10px 14px;"><span class="badge" style="--c:var(--cyan);width:42px;height:42px"><svg><use href="#g-cube"/></svg></span><b style="color:var(--violet);width:280px">Three.js</b><span style="color:var(--slate)">Vue 3D de la salle en temps réel dans le navigateur</span></div>
-    <div class="trow" style="display:flex;gap:14px;align-items:center;background:#fff;border-radius:12px;padding:10px 14px;"><span class="badge" style="--c:var(--pink);width:42px;height:42px"><svg><use href="#g-robot"/></svg></span><b style="color:var(--violet);width:280px">Ollama (IA locale)</b><span style="color:var(--slate)">Génération de jeux 100 % hors ligne, données privées</span></div>
-  </div>
-  <div class="pageno">8 / 21</div>
-</section>
-
-<!-- 9 POURQUOI CETTE STACK -->
-<section class="slide">
-  <div class="head"><div class="num">5</div><div><div class="kick">React / Next.js / Node / TS &nbsp;vs&nbsp; JS pur + Node-RED</div><h2>Pourquoi cette stack ?</h2></div>
-    <span class="badge hicon" style="--c:var(--violet);width:54px;height:54px"><svg><use href="#g-code"/></svg></span></div>
+  <div class="head"><div class="num">4</div><div><div class="kick">React / Next.js / TypeScript &nbsp;vs&nbsp; JS + Node-RED</div><h2>Pourquoi cette stack ?</h2></div><span class="me">E2</span></div>
   <div class="body">
     <div class="col">
-      <div class="band" style="background:var(--slate)">Approche initiale : Node-RED + JS pur</div>
-      <ul><li>Node-RED : top pour prototyper l'IoT, limité pour une UI riche (3D, éditeur)</li>
-        <li>Flux en JSON difficiles à versionner et relire dans Git</li>
-        <li>JS pur : aucun typage, erreurs vues seulement à l'exécution</li>
-        <li>Refactorisation risquée, autocomplétion faible</li>
-        <li>Complexité vite ingérable sur un gros projet</li></ul>
+      <div class="band" style="background:var(--slate)">Piste initiale : Node-RED</div>
+      <ul><li>Excellent pour câbler des flux, <b>mal adapté</b> à une vraie appli multi-pages</li>
+        <li>Pas de composants visuels pour une UI/UX pédagogique riche</li>
+        <li>Flux vite illisibles à grande échelle, rendu HTML/CSS limité</li></ul>
     </div>
     <div class="col">
-      <div class="band" style="background:var(--violet)">Choix retenu : Next.js + React + Node + TS</div>
-      <ul><li>React : interface en composants réutilisables</li>
-        <li>Next.js : front et back (API) dans un seul projet</li>
-        <li>Node.js : même langage côté serveur et navigateur</li>
-        <li>TypeScript : typage strict, bugs attrapés à la compilation</li>
-        <li>Du code texte : versionnable et testable (tsc + build)</li></ul>
+      <div class="band" style="background:var(--violet)">Choix retenu : Next.js + React + TS</div>
+      <ul><li><b>React</b> : composants réutilisables + état réactif (jeux instantanés)</li>
+        <li><b>TypeScript</b> : typage strict, erreurs vues à la compilation (maintenable)</li>
+        <li><b>Next.js</b> : UI + API + un seul serveur Node, idéal sur Pi</li>
+        <li class="sub">Next.js 16 · TS 5.5 · better-sqlite3 · Three.js · Docker</li></ul>
     </div>
   </div>
-  <div class="pageno">9 / 21</div>
+  <div class="pageno">8 / 22</div>
 </section>
 
-<!-- 10 RESEAU / DOCKER -->
+<!-- 9 RESEAU / DEPLOIEMENT -->
 <section class="slide">
-  <div class="head"><div class="num">6</div><div><div class="kick">Docker / Raspberry Pi</div><h2>Réseau et déploiement</h2></div>
-    <span class="badge hicon" style="--c:var(--indigo);width:54px;height:54px"><svg><use href="#g-container"/></svg></span></div>
+  <div class="head"><div class="num">5</div><div><div class="kick">Docker · Raspberry Pi 5</div><h2>Réseau et déploiement</h2></div></div>
   <div class="body">
     <div class="col"><ul>
-      <li>Orchestration via docker-compose.yml (4 services)</li>
-      <li class="sub">color-room : l'application (port 8080)</li>
-      <li class="sub">ollama + ollama-pull : IA locale (port 11434)</li>
-      <li class="sub">portainer : supervision des conteneurs (9000)</li>
-      <li>Réseau local : tablettes et téléphones sur le même Wi-Fi</li>
-      <li>Secrets isolés dans un fichier .env (non versionné)</li>
-      <li>Mise à jour : git pull puis docker compose up</li>
+      <li>Image <b>Docker multi-stage</b> (deps → builder → runner) pour arm64</li>
+      <li>Application exposée sur le <b>port 8080</b>, supervisée par <b>Portainer</b></li>
+      <li>Le Pi fournit le Wi-Fi local <b>ColorRoom_WiFI</b> (tablettes, PC)</li>
+      <li>API de supervision des dalles atteinte depuis le Pi ; <b>CS-160 en USB</b></li>
+      <li>Base SQLite dans un volume Docker (persistance entre redémarrages)</li>
+      <li>Secrets (compte admin) isolés dans un fichier <b>.env</b></li>
     </ul></div>
-    <div style="width:430px;display:flex;align-items:center"><div class="codecard" style="width:100%">
-      <span class="c"># déploiement sur le Pi</span><br>
+    <div style="width:420px;display:flex;align-items:center"><div class="codecard" style="width:100%">
+      <span class="c"># déploiement sur le Raspberry Pi</span><br>
       <span class="w">git pull origin main</span><br>
       <span class="w">docker compose up -d --build</span><br><br>
-      <span class="c"># 4 conteneurs démarrent</span><br>
-      color-room&nbsp;&nbsp;&nbsp;:8080<br>ollama&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;:11434<br>portainer&nbsp;&nbsp;&nbsp;&nbsp;:9000
+      <span class="c"># services</span><br>
+      app (Next.js)&nbsp;&nbsp;:8080<br>portainer&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;:9000
     </div></div>
   </div>
-  <div class="pageno">10 / 21</div>
+  <div class="pageno">9 / 22</div>
 </section>
 
-<!-- 11 FONCTIONNALITES -->
+<!-- 10 UI / DESIGN SYSTEM -->
 <section class="slide">
-  <div class="head"><div class="num">7</div><div><div class="kick">Ce que fait l'appli</div><h2>Fonctionnalités du projet</h2></div>
-    <span class="badge hicon" style="--c:var(--violet);width:54px;height:54px"><svg><use href="#g-puzzle"/></svg></span></div>
+  <div class="head"><div class="num">6</div><div><div class="kick">Ma partie · interface</div><h2>Interface et design system</h2></div><span class="me">E2</span></div>
+  <div class="body">
+    <div class="col"><ul>
+      <li>Design system « <b>verre dépoli</b> » : mêmes variables CSS sur toutes les pages</li>
+      <li>Pages réalisées : accueil 3D, /jeux, /mesure, /spectre, /chromaticite, /gestion, /aide</li>
+      <li><b>Menu dynamique</b> : infos du compte connecté, lien /gestion réservé aux enseignants</li>
+      <li>Apparition progressive des pavés (flou + translation + opacité)</li>
+    </ul></div>
+    <div class="col"><ul>
+      <li><b>Vue 3D temps réel</b> (Three.js, composant Room3D)</li>
+      <li>Représente les <b>2 cellules jumelles</b> ; clic = transition caméra (GSAP)</li>
+      <li class="sub">Rendu uniquement côté navigateur, canvas détruit au démontage (pas de fuite mémoire)</li>
+      <li class="sub">Pause quand l'onglet est masqué (économie de batterie sur tablette)</li>
+    </ul></div>
+  </div>
+  <div class="pageno">10 / 22</div>
+</section>
+
+<!-- 11 BDD -->
+<section class="slide">
+  <div class="head"><div class="num">6</div><div><div class="kick">Ma partie · données</div><h2>Base de données SQLite</h2></div><span class="me">E2</span></div>
+  <div class="body">
+    <div class="col"><ul>
+      <li><b>SQLite</b> (better-sqlite3) : un simple fichier, sans serveur, idéal embarqué</li>
+      <li><b>7 tables</b> : crg_users, crg_sessions, crg_classes, crg_class_members, crg_scores, crg_games…</li>
+      <li>Relations par clés étrangères, suppression en cascade</li>
+      <li><b>Migrations idempotentes</b> (CREATE TABLE IF NOT EXISTS) au démarrage</li>
+      <li>Mode <b>WAL + busy_timeout</b> : accès concurrents sans erreur SQLITE_BUSY</li>
+    </ul></div>
+    <div style="width:380px;display:flex;align-items:center"><div class="codecard" style="width:100%">
+      <span class="c">CREATE TABLE IF NOT EXISTS crg_users (</span><br>
+      &nbsp;&nbsp;id TEXT <span class="w">PRIMARY KEY</span>,<br>
+      &nbsp;&nbsp;name TEXT <span class="w">NOT NULL UNIQUE</span>,<br>
+      &nbsp;&nbsp;user_type TEXT <span class="w">DEFAULT</span> 'apprenant',<br>
+      &nbsp;&nbsp;password_hash TEXT, niveau TEXT )<br><br>
+      <span class="c">PRAGMA journal_mode = WAL;</span>
+    </div></div>
+  </div>
+  <div class="pageno">11 / 22</div>
+</section>
+
+<!-- 12 SECURITE / RGPD -->
+<section class="slide">
+  <div class="head"><div class="num">6</div><div><div class="kick">Ma partie · sécurité</div><h2>Authentification et données personnelles</h2></div><span class="me">E2</span></div>
+  <div class="body" style="flex-direction:column;justify-content:center;"><ul>
+    <li><span class="badge" style="--c:var(--slate);width:30px;height:30px"><svg><use href="#g-lock"/></svg></span><b>3 rôles</b> : administrateur (créé via .env), enseignant, apprenant</li>
+    <li><span class="badge" style="--c:var(--violet);width:30px;height:30px"><svg><use href="#g-lock"/></svg></span>Mots de passe hachés <b>PBKDF2-SHA512</b> (100 000 itérations, sel aléatoire), jamais en clair</li>
+    <li><span class="badge" style="--c:var(--cyan);width:30px;height:30px"><svg><use href="#g-network"/></svg></span>Sessions par <b>cookie HttpOnly + SameSite=lax</b> (7 jours) : anti-XSS / anti-CSRF</li>
+    <li><span class="badge" style="--c:var(--green);width:30px;height:30px"><svg><use href="#g-check"/></svg></span><b>Données 100 % locales</b> : tout reste sur le Pi, rien sur Internet</li>
+    <li><span class="badge" style="--c:var(--amber);width:30px;height:30px"><svg><use href="#g-check"/></svg></span>Minimisation (pseudo seul), droit à l'effacement en cascade, cloisonnement par rôle</li>
+  </ul></div>
+  <div class="pageno">12 / 22</div>
+</section>
+
+<!-- 13 COMPTES / CLASSES / SCORES -->
+<section class="slide">
+  <div class="head"><div class="num">6</div><div><div class="kick">Ma partie · gestion</div><h2>Comptes, classes, scores et tableau de bord</h2></div><span class="me">E2</span></div>
+  <div class="body">
+    <div class="col"><ul>
+      <li><b>Inscription / connexion</b> : rôle détecté côté serveur, connexion auto après inscription</li>
+      <li><b>Classes</b> : code à 6 caractères (sans 0/O, 1/I), rejointe à l'inscription ou via code</li>
+      <li><b>Niveaux</b> (collège → grand public) assignés par l'enseignant</li>
+      <li><b>Historique des scores</b> : l'apprenant voit les siens, l'enseignant ceux de tous (403 sinon)</li>
+    </ul></div>
+    <div class="col"><ul>
+      <li><b>Tableau de bord /gestion</b> (enseignants/admins), 3 onglets :</li>
+      <li class="sub">Utilisateurs : niveau, reset mot de passe, suppression</li>
+      <li class="sub">Classes : création, code, membres</li>
+      <li class="sub">Scores : consultation, filtre, <b>export CSV</b> (UTF-8 + BOM pour Excel)</li>
+    </ul></div>
+  </div>
+  <div class="pageno">13 / 22</div>
+</section>
+
+<!-- 14 JEUX SOLO -->
+<section class="slide">
+  <div class="head"><div class="num">7</div><div><div class="kick">Ma partie · jeux solo</div><h2>Les jeux et le pilotage des dalles</h2></div><span class="me">E2</span></div>
   <div class="body" style="align-items:center"><div class="cards">
-    <div class="fcard" style="--c:var(--indigo)"><span class="badge" style="--c:var(--indigo)"><svg><use href="#g-play"/></svg></span><div><h3>Jeux intégrés</h3><p>Color Speed, Simon, Puissance 4, Mémoire, mesure</p></div></div>
-    <div class="fcard" style="--c:var(--violet)"><span class="badge" style="--c:var(--violet)"><svg><use href="#g-puzzle"/></svg></span><div><h3>Éditeur low-code</h3><p>Relier des blocs, ou coder en Python / JS</p></div></div>
-    <div class="fcard" style="--c:var(--pink)"><span class="badge" style="--c:var(--pink)"><svg><use href="#g-robot"/></svg></span><div><h3>Génération par IA</h3><p>Décrire un jeu en une phrase, il est créé</p></div></div>
-    <div class="fcard" style="--c:var(--green)"><span class="badge" style="--c:var(--green)"><svg><use href="#g-phone"/></svg></span><div><h3>Multijoueur</h3><p>1 joueur = 1 dalle, rejoint par QR code</p></div></div>
-    <div class="fcard" style="--c:var(--amber)"><span class="badge" style="--c:var(--amber)"><svg><use href="#g-palette"/></svg></span><div><h3>Mesure CS-160</h3><p>Colorimètre réel + diagramme CIE 1931</p></div></div>
-    <div class="fcard" style="--c:var(--slate)"><span class="badge" style="--c:var(--slate)"><svg><use href="#g-lock"/></svg></span><div><h3>Administration</h3><p>Comptes, classes, scores, niveaux</p></div></div>
+    <div class="fcard" style="--c:var(--indigo)"><span class="badge" style="--c:var(--indigo)"><svg><use href="#g-cube"/></svg></span><div><h3>Tetris Lumière</h3><p>Grille projetée sur les dalles, MAJ ciblées</p></div></div>
+    <div class="fcard" style="--c:var(--violet)"><span class="badge" style="--c:var(--violet)"><svg><use href="#g-play"/></svg></span><div><h3>Simon Lumière</h3><p>Mémoriser une séquence de couleurs</p></div></div>
+    <div class="fcard" style="--c:var(--amber)"><span class="badge" style="--c:var(--amber)"><svg><use href="#g-palette"/></svg></span><div><h3>Maître du Blanc</h3><p>Retrouver une température de couleur</p></div></div>
+    <div class="fcard" style="--c:var(--green)"><span class="badge" style="--c:var(--green)"><svg><use href="#g-bolt"/></svg></span><div><h3>Color Speed</h3><p>Identifier des couleurs au plus vite</p></div></div>
+    <div class="fcard" style="--c:var(--pink)"><span class="badge" style="--c:var(--pink)"><svg><use href="#g-target"/></svg></span><div><h3>Chasseur de Gamut</h3><p>Reproduire une cible sur le CIE</p></div></div>
+    <div class="fcard" style="--c:var(--cyan)"><span class="badge" style="--c:var(--cyan)"><svg><use href="#g-palette"/></svg></span><div><h3>Mix de Canaux</h3><p>Mélanger 3 canaux LED</p></div></div>
   </div></div>
-  <div class="pageno">11 / 21</div>
+  <div class="pageno" style="left:30px;right:auto">Pilotage temps réel : 32 canaux envoyés en parallèle (concurrence limitée) · couleur écran = couleur dalle</div>
+  <div class="pageno">14 / 22</div>
 </section>
 
-<!-- 12 FOCUS EDITEUR -->
+<!-- 15 PUISSANCE 4 IA -->
 <section class="slide">
-  <div class="head"><div class="num">8</div><div><div class="kick">Point fort 1 / 3</div><h2>Focus : l'éditeur de jeux</h2></div>
-    <span class="badge hicon" style="--c:var(--violet);width:54px;height:54px"><svg><use href="#g-puzzle"/></svg></span></div>
+  <div class="head"><div class="num">7</div><div><div class="kick">Ma partie · intelligence artificielle</div><h2>Puissance 4 et son IA minimax</h2></div><span class="me">E2</span></div>
   <div class="body">
     <div class="col"><ul>
-      <li>Programmation visuelle par noeuds reliés (style blueprint)</li>
-      <li class="sub">Évènements (clic dalle, timer) puis actions (allumer, score, son)</li>
-      <li>Catalogue d'environ 190 blocs : logique, maths, rendu, animations, multijoueur</li>
-      <li>Bloc Script : code Python ou JavaScript exécuté dans le jeu</li>
-      <li>Aperçu en direct sur la vue 3D et sur les vraies dalles</li>
-      <li>Les jeux créés sont sauvegardés et jouables par tous</li>
+      <li>Grille 7×6 projetée sur les 42 dalles, à 2 joueurs ou contre l'ordinateur</li>
+      <li>IA <b>100 % hors-ligne</b>, directement dans le navigateur</li>
+      <li>Algorithme <b>minimax + élagage alpha-bêta</b> : anticipe plusieurs coups</li>
+      <li>Fonction d'évaluation : bonus alignements, malus accru sur les menaces (défense)</li>
+      <li><b>3 niveaux</b> (vert / jaune / rouge) = profondeur 2 / 4 / 7</li>
+      <li>Décision quasi instantanée (~70 ms), fluide même sur tablette</li>
     </ul></div>
-    <div style="width:300px;display:flex;align-items:center">
-      <div style="background:#fff;border-radius:14px;padding:18px;width:100%;text-align:center">
-        <div style="font-size:12px;color:var(--violet);font-weight:800;margin-bottom:10px">EXEMPLE DE FLUX</div>
-        <div style="color:var(--indigo);font-weight:800">Démarrer</div><div style="color:var(--grey)">↓</div>
-        <div style="color:var(--violet);font-weight:800">Dalle aléatoire</div><div style="color:var(--grey)">↓</div>
-        <div style="color:var(--pink);font-weight:800">Clic du joueur ?</div><div style="color:var(--grey)">↓</div>
-        <div style="color:var(--green);font-weight:800">+1 point et son</div>
-      </div>
+    <div style="width:360px;display:flex;align-items:center"><div class="codecard" style="width:100%">
+      <span class="c">// profondeur selon le niveau</span><br>
+      const cfg = DIFF[difficulty]; <span class="c">// 2 / 4 / 7</span><br><br>
+      const v = winsAt(g,row,col,AI)<br>
+      &nbsp;&nbsp;? <span class="w">WIN_SCORE</span><br>
+      &nbsp;&nbsp;: <span class="w">minimax</span>(g, cfg.depth-1,<br>
+      &nbsp;&nbsp;&nbsp;&nbsp;-Infinity, Infinity, false);
+    </div></div>
+  </div>
+  <div class="pageno">15 / 22</div>
+</section>
+
+<!-- 16 MULTIJOUEUR -->
+<section class="slide">
+  <div class="head"><div class="num">7</div><div><div class="kick">Ma partie · jeux en réseau</div><h2>Les jeux multijoueur</h2></div><span class="me">E2</span></div>
+  <div class="body">
+    <div class="col"><ul>
+      <li>État de la partie conservé <b>en base</b>, récupéré par <b>polling</b> de /state</li>
+      <li class="sub">Plus simple à déployer sur Pi que des WebSockets</li>
+      <li><b>Spectre Chromatique</b> : jusqu'à 8 joueurs, reproduire une couleur (score = distance)</li>
+      <li><b>Morpion en réseau</b> : 2 joueurs (X/O), dalles rouge/bleu, détection de victoire</li>
+      <li><b>Multijoueur générique</b> : chaque joueur règle un canal vers une cible commune</li>
+      <li>Système de <b>présence</b> léger ; le siège 1 contrôle démarrage et arrêt</li>
+    </ul></div>
+    <div style="width:300px;display:flex;align-items:center;justify-content:center;gap:14px">
+      <div style="width:90px;height:180px;background:var(--dark);border:3px solid var(--slate);border-radius:20px;display:grid;place-items:center"><div style="width:58px;height:90px;border-radius:12px;background:var(--green)"></div></div>
+      <div style="width:90px;height:180px;background:var(--dark);border:3px solid var(--slate);border-radius:20px;display:grid;place-items:center;transform:translateY(14px)"><div style="width:58px;height:90px;border-radius:12px;background:var(--pink)"></div></div>
     </div>
   </div>
-  <div class="pageno">12 / 21</div>
+  <div class="pageno">16 / 22</div>
 </section>
 
-<!-- 13 FOCUS IA -->
+<!-- 17 MESURE / CIE -->
 <section class="slide">
-  <div class="head"><div class="num">9</div><div><div class="kick">Point fort 2 / 3</div><h2>Focus : génération par IA</h2></div>
-    <span class="badge hicon" style="--c:var(--pink);width:54px;height:54px"><svg><use href="#g-robot"/></svg></span></div>
+  <div class="head"><div class="num">8</div><div><div class="kick">Ma partie · physique de la lumière</div><h2>Mesure colorimétrique et chromaticité</h2></div><span class="me">E2</span></div>
   <div class="body">
     <div class="col"><ul>
-      <li>L'utilisateur décrit le jeu en langage naturel</li>
-      <li>Cascade intelligente : Gemini (cloud) puis repli Ollama (local)</li>
-      <li class="sub">Marche hors ligne grâce au modèle local sur le Pi</li>
-      <li>L'IA renvoie un JSON strict, converti en blocs et interface</li>
-      <li>Garde-fou : refuse poliment les jeux impossibles (Forza, GTA)</li>
-      <li>Validation et nettoyage systématiques de la sortie</li>
-    </ul></div>
-    <div style="width:330px;display:flex;align-items:center">
-      <div class="codecard" style="width:100%">
-        <span class="c">CASCADE IA</span><br><br>
-        <span class="w">1. Clé Gemini présente ?</span><br>&nbsp;&nbsp;&nbsp;oui : Gemini Flash<br><br>
-        <span class="w">2. Échec ou hors ligne ?</span><br>&nbsp;&nbsp;&nbsp;repli : Ollama (Pi)<br><br>
-        <span class="w">3. Sortie JSON validée</span><br>&nbsp;&nbsp;&nbsp;blocs + UI générés
-      </div>
-    </div>
-  </div>
-  <div class="pageno">13 / 21</div>
-</section>
-
-<!-- 14 FOCUS MESURE -->
-<section class="slide">
-  <div class="head"><div class="num">10</div><div><div class="kick">Point fort 3 / 3</div><h2>Focus : mesure colorimétrique</h2></div>
-    <span class="badge hicon" style="--c:var(--amber);width:54px;height:54px"><svg><use href="#g-palette"/></svg></span></div>
-  <div class="body">
-    <div class="col"><ul>
-      <li>Colorimètre Konica Minolta CS-160 piloté via une API</li>
-      <li>Mesure réelle de la lumière émise (X Y Z, x y Lv)</li>
-      <li>Affichage sur le diagramme de chromaticité CIE 1931</li>
-      <li>Jeux basés sur la mesure (reconnaître une couleur, métamérie)</li>
-      <li>Écart de couleur (delta E) pour scorer la précision</li>
-      <li>Lien direct entre le virtuel et le réel mesuré</li>
+      <li>Page /mesure reliée au colorimètre <b>Konica Minolta CS-150/160</b> (pont /api/CS160)</li>
+      <li>Mesure réelle : coordonnées <b>XYZ</b>, luminance <b>Lv</b>, chromaticité <b>x, y</b></li>
+      <li>Point tracé sur le <b>diagramme CIE 1931</b> : comparer le réel à l'attendu</li>
+      <li>32 canaux = <b>18 LED spectrales</b> (404→780 nm) + <b>14 LED phosphore</b> (blanc chaud)</li>
+      <li class="sub">Profils colorimétriques corrigés à partir des longueurs d'onde réelles</li>
     </ul></div>
     <div style="width:330px;display:flex;align-items:center;justify-content:center">
       <svg class="cie" viewBox="0 0 100 100">
-        <polygon points="22,8 9,40 7,62 16,84 42,94 64,84 78,60 70,36 50,16 32,10"
-          fill="rgba(67,97,238,.18)" stroke="#334155" stroke-width="1.2"/>
-        <polygon points="62,30 30,78 20,38" fill="none" stroke="#fff" stroke-width="1.4"/>
+        <polygon points="22,8 9,40 7,62 16,84 42,94 64,84 78,60 70,36 50,16 32,10" fill="rgba(67,97,238,.18)" stroke="#334155" stroke-width="1.2"/>
+        <polygon points="62,30 30,78 20,38" fill="none" stroke="#0f172a" stroke-width="1.4"/>
         <circle cx="62" cy="30" r="3" fill="#ef4444"/><circle cx="30" cy="78" r="3" fill="#06d6a0"/><circle cx="20" cy="38" r="3" fill="#4361ee"/>
-        <circle cx="40" cy="50" r="3.2" fill="#fff"/><circle cx="40" cy="50" r="1.6" fill="#ec4899"/>
+        <circle cx="40" cy="50" r="3.2" fill="#0f172a"/><circle cx="40" cy="50" r="1.6" fill="#ec4899"/>
       </svg>
     </div>
   </div>
-  <div class="pageno">14 / 21</div>
+  <div class="pageno">17 / 22</div>
 </section>
 
-<!-- 15 MULTIJOUEUR -->
+<!-- 18 DOC / ROBUSTESSE -->
 <section class="slide">
-  <div class="head"><div class="num">11</div><div><div class="kick">Une dalle par joueur</div><h2>Multijoueur en réseau local</h2></div>
-    <span class="badge hicon" style="--c:var(--green);width:54px;height:54px"><svg><use href="#g-phone"/></svg></span></div>
+  <div class="head"><div class="num">9</div><div><div class="kick">Ma partie · qualité</div><h2>Documentation et robustesse</h2></div><span class="me">E2</span></div>
   <div class="body">
-    <div class="col"><ul>
-      <li>Chaque joueur ouvre la page sur son téléphone</li>
-      <li>Il scanne un QR code ou tape l'adresse locale</li>
-      <li>Il reçoit une dalle (un siège) et choisit sa couleur</li>
-      <li>Sa dalle s'allume en temps réel dans la Color Room</li>
-      <li>L'animateur peut jouer aussi depuis la tablette</li>
-      <li>Tout passe par le Wi-Fi local (pas d'Internet)</li>
-    </ul></div>
-    <div style="width:430px;display:flex;align-items:center"><div class="phones">
-      <div class="phone"><div class="screen" style="background:var(--green)"></div></div>
-      <div class="phone" style="transform:translateY(16px)"><div class="screen" style="background:var(--amber)"></div></div>
-      <div class="phone"><div class="screen" style="background:var(--pink)"></div></div>
-    </div></div>
+    <div class="col">
+      <div style="font-weight:800;color:var(--violet);margin-bottom:8px;">Documentation (responsable Wiki)</div>
+      <ul><li>Notice apprenant intégrée (page /aide), par sections au défilement</li>
+        <li>Manuel d'installation (README) : Docker, mode dev, service permanent sur Pi</li>
+        <li>Variables d'environnement et compte admin documentés</li></ul>
+    </div>
+    <div class="col">
+      <div style="font-weight:800;color:var(--green);margin-bottom:8px;">Robustesse</div>
+      <ul><li>Migrations idempotentes (CREATE IF NOT EXISTS + ALTER protégés)</li>
+        <li><b>Transactions tout-ou-rien</b> (inscription = user + classe atomiques)</li>
+        <li>UTF-8 + BOM aux exports CSV ; connexion SQLite en singleton</li></ul>
+    </div>
   </div>
-  <div class="pageno">15 / 21</div>
+  <div class="pageno">18 / 22</div>
 </section>
 
-<!-- 16 SECURITE -->
+<!-- 19 DIFFICULTES -->
 <section class="slide">
-  <div class="head"><div class="num">12</div><div><div class="kick">Bonnes pratiques</div><h2>Sécurité</h2></div>
-    <span class="badge hicon" style="--c:var(--slate);width:54px;height:54px"><svg><use href="#g-lock"/></svg></span></div>
-  <div class="body" style="flex-direction:column;justify-content:center;"><ul>
-    <li><span class="badge" style="--c:var(--slate);width:32px;height:32px"><svg><use href="#g-lock"/></svg></span>Mots de passe hachés (PBKDF2-SHA512, 100 000 itérations, sel) : jamais en clair</li>
-    <li><span class="badge" style="--c:var(--cyan);width:32px;height:32px"><svg><use href="#g-network"/></svg></span>Sessions par cookie httpOnly + rôles (élève, enseignant, admin)</li>
-    <li><span class="badge" style="--c:var(--slate);width:32px;height:32px"><svg><use href="#g-gear"/></svg></span>Secrets dans .env, exclu de Git via .gitignore</li>
-    <li><span class="badge" style="--c:var(--green);width:32px;height:32px"><svg><use href="#g-check"/></svg></span>Transactions SQL atomiques (ACID) pour des états cohérents</li>
-    <li><span class="badge" style="--c:var(--indigo);width:32px;height:32px"><svg><use href="#g-container"/></svg></span>Réseau local isolé : pas d'exposition Internet, IA hors ligne possible</li>
-    <li><span class="badge" style="--c:var(--slate);width:32px;height:32px"><svg><use href="#g-doc"/></svg></span>Retour d'expérience : secret committé par erreur, purgé de l'historique Git</li>
-  </ul></div>
-  <div class="pageno">16 / 21</div>
-</section>
-
-<!-- 17 GESTION DE PROJET -->
-<section class="slide">
-  <div class="head"><div class="num">13</div><div><div class="kick">Méthode et outils</div><h2>Gestion de projet</h2></div>
-    <span class="badge hicon" style="--c:var(--slate);width:54px;height:54px"><svg><use href="#g-doc"/></svg></span></div>
-  <div class="body">
-    <div class="col"><ul>
-      <li>Versioning Git et GitHub (branches, commits clairs)</li>
-      <li>Développement incrémental, fonctionnalité par fonctionnalité</li>
-      <li>Tests à chaque étape : typage (tsc) et build de production</li>
-      <li>Documentation : 15 diagrammes UML et un guide technique</li>
-      <li>Conteneurisation pour des déploiements fiables</li>
-    </ul></div>
-    <div style="width:380px;display:flex;align-items:center"><div style="background:#fff;border-radius:14px;padding:18px 20px;width:100%">
-      <div style="font-size:12px;color:var(--violet);font-weight:800;margin-bottom:12px">OUTILS UTILISÉS</div>
-      <div style="font-size:15px;color:var(--slate);line-height:2.1">
-      Code · VS Code / TypeScript<br>Versions · Git + GitHub<br>Conteneurs · Docker Compose<br>
-      Supervision · Portainer<br>Modélisation · UML (PlantUML)<br>Cible · Raspberry Pi</div>
-    </div></div>
-  </div>
-  <div class="pageno">17 / 21</div>
-</section>
-
-<!-- 18 DIFFICULTES -->
-<section class="slide">
-  <div class="head"><div class="num">14</div><div><div class="kick">Démarche d'ingénieur</div><h2>Difficultés rencontrées et solutions</h2></div>
-    <span class="badge hicon" style="--c:var(--slate);width:54px;height:54px"><svg><use href="#g-gear"/></svg></span></div>
+  <div class="head"><div class="num">10</div><div><div class="kick">Démarche d'ingénieur</div><h2>Difficultés rencontrées et solutions</h2></div><span class="me">E2</span></div>
   <div class="body" style="flex-direction:column;justify-content:center;">
-    <div class="fix"><div class="pb">! Lag de la vue 3D sur tablette</div><div class="ar">→</div><div class="so"><span class="badge" style="--c:var(--green);width:28px;height:28px"><svg><use href="#g-check"/></svg></span>Textures allégées, pixel ratio plafonné, snapshots dédupliqués</div></div>
-    <div class="fix"><div class="pb">! Contextes WebGL bloqués (crash)</div><div class="ar">→</div><div class="so"><span class="badge" style="--c:var(--green);width:28px;height:28px"><svg><use href="#g-check"/></svg></span>Libération explicite du contexte + repli gracieux</div></div>
-    <div class="fix"><div class="pb">! Son d'un jeu joué sans fin</div><div class="ar">→</div><div class="so"><span class="badge" style="--c:var(--green);width:28px;height:28px"><svg><use href="#g-check"/></svg></span>Bug d'unité ms / secondes corrigé dans l'audio</div></div>
-    <div class="fix"><div class="pb">! Tetris injouable sur 6x7</div><div class="ar">→</div><div class="so"><span class="badge" style="--c:var(--green);width:28px;height:28px"><svg><use href="#g-check"/></svg></span>Refonte en jeu de combinaison de couleurs (pièces 1-2 cases)</div></div>
+    <div class="fix"><div class="pb">Latence des plaques (32 canaux, ~dizaines de ms)</div><div class="ar">→</div><div class="so"><span class="badge" style="--c:var(--green);width:26px;height:26px"><svg><use href="#g-check"/></svg></span>Envoi des canaux en parallèle, concurrence limitée, timeout court</div></div>
+    <div class="fix"><div class="pb">Couleur à l'écran ≠ couleur sur les dalles</div><div class="ar">→</div><div class="so"><span class="badge" style="--c:var(--green);width:26px;height:26px"><svg><use href="#g-check"/></svg></span>Rendu unifié + profils canaux calés sur les longueurs d'onde réelles</div></div>
+    <div class="fix"><div class="pb">Accès concurrents à la base (SQLITE_BUSY)</div><div class="ar">→</div><div class="so"><span class="badge" style="--c:var(--green);width:26px;height:26px"><svg><use href="#g-check"/></svg></span>Mode WAL + busy_timeout + connexion en singleton</div></div>
+    <div class="fix"><div class="pb">Multijoueur temps réel sur Raspberry Pi</div><div class="ar">→</div><div class="so"><span class="badge" style="--c:var(--green);width:26px;height:26px"><svg><use href="#g-check"/></svg></span>État en base + polling /state (plus simple et fiable que WebSockets)</div></div>
   </div>
-  <div class="pageno">18 / 21</div>
+  <div class="pageno">19 / 22</div>
 </section>
 
-<!-- 19 BILAN -->
+<!-- 20 BILAN -->
 <section class="slide">
-  <div class="head"><div class="num">15</div><div><div class="kick">Conclusion technique</div><h2>Bilan et perspectives</h2></div>
-    <span class="badge hicon" style="--c:var(--indigo);width:54px;height:54px"><svg><use href="#g-chart"/></svg></span></div>
+  <div class="head"><div class="num">10</div><div><div class="kick">Conclusion</div><h2>Bilan et perspectives</h2></div></div>
   <div class="body">
     <div class="col">
-      <h3 style="color:var(--green);font-size:18px;margin-bottom:10px;display:flex;gap:8px;align-items:center"><span class="badge" style="--c:var(--green);width:30px;height:30px"><svg><use href="#g-check"/></svg></span>Objectifs atteints</h3>
-      <ul><li>Pilotage temps réel des 42 dalles</li><li>Mesure réelle au colorimètre + CIE</li>
-        <li>Éditeur et génération IA fonctionnels</li><li>Multijoueur en réseau local</li><li>Déploiement automatisé sur Pi</li></ul>
+      <div style="font-weight:800;color:var(--green);margin-bottom:8px;display:flex;gap:8px;align-items:center"><span class="badge" style="--c:var(--green);width:28px;height:28px"><svg><use href="#g-check"/></svg></span>Objectifs E2 atteints</div>
+      <ul><li>Interface, base de données et comptes opérationnels</li>
+        <li>Jeux solo, IA Puissance 4 et multijoueur fonctionnels</li>
+        <li>Mesure CS-160 et diagramme CIE</li>
+        <li>Documentation et déploiement Docker sur Pi</li></ul>
     </div>
     <div class="col">
-      <h3 style="color:var(--violet);font-size:18px;margin-bottom:10px;display:flex;gap:8px;align-items:center"><span class="badge" style="--c:var(--amber);width:30px;height:30px"><svg><use href="#g-bolt"/></svg></span>Perspectives</h3>
-      <ul><li>Vrai système de salons multijoueurs (codes)</li><li>Streaming de la génération IA en temps réel</li>
-        <li>Plus de jeux pédagogiques et de tutoriels</li><li>Tableau de bord enseignant enrichi</li><li>Tests automatisés (CI / CD)</li></ul>
+      <div style="font-weight:800;color:var(--violet);margin-bottom:8px;display:flex;gap:8px;align-items:center"><span class="badge" style="--c:var(--amber);width:28px;height:28px"><svg><use href="#g-bolt"/></svg></span>Perspectives</div>
+      <ul><li>Salons multijoueur avec codes de partie</li>
+        <li>Nouveaux jeux pédagogiques et tutoriels</li>
+        <li>Tableau de bord enseignant enrichi, tests automatisés (CI/CD)</li>
+        <li class="sub">Exploration perso : génération de jeux assistée par IA locale (Ollama)</li></ul>
     </div>
   </div>
-  <div class="pageno">19 / 21</div>
+  <div class="pageno">20 / 22</div>
 </section>
 
-<!-- 20 DEMO -->
+<!-- 21 DEMO -->
 <section class="slide dark">
   <div class="body center">
-    <span class="badge" style="--c:var(--green);width:84px;height:84px;margin-bottom:18px"><svg><use href="#g-play"/></svg></span>
+    <span class="badge" style="--c:var(--green);width:80px;height:80px;margin-bottom:16px"><svg><use href="#g-play"/></svg></span>
     <div class="kick" style="color:var(--green);font-weight:800;letter-spacing:.06em">PLACE À LA</div>
-    <div class="big-merci">Démonstration</div>
-    <p style="color:#cbd5e1;font-size:16px;margin-top:18px;line-height:1.9;">
-      1. Lancer un jeu sur les dalles &nbsp;·&nbsp; 2. Créer un jeu (éditeur)<br>
-      3. Générer un jeu avec l'IA &nbsp;·&nbsp; 4. Multijoueur (QR + téléphone)<br>
-      5. Mesure CS-160 + diagramme CIE &nbsp;·&nbsp; 6. Portainer / Docker</p>
+    <div class="big">Démonstration</div>
+    <p style="color:#cbd5e1;font-size:16px;margin-top:16px;line-height:1.9;">
+      1. Connexion / inscription &nbsp;·&nbsp; 2. Catalogue de jeux + un jeu solo sur les dalles<br>
+      3. Puissance 4 contre l'IA &nbsp;·&nbsp; 4. Un jeu multijoueur (2 terminaux)<br>
+      5. Mesure CS-160 + diagramme CIE &nbsp;·&nbsp; 6. Tableau de bord /gestion</p>
   </div>
-  <div class="pageno">20 / 21</div>
+  <div class="pageno">21 / 22</div>
 </section>
 
-<!-- 21 MERCI -->
+<!-- 22 MERCI -->
 <section class="slide dark center" style="justify-content:center">
-  <div class="stripes" style="position:absolute;top:30%"><i style="background:var(--indigo)"></i><i style="background:var(--violet)"></i><i style="background:var(--pink)"></i></div>
-  <div class="big-merci">Merci de votre attention</div>
+  <div class="stripes" style="position:absolute;top:30%;left:0;right:0;"><i style="background:var(--indigo)"></i><i style="background:var(--violet)"></i><i style="background:var(--pink)"></i></div>
+  <div class="big">Merci de votre attention</div>
   <div style="color:var(--green);font-weight:800;font-size:22px;margin-top:14px">Avez-vous des questions ?</div>
-  <div style="position:absolute;bottom:30px;color:var(--grey);font-size:13px;">ColorRoom · BTS CIEL option IR · Session 2026</div>
-  <div class="pageno">21 / 21</div>
+  <div style="position:absolute;bottom:30px;color:var(--grey);font-size:13px;">ColorRoom · Téo Trompier (E2) · BTS CIEL option IR · Session 2026</div>
+  <div class="pageno">22 / 22</div>
 </section>
 
 </div>
-
 <script>
-  // Grilles LED aléatoires
   const COLS=['#4361ee','#7c3aed','#ec4899','#06d6a0','#f59e0b','#22d3ee','#ef4444'];
-  function fillGrid(id){
-    const g=document.getElementById(id); if(!g) return;
+  function fill(id){const g=document.getElementById(id);if(!g)return;
     for(let i=0;i<42;i++){const c=document.createElement('i');
-      c.style.background=COLS[Math.floor(Math.random()*COLS.length)];g.appendChild(c);}
-  }
-  fillGrid('led1'); fillGrid('led2');
+      c.style.borderRadius='22%';c.style.background=COLS[Math.floor(Math.random()*COLS.length)];g.appendChild(c);}}
+  fill('led1');fill('led2');
 </script>
 </body>
 </html>
