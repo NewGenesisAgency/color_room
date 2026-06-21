@@ -282,17 +282,16 @@ def media_slide(kick,title,bullets,img,icon,me=True,ratio="0 0 40%"):
 
 S=[]
 
-# 1 COVER
+# 1 COVER (version simple, sans icônes)
 S.append(slide(f'''<div class="body cover">
   <div class="l">
-    <div class="coverbadge">{ic("sparkles")} BTS CIEL · OPTION A · INFORMATIQUE ET RÉSEAUX · E6-2 · 2026</div>
+    <div class="coverbadge">BTS CIEL · OPTION A · INFORMATIQUE ET RÉSEAUX · E6-2 · 2026</div>
     <h1>ColorRoom</h1>
-    <div class="dash"><i style="background:var(--r)"></i><i style="background:var(--y)"></i><i style="background:var(--g)"></i><i style="background:var(--b)"></i><i style="background:var(--accent)"></i></div>
     <div class="sub">Serious games pédagogiques sur les plaques lumineuses de la ColorRoom</div>
     <div class="covermeta">
-      <div class="cmrow"><span class="ci">{ic("users")}</span><span><b>Téo Trompier</b> · candidat E2 · sous-équipe JavaScript</span></div>
-      <div class="cmrow"><span class="ci">{ic("house")}</span><span>Lycée Édouard Branly · Lyon</span></div>
-      <div class="cmrow"><span class="ci">{ic("target")}</span><span><b>LUMEN</b> – Cité de la Lumière · <b>ENTPE / LTDS</b> – labo BPMNP</span></div>
+      <div class="cmrow"><b>Téo Trompier</b> · candidat E2 · sous-équipe JavaScript</div>
+      <div class="cmrow">Lycée Édouard Branly · Lyon</div>
+      <div class="cmrow"><b>LUMEN</b> – Cité de la Lumière · <b>ENTPE / LTDS</b> · labo BPMNP</div>
     </div>
     <div class="coverlogos">
       <div class="ll">Pile technique</div>
@@ -301,9 +300,7 @@ S.append(slide(f'''<div class="body cover">
       </div>
     </div>
   </div>
-  <div class="media" style="flex:1"><div style="display:flex;flex-direction:column;align-items:center;width:100%">
-    <img class="shot" src="{IMG['home']}"><div class="cap">{ic("eye")} Page d'accueil de ColorRoom Games</div>
-  </div></div>
+  <div class="media" style="flex:1"><img class="shot" src="{IMG['home']}"></div>
 </div>'''))
 
 # 2 SOMMAIRE (aligné sur le déroulé réel des diapositives)
