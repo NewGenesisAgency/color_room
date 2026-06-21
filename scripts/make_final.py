@@ -502,7 +502,6 @@ S.append(slide(head("Technologies mises en œuvre","La pile technique","boxes",m
  tech("css","CSS","langage de style")+tech("lucide","Lucide","icônes")+
  tech("ollama","Ollama","exécution de modèles IA en local")+
  '</div>'
- '<div style="text-align:center;margin-top:14px;font-size:12.5px;color:var(--muted)">Tests automatisés avec <b>Playwright</b></div>'
  '</div>'))
 
 # 12 RESEAU
