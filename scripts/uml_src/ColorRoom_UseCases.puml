@@ -1,66 +1,68 @@
 @startuml
 left to right direction
-skinparam dpi 160
+skinparam dpi 150
 skinparam defaultFontName Inter
-skinparam defaultFontSize 15
+skinparam defaultFontSize 14
 skinparam ArrowColor #5b6472
 skinparam usecaseBorderColor #6b7280
 skinparam rectangleBorderColor #9aa3b2
 
 actor "Apprenant" as AP
 actor "Enseignant" as EN
+actor "Admin" as AD
 EN --|> AP
+AD --|> EN
 
 rectangle "ColorRoom Serious game" {
-  usecase "Choisir le jeu" as UC_choisir #AEEBFF
-  usecase "Choisir un type\nde jeux" as UC_type #AEEBFF
-  usecase "Choisir un niveau" as UC_niveau #AEEBFF
-  usecase "Jouer" as UC_jouer #AEEBFF
-  usecase "Visualiser les\nrésultats" as UC_visu #AEEBFF
-  usecase "S'identifier" as UC_id #AEEBFF
+  usecase "Créer un compte" as UC_reg #AEEBFF
+  usecase "Rejoindre une classe" as UC_join #AEEBFF
+  usecase "S'identifier" as UC_login #AEEBFF
+  usecase "Jouer" as UC_play #AEEBFF
+  usecase "Appliquer des scènes" as UC_scene #AEEBFF
+  usecase "Mesurer la couleur\n(CS-160)" as UC_measure #AEEBFF
+  usecase "Visualiser ses résultats" as UC_results #AEEBFF
   usecase "Commander les\nplaques lumineuses" as UC_cmd #AEEBFF
-  usecase "Appliquer\ndes scènes" as UC_scenes #AEEBFF
-  usecase "Créer des comptes\napprenants" as UC_comptes #AEEBFF
-  usecase "Gérer les scores" as UC_scores #AEEBFF
-  usecase "Acquérir des\nmesures" as UC_mesures #CCF2CF
-  usecase "Tester les\ncommandes" as UC_testcmd #CCF2CF
-  usecase "Tester les plaques" as UC_testpl #F8CBCB
-  usecase "Créer/Modifier\ndes jeux" as UC_jeux #D9C9F2
-  usecase "Concevoir l'interface\nutilisateur (UI)" as UC_ui #D9C9F2
-  usecase "Programmer la\nlogique" as UC_logique #D9C9F2
+
+  usecase "Gérer les classes\net les élèves" as UC_classes #D9C9F2
+  usecase "Créer / modifier\ndes jeux" as UC_edit #D9C9F2
+  usecase "Concevoir\nl'interface" as UC_ui #D9C9F2
+  usecase "Programmer\nla logique" as UC_logic #D9C9F2
+  usecase "Générer un jeu\npar IA" as UC_ai #D9C9F2
+  usecase "Configurer les\nAPI / matériel" as UC_config #D9C9F2
+
+  usecase "Gérer les\nutilisateurs" as UC_users #F8CBCB
 }
 
-node "Logiciel de commande\net plaques lumineuse" as SYS
-node "Appareils de mesure" as MES
+node "Plaques LED\n(supervision)" as SYS
+node "Colorimètre CS-160" as CS
 
-AP --> UC_choisir
-AP --> UC_jouer
-AP --> UC_visu
-AP --> UC_id
-EN --> UC_testpl
-EN --> UC_testcmd
-EN --> UC_comptes
-EN --> UC_jeux
-EN --> UC_scores
+AP --> UC_reg
+AP --> UC_join
+AP --> UC_login
+AP --> UC_play
+AP --> UC_scene
+AP --> UC_measure
+AP --> UC_results
+EN --> UC_classes
+EN --> UC_edit
+EN --> UC_config
+AD --> UC_users
 
-UC_choisir ..> UC_type : <<include>>
-UC_choisir ..> UC_niveau : <<include>>
-UC_jouer ..> UC_cmd : <<include>>
-UC_jouer ..> UC_mesures : <<include>>
-UC_scenes ..> UC_cmd : <<extend>>
-UC_jeux ..> UC_ui : <<include>>
-UC_jeux ..> UC_logique : <<include>>
+UC_reg ..> UC_join : <<extend>>
+UC_play ..> UC_cmd : <<include>>
+UC_scene ..> UC_cmd : <<include>>
+UC_measure ..> UC_cmd : <<include>>
+UC_edit ..> UC_ui : <<include>>
+UC_edit ..> UC_logic : <<include>>
+UC_ai ..> UC_edit : <<extend>>
 
 UC_cmd --> SYS
-UC_mesures --> MES
-UC_testcmd --> MES
-UC_testpl --> SYS
+UC_measure --> CS
 
 legend right
-|= |= Responsable et perimetre |
-|<#AEEBFF>  | E2 : UI/UX, Base de donnees, Gestion utilisateurs |
-|<#CCF2CF>  | E1 : Serveur, Docker, CI-CD, Instruments mesure |
-|<#D9C9F2>  | E3 : Creation jeux, Execution, Composants |
-|<#F8CBCB>  | E4 : API REST ColorRoom, Tests, Documentation |
+|= |= Rôle minimum requis |
+|<#AEEBFF>  | Apprenant |
+|<#D9C9F2>  | Enseignant (hérite Apprenant) |
+|<#F8CBCB>  | Admin (hérite Enseignant) |
 endlegend
 @enduml
