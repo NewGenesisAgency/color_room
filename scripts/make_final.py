@@ -32,7 +32,7 @@ def luc_inner(name):
     return m.group(1).strip()
 LIST=["house","gamepad-2","bot","lock","database","share-2","palette","cpu","layout-dashboard",
       "target","users","code-xml","file-text","boxes","zap","circle-check","chart-column",
-      "network","puzzle","eye","sparkles","flask-conical"]
+      "network","puzzle","eye","sparkles","flask-conical","wrench"]
 SPRITE='<svg width="0" height="0" style="position:absolute">'+"".join(
     f'<symbol id="ic-{n}" viewBox="0 0 24 24">{luc_inner(n)}</symbol>' for n in LIST)+'</svg>'
 def ic(name): return f'<svg class="ic"><use href="#ic-{name}"></use></svg>'
@@ -113,11 +113,32 @@ code{font-family:"Inter",Arial,sans-serif;font-size:.9em;font-weight:600;backgro
     background:rgba(255,255,255,.82);
     box-shadow:0 8px 24px rgba(17,19,26,.07),inset 0 1px 0 rgba(255,255,255,.7)}
 .role.me2{border-color:rgba(109,74,255,.55);background:linear-gradient(150deg,rgba(247,245,255,.75),rgba(255,255,255,.5));box-shadow:0 10px 28px rgba(109,74,255,.18),inset 0 1px 0 rgba(255,255,255,.8)}
-.role b{font-size:15.5px;color:var(--ink)}
-.role .tag{font-size:10px;font-weight:800;color:#fff;background:var(--accent);border-radius:20px;padding:2px 9px;margin-left:7px}
-.role span{display:block;font-size:13px;color:var(--muted);margin-top:4px;line-height:1.35}
-.lab{font-weight:700;color:var(--ink);font-size:17px;margin-bottom:9px}
+.role b{font-size:15px;color:var(--ink)}
+.role .tag{display:inline-block;font-size:10px;font-weight:800;color:#fff;background:var(--accent);border-radius:20px;padding:2px 9px;margin-left:7px;vertical-align:middle}
+.role span{display:block;font-size:12.5px;color:var(--muted);margin-top:4px;line-height:1.35}
+/* carte membre avec avatar + icone */
+.role.mb{display:flex;gap:13px;align-items:flex-start;padding:14px 16px}
+.role .ava{width:44px;height:44px;border-radius:13px;flex-shrink:0;display:grid;place-items:center;
+    font-family:"Bricolage Grotesque",Inter,sans-serif;font-weight:800;font-size:16px;color:#fff;letter-spacing:.02em}
+.role .rico{margin-left:auto;color:var(--accent);align-self:center;opacity:.85}
+.role .rico .ic{width:24px;height:24px}
+.role.me2 .rico{color:var(--accent)}
+.teams{display:flex;gap:14px;width:100%}
+.teamchip{flex:1;display:flex;align-items:center;gap:11px;border:1px solid var(--line);border-radius:13px;padding:11px 15px;background:#fff}
+.teamchip.on{border-color:rgba(109,74,255,.4);background:#f7f5ff}
+.teamchip .tci{width:34px;height:34px;border-radius:10px;background:#f1eeff;color:var(--accent);display:grid;place-items:center;flex-shrink:0}
+.teamchip b{font-size:14px;color:var(--ink)}
+.teamchip small{display:block;font-size:11.5px;color:var(--muted);margin-top:1px}
+.lab{font-weight:700;color:var(--ink);font-size:17px;margin-bottom:9px;display:flex;align-items:center;gap:8px}
+.lab .ic{width:19px;height:19px}
 .lab.a{color:var(--accent)} .lab.b{color:var(--accent2)}
+/* lignes d'objectifs/contraintes avec pastille d'icone */
+.feat{display:flex;flex-direction:column;gap:12px}
+.frow{display:flex;gap:12px;align-items:flex-start}
+.frow .fi{width:32px;height:32px;border-radius:10px;background:#f1eeff;color:var(--accent);display:grid;place-items:center;flex-shrink:0}
+.frow .fi .ic{width:18px;height:18px}
+.frow.b .fi{background:#e6f7f3;color:var(--accent2)}
+.frow .ft{font-size:15px;line-height:1.4;color:var(--ink2);padding-top:5px}
 .split{display:flex;gap:30px;width:100%}
 .fix{display:flex;gap:12px;align-items:stretch;margin-bottom:12px}
 .fix .pb{flex:1;border:1px solid #f1d6d6;background:#fdf4f4;color:#b4434b;border-radius:12px;padding:12px 15px;font-weight:600;font-size:14px;display:flex;align-items:center;gap:9px}
@@ -258,19 +279,23 @@ S.append(slide(head("Une installation lumineuse unique","Le système ColorRoom",
  </div></div></div>'''))
 
 # 5 PROBLEMATIQUE
+def frow(icon,text,b=False):
+    return f'<div class="frow{" b" if b else ""}"><div class="fi">{ic(icon)}</div><div class="ft">{text}</div></div>'
 S.append(slide(head("Le besoin","Problématique et objectifs","puzzle")+
- '''<div class="body" style="flex-direction:column;gap:16px">
-   <div class="quote">Le logiciel de recherche de la ColorRoom est trop complexe pour l'initiation. Comment rendre la salle accessible aux apprenants, de façon ludique et pédagogique ?</div>
-   <div class="split">
-     <div class="col"><div class="lab a">Objectifs</div><ul>
-       <li>Une série de <b>serious games</b> sur la lumière et la couleur</li>
-       <li>Accessible depuis un navigateur, sans installation</li>
-       <li>Adaptable à une seule plaque lumineuse</li></ul></div>
-     <div class="col"><div class="lab b">Contraintes</div><ul>
-       <li><b>Raspberry Pi 5</b> + SSD, Docker imposé</li>
-       <li>Fonctionnement <b>hors-ligne</b> (réseau local)</li>
-       <li>Latence des plaques à compenser</li></ul></div>
-   </div></div>'''))
+ '<div class="body" style="flex-direction:column;gap:20px;justify-content:center">'
+ '<div class="quote">Le logiciel de recherche de la ColorRoom est trop complexe pour l\'initiation. Comment rendre la salle accessible aux apprenants, de façon ludique et pédagogique ?</div>'
+ '<div class="split">'
+ f'<div class="col"><div class="lab a">{ic("target")}Objectifs</div><div class="feat">'
+ +frow("gamepad-2","Une série de <b>serious games</b> sur la lumière et la couleur")
+ +frow("eye","Accessible depuis un <b>navigateur</b>, sans installation")
+ +frow("cpu","Adaptable à une <b>seule plaque</b> lumineuse")
+ +'</div></div>'
+ f'<div class="col"><div class="lab b">{ic("lock")}Contraintes</div><div class="feat">'
+ +frow("boxes","<b>Raspberry Pi 5</b> + SSD, Docker imposé",b=True)
+ +frow("share-2","Fonctionnement <b>hors-ligne</b> (réseau local)",b=True)
+ +frow("zap","<b>Latence</b> des plaques à compenser",b=True)
+ +'</div></div>'
+ '</div></div>'))
 
 # 6 USE CASES
 S.append(diagram("Acteurs et fonctions attendues","Diagramme de cas d'utilisation",IMG['uc'],"users",
@@ -280,13 +305,24 @@ S.append(diagram("Acteurs et fonctions attendues","Diagramme de cas d'utilisatio
    "<i>Jouer</i> et <i>Mesurer</i> <b>incluent</b> <i>Allumer les dalles</i>")))
 
 # 7 EQUIPE
+def member(ini,name,role,icon,bg,me=False):
+    tag='<span class="tag">MOI</span>' if me else ''
+    return (f'<div class="role mb{" me2" if me else ""}">'
+            f'<div class="ava" style="background:{bg}">{ini}</div>'
+            f'<div style="min-width:0"><b>{name}{tag}</b><span>{role}</span></div>'
+            f'<div class="rico">{ic(icon)}</div></div>')
 S.append(slide(head("8 étudiants · sous-équipes JavaScript et Python","Équipe et répartition","users",me=True)+
- '''<div class="body" style="flex-direction:column;gap:14px"><div class="roles">
-   <div class="role"><b>E1 · Maxime Bonnevay</b><span>Infrastructure Pi & Docker, CI/CD, intégration colorimètre, sécurité</span></div>
-   <div class="role me2"><b>E2 · Téo Trompier<span class="tag">MOI</span></b><span>Base de données, API, UI/UX, jeux solo + multijoueur, proxy LED, documentation</span></div>
-   <div class="role"><b>E3 · Ilyes Arbadji</b><span>Éditeur de jeux (hors de mon périmètre)</span></div>
-   <div class="role"><b>E4 · Hasan Akyuz</b><span>Tests de l'API, simulateur de plaques, Swagger / Postman</span></div>
- </div></div>'''))
+ '<div class="body" style="flex-direction:column;gap:16px;justify-content:center">'
+ '<div class="teams">'
+ f'<div class="teamchip on"><div class="tci">{ic("code-xml")}</div><div><b>Équipe JavaScript · React</b><small>E1 → E4 · dont moi (E2)</small></div></div>'
+ f'<div class="teamchip"><div class="tci">{ic("boxes")}</div><div><b>Équipe Python · NiceGUI</b><small>E5 → E8</small></div></div>'
+ '</div>'
+ '<div class="roles">'
+ +member("MB","E1 · Maxime Bonnevay","Infrastructure Pi &amp; Docker, CI/CD, intégration colorimètre, sécurité","wrench","#1fb6a6")
+ +member("TT","E2 · Téo Trompier","Base de données, API, UI/UX, jeux solo + multijoueur, proxy LED, documentation","code-xml","#6d4aff",me=True)
+ +member("IA","E3 · Ilyes Arbadji","Éditeur de jeux no-code (hors de mon périmètre)","puzzle","#3b6dff")
+ +member("HA","E4 · Hasan Akyuz","Tests de l'API, simulateur de plaques, Swagger / Postman","circle-check","#f5a524")
+ +'</div></div>'))
 
 # 7b PLANIFICATION (Gantt réel)
 S.append(slide(head("Planification du projet","Diagramme de Gantt","chart-column")+
