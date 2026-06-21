@@ -171,12 +171,12 @@ Projet d'**équipe de 8**, 2 sous-équipes (JavaScript / Python). **Moi = E2.**
 
 ## 6. Montrer/expliquer mon code et son évolution (2 min)
 
-**5 extraits à ouvrir en live** (les mêmes que dans le deck, slides 20/22/24/26/34) :
+**5 extraits à ouvrir en live** (les mêmes que dans le deck, slides 20/22/24/25/34) :
 
 1. **`app/app/_components/Room3D.tsx`** : **Three.js** : `new THREE.Scene()` + `WebGLRenderer`, un `Mesh` par dalle, boucle `requestAnimationFrame`, `forceContextLoss` au démontage.
 2. **`app/app/api/auth/register/route.ts`** : **variable transactionnelle** : `db.transaction(() => { … })()` → user + adhésion classe, **tout-ou-rien** (BEGIN/COMMIT/ROLLBACK, ACID).
 3. **`app/app/api/supervision/batch/route.ts`** : **variable atomique** : compteur `hwInFlight` + file de Promises (`acquireHwSlot`/`releaseHwSlot`), atomique car boucle d'événements **mono-thread**, borné à **2 slots**.
-4. **`app/lib/auth.ts`** : `hashPassword` : `pbkdf2Sync(password, salt, 100_000, 64, 'sha512')`, format `sel:hash`. → *« jamais de mot de passe en clair. »*
+4. **`app/app/_components/GameColorSpeed.tsx`** : **variable volatile** : `useRef` (combo, dalle, chrono) = mémoire **sans re-rendu**, perdue au reload ; on ne persiste que le score. *(PBKDF2 reste cité sur la slide Sécurité.)*
 5. **`app/app/_components/GamePuissance4.tsx`** : `scoreWindow` + `minimax` alpha-bêta. → *« l'intelligence de l'IA (pas un réseau de neurones). »*
 
 **Évolution dans le temps (à raconter avec `git log`) :**
