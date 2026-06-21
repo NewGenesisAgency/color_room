@@ -4,11 +4,16 @@
    icones Lucide officielles + logos des technos. Genere HTML puis PDF."""
 import base64, pathlib, re
 
-SHOTS="scripts/shots"; UML="scripts/uml"; LOGO="scripts/logos"; LUC="scripts/lucide"
+SHOTS="scripts/shots"; UML="scripts/uml"; LOGO="scripts/logos"; LUC="scripts/lucide"; PHOTO="scripts/photos"
 def b64(path): return "data:image/png;base64,"+base64.b64encode(pathlib.Path(path).read_bytes()).decode()
+def b64f(path):
+    ext=pathlib.Path(path).suffix.lower().lstrip(".")
+    mime="jpeg" if ext in ("jpg","jpeg") else ext
+    return f"data:image/{mime};base64,"+base64.b64encode(pathlib.Path(path).read_bytes()).decode()
 def shot(n): return b64(f"{SHOTS}/{n}.png")
 def uml(n):  return b64(f"{UML}/ColorRoom_{n}.png")
 def logo(n): return "data:image/svg+xml;base64,"+base64.b64encode(pathlib.Path(f"{LOGO}/{n}.svg").read_bytes()).decode()
+def photo(n): return b64f(f"{PHOTO}/{n}")
 
 IMG={
  "home":shot("home"),"jeux":shot("jeux"),"gestion":shot("gestion"),"chroma":shot("chromaticite"),
@@ -18,6 +23,7 @@ IMG={
  "smp":uml("Seq_MP"),"ej":uml("Etats_Jeu"),"ecs":uml("Etats_CS160"),"remap":uml("Activite_Remap"),
 }
 LOGOS={n:logo(n) for n in ["react","nextdotjs","typescript","sqlite","docker","threedotjs","nodedotjs","raspberrypi"]}
+PHO={"lumen":photo("lumen.png"),"map":photo("map.png"),"plaque":photo("plaque.jpg"),"gantt":photo("gantt.png")}
 
 # --- Sprite Lucide (icones officielles, ISC) ---
 def luc_inner(name):
@@ -41,20 +47,33 @@ CSS = """
 body{background:var(--ghost);font-family:"Inter",Arial,sans-serif;color:var(--ink2);
      padding:30px 0 64px;-webkit-font-smoothing:antialiased}
 .deck{display:flex;flex-direction:column;align-items:center;gap:26px}
-.slide{width:min(1180px,95vw);aspect-ratio:16/9;background:#fff;border-radius:20px;
+.slide{width:min(1180px,95vw);aspect-ratio:16/9;border-radius:20px;
        overflow:hidden;position:relative;display:flex;flex-direction:column;
+       background:linear-gradient(135deg,#ffffff 0%,#fbfaff 52%,#f5fbfa 100%);
        box-shadow:0 1px 0 rgba(17,19,26,.04),0 18px 50px rgba(17,19,26,.10);border:1px solid #edf0f5}
+/* liquid glass : halos colorés diffus derrière les panneaux dépolis */
+.slide::before{content:"";position:absolute;inset:0;pointer-events:none;z-index:0;
+       background:radial-gradient(46% 60% at 88% 8%,rgba(109,74,255,.13),transparent 60%),
+                 radial-gradient(42% 55% at 6% 96%,rgba(31,182,166,.13),transparent 60%),
+                 radial-gradient(30% 40% at 50% 50%,rgba(59,109,255,.05),transparent 70%)}
+.slide>*{position:relative;z-index:1}
 h1,h2,h3,.disp,.big,.num,.lab,.toc .n{font-family:"Bricolage Grotesque","Inter",Arial,sans-serif;letter-spacing:-.02em}
 .ic{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;display:block}
 .head{padding:28px 46px 0;display:flex;align-items:center;gap:15px}
-.hicon{width:48px;height:48px;border-radius:14px;background:#f1eeff;color:var(--accent);
-       display:grid;place-items:center;flex-shrink:0}
+.hicon{width:48px;height:48px;border-radius:14px;color:var(--accent);
+       display:grid;place-items:center;flex-shrink:0;
+       background:linear-gradient(150deg,rgba(109,74,255,.18),rgba(109,74,255,.07));
+       border:1px solid rgba(255,255,255,.7);
+       box-shadow:0 6px 16px rgba(109,74,255,.16),inset 0 1px 0 rgba(255,255,255,.8);
+       -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
 .hicon .ic{width:25px;height:25px}
 .kick{font-size:12px;font-weight:600;letter-spacing:.15em;text-transform:uppercase;color:var(--accent)}
 .head h2{font-size:32px;font-weight:700;color:var(--ink);margin-top:5px;line-height:1.05}
 .rule{height:3px;width:52px;background:var(--accent);border-radius:2px;margin:13px 0 0 109px}
-.me{position:absolute;top:30px;right:46px;font-size:11px;font-weight:700;color:var(--accent);
-    border:1px solid var(--accent);border-radius:30px;padding:4px 11px;letter-spacing:.05em}
+.me{position:absolute;top:30px;right:46px;font-size:11px;font-weight:700;color:var(--accent);z-index:2;
+    border:1px solid rgba(109,74,255,.5);border-radius:30px;padding:4px 11px;letter-spacing:.05em;
+    background:rgba(255,255,255,.55);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
+    box-shadow:0 4px 14px rgba(109,74,255,.14),inset 0 1px 0 rgba(255,255,255,.8)}
 .body{flex:1;padding:22px 46px 40px;display:flex;gap:30px;min-height:0}
 .col{flex:1;min-width:0}
 ul{list-style:none;display:flex;flex-direction:column;gap:12px}
@@ -67,6 +86,10 @@ code{font-family:"Inter",Arial,sans-serif;font-size:.9em;font-weight:600;backgro
 .pageno{position:absolute;bottom:16px;right:20px;font-size:11.5px;color:#aeb6c6;font-weight:500}
 .diagram{max-height:100%;max-width:100%;width:auto;display:block;margin:auto;border:1px solid var(--line);border-radius:10px;background:#fff}
 .shot{width:100%;border-radius:12px;border:1px solid var(--line);box-shadow:0 10px 30px rgba(17,19,26,.12);display:block}
+.photo{border-radius:14px;border:1px solid rgba(255,255,255,.7);display:block;object-fit:cover;
+    box-shadow:0 14px 38px rgba(17,19,26,.16),inset 0 1px 0 rgba(255,255,255,.4)}
+.photostack{display:flex;flex-direction:column;gap:12px;width:100%;height:100%;justify-content:center}
+.cap{font-size:11.5px;color:var(--muted);font-weight:500;margin-top:6px;display:flex;align-items:center;gap:6px}
 .media{flex:1;display:flex;align-items:center;justify-content:center;min-width:0}
 .cover{justify-content:center;padding:0 70px;gap:46px}
 .cover .l{flex:1.25}
@@ -77,16 +100,26 @@ code{font-family:"Inter",Arial,sans-serif;font-size:.9em;font-weight:600;backgro
 .dash{display:flex;gap:6px;margin:14px 0}
 .dash i{width:42px;height:6px;border-radius:3px}
 .toc{display:grid;grid-template-columns:1fr 1fr;gap:14px 46px;width:100%;align-content:center}
-.toc .it{display:flex;gap:13px;align-items:center;font-size:16.5px;color:var(--ink);font-weight:600}
-.toc .it .ico{width:38px;height:38px;border-radius:11px;background:#f4f5f9;color:var(--accent);display:grid;place-items:center;flex-shrink:0}
+.toc .it{display:flex;gap:13px;align-items:center;font-size:16.5px;color:var(--ink);font-weight:600;
+    border-radius:14px;padding:12px 15px;
+    background:rgba(255,255,255,.55);border:1px solid rgba(255,255,255,.7);
+    -webkit-backdrop-filter:blur(14px) saturate(140%);backdrop-filter:blur(14px) saturate(140%);
+    box-shadow:0 8px 26px rgba(17,19,26,.07),inset 0 1px 0 rgba(255,255,255,.7)}
+.toc .it .ico{width:38px;height:38px;border-radius:11px;color:var(--accent);display:grid;place-items:center;flex-shrink:0;
+    background:linear-gradient(150deg,rgba(109,74,255,.16),rgba(109,74,255,.06));border:1px solid rgba(255,255,255,.7)}
 .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;width:100%;align-self:center}
-.stat{border:1px solid var(--line);border-radius:16px;padding:20px 22px;display:flex;flex-direction:column;gap:5px}
-.stat .si{width:38px;height:38px;border-radius:11px;background:#f4f5f9;color:var(--accent);display:grid;place-items:center;margin-bottom:6px}
+.stat{border:1px solid rgba(255,255,255,.7);border-radius:16px;padding:20px 22px;display:flex;flex-direction:column;gap:5px;
+    background:rgba(255,255,255,.5);-webkit-backdrop-filter:blur(16px) saturate(140%);backdrop-filter:blur(16px) saturate(140%);
+    box-shadow:0 10px 30px rgba(17,19,26,.08),inset 0 1px 0 rgba(255,255,255,.75)}
+.stat .si{width:38px;height:38px;border-radius:11px;color:var(--accent);display:grid;place-items:center;margin-bottom:6px;
+    background:linear-gradient(150deg,rgba(109,74,255,.16),rgba(109,74,255,.06));border:1px solid rgba(255,255,255,.7)}
 .stat .num{font-size:38px;font-weight:800;color:var(--ink);line-height:1}
 .stat .lbl{font-size:13px;color:var(--muted);font-weight:500}
 .roles{display:grid;grid-template-columns:1fr 1fr;gap:14px;width:100%}
-.role{border:1px solid var(--line);border-radius:14px;padding:15px 17px;background:#fff}
-.role.me2{border-color:var(--accent);background:#f7f5ff;box-shadow:0 6px 18px rgba(109,74,255,.12)}
+.role{border:1px solid rgba(255,255,255,.7);border-radius:14px;padding:15px 17px;
+    background:rgba(255,255,255,.5);-webkit-backdrop-filter:blur(14px) saturate(140%);backdrop-filter:blur(14px) saturate(140%);
+    box-shadow:0 8px 24px rgba(17,19,26,.07),inset 0 1px 0 rgba(255,255,255,.7)}
+.role.me2{border-color:rgba(109,74,255,.55);background:linear-gradient(150deg,rgba(247,245,255,.75),rgba(255,255,255,.5));box-shadow:0 10px 28px rgba(109,74,255,.18),inset 0 1px 0 rgba(255,255,255,.8)}
 .role b{font-size:15.5px;color:var(--ink)}
 .role .tag{font-size:10px;font-weight:800;color:#fff;background:var(--accent);border-radius:20px;padding:2px 9px;margin-left:7px}
 .role span{display:block;font-size:13px;color:var(--muted);margin-top:4px;line-height:1.35}
@@ -99,11 +132,16 @@ code{font-family:"Inter",Arial,sans-serif;font-size:.9em;font-weight:600;backgro
 .fix .so{flex:1.15;border:1px solid #cfeee2;background:#f2fbf7;color:#15795f;border-radius:12px;padding:12px 15px;font-weight:600;font-size:13.5px;display:flex;align-items:center;gap:9px}
 .center{align-items:center;justify-content:center;text-align:center;flex-direction:column;gap:8px}
 .big{font-size:52px;font-weight:800;color:var(--ink)}
-.quote{border-left:4px solid var(--accent);background:#f7f5ff;border-radius:0 12px 12px 0;
-       padding:16px 20px;font-size:18px;font-weight:600;color:var(--ink);line-height:1.4}
+.quote{border-left:4px solid var(--accent);border-radius:0 14px 14px 0;
+       padding:16px 20px;font-size:18px;font-weight:600;color:var(--ink);line-height:1.4;
+       background:linear-gradient(120deg,rgba(247,245,255,.8),rgba(255,255,255,.45));
+       -webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);
+       box-shadow:0 8px 24px rgba(109,74,255,.10),inset 0 1px 0 rgba(255,255,255,.6)}
 .stackgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;width:100%;align-self:center}
-.tech{border:1px solid var(--line);border-radius:16px;padding:20px 16px;display:flex;flex-direction:column;
-      align-items:center;gap:10px;text-align:center}
+.tech{border:1px solid rgba(255,255,255,.7);border-radius:16px;padding:20px 16px;display:flex;flex-direction:column;
+      align-items:center;gap:10px;text-align:center;
+      background:rgba(255,255,255,.5);-webkit-backdrop-filter:blur(16px) saturate(140%);backdrop-filter:blur(16px) saturate(140%);
+      box-shadow:0 10px 28px rgba(17,19,26,.08),inset 0 1px 0 rgba(255,255,255,.75)}
 .tech img{height:46px;width:auto}
 .tech b{font-size:14.5px;color:var(--ink)}
 .tech small{font-size:11.5px;color:var(--muted)}
@@ -120,7 +158,9 @@ code{font-family:"Inter",Arial,sans-serif;font-size:.9em;font-weight:600;backgro
 .src .ic{width:16px;height:16px;color:var(--accent);flex-shrink:0}
 .src b{color:var(--accent);font-weight:600}
 .vargrid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:13px;width:100%}
-.varc{border:1px solid var(--line);border-radius:13px;padding:14px 15px}
+.varc{border:1px solid rgba(255,255,255,.7);border-radius:13px;padding:14px 15px;
+    background:rgba(255,255,255,.5);-webkit-backdrop-filter:blur(14px) saturate(140%);backdrop-filter:blur(14px) saturate(140%);
+    box-shadow:0 8px 22px rgba(17,19,26,.07),inset 0 1px 0 rgba(255,255,255,.7)}
 .varc .vt{font-weight:700;color:var(--ink);font-size:14.5px;display:flex;align-items:center;gap:8px}
 .varc .vt .ic{width:18px;height:18px;color:var(--accent)}
 .varc p{font-size:12px;color:var(--muted);margin-top:5px;line-height:1.4}
@@ -186,24 +226,30 @@ toc=[("target","Contexte et système"),("users","Cas d'utilisation et équipe"),
 toc_html="".join(f'<div class="it"><span class="ico">{ic(i)}</span>{t}</div>' for i,t in toc)
 S.append(slide(head("Plan de la présentation","Sommaire","layout-dashboard")+f'<div class="body"><div class="toc">{toc_html}</div></div>'))
 
-# 3 CONTEXTE
-S.append(media_slide("Le projet et son commanditaire","Contexte et partenaire",
- '''<ul><li>Commanditaire : laboratoire de recherche <b>ENTPE / LTDS / BPMNP</b></li>
+# 3 CONTEXTE (vraies photos : bâtiment LUMEN + carte Lyon)
+S.append(slide(head("Le projet et son commanditaire","Contexte et partenaire","target")+
+ f'''<div class="body"><div class="col" style="flex:0 0 44%;display:flex;flex-direction:column;justify-content:center"><ul>
+   <li>Commanditaire : laboratoire de recherche <b>ENTPE / LTDS</b>, équipe <b>BPMNP</b></li>
    <li>ColorRoom hébergée à <b>LUMEN – La Cité de la Lumière</b> (Lyon Confluence)</li>
    <li>Équipement scientifique : <b>2 cellules jumelles</b> d'analyse des effets colorés</li>
-   <li>Éclairages à spectres précis et hautes intensités</li>
-   <li class="sub">Contacts : M. Labayrade, M. Vella · Professeur : M. Delbosc</li></ul>''',IMG['home'],"target",me=False))
+   <li>Éclairages à <b>spectres précis</b> et hautes intensités</li>
+   <li class="sub">Contacts : M. Labayrade, M. Vella · Professeur : M. Delbosc</li></ul></div>
+   <div class="media"><div class="photostack">
+     <div><img class="photo" src="{PHO['lumen']}" style="width:100%;height:215px"><div class="cap">{ic("target")} LUMEN · Cité de la Lumière (Lyon Confluence)</div></div>
+     <div><img class="photo" src="{PHO['map']}" style="width:100%;height:150px"><div class="cap">{ic("network")} Implantation : LUMEN &amp; ENTPE, agglomération lyonnaise</div></div>
+   </div></div></div>'''))
 
-# 4 SYSTEME
+# 4 SYSTEME (vraie photo de la plaque + stats + RS-485)
 S.append(slide(head("Une installation lumineuse unique","Le système ColorRoom","cpu")+
- '''<div class="body"><div class="stats">
-   <div class="stat"><div class="si">'''+ic("cpu")+'''</div><div class="num">42</div><div class="lbl">plaques lumineuses</div></div>
-   <div class="stat"><div class="si">'''+ic("palette")+'''</div><div class="num">32</div><div class="lbl">canaux LED par dalle</div></div>
-   <div class="stat"><div class="si">'''+ic("zap")+'''</div><div class="num">404–780</div><div class="lbl">spectre couvert (nm)</div></div>
-   <div class="stat"><div class="si">'''+ic("layout-dashboard")+'''</div><div class="num">2</div><div class="lbl">cellules jumelles</div></div>
-   <div class="stat"><div class="si">'''+ic("network")+'''</div><div class="num">1</div><div class="lbl">Raspberry Pi 5 autonome</div></div>
-   <div class="stat"><div class="si">'''+ic("gamepad-2")+'''</div><div class="num">7+</div><div class="lbl">jeux éducatifs</div></div>
- </div></div>'''))
+ f'''<div class="body"><div class="col" style="flex:0 0 34%;display:flex;flex-direction:column;justify-content:center">
+   <img class="photo" src="{PHO['plaque']}" style="width:100%;height:330px">
+   <div class="cap">{ic("zap")} LED en bandes sur les bords d'une plaque · 2360 LED, ~300 W</div></div>
+   <div class="col" style="flex:1"><div class="stats" style="grid-template-columns:repeat(2,1fr);gap:13px">
+   <div class="stat"><div class="si">'''+ic("cpu")+'''</div><div class="num">42</div><div class="lbl">plaques (21 par cellule)</div></div>
+   <div class="stat"><div class="si">'''+ic("palette")+'''</div><div class="num">32</div><div class="lbl">canaux = 24 spectres étroits + 8 blancs</div></div>
+   <div class="stat"><div class="si">'''+ic("zap")+'''</div><div class="num">2360</div><div class="lbl">LED par plaque (~300 W max)</div></div>
+   <div class="stat"><div class="si">'''+ic("share-2")+'''</div><div class="num">RS-485</div><div class="lbl">bus de pilotage des dalles</div></div>
+ </div></div></div>'''))
 
 # 5 PROBLEMATIQUE
 S.append(slide(head("Le besoin","Problématique et objectifs","puzzle")+
@@ -231,6 +277,12 @@ S.append(slide(head("8 étudiants · sous-équipes JavaScript et Python","Équip
    <div class="role"><b>E3 · Ilyes Arbadji</b><span>Éditeur de jeux (hors de mon périmètre)</span></div>
    <div class="role"><b>E4 · Hasan Akyuz</b><span>Tests de l'API, simulateur de plaques, Swagger / Postman</span></div>
  </div></div>'''))
+
+# 7b PLANIFICATION (Gantt réel)
+S.append(slide(head("Planification du projet","Diagramme de Gantt","chart-column")+
+ f'''<div class="body" style="padding:14px 40px 30px;flex-direction:column;align-items:center;justify-content:center;gap:8px">
+   <img class="photo" src="{PHO['gantt']}" style="max-height:430px;max-width:100%;width:auto;background:#fff">
+   <div class="cap">{ic("flask-conical")} Jalons par étudiant · ma contribution (E2) suivie tout au long du projet</div></div>'''))
 
 # 8 ARCHITECTURE
 S.append(slide(head("Vue d'ensemble · diagramme de composants","Architecture logicielle","network",me=True)+
@@ -269,8 +321,9 @@ S.append(slide(head("Technologies mises en œuvre","La pile technique","boxes",m
 S.append(slide(head("Docker · Raspberry Pi 5 · diagramme de déploiement","Réseau et déploiement","share-2")+
  f'''<div class="body"><div class="col" style="flex:0 0 38%;display:flex;flex-direction:column;justify-content:center"><ul>
    <li>Image <b>Docker multi-stage</b> (deps → builder → runner), <b>arm64</b></li>
-   <li>App sur le <b>port 8080</b>, supervisée par <b>Portainer</b></li>
+   <li>App supervisée par <b>Portainer</b> · dalles pilotées en <b>RS-485</b></li>
    <li>Wi-Fi local <b>ColorRoom_WiFI</b> ; <b>CS-160 en USB</b></li>
+   <li>Accès depuis tout appareil : <b>http://172.17.40.39/</b></li>
    <li class="sub">SQLite en volume · git pull puis docker compose up</li></ul></div>
    <div class="media"><img class="diagram" src="{IMG['dep']}"></div></div>'''))
 
@@ -402,7 +455,7 @@ S.append(media_slide("Ma partie · physique de la lumière","Mesure colorimétri
  '''<ul><li>Colorimètre <b>Konica Minolta CS-150/160</b> via pont .NET (<code>/api/CS160</code>)</li>
    <li>Tristimulus <b>CIE XYZ</b>, luminance <b>Lv (cd/m²)</b>, chromaticité <b>(x, y)</b></li>
    <li>Tracé sur le <b>diagramme CIE 1931</b> ; écart <b>ΔE</b> pour le score</li>
-   <li>32 canaux = <b>18 spectrales</b> (404–780 nm) + <b>14 phosphore</b></li></ul>''',IMG['chroma'],"palette",ratio="0 0 42%"))
+   <li>32 canaux = <b>24 spectres étroits</b> (proche UV → proche IR) + <b>8 blancs</b></li></ul>''',IMG['chroma'],"palette",ratio="0 0 42%"))
 
 # 25 SEQ CS160
 S.append(diagram("Séquence · mesure","Pilotage du colorimètre CS-160",IMG['scs'],"palette",me=True))
