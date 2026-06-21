@@ -23,7 +23,7 @@ IMG={
  "smp":uml("Seq_MP"),"ej":uml("Etats_Jeu"),"ecs":uml("Etats_CS160"),"remap":uml("Activite_Remap"),
 }
 LOGOS={n:logo(n) for n in ["react","nextdotjs","typescript","sqlite","docker","threedotjs","nodedotjs","raspberrypi","javascript","nodered"]}
-PHO={"lumen":photo("lumen.jpg"),"plaque":photo("plaque.jpg"),"gantt":photo("gantt.png")}
+PHO={"lumen":photo("lumen.jpg"),"map":photo("map.jpg"),"plaque":photo("plaque.jpg"),"gantt":photo("gantt.png")}
 
 # --- Sprite Lucide (icones officielles, ISC) ---
 def luc_inner(name):
@@ -175,9 +175,10 @@ code{font-family:"Inter",Arial,sans-serif;font-size:.9em;font-weight:600;backgro
 .codebar .file{margin-left:8px;font-size:12px;color:#aeb6c6;font-weight:600}
 .code pre{padding:14px 16px;font-family:"Inter",Arial,sans-serif;font-size:12.5px;line-height:1.6;color:#d6def0;white-space:pre-wrap;word-break:break-word;font-feature-settings:"tnum"}
 .code .kw{color:#c792ea} .code .st{color:#86e0ad} .code .cm{color:#737d92} .code .fn{color:#82aaff} .code .nb{color:#f7c668}
-.src{font-size:11.5px;color:var(--muted);margin-top:11px;display:flex;align-items:center;gap:8px;line-height:1.4}
-.src .ic{width:16px;height:16px;color:var(--accent);flex-shrink:0}
-.src b{color:var(--accent);font-weight:600}
+.src{font-size:11px;color:var(--muted);margin-top:11px;display:flex;align-items:flex-start;gap:8px;line-height:1.45;min-width:0}
+.src .ic{width:16px;height:16px;color:var(--accent);flex-shrink:0;margin-top:1px}
+.src span{min-width:0;word-break:break-all;overflow-wrap:anywhere}
+.src b{color:var(--accent);font-weight:600;word-break:normal}
 .vargrid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:13px;width:100%}
 .varc{border:1px solid rgba(255,255,255,.7);border-radius:13px;padding:14px 15px;
     background:rgba(255,255,255,.82);
@@ -237,8 +238,8 @@ def code_slide(kick,title,icon,bullets,filelabel,pre,ghpath,lines):
               f'<span class="dot" style="background:#28c840"></span><span class="file">{filelabel}</span></div>'
               f'<pre>{pre}</pre></div>')
     return slide(head(kick,title,icon,me=True)+
-        f'<div class="body"><div class="col" style="flex:0 0 38%;display:flex;flex-direction:column;justify-content:center">{bullets}{src}</div>'
-        f'<div class="col" style="flex:1;display:flex;align-items:center">{codecard}</div></div>')
+        f'<div class="body"><div class="col" style="flex:0 0 36%;min-width:0;display:flex;flex-direction:column;justify-content:center">{bullets}{src}</div>'
+        f'<div class="col" style="flex:1;min-width:0;display:flex;align-items:center">{codecard}</div></div>')
 
 def diagram(kick,title,img,icon,me=False,notes=None):
     if not notes:
@@ -293,11 +294,8 @@ S.append(slide(head("Le projet et son commanditaire","Contexte et partenaire","t
    <li>Éclairages à <b>spectres précis</b> et hautes intensités</li>
    <li class="sub">Contacts : M. Labayrade, M. Vella · Professeur : M. Delbosc</li></ul></div>
    <div class="media"><div class="photostack">
-     <div><img class="photo" src="{PHO['lumen']}" style="width:100%;height:250px"><div class="cap">{ic("target")} LUMEN · Cité de la Lumière (Lyon Confluence)</div></div>
-     <div class="loccard">
-       <div class="locrow"><div class="lp">{ic("map-pin")}</div><div><b>LUMEN · Cité de la Lumière</b><small>Lyon Confluence · accueille la ColorRoom</small></div></div>
-       <div class="locrow b"><div class="lp">{ic("map-pin")}</div><div><b>ENTPE / LTDS · labo BPMNP</b><small>Campus de Vaulx-en-Velin · commanditaire</small></div></div>
-     </div>
+     <div><img class="photo" src="{PHO['lumen']}" style="width:100%;height:212px"><div class="cap">{ic("target")} LUMEN · Cité de la Lumière (Lyon Confluence)</div></div>
+     <div><img class="photo" src="{PHO['map']}" style="width:100%;height:150px"><div class="cap">{ic("map-pin")} Implantation : LUMEN (Confluence) &amp; ENTPE (agglomération lyonnaise)</div></div>
    </div></div></div>'''))
 
 # 4 SYSTEME (vraie photo de la plaque + stats + RS-485)
@@ -447,20 +445,27 @@ S.append(slide(head("Ma partie · données · modèle relationnel","Base de donn
    <div class="media"><img class="diagram" src="{IMG['erd']}"></div></div>'''))
 
 # 14b CODE transaction atomique
-S.append(code_slide("Extrait de code · données","Transaction atomique (ACID)","circle-check",
- '''<ul><li>L'inscription crée l'utilisateur <b>et</b> son adhésion de classe</li>
-   <li><b>Tout-ou-rien</b> : si une étape échoue, rien n'est écrit (pas de compte « à moitié créé »)</li>
-   <li>Garanti par <code>db.transaction()</code> de better-sqlite3</li></ul>''',
+S.append(code_slide("Extrait de code · données","Variable transactionnelle (ACID)","circle-check",
+ '''<ul><li><code>db.transaction()</code> encapsule un <b>BEGIN / COMMIT / ROLLBACK</b></li>
+   <li>L'inscription = INSERT utilisateur <b>+</b> jonction de classe, en <b>une seule unité</b></li>
+   <li><b>Atomicité</b> : exception &rarr; <b>ROLLBACK</b> total, jamais de compte « à moitié créé »</li>
+   <li>Requêtes <b>préparées</b> (<code>prepare</code>) = anti-injection SQL</li></ul>''',
  "app/api/auth/register/route.ts",
- '''<span class="cm">// Tout-ou-rien : si la jonction de classe échoue,</span>
-<span class="cm">// l'utilisateur n'est pas créé non plus.</span>
+ '''<span class="cm">// Variable transactionnelle : tout-ou-rien (ACID).</span>
 <span class="kw">const</span> insertAll = db.<span class="fn">transaction</span>(() =&gt; {
-  db.<span class="fn">prepare</span>(<span class="st">"INSERT INTO crg_users …"</span>).<span class="fn">run</span>(…);
-  <span class="kw">if</span> (classCode) db.<span class="fn">prepare</span>(<span class="st">"INSERT OR IGNORE</span>
-        <span class="st">INTO crg_class_members …"</span>).<span class="fn">run</span>(…);
+  db.<span class="fn">prepare</span>(<span class="st">"INSERT INTO crg_users (id, name,</span>
+    <span class="st">user_type, password_hash, …) VALUES (?,…)"</span>)
+    .<span class="fn">run</span>(id, name, <span class="st">'apprenant'</span>, hash, …);
+
+  <span class="kw">if</span> (classCode?.<span class="fn">trim</span>()) {            <span class="cm">// jonction optionnelle</span>
+    <span class="kw">const</span> cls = db.<span class="fn">prepare</span>(<span class="st">"SELECT id FROM</span>
+      <span class="st">crg_classes WHERE code = ?"</span>).<span class="fn">get</span>(code);
+    <span class="kw">if</span> (cls) db.<span class="fn">prepare</span>(<span class="st">"INSERT OR IGNORE INTO</span>
+      <span class="st">crg_class_members …"</span>).<span class="fn">run</span>(rid, cls.id, id);
+  }
 });
-<span class="fn">insertAll</span>();   <span class="cm">// exécution atomique (ACID)</span>''',
- "api/auth/register/route.ts","L47-L58"))
+<span class="fn">insertAll</span>();   <span class="cm">// BEGIN … COMMIT (ROLLBACK si throw)</span>''',
+ "api/auth/register/route.ts","L47-L62"))
 
 # 14c VARIABLES / PERSISTANCE
 def varc(i,t,d): return f'<div class="varc"><div class="vt">{ic(i)}{t}</div><p>{d}</p></div>'
@@ -473,6 +478,29 @@ S.append(slide(head("Typologie des variables et de la persistance","Gestion de l
  +varc("share-2","Réactive","<code>useState</code> : déclenche le re-rendu de l'interface à chaque changement.")
  +varc("network","Concurrente","Sémaphore <code>HW_CONCURRENCY=2</code> : sérialise les accès au matériel. <code>batch</code>")
  +'</div></div>'))
+
+# 14d CODE compteur atomique / semaphore materiel
+S.append(code_slide("Extrait de code · concurrence","Variable atomique · sémaphore matériel","cpu",
+ '''<ul><li><code>hwInFlight</code> = <b>compteur atomique</b> des accès au matériel en cours</li>
+   <li><b>Atomique</b> de fait : la boucle d'événements de Node est <b>mono-thread</b> (pas d'accès simultané réel)</li>
+   <li>Au-delà de <b>2 slots</b>, les requêtes attendent dans une <b>file</b> (Promises)</li>
+   <li>supervision.exe est <b>quasi-série</b> : on borne pour ne pas le saturer</li></ul>''',
+ "app/api/supervision/batch/route.ts",
+ '''<span class="kw">const</span> HW_CONCURRENCY = <span class="nb">2</span>;   <span class="cm">// quasi-série</span>
+<span class="kw">let</span> hwInFlight = <span class="nb">0</span>;          <span class="cm">// variable atomique</span>
+<span class="kw">const</span> hwWaiters: Waiter[] = [];  <span class="cm">// file d'attente</span>
+
+<span class="kw">async function</span> <span class="fn">acquireHwSlot</span>() {
+  <span class="kw">if</span> (hwInFlight &lt; HW_CONCURRENCY) {
+    hwInFlight++; <span class="kw">return</span> <span class="kw">true</span>;     <span class="cm">// slot libre</span>
+  }
+  <span class="kw">return new</span> <span class="fn">Promise</span>(r =&gt; hwWaiters.<span class="fn">push</span>({ resolve: r }));
+}
+<span class="kw">function</span> <span class="fn">releaseHwSlot</span>() {
+  hwInFlight--;                  <span class="cm">// libère un slot</span>
+  <span class="fn">drainWaiters</span>();              <span class="cm">// réveille le suivant</span>
+}''',
+ "api/supervision/batch/route.ts","L39-L80"))
 
 # 15 SECURITE
 S.append(media_slide("Ma partie · sécurité","Authentification et données personnelles",
