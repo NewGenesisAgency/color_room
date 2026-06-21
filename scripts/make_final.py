@@ -636,29 +636,33 @@ S.append(diagram("Diagramme d'états","Cycle de vie d'une partie",IMG['ej'],"gam
    "Calcul et enregistrement du <b>score</b> en fin de partie",
    "Réinitialisation pour <b>rejouer</b>")))
 
-# 21 P4 IA
-S.append(media_slide("Ma partie · intelligence artificielle","Puissance 4 et son IA minimax",
- '''<ul><li>Grille 6 colonnes × 7 lignes (42 cases) ; 2 joueurs ou contre l'ordinateur</li>
-   <li>IA <b>hors-ligne</b> : <b>minimax</b> + <b>élagage alpha-bêta</b>, anti-piège</li>
-   <li>Heuristique par <b>fenêtres de 4</b> (défense pondérée &gt; attaque) + poids central</li>
-   <li><b>5 niveaux</b> de difficulté, réglés par <code>depth</code> et <code>noise</code></li></ul>''',IMG['p4'],"bot",ratio="0 0 44%"))
-
-# 21b CODE minimax
-S.append(code_slide("Extrait de code · IA","Évaluation minimax (alpha-bêta)","bot",
- '''<ul><li>Chaque fenêtre de 4 cases est notée du point de vue de l'IA</li>
-   <li><b>Défense &gt; attaque</b> : un alignement adverse de 3 vaut -170, le mien +130</li>
-   <li>Victoire = <code>WIN_SCORE</code> (1 000 000) ; difficulté via <code>depth</code> et <code>noise</code></li></ul>''',
+# 21 P4 IA (minimax + alpha-beta, fusionne)
+S.append(code_slide("Ma partie · intelligence artificielle","Puissance 4 et son IA minimax","bot",
+ '''<ul><li>Grille 6 × 7 ; 2 joueurs ou IA <b>hors-ligne</b></li>
+   <li><b>minimax</b> + <b>élagage alpha-bêta</b> : on coupe les branches inutiles (<code>alpha &gt;= beta</code>)</li>
+   <li>Feuilles évaluées par <code>evaluateBoard</code> : fenêtres de 4, <b>défense &gt; attaque</b> + poids central</li>
+   <li>Coups triés <b>centre d'abord</b> (<code>orderColumns</code>) pour élaguer plus tôt</li>
+   <li><b>5 niveaux</b> réglés par <code>depth</code> et <code>noise</code> ; victoire = <code>WIN_SCORE</code></li></ul>''',
  "app/app/_components/GamePuissance4.tsx",
- '''<span class="cm">// Note d'une fenêtre de 4 (défense &gt; attaque)</span>
-<span class="kw">function</span> <span class="fn">scoreWindow</span>(me, opp) {
-  <span class="kw">if</span> (me&gt;<span class="nb">0</span> &amp;&amp; opp&gt;<span class="nb">0</span>) <span class="kw">return</span> <span class="nb">0</span>;   <span class="cm">// fenêtre morte</span>
-  <span class="kw">if</span> (me===<span class="nb">4</span>)  <span class="kw">return</span> WIN_SCORE; <span class="cm">// 1 000 000</span>
-  <span class="kw">if</span> (me===<span class="nb">3</span>)  <span class="kw">return</span> <span class="nb">130</span>;
-  <span class="kw">if</span> (opp===<span class="nb">3</span>) <span class="kw">return</span> -<span class="nb">170</span>;    <span class="cm">// bloque la menace</span>
-  ...
-}
-<span class="cm">// minimax + alpha-bêta · réglé par depth et noise</span>''',
- "app/app/_components/GamePuissance4.tsx","L118-L129"))
+ '''<span class="cm">// minimax avec élagage alpha-bêta (depth, noise → difficulté)</span>
+<span class="kw">function</span> <span class="fn">minimax</span>(grid, depth, alpha, beta, maximizing) {
+  <span class="kw">if</span> (depth === <span class="nb">0</span>) <span class="kw">return</span> <span class="fn">evaluateBoard</span>(grid); <span class="cm">// heuristique</span>
+  <span class="kw">if</span> (maximizing) {                       <span class="cm">// tour de l'IA</span>
+    <span class="kw">let</span> value = -Infinity;
+    <span class="kw">for</span> (<span class="kw">const</span> c <span class="kw">of</span> <span class="fn">orderColumns</span>(valid)) { <span class="cm">// centre d'abord</span>
+      <span class="kw">const</span> d = <span class="fn">dropAt</span>(grid, c, AI);
+      <span class="kw">const</span> v = <span class="fn">winsAt</span>(d.grid, d.row, c, AI)
+        ? WIN_SCORE + depth                <span class="cm">// gain immédiat</span>
+        : <span class="fn">minimax</span>(d.grid, depth-<span class="nb">1</span>, alpha, beta, <span class="kw">false</span>);
+      value = Math.<span class="fn">max</span>(value, v);
+      alpha = Math.<span class="fn">max</span>(alpha, value);
+      <span class="kw">if</span> (alpha &gt;= beta) <span class="kw">break</span>;          <span class="cm">// coupure bêta</span>
+    }
+    <span class="kw">return</span> value;
+  }
+  <span class="cm">// ... cas minimisant (joueur) : coupure alpha symétrique</span>
+}''',
+ "app/app/_components/GamePuissance4.tsx","L174-L199"))
 
 # 22 MULTIJOUEUR
 S.append(media_slide("Ma partie · jeux en réseau","Les jeux multijoueur",
