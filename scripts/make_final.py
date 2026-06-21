@@ -92,10 +92,21 @@ code{font-family:"Inter",Arial,sans-serif;font-size:.9em;font-weight:600;backgro
 .locrow b{font-size:13.5px;color:var(--ink)}
 .locrow small{display:block;font-size:11.5px;color:var(--muted);margin-top:1px}
 .media{flex:1;display:flex;align-items:center;justify-content:center;min-width:0}
-.cover{justify-content:center;padding:0 70px;gap:46px}
-.cover .l{flex:1.25}
-.cover h1{font-size:80px;font-weight:800;color:var(--ink);line-height:.95;margin:10px 0;font-family:"Bricolage Grotesque","Inter",sans-serif}
-.cover .sub{font-size:20px;color:var(--ink2);font-weight:500;max-width:560px}
+.cover{justify-content:center;align-items:center;padding:0 64px;gap:48px}
+.cover .l{flex:1.15}
+.cover h1{font-size:84px;font-weight:800;color:var(--ink);line-height:.92;margin:12px 0 4px;font-family:"Bricolage Grotesque","Inter",sans-serif}
+.cover .sub{font-size:19px;color:var(--ink2);font-weight:500;max-width:520px;line-height:1.45}
+.coverbadge{display:inline-flex;align-items:center;gap:7px;font-size:11.5px;font-weight:700;letter-spacing:.06em;
+   color:var(--accent);background:linear-gradient(150deg,rgba(109,74,255,.13),rgba(109,74,255,.05));
+   border:1px solid rgba(109,74,255,.28);border-radius:30px;padding:6px 14px}
+.covermeta{margin:24px 0 4px;display:flex;flex-direction:column;gap:11px}
+.cmrow{display:flex;align-items:center;gap:10px;font-size:14px;color:var(--ink2)}
+.cmrow .ci{width:30px;height:30px;border-radius:9px;flex-shrink:0;display:grid;place-items:center;color:var(--accent);
+   background:linear-gradient(150deg,rgba(109,74,255,.14),rgba(109,74,255,.05));border:1px solid rgba(255,255,255,.7)}
+.cmrow .ci .ic{width:16px;height:16px}
+.cmrow b{color:var(--ink)}
+.coverlogos{margin-top:22px}
+.coverlogos .ll{font-size:10.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:9px}
 .cover .meta{margin-top:26px;font-size:15px;color:var(--ink2)}
 .cover .meta small{color:var(--muted)}
 .dash{display:flex;gap:6px;margin:14px 0}
@@ -262,17 +273,25 @@ S=[]
 # 1 COVER
 S.append(slide(f'''<div class="body cover">
   <div class="l">
-    <div class="kick" style="font-size:13px">BTS CIEL · OPTION A INFORMATIQUE ET RÉSEAUX · ÉPREUVE E6-2 · 2026</div>
+    <div class="coverbadge">{ic("sparkles")} BTS CIEL · OPTION A · INFORMATIQUE ET RÉSEAUX · E6-2 · 2026</div>
     <h1>ColorRoom</h1>
     <div class="dash"><i style="background:var(--r)"></i><i style="background:var(--y)"></i><i style="background:var(--g)"></i><i style="background:var(--b)"></i><i style="background:var(--accent)"></i></div>
     <div class="sub">Serious games pédagogiques sur les plaques lumineuses de la ColorRoom</div>
-    <div class="meta"><b>Téo Trompier</b> &nbsp;·&nbsp; partie E2<br>
-      <small>Équipe JavaScript · Lycée Édouard Branly, Lyon<br>Partenaires : LUMEN – La Cité de la Lumière · ENTPE / LTDS / BPMNP</small></div>
-    <div class="logorow">
-      <img src="{LOGOS['nextdotjs']}"><img src="{LOGOS['react']}"><img src="{LOGOS['typescript']}"><img src="{LOGOS['sqlite']}"><img src="{LOGOS['docker']}"><img src="{LOGOS['raspberrypi']}">
+    <div class="covermeta">
+      <div class="cmrow"><span class="ci">{ic("users")}</span><span><b>Téo Trompier</b> · candidat E2 · sous-équipe JavaScript</span></div>
+      <div class="cmrow"><span class="ci">{ic("house")}</span><span>Lycée Édouard Branly · Lyon</span></div>
+      <div class="cmrow"><span class="ci">{ic("target")}</span><span><b>LUMEN</b> – Cité de la Lumière · <b>ENTPE / LTDS</b> – labo BPMNP</span></div>
+    </div>
+    <div class="coverlogos">
+      <div class="ll">Pile technique</div>
+      <div class="logorow">
+        <img src="{LOGOS['nextdotjs']}"><img src="{LOGOS['react']}"><img src="{LOGOS['typescript']}"><img src="{LOGOS['sqlite']}"><img src="{LOGOS['docker']}"><img src="{LOGOS['raspberrypi']}">
+      </div>
     </div>
   </div>
-  <div class="media" style="flex:1"><img class="shot" src="{IMG['home']}"></div>
+  <div class="media" style="flex:1"><div style="display:flex;flex-direction:column;align-items:center;width:100%">
+    <img class="shot" src="{IMG['home']}"><div class="cap">{ic("eye")} Page d'accueil de ColorRoom Games</div>
+  </div></div>
 </div>'''))
 
 # 2 SOMMAIRE (aligné sur le déroulé réel des diapositives)
@@ -358,8 +377,8 @@ S.append(slide(head("8 étudiants · sous-équipes JavaScript et Python","Équip
 
 # 7b PLANIFICATION (Gantt réel)
 S.append(slide(head("Planification du projet","Diagramme de Gantt","chart-column")+
- f'''<div class="body" style="padding:14px 40px 30px;flex-direction:column;align-items:center;justify-content:center;gap:8px">
-   <img class="photo" src="{PHO['gantt']}" style="max-height:430px;max-width:100%;width:auto;background:#fff">
+ f'''<div class="body" style="padding:6px 24px 24px;flex-direction:column;align-items:center;justify-content:center;gap:5px">
+   <img class="photo" src="{PHO['gantt']}" style="max-height:512px;max-width:100%;width:auto;background:#fff">
    <div class="cap">{ic("flask-conical")} Jalons par étudiant · ma contribution (E2) suivie tout au long du projet</div></div>'''))
 
 # 8 ARCHITECTURE
