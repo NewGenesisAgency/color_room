@@ -241,7 +241,7 @@ def head(kick,title,icon,me=False):
 def slide(inner,cls=""):
     return f'<section class="slide {cls}">{inner}<div class="foot">Téo Trompier</div><div class="pageno"></div></section>'
 
-GH="github.com/NewGenesisAgency/color_room/blob/main/app"
+GH="github.com/NewGenesisAgency/color_room/blob/main"
 def code_slide(kick,title,icon,bullets,filelabel,pre,ghpath,lines):
     src=(f'<div class="src">{ic("code-xml")}<span><b>{filelabel}</b><br>{GH}/{ghpath}#{lines}</span></div>')
     codecard=(f'<div class="code"><div class="codebar">'
@@ -411,7 +411,7 @@ S.append(slide(head("React / Next.js / TypeScript vs JS + Node-RED","Choix techn
  # lignes de comparaison
  +cmprow("Paradigme",
    "Modèle <b>flow-based</b> (dataflow visuel) : inadapté à une appli <b>multi-pages</b> stateful",
-   "Paradigme <b>déclaratif à composants</b> (JSX) + routage <b>App Router</b>")
+   "Paradigme <b>déclaratif à composants</b> (TSX) + routage <b>App Router</b>")
  +cmprow("Interface / UI",
    "Pas de <b>composants</b> réutilisables pour une UI/UX riche (3D, catalogue)",
    "<b>React</b> : <b>Virtual DOM</b> + réconciliation, rendu ciblé, état réactif")
@@ -469,7 +469,7 @@ S.append(code_slide("Extrait de code · données","Variable transactionnelle (AC
    <li>L'inscription = INSERT utilisateur <b>+</b> jonction de classe, en <b>une seule unité</b></li>
    <li><b>Atomicité</b> : exception &rarr; <b>ROLLBACK</b> total, jamais de compte « à moitié créé »</li>
    <li>Requêtes <b>préparées</b> (<code>prepare</code>) = anti-injection SQL</li></ul>''',
- "app/api/auth/register/route.ts",
+ "app/app/api/auth/register/route.ts",
  '''<span class="cm">// Variable transactionnelle : tout-ou-rien (ACID).</span>
 <span class="kw">const</span> insertAll = db.<span class="fn">transaction</span>(() =&gt; {
   db.<span class="fn">prepare</span>(<span class="st">"INSERT INTO crg_users (id, name,</span>
@@ -484,7 +484,7 @@ S.append(code_slide("Extrait de code · données","Variable transactionnelle (AC
   }
 });
 <span class="fn">insertAll</span>();   <span class="cm">// BEGIN … COMMIT (ROLLBACK si throw)</span>''',
- "api/auth/register/route.ts","L47-L62"))
+ "app/app/api/auth/register/route.ts","L47-L62"))
 
 # 14c VARIABLES / PERSISTANCE
 def varc(i,t,d): return f'<div class="varc"><div class="vt">{ic(i)}{t}</div><p>{d}</p></div>'
@@ -504,7 +504,7 @@ S.append(code_slide("Extrait de code · concurrence","Variable atomique · séma
    <li><b>Atomique</b> de fait : la boucle d'événements de Node est <b>mono-thread</b> (pas d'accès simultané réel)</li>
    <li>Au-delà de <b>2 slots</b>, les requêtes attendent dans une <b>file</b> (Promises)</li>
    <li>supervision.exe est <b>quasi-série</b> : on borne pour ne pas le saturer</li></ul>''',
- "app/api/supervision/batch/route.ts",
+ "app/app/api/supervision/batch/route.ts",
  '''<span class="kw">const</span> HW_CONCURRENCY = <span class="nb">2</span>;   <span class="cm">// quasi-série</span>
 <span class="kw">let</span> hwInFlight = <span class="nb">0</span>;          <span class="cm">// variable atomique</span>
 <span class="kw">const</span> hwWaiters: Waiter[] = [];  <span class="cm">// file d'attente</span>
@@ -519,7 +519,7 @@ S.append(code_slide("Extrait de code · concurrence","Variable atomique · séma
   hwInFlight--;                  <span class="cm">// libère un slot</span>
   <span class="fn">drainWaiters</span>();              <span class="cm">// réveille le suivant</span>
 }''',
- "api/supervision/batch/route.ts","L39-L80"))
+ "app/app/api/supervision/batch/route.ts","L39-L80"))
 
 # 15 SECURITE
 S.append(media_slide("Ma partie · sécurité","Authentification et données personnelles",
@@ -540,7 +540,7 @@ S.append(code_slide("Extrait de code · sécurité","Hachage des mots de passe (
               <span class="nb">100_000</span>, <span class="nb">64</span>, <span class="st">'sha512'</span>).toString(<span class="st">'hex'</span>);
   <span class="kw">return</span> <span class="st">`${salt}:${hash}`</span>;  <span class="cm">// format sel:hash</span>
 }''',
- "lib/auth.ts","L19-L23"))
+ "app/lib/auth.ts","L19-L23"))
 
 # 16 SEQ AUTH
 S.append(diagram("Séquence · connexion","Authentification (PBKDF2 + cookie)",IMG['sauth'],"lock",me=True,
@@ -589,7 +589,7 @@ S.append(code_slide("Extrait de code · IA","Évaluation minimax (alpha-bêta)",
  '''<ul><li>Chaque fenêtre de 4 cases est notée du point de vue de l'IA</li>
    <li><b>Défense &gt; attaque</b> : un alignement adverse de 3 vaut -170, le mien +130</li>
    <li>Victoire = <code>WIN_SCORE</code> (1 000 000) ; recherche bornée en profondeur</li></ul>''',
- "app/_components/GamePuissance4.tsx",
+ "app/app/_components/GamePuissance4.tsx",
  '''<span class="cm">// Note d'une fenêtre de 4 (défense &gt; attaque)</span>
 <span class="kw">function</span> <span class="fn">scoreWindow</span>(me, opp) {
   <span class="kw">if</span> (me&gt;<span class="nb">0</span> &amp;&amp; opp&gt;<span class="nb">0</span>) <span class="kw">return</span> <span class="nb">0</span>;   <span class="cm">// fenêtre morte</span>
@@ -599,7 +599,7 @@ S.append(code_slide("Extrait de code · IA","Évaluation minimax (alpha-bêta)",
   ...
 }
 <span class="cm">// minimax + alpha-bêta · profondeur 1 → 12</span>''',
- "_components/GamePuissance4.tsx","L116-L128"))
+ "app/app/_components/GamePuissance4.tsx","L118-L129"))
 
 # 22 MULTIJOUEUR
 S.append(media_slide("Ma partie · jeux en réseau","Les jeux multijoueur",
