@@ -464,21 +464,21 @@ S.append(slide(head("React / Next.js / TypeScript vs JS + Node-RED","Choix techn
  f'<div class="cmph bad"><div class="lg"><img src="{LOGOS["javascript"]}"><img src="{LOGOS["nodered"]}"></div><b>JS + Node-RED</b><span class="st">Piste écartée</span></div>'
  f'<div class="cmph good"><div class="lg"><img src="{LOGOS["react"]}"><img src="{LOGOS["nextdotjs"]}"><img src="{LOGOS["typescript"]}"></div><b>Next.js + React + TS</b><span class="st">Retenu</span></div>'
  # lignes de comparaison
- +cmprow("Paradigme",
-   "Modèle <b>flow-based</b> (dataflow visuel) : inadapté à une appli <b>multi-pages</b> stateful",
-   "Paradigme <b>déclaratif à composants</b> (TSX) + routage <b>App Router</b>")
- +cmprow("Interface / UI",
-   "Pas de <b>composants</b> réutilisables pour une UI/UX riche (3D, catalogue)",
-   "<b>React</b> : <b>Virtual DOM</b> + réconciliation, rendu ciblé, état réactif")
- +cmprow("Sûreté du code",
-   "<b>JavaScript</b> non typé : erreurs détectées au <b>runtime</b>",
-   "<b>TypeScript strict</b> : typage statique, erreurs à la <b>compilation</b> (tsc + ESLint)")
- +cmprow("Maintenabilité",
-   "Flux <b>JSON sérialisés</b> peu <b>diffables</b>, illisibles à grande échelle",
-   "Code <b>modulaire</b> et <b>versionnable</b> (diffs Git lisibles, revue de code)")
- +cmprow("Back-end",
-   "Logique éclatée en <b>nœuds</b> ad hoc, couplée au moteur de flux",
-   "<b>Route Handlers</b> natifs + <b>Server Components</b> : un seul <b>runtime Node</b>")
+ +cmprow("Façon de programmer",
+   "On <b>relie des boîtes</b> (flux) : peu adapté à une vraie appli à plusieurs pages",
+   "On <b>assemble des blocs</b> réutilisables (composants) + pages claires")
+ +cmprow("Interface",
+   "Pas de blocs d'interface réutilisables (3D, catalogue difficiles)",
+   "<b>React</b> : blocs réutilisables, l'écran se met à jour <b>tout seul</b>")
+ +cmprow("Fiabilité du code",
+   "<b>JavaScript</b> : les erreurs apparaissent <b>une fois l'appli lancée</b>",
+   "<b>TypeScript</b> : les erreurs sont repérées <b>avant de lancer</b> (à l'écriture)")
+ +cmprow("Maintenance",
+   "Fichiers de flux <b>difficiles à relire</b> et à suivre dans Git",
+   "Code clair, <b>facile à relire</b> et à suivre version par version (Git)")
+ +cmprow("Côté serveur",
+   "Logique <b>dispersée</b>, liée à l'outil de flux",
+   "Front <b>et</b> back dans un <b>seul projet</b> (Next.js)")
  +'</div></div>'))
 
 # 11 STACK (logos)
@@ -550,9 +550,22 @@ S.append(slide(head("Ma partie · données · modèle relationnel","Base de donn
    <li><b>journal_mode=WAL</b> + busy_timeout</li></ul></div>
    <div class="media"><img class="diagram" src="{IMG['erd']}"></div></div>'''))
 
+# 14c VARIABLES / PERSISTANCE
+def varc(i,t,d): return f'<div class="varc"><div class="vt">{ic(i)}{t}</div><p>{d}</p></div>'
+S.append(slide(head("Typologie des variables et de la persistance","Gestion de l'état","database",me=True)+
+ '<div class="body" style="align-items:center"><div class="vargrid">'
+ +varc("database","Persistante","Stockée durablement en SQLite (survit aux redémarrages, volume Docker). <code>lib/db</code>")
+ +varc("circle-check","Transactionnelle · atomique","<code>db.transaction()</code> : ACID, tout-ou-rien (user + classe). <code>register</code>")
+ +varc("zap","Volatile (en mémoire)","<code>useRef</code> : état runtime des dalles/jeux, perdu au rechargement. <code>app/jeux</code>")
+ +varc("lock","Environnement","<code>process.env</code> : secrets (clé, mot de passe admin) via <code>.env</code>, hors Git.")
+ +varc("share-2","Réactive","<code>useState</code> : déclenche le re-rendu de l'interface à chaque changement.")
+ +varc("network","Concurrente","Sémaphore <code>HW_CONCURRENCY=2</code> : sérialise les accès au matériel. <code>batch</code>")
+ +'</div></div>'))
+
 # 14b CODE transaction atomique
 S.append(code_slide("Extrait de code · données","Variable transactionnelle (ACID)","circle-check",
- '''<ul><li><code>db.transaction()</code> encapsule un <b>BEGIN / COMMIT / ROLLBACK</b></li>
+ '''<ul><li><span style="font-size:12px;color:var(--muted)">(ACID = Atomicité, Cohérence, Isolation, Durabilité : les garanties d'une transaction)</span></li>
+   <li><code>db.transaction()</code> encapsule un <b>BEGIN / COMMIT / ROLLBACK</b></li>
    <li>L'inscription = INSERT utilisateur <b>+</b> jonction de classe, en <b>une seule unité</b></li>
    <li><b>Atomicité</b> : exception &rarr; <b>ROLLBACK</b> total, jamais de compte « à moitié créé »</li>
    <li>Requêtes <b>préparées</b> (<code>prepare</code>) = anti-injection SQL</li></ul>''',
@@ -572,18 +585,6 @@ S.append(code_slide("Extrait de code · données","Variable transactionnelle (AC
 });
 <span class="fn">insertAll</span>();   <span class="cm">// BEGIN … COMMIT (ROLLBACK si throw)</span>''',
  "app/app/api/auth/register/route.ts","L47-L62"))
-
-# 14c VARIABLES / PERSISTANCE
-def varc(i,t,d): return f'<div class="varc"><div class="vt">{ic(i)}{t}</div><p>{d}</p></div>'
-S.append(slide(head("Typologie des variables et de la persistance","Gestion de l'état","database",me=True)+
- '<div class="body" style="align-items:center"><div class="vargrid">'
- +varc("database","Persistante","Stockée durablement en SQLite (survit aux redémarrages, volume Docker). <code>lib/db</code>")
- +varc("circle-check","Transactionnelle · atomique","<code>db.transaction()</code> : ACID, tout-ou-rien (user + classe). <code>register</code>")
- +varc("zap","Volatile (en mémoire)","<code>useRef</code> : état runtime des dalles/jeux, perdu au rechargement. <code>app/jeux</code>")
- +varc("lock","Environnement","<code>process.env</code> : secrets (clé, mot de passe admin) via <code>.env</code>, hors Git.")
- +varc("share-2","Réactive","<code>useState</code> : déclenche le re-rendu de l'interface à chaque changement.")
- +varc("network","Concurrente","Sémaphore <code>HW_CONCURRENCY=2</code> : sérialise les accès au matériel. <code>batch</code>")
- +'</div></div>'))
 
 # 14d CODE compteur atomique / semaphore materiel
 S.append(code_slide("Extrait de code · concurrence","Variable atomique · sémaphore matériel","cpu",
@@ -608,13 +609,6 @@ S.append(code_slide("Extrait de code · concurrence","Variable atomique · séma
 }''',
  "app/app/api/supervision/batch/route.ts","L39-L80"))
 
-# 15 SECURITE
-S.append(media_slide("Ma partie · sécurité","Authentification et données personnelles",
- '''<ul><li><b>3 rôles</b> : admin (via .env), enseignant, apprenant</li>
-   <li>Hachage <b>PBKDF2-HMAC-SHA512</b> (100 000 itér., sel 16 o, clé 64 o)</li>
-   <li>Session en <b>cookie HttpOnly + SameSite=lax</b> (anti-XSS / CSRF)</li>
-   <li><b>Données 100 % locales</b> ; minimisation, effacement en cascade</li></ul>''',IMG['login'],"lock",ratio="0 0 50%"))
-
 # 15b CODE variable volatile (useRef) - apres securite
 S.append(code_slide("Extrait de code · variable volatile","État temporaire en mémoire (useRef)","zap",
  '''<ul><li>Une variable <b>volatile</b> vit en <b>mémoire vive</b> le temps de la partie : <b>perdue au rechargement</b></li>
@@ -634,6 +628,13 @@ S.append(code_slide("Extrait de code · variable volatile","État temporaire en 
 comboRef.current++;            <span class="cm">// mutation directe, sans re-render</span>
 <span class="cm">// ... en fin de partie SEULEMENT, on persiste le score en base.</span>''',
  "app/app/_components/GameColorSpeed.tsx","L160-L181"))
+
+# 15 SECURITE
+S.append(media_slide("Ma partie · sécurité","Authentification et données personnelles",
+ '''<ul><li><b>3 rôles</b> : apprenant, enseignant, administrateur</li>
+   <li>Les mots de passe ne sont <b>jamais en clair</b> : ils sont <b>hachés</b> (transformés en empreinte impossible à inverser)</li>
+   <li>Connexion gardée par un <b>cookie sécurisé</b> (inaccessible aux autres sites)</li>
+   <li><b>Tout reste en local</b> : un simple pseudo suffit (respect du RGPD)</li></ul>''',IMG['login'],"lock",ratio="0 0 50%"))
 
 # 16 SEQ AUTH
 S.append(diagram("Séquence · connexion","Authentification (PBKDF2 + cookie)",IMG['sauth'],"lock",me=True,
@@ -656,19 +657,19 @@ S.append(media_slide("Ma partie · parcours apprenant","Création de compte et a
    <li>Création <b>atomique</b> (compte + adhésion) puis <b>connexion automatique</b></li>
    <li class="sub">RGPD : un simple <b>pseudo</b> suffit, aucune donnée nominative</li></ul>''',IMG['register'],"users",ratio="0 0 46%"))
 
-# 18 JEUX SOLO
-S.append(media_slide("Ma partie · jeux solo","Les jeux et le pilotage des dalles",
- '''<ul><li><b>Tetris</b>, <b>Simon</b>, <b>Maître du Blanc</b>, <b>Color Speed</b>…</li>
-   <li>Pilotage des <b>32 canaux/dalle</b> en parallèle (Promise.all)</li>
-   <li>Timeout via <b>AbortController</b> ; couleur écran = couleur dalle</li>
-   <li class="sub">CHANNEL_PROFILES calés sur la longueur d'onde réelle</li></ul>''',IMG['cs'],"gamepad-2",ratio="0 0 40%"))
-
 # 19 SEQ JEU
 S.append(diagram("Séquence · exécution d'un jeu","Du clic joueur aux dalles",IMG['sjeu'],"gamepad-2",me=True,
  notes=nl("Le joueur lance une partie depuis le catalogue",
    "Le <b>runtime</b> parcourt le graphe de nœuds du jeu",
    "Chaque nœud couleur appelle <b>/api/supervision</b>",
    "Les <b>dalles</b> s'allument ; le score remonte à l'écran")))
+
+# 27 ACTIVITE REMAP
+S.append(diagram("Diagramme d'activité","Remappage des canaux LED",IMG['remap'],"share-2",me=True,
+ notes=nl("Entrée : une couleur <b>RGB</b> demandée par le jeu",
+   "Conversion vers les <b>32 canaux</b> de la plaque",
+   "Application des <b>profils</b> (longueur d'onde réelle)",
+   "Envoi de la trame au matériel (proxy supervision)")))
 
 # 20 ETATS JEU
 S.append(diagram("Diagramme d'états","Cycle de vie d'une partie",IMG['ej'],"gamepad-2",me=True,
@@ -721,38 +722,6 @@ S.append(media_slide("Exploration · éditeur &amp; génération par IA","Créer
    <li>Mon exploration : <b>« Créer avec l'IA »</b> génère un jeu complet depuis une phrase</li>
    <li>Route <code>/api/ai/generate-game</code> → <b>Ollama</b> (local) ou Gemini (cloud, optionnel)</li>
    <li class="sub">Garde-fous : reste <b>éducatif</b> ; intègre les nœuds CS-160 et dalles</li></ul>''',IMG['editeur'],"sparkles",ratio="0 0 40%"))
-
-# 24 MESURE
-S.append(media_slide("Ma partie · physique de la lumière","Mesure colorimétrique et chromaticité",
- '''<ul><li>Colorimètre <b>Konica Minolta CS-160</b> via un <b>pont .NET</b></li>
-   <li>Lecture du <b>tristimulus XYZ</b>, de la <b>chromaticité (x, y)</b> et de la luminance <b>Lv</b></li>
-   <li>Point tracé sur le <b>diagramme CIE 1931</b> ; <b>ΔE</b> = score de précision</li></ul>
-   <div class="varc" style="margin-top:14px">
-     <div class="vt">''' + ic("flask-conical") + ''' Deux termes à retenir</div>
-     <p><b>Tristimulus XYZ</b> : 3 valeurs (X, Y, Z) qui décrivent une couleur <b>telle que perçue par l'œil</b> (base de la colorimétrie CIE).<br>
-     <b>ΔE (Delta E)</b> : l'<b>écart perçu</b> entre deux couleurs ; plus il est petit, plus la couleur mesurée est proche de la cible.</p>
-   </div>''',IMG['chroma'],"palette",ratio="0 0 46%"))
-
-# 25 SEQ CS160
-S.append(diagram("Séquence · mesure","Pilotage du colorimètre CS-160",IMG['scs'],"palette",me=True,
- notes=nl("Connexion au CS-160 via le <b>pont .NET</b>",
-   "Allumage de la <b>dalle cible</b> à mesurer",
-   "Mesure : <b>tristimulus XYZ</b>, <b>Lv</b>, chromaticité <b>(x, y)</b>",
-   "Tracé du point sur le <b>diagramme CIE 1931</b>")))
-
-# 26 ETATS CS160
-S.append(diagram("Diagramme d'états","Cycle de mesure du CS-160",IMG['ecs'],"palette",me=True,
- notes=nl("États : <b>Déconnecté</b> → <b>Connecté</b>",
-   "<b>Mesure en cours</b> → <b>Résultat</b> disponible",
-   "Gestion des <b>erreurs</b> (timeout, appareil absent)",
-   "Retour à l'état prêt pour une nouvelle mesure")))
-
-# 27 ACTIVITE REMAP
-S.append(diagram("Diagramme d'activité","Remappage des canaux LED",IMG['remap'],"share-2",me=True,
- notes=nl("Entrée : une couleur <b>RGB</b> demandée par le jeu",
-   "Conversion vers les <b>32 canaux</b> de la plaque",
-   "Application des <b>profils</b> (longueur d'onde réelle)",
-   "Envoi de la trame au matériel (proxy supervision)")))
 
 # 27b AIDE + QUALITE (fusion : une seule slide, image /aide)
 S.append(media_slide("Ma partie · aide &amp; qualité","Documentation et robustesse",
