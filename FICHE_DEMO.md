@@ -171,7 +171,7 @@ Projet d'**équipe de 8**, 2 sous-équipes (JavaScript / Python). **Moi = E2.**
 
 ## 6. Montrer/expliquer mon code et son évolution (2 min)
 
-**5 extraits à ouvrir en live** (les mêmes que dans le deck, slides 20/22/24/25/34) :
+**5 extraits à ouvrir en live** (les mêmes que dans le deck, slides 20/22/24/26/34) :
 
 1. **`app/app/_components/Room3D.tsx`** : **Three.js** : `new THREE.Scene()` + `WebGLRenderer`, un `Mesh` par dalle, boucle `requestAnimationFrame`, `forceContextLoss` au démontage.
 2. **`app/app/api/auth/register/route.ts`** : **variable transactionnelle** : `db.transaction(() => { … })()` → user + adhésion classe, **tout-ou-rien** (BEGIN/COMMIT/ROLLBACK, ACID).

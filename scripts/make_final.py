@@ -608,7 +608,14 @@ S.append(code_slide("Extrait de code · concurrence","Variable atomique · séma
 }''',
  "app/app/api/supervision/batch/route.ts","L39-L80"))
 
-# 14e CODE variable volatile (useRef)
+# 15 SECURITE
+S.append(media_slide("Ma partie · sécurité","Authentification et données personnelles",
+ '''<ul><li><b>3 rôles</b> : admin (via .env), enseignant, apprenant</li>
+   <li>Hachage <b>PBKDF2-HMAC-SHA512</b> (100 000 itér., sel 16 o, clé 64 o)</li>
+   <li>Session en <b>cookie HttpOnly + SameSite=lax</b> (anti-XSS / CSRF)</li>
+   <li><b>Données 100 % locales</b> ; minimisation, effacement en cascade</li></ul>''',IMG['login'],"lock",ratio="0 0 50%"))
+
+# 15b CODE variable volatile (useRef) - apres securite
 S.append(code_slide("Extrait de code · variable volatile","État temporaire en mémoire (useRef)","zap",
  '''<ul><li>Une variable <b>volatile</b> vit en <b>mémoire vive</b> le temps de la partie : <b>perdue au rechargement</b></li>
    <li><code>useRef</code> : valeur mutable <b>sans re-rendu</b> (rapide : état de jeu haute fréquence)</li>
@@ -627,13 +634,6 @@ S.append(code_slide("Extrait de code · variable volatile","État temporaire en 
 comboRef.current++;            <span class="cm">// mutation directe, sans re-render</span>
 <span class="cm">// ... en fin de partie SEULEMENT, on persiste le score en base.</span>''',
  "app/app/_components/GameColorSpeed.tsx","L160-L181"))
-
-# 15 SECURITE
-S.append(media_slide("Ma partie · sécurité","Authentification et données personnelles",
- '''<ul><li><b>3 rôles</b> : admin (via .env), enseignant, apprenant</li>
-   <li>Hachage <b>PBKDF2-HMAC-SHA512</b> (100 000 itér., sel 16 o, clé 64 o)</li>
-   <li>Session en <b>cookie HttpOnly + SameSite=lax</b> (anti-XSS / CSRF)</li>
-   <li><b>Données 100 % locales</b> ; minimisation, effacement en cascade</li></ul>''',IMG['login'],"lock",ratio="0 0 50%"))
 
 # 16 SEQ AUTH
 S.append(diagram("Séquence · connexion","Authentification (PBKDF2 + cookie)",IMG['sauth'],"lock",me=True,

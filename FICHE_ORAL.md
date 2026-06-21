@@ -65,7 +65,7 @@ La **ColorRoom** est un équipement scientifique du laboratoire **ENTPE / LTDS /
 > - **Three.js** (slide 20) : `Room3D.tsx` : Scene + WebGLRenderer + boucle de rendu + `forceContextLoss`.
 > - **Variable transactionnelle ACID** (slide 22) : `db.transaction()` de `register/route.ts`.
 > - **Variable atomique · sémaphore** (slide 24) : `hwInFlight` de `supervision/batch/route.ts`.
-> - **Variable volatile (useRef)** (slide 25) : `comboRef`/`useState` de `GameColorSpeed.tsx`.
+> - **Variable volatile (useRef)** (slide 26) : `comboRef`/`useState` de `GameColorSpeed.tsx`.
 > - **Minimax (alpha-bêta)** (slide 34) : `scoreWindow` de `GamePuissance4.tsx`.
 
 ---
@@ -194,8 +194,8 @@ La **ColorRoom** est un équipement scientifique du laboratoire **ENTPE / LTDS /
 | 22 ★ | **Code · transactionnelle (ACID)** | 0:40 | `db.transaction()` : user + classe, **tout-ou-rien** (ROLLBACK). |
 | 23 | Typologie des variables | 0:35 | transactionnelle, **volatile** (`useRef`), persistante, concurrente, réactive, environnement. |
 | 24 ★ | **Code · atomique (sémaphore)** | 0:40 | `hwInFlight` borné à **2**, file de Promises, **mono-thread**. |
-| 25 ★ | **Code · variable volatile (useRef)** | 0:35 | `useRef` = mémoire **sans re-rendu** (combo, dalle, chrono), **perdu au reload** ; on ne persiste que le score. |
-| 26 | Sécurité | 0:30 | **PBKDF2-HMAC-SHA512** ; cookie **HttpOnly+SameSite**, **RGPD** (pseudo). |
+| 25 | Sécurité | 0:30 | **PBKDF2-HMAC-SHA512** ; cookie **HttpOnly+SameSite**, **RGPD** (pseudo). |
+| 26 ★ | **Code · variable volatile (useRef)** | 0:35 | `useRef` = mémoire **sans re-rendu** (combo, dalle, chrono), **perdu au reload** ; on ne persiste que le score. |
 | 27 ⚡ | Séquence · connexion | 0:18 | `verifyPassword` (PBKDF2) → session (30 j) → cookie. |
 | 28 | Tableau de bord enseignant | 0:35 | **Classes** : code 6 car. (`CS5VHX`) **+ QR code** ; suivi élèves ; gestion utilisateurs ; **CSV**. |
 | 29 | Parcours apprenant | 0:30 | Inscription 3 étapes ; **rejoindre une classe** via le **code** ; atomique + connexion auto. |
@@ -222,7 +222,7 @@ La **ColorRoom** est un équipement scientifique du laboratoire **ENTPE / LTDS /
 | 45 | Place à la démonstration | 0:10 | « Place à la **démonstration sur le matériel réel**. » |
 | 46 ★ | **Vidéo du projet** | **2:00** | **Lancer la vidéo** (la ColorRoom réelle) → enchaîne sur la démo live. |
 
-**Total ≈ 18 min parlé + 2 min vidéo = 20:00.** En retard → couper les « ⚡ ». Ne jamais sacrifier les ★ (11, 15, 22, 24, 25, 33, 34, 46).
+**Total ≈ 18 min parlé + 2 min vidéo = 20:00.** En retard → couper les « ⚡ ». Ne jamais sacrifier les ★ (11, 15, 22, 24, 26, 33, 34, 46).
 
 ---
 
