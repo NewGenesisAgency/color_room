@@ -11,8 +11,24 @@
 | 5 | **Constituants de ma partie** + interactions avec les camarades (**tests d'intégration**) | §5 |
 | 6 | **Montrer/expliquer mon code** et son **évolution** | §6 |
 
-> ⏱️ **Plan minuté (20 min)** : §1 réel/déploiement 3 min · §2 recette 7 min · §3 outils 3 min · §4 contribution 2 min · §5 intégration 3 min · §6 code & évolution 2 min.
+> ⏱️ **Plan minuté (20 min)** : **vidéo 2 min** (système réel) · §1 réel/déploiement 1 min · §2 recette 7 min · §3 outils 3 min · §4 contribution 2 min · §5 intégration 3 min · §6 code & évolution 2 min.
 > 🛟 **Avoir une vidéo de secours** de chaque test de recette, au cas où le Pi / le CS-160 / le Wi-Fi flanche.
+
+> 🔑 **À taper en tout premier sur la tablette devant le jury : `http://172.17.40.39/`** (Wi-Fi local **ColorRoom_WiFI**, fonctionne depuis n'importe quel appareil de la salle).
+
+---
+
+## 0. La vidéo de 2 min — AU DÉBUT de la démo
+
+**Décision : montrer la vidéo en ouverture de la démonstration.**
+
+1. La vraie **ColorRoom** (2 cellules, 42 plaques) est à **LUMEN**, pas dans la salle : la vidéo est **le seul moyen de montrer le système réel complet** exigé par le jury (« éléments réels correspondant au diagramme de déploiement »).
+2. Elle **plante le décor** (matériel, dalles qui s'allument) avant les manips live.
+3. **Filet de sécurité** : si le Pi/CS-160/Wi-Fi bug en live, le jury a déjà vu le système marcher.
+
+**À dire en lançant la vidéo (15 s) :** « Avant de manipuler en direct, voici en 2 minutes le **système réel** installé à LUMEN : les deux cellules, les plaques pilotées en **RS-485**, et l'application en service. » → puis enchaîner sur les **tests de recette live**.
+
+> ❌ Ne pas la garder pour la fin : risque de manquer de temps, et la fin doit montrer **toi en train de piloter** le système, pas une vidéo.
 
 ---
 
@@ -26,19 +42,19 @@ Diagramme de déploiement (rappel) → correspondance physique :
 |-------------------|------------------------|
 | **Raspberry Pi 5** | la carte (le « serveur » de la salle), alimentée, en réseau |
 | **Docker** (sur le Pi) | `docker compose ps` → 4 conteneurs : `color-room`, `portainer`, `color-room-ollama`, `ollama-pull` |
-| **App Next.js** | navigateur → `http://<ip-du-pi>:8080` |
-| **supervision.exe** | le pont matériel qui pilote les dalles |
-| **Dalles LED** | les **42 plaques** / la cellule ColorRoom (ou la maquette de dalles) |
+| **App Next.js** | navigateur → **`http://172.17.40.39/`** (ou `http://<ip-du-pi>:8080`) |
+| **supervision.exe** | le pont matériel : reçoit mon API et émet des trames **RS-485** vers les plaques |
+| **Dalles LED** | les **42 plaques** (21/cellule, 2 cellules) ; une plaque = **2360 LED**, **32 canaux** (24 spectres étroits + 8 blancs), pilotée en **RS-485** |
 | **CS-160** | le **colorimètre Konica Minolta** branché en **USB** sur le Pi |
 | **Clients Wi-Fi** | tablette + téléphone connectés au Wi-Fi local **ColorRoom_WiFI** |
 | **Ollama** | conteneur d'IA **locale** (assistant de l'éditeur, 100 % hors-ligne) |
 
-**Phrase d'accroche :** « Voici le diagramme de déploiement, et voici les éléments réels qui lui correspondent : un Raspberry Pi 5 qui héberge, dans Docker, l'application Next.js, le pont matériel supervision et l'IA locale ; les dalles LED et le colorimètre CS-160 sont reliés au Pi ; les utilisateurs se connectent en Wi-Fi local. **Tout est hors-ligne.** »
+**Phrase d'accroche :** « Voici le diagramme de déploiement, et voici les éléments réels qui lui correspondent : un Raspberry Pi 5 qui héberge, dans Docker, l'application Next.js, le pont matériel supervision et l'IA locale ; les **42 dalles** sont pilotées en **bus RS-485**, le colorimètre **CS-160 en USB** ; les utilisateurs se connectent en **Wi-Fi local (ColorRoom_WiFI)** sur **http://172.17.40.39/**. **Tout est hors-ligne.** »
 
 **Commandes à taper en live (preuve que c'est réel) :**
 ```bash
 docker compose ps                 # les conteneurs tournent
-curl -s http://localhost:8080/api/health   # l'app répond {"ok":true}
+curl -s http://172.17.40.39/api/health     # l'app répond {"ok":true}
 ip a | grep wlan                  # le Pi diffuse bien le réseau de la salle
 ```
 
