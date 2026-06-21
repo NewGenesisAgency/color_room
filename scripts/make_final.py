@@ -748,18 +748,12 @@ S.append(diagram("Diagramme d'activité","Remappage des canaux LED",IMG['remap']
    "Application des <b>profils</b> (longueur d'onde réelle)",
    "Envoi de la trame au matériel (proxy supervision)")))
 
-# 27b AIDE
-S.append(media_slide("Ma partie · aide intégrée","Documentation pour l'apprenant",
- '''<ul><li>Page <b>/aide</b> embarquée : comment jouer, mesurer, lire le diagramme CIE</li>
-   <li>Accessible <b>hors-ligne</b>, directement dans l'app</li>
-   <li>Complète le <b>manuel d'installation</b> (README) et les 15 diagrammes UML</li></ul>''',IMG['aide'],"file-text",ratio="0 0 46%"))
-
-# 28 DOC
-S.append(media_slide("Ma partie · qualité","Documentation et robustesse",
- '''<ul><li>Notice apprenant intégrée (page /aide)</li>
-   <li>Manuel d'installation (README) : Docker, dev, service permanent</li>
-   <li>Migrations idempotentes · <b>transactions ACID</b></li>
-   <li class="sub">Connexion SQLite en singleton · exports UTF-8 + BOM</li></ul>''',IMG['aide'],"file-text",ratio="0 0 46%"))
+# 27b AIDE + QUALITE (fusion : une seule slide, image /aide)
+S.append(media_slide("Ma partie · aide &amp; qualité","Documentation et robustesse",
+ '''<ul><li>Page <b>/aide</b> embarquée (hors-ligne) : comment jouer, mesurer, lire le diagramme CIE</li>
+   <li><b>Documentation</b> rédigée par moi : guide technique, <b>15 diagrammes UML</b>, README d'installation</li>
+   <li>Robustesse : <b>migrations idempotentes</b>, <b>transactions ACID</b>, connexion SQLite en <b>singleton</b></li>
+   <li class="sub">Vérif <b>types (tsc)</b> + build prod à chaque étape · exports CSV UTF-8 + BOM · tests API (E4)</li></ul>''',IMG['aide'],"file-text",ratio="0 0 48%"))
 
 # 29 DIFFICULTES
 S.append(slide(head("Démarche d'ingénieur","Difficultés rencontrées et solutions","flask-conical",me=True)+
@@ -797,24 +791,8 @@ S.append(slide(head("Notes réseau · ouvrir les ports (Windows)","Rendre l'API 
  f'<div class="body"><div class="col" style="flex:0 0 36%;min-width:0;display:flex;flex-direction:column;justify-content:center">{_winbull}{_winsrc}</div>'
  f'<div class="col" style="flex:1;min-width:0;display:flex;align-items:center">{_wincard}</div></div>'))
 
-# 30 BILAN
-S.append(slide(head("Conclusion","Bilan et perspectives","chart-column")+
- '''<div class="body"><div class="col"><div class="lab a">Objectifs E2 atteints</div><ul>
-   <li>Interface, base de données et comptes opérationnels</li>
-   <li>Jeux solo, IA Puissance 4 et multijoueur</li>
-   <li>Mesure CS-160 et diagramme CIE</li>
-   <li>Documentation et déploiement Docker</li></ul></div>
-   <div class="col"><div class="lab b">Perspectives</div><ul>
-   <li>Salons multijoueur avec codes de partie</li>
-   <li>Nouveaux jeux pédagogiques et tutoriels</li>
-   <li>Tests automatisés (CI/CD)</li>
-   <li class="sub">Exploration : génération de jeux par IA locale (Ollama)</li></ul></div></div>'''))
-
-# 31 DEMO
+# 31 DEMO (slide-pont vers la démonstration)
 S.append(slide('<div class="body center"><div class="hicon" style="width:64px;height:64px;border-radius:18px;margin-bottom:6px">'+ic("eye")+'</div><div class="kick">Place à la</div><div class="big">Démonstration</div><p style="color:var(--muted);font-size:16px;margin-top:12px;max-width:760px;line-height:1.8">Connexion · catalogue et un jeu sur les dalles · Puissance 4 contre l’IA · un jeu multijoueur · mesure CS-160 et diagramme CIE · tableau de bord enseignant</p></div>'))
-
-# 32 MERCI
-S.append(slide('<div class="body center"><div class="dash" style="justify-content:center"><i style="background:var(--r)"></i><i style="background:var(--y)"></i><i style="background:var(--g)"></i><i style="background:var(--b)"></i><i style="background:var(--accent)"></i></div><div class="big" style="margin-top:8px">Merci de votre attention</div><div style="color:var(--accent);font-weight:700;font-size:21px;margin-top:12px;font-family:Bricolage Grotesque,Inter,sans-serif">Avez-vous des questions ?</div><div style="position:absolute;bottom:28px;left:0;right:0;text-align:center;color:var(--muted);font-size:13px">ColorRoom · Téo Trompier (E2) · BTS CIEL option IR · Session 2026</div></div>'))
 
 # 33 VIDEO (a lancer en fin de presentation)
 S.append(slide('<div class="body center">'
