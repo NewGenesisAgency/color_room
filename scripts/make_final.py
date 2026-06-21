@@ -18,6 +18,7 @@ def photo(n): return b64f(f"{PHOTO}/{n}")
 IMG={
  "home":shot("home"),"jeux":shot("jeux"),"gestion":shot("gestion"),"chroma":shot("chromaticite"),
  "aide":shot("aide"),"login":shot("login"),"cs":shot("colorspeed_run"),"p4":shot("puissance4"),"multi":shot("multi"),
+ "config":shot("configuration"),"register":shot("register"),"editeur":shot("editeur"),"mesure":shot("mesure"),
  "uc":uml("UseCases"),"cls":uml("Classes"),"comp":uml("Composants"),"dep":uml("Deploiement"),
  "erd":uml("ERD"),"sauth":uml("Seq_Auth"),"sjeu":uml("Seq_Jeu"),"scs":uml("Seq_CS160"),
  "smp":uml("Seq_MP"),"ej":uml("Etats_Jeu"),"ecs":uml("Etats_CS160"),"remap":uml("Activite_Remap"),
@@ -450,6 +451,13 @@ S.append(slide(head("Docker · Raspberry Pi 5 · diagramme de déploiement","Ré
    <li class="sub">SQLite en volume · git pull puis docker compose up</li></ul></div>
    <div class="media"><img class="diagram" src="{IMG['dep']}"></div></div>'''))
 
+# 12b CONFIGURATION
+S.append(media_slide("Ma partie · configuration","Adresses des API et canaux LED",
+ '''<ul><li>Réglage des <b>URL d'API à chaud</b> (Supervision, CS-160) sans redémarrer le serveur</li>
+   <li>Stockées en base ; repli sur les <b>variables d'environnement</b></li>
+   <li>Bouton <b>Tester (/health)</b> pour vérifier la liaison matériel</li>
+   <li>Banc de test des <b>32 canaux LED</b> (0-255) par dalle, debounce 200 ms</li></ul>''',IMG['config'],"wrench",ratio="0 0 42%"))
+
 # 13 INTERFACE
 S.append(media_slide("Ma partie · interface","Interface et design system",
  '''<ul><li>Design system « <b>verre dépoli</b> » : variables CSS partagées</li>
@@ -457,6 +465,31 @@ S.append(media_slide("Ma partie · interface","Interface et design system",
    <li><b>Menu dynamique</b> selon le rôle</li>
    <li><b>Vue 3D</b> (Three.js : WebGLRenderer, Room3D, 2 cellules)</li>
    <li class="sub">forceContextLoss au démontage · pause via Page Visibility API</li></ul>''',IMG['jeux'],"layout-dashboard",ratio="0 0 42%"))
+
+# 13b THREE.JS (code)
+S.append(code_slide("Extrait de code · 3D temps réel","Vue 3D de la salle (Three.js)","boxes",
+ '''<ul><li><b>Scène + caméra + WebGLRenderer</b> montés dans la page</li>
+   <li>Chaque <b>dalle</b> = un <code>Mesh</code> ; sa couleur suit l'état du jeu en direct</li>
+   <li><b>Boucle de rendu</b> via <code>requestAnimationFrame</code></li>
+   <li>Au démontage : <b>forceContextLoss</b> → évite la fuite de contexte WebGL</li></ul>''',
+ "app/app/_components/Room3D.tsx",
+ '''<span class="cm">// Scène, caméra, renderer WebGL</span>
+<span class="kw">const</span> scene = <span class="kw">new</span> THREE.<span class="fn">Scene</span>();
+<span class="kw">const</span> camera = <span class="kw">new</span> THREE.<span class="fn">PerspectiveCamera</span>(CAM_FOV, W/H, <span class="nb">0.05</span>, <span class="nb">80</span>);
+<span class="kw">const</span> renderer = <span class="kw">new</span> THREE.<span class="fn">WebGLRenderer</span>({ antialias: <span class="kw">true</span> });
+renderer.<span class="fn">setSize</span>(W, H);
+mount.<span class="fn">appendChild</span>(renderer.domElement);
+
+<span class="cm">// une dalle = un Mesh ajouté à la scène</span>
+<span class="kw">const</span> plate = <span class="kw">new</span> THREE.<span class="fn">Mesh</span>(geometry, material);
+scene.<span class="fn">add</span>(plate);
+
+<span class="cm">// boucle de rendu</span>
+<span class="kw">function</span> <span class="fn">loop</span>() { renderer.<span class="fn">render</span>(scene, camera); raf = <span class="fn">requestAnimationFrame</span>(loop); }
+<span class="fn">loop</span>();
+
+<span class="kw">return</span> () =&gt; { <span class="fn">cancelAnimationFrame</span>(raf); renderer.<span class="fn">forceContextLoss</span>(); };''',
+ "app/app/_components/Room3D.tsx","L255-L539"))
 
 # 14 BDD
 S.append(slide(head("Ma partie · données · modèle relationnel","Base de données SQLite","database",me=True)+
@@ -554,11 +587,18 @@ S.append(diagram("Séquence · connexion","Authentification (PBKDF2 + cookie)",I
    "Renvoi d'un cookie <b>HttpOnly + SameSite</b> (30 j glissants)")))
 
 # 17 GESTION
-S.append(media_slide("Ma partie · gestion","Comptes, classes, scores et tableau de bord",
- '''<ul><li><b>Classes</b> : code 6 caractères (sans 0/O, 1/I)</li>
-   <li><b>Niveaux</b> assignés par l'enseignant</li>
-   <li><b>Scores</b> : JOIN scores × users ; <code>all=1</code> réservé (HTTP 403)</li>
-   <li class="sub">Tableau de bord /gestion · export CSV (Blob, BOM UTF-8)</li></ul>''',IMG['gestion'],"users",ratio="0 0 44%"))
+S.append(media_slide("Ma partie · gestion","Tableau de bord enseignant",
+ '''<ul><li><b>Classes</b> : code de 6 caractères (ex. <code>CS5VHX</code>, sans 0/O, 1/I) + <b>QR code</b></li>
+   <li><b>Suivi des élèves</b> : niveau et scores par apprenant</li>
+   <li><b>Gestion des utilisateurs</b> : rôles, réinitialisation, suppression (admin)</li>
+   <li class="sub">Export <b>CSV</b> (Blob, BOM UTF-8) · scores en JOIN scores × users</li></ul>''',IMG['gestion'],"users",ratio="0 0 44%"))
+
+# 17b PARCOURS APPRENANT (création de compte + rejoindre une classe)
+S.append(media_slide("Ma partie · parcours apprenant","Création de compte et adhésion à une classe",
+ '''<ul><li>Inscription guidée en <b>3 étapes</b> : pseudo + mot de passe, avatar, classe</li>
+   <li><b>Rejoindre une classe</b> en saisissant son <b>code</b> (fourni par l'enseignant)</li>
+   <li>Création <b>atomique</b> (compte + adhésion) puis <b>connexion automatique</b></li>
+   <li class="sub">RGPD : un simple <b>pseudo</b> suffit, aucune donnée nominative</li></ul>''',IMG['register'],"users",ratio="0 0 46%"))
 
 # 18 JEUX SOLO
 S.append(media_slide("Ma partie · jeux solo","Les jeux et le pilotage des dalles",
@@ -619,6 +659,13 @@ S.append(diagram("Séquence · multijoueur","État partagé et interrogation pé
    "L'état est <b>persisté en base</b> (state_json)",
    "Chaque client interroge <b>/state</b> en <b>polling</b> → écrans synchronisés")))
 
+# 23c EDITEUR + IA GENERATIVE
+S.append(media_slide("Exploration · éditeur &amp; génération par IA","Créer un jeu sans coder",
+ '''<ul><li>Éditeur <b>no-code</b> (partie E3) : graphe de <b>nœuds</b> + aperçu 3D live</li>
+   <li>Mon exploration : <b>« Créer avec l'IA »</b> génère un jeu complet depuis une phrase</li>
+   <li>Route <code>/api/ai/generate-game</code> → <b>Ollama</b> (local) ou Gemini (cloud, optionnel)</li>
+   <li class="sub">Garde-fous : reste <b>éducatif</b> ; intègre les nœuds CS-160 et dalles</li></ul>''',IMG['editeur'],"sparkles",ratio="0 0 40%"))
+
 # 24 MESURE
 S.append(media_slide("Ma partie · physique de la lumière","Mesure colorimétrique et chromaticité",
  '''<ul><li>Colorimètre <b>Konica Minolta CS-160</b> via un <b>pont .NET</b></li>
@@ -651,6 +698,12 @@ S.append(diagram("Diagramme d'activité","Remappage des canaux LED",IMG['remap']
    "Application des <b>profils</b> (longueur d'onde réelle)",
    "Envoi de la trame au matériel (proxy supervision)")))
 
+# 27b AIDE
+S.append(media_slide("Ma partie · aide intégrée","Documentation pour l'apprenant",
+ '''<ul><li>Page <b>/aide</b> embarquée : comment jouer, mesurer, lire le diagramme CIE</li>
+   <li>Accessible <b>hors-ligne</b>, directement dans l'app</li>
+   <li>Complète le <b>manuel d'installation</b> (README) et les 15 diagrammes UML</li></ul>''',IMG['aide'],"file-text",ratio="0 0 46%"))
+
 # 28 DOC
 S.append(media_slide("Ma partie · qualité","Documentation et robustesse",
  '''<ul><li>Notice apprenant intégrée (page /aide)</li>
@@ -662,11 +715,37 @@ S.append(media_slide("Ma partie · qualité","Documentation et robustesse",
 S.append(slide(head("Démarche d'ingénieur","Difficultés rencontrées et solutions","flask-conical",me=True)+
  '<div class="body" style="flex-direction:column;justify-content:center">'+
  ''.join(f'<div class="fix"><div class="pb">{p}</div><div class="ar">'+ic("share-2")+f'</div><div class="so">'+ic("circle-check")+f'<span>{s}</span></div></div>' for p,s in [
+   ("CORS &amp; pare-feu bloquant l'API Supervision","En-têtes CORS + ouverture du port Windows + portproxy (slide suivante)"),
    ("Latence des plaques (32 canaux)","Envoi parallèle (Promise.all) + timeout (AbortController)"),
    ("Couleur écran différente des dalles","Rendu unifié + profils calés sur les longueurs d'onde"),
    ("Accès concurrents (SQLITE_BUSY)","Mode WAL + busy_timeout + connexion singleton"),
    ("Multijoueur temps réel sur Pi","État en base + polling /state (vs WebSockets)"),
  ])+'</div>'))
+
+# 29b NOTES RESEAU WINDOWS (CORS / ports)
+_winpre='''<span class="cm"># 1) Autoriser le port 18080 dans le pare-feu</span>
+<span class="fn">New-NetFirewallRule</span> -DisplayName <span class="st">"ColorRoom-Supervision"</span> `
+  -Direction Inbound -Protocol TCP -LocalPort <span class="nb">18080</span> -Action Allow
+
+<span class="cm"># 2) Rediriger le port 18080 (réseau) vers 8080 (local)</span>
+netsh interface portproxy <span class="fn">add</span> v4tov4 `
+  listenport=<span class="nb">18080</span> listenaddress=<span class="nb">0.0.0.0</span> `
+  connectport=<span class="nb">8080</span> connectaddress=<span class="nb">127.0.0.1</span>
+
+<span class="cm"># L'API écoute en local sur 8080 ; la</span>
+<span class="cm"># redirection l'expose sur 18080.</span>'''
+_winbull='''<ul><li>Le navigateur bloquait l'API Supervision (<b>CORS</b> + pare-feu)</li>
+   <li>L'API écoute en <b>local sur 8080</b> ; on l'expose sur le réseau via <b>18080</b></li>
+   <li>À lancer dans <b>PowerShell (administrateur)</b> sur le poste hôte de l'API</li>
+   <li class="sub">Combiné aux <b>en-têtes CORS</b> renvoyés par l'API</li></ul>'''
+_winsrc=f'<div class="src">{ic("wrench")}<span><b>Notes d\'installation · réseau Windows</b><br>PowerShell (administrateur) · poste hôte de la Supervision</span></div>'
+_wincard=(f'<div class="code"><div class="codebar">'
+          f'<span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span>'
+          f'<span class="dot" style="background:#28c840"></span><span class="file">PowerShell · administrateur</span></div>'
+          f'<pre>{_winpre}</pre></div>')
+S.append(slide(head("Notes réseau · ouvrir les ports (Windows)","Rendre l'API Supervision joignable","share-2",me=True)+
+ f'<div class="body"><div class="col" style="flex:0 0 36%;min-width:0;display:flex;flex-direction:column;justify-content:center">{_winbull}{_winsrc}</div>'
+ f'<div class="col" style="flex:1;min-width:0;display:flex;align-items:center">{_wincard}</div></div>'))
 
 # 30 BILAN
 S.append(slide(head("Conclusion","Bilan et perspectives","chart-column")+
