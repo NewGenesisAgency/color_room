@@ -10,7 +10,7 @@ def b64f(path):
     ext=pathlib.Path(path).suffix.lower().lstrip(".")
     mime="jpeg" if ext in ("jpg","jpeg") else ext
     return f"data:image/{mime};base64,"+base64.b64encode(pathlib.Path(path).read_bytes()).decode()
-def shot(n): return b64(f"{SHOTS}/{n}.png")
+def shot(n): return b64f(f"{SHOTS}/{n}.jpg")
 def uml(n):  return b64(f"{UML}/ColorRoom_{n}.png")
 def logo(n): return "data:image/svg+xml;base64,"+base64.b64encode(pathlib.Path(f"{LOGO}/{n}.svg").read_bytes()).decode()
 def photo(n): return b64f(f"{PHOTO}/{n}")
@@ -53,9 +53,7 @@ body{background:var(--ghost);font-family:"Inter",Arial,sans-serif;color:var(--in
        box-shadow:0 1px 0 rgba(17,19,26,.04),0 18px 50px rgba(17,19,26,.10);border:1px solid #edf0f5}
 /* liquid glass : halos colorés diffus derrière les panneaux dépolis */
 .slide::before{content:"";position:absolute;inset:0;pointer-events:none;z-index:0;
-       background:radial-gradient(46% 60% at 88% 8%,rgba(109,74,255,.13),transparent 60%),
-                 radial-gradient(42% 55% at 6% 96%,rgba(31,182,166,.13),transparent 60%),
-                 radial-gradient(30% 40% at 50% 50%,rgba(59,109,255,.05),transparent 70%)}
+       background:radial-gradient(44% 58% at 90% 6%,rgba(109,74,255,.09),transparent 62%),radial-gradient(40% 52% at 5% 98%,rgba(31,182,166,.08),transparent 64%)}
 .slide>*{position:relative;z-index:1}
 h1,h2,h3,.disp,.big,.num,.lab,.toc .n{font-family:"Bricolage Grotesque","Inter",Arial,sans-serif;letter-spacing:-.02em}
 .ic{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;display:block}
@@ -64,15 +62,14 @@ h1,h2,h3,.disp,.big,.num,.lab,.toc .n{font-family:"Bricolage Grotesque","Inter",
        display:grid;place-items:center;flex-shrink:0;
        background:linear-gradient(150deg,rgba(109,74,255,.18),rgba(109,74,255,.07));
        border:1px solid rgba(255,255,255,.7);
-       box-shadow:0 6px 16px rgba(109,74,255,.16),inset 0 1px 0 rgba(255,255,255,.8);
-       -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+       box-shadow:0 6px 16px rgba(109,74,255,.16),inset 0 1px 0 rgba(255,255,255,.8);}
 .hicon .ic{width:25px;height:25px}
 .kick{font-size:12px;font-weight:600;letter-spacing:.15em;text-transform:uppercase;color:var(--accent)}
 .head h2{font-size:32px;font-weight:700;color:var(--ink);margin-top:5px;line-height:1.05}
 .rule{height:3px;width:52px;background:var(--accent);border-radius:2px;margin:13px 0 0 109px}
 .me{position:absolute;top:30px;right:46px;font-size:11px;font-weight:700;color:var(--accent);z-index:2;
     border:1px solid rgba(109,74,255,.5);border-radius:30px;padding:4px 11px;letter-spacing:.05em;
-    background:rgba(255,255,255,.55);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
+    background:rgba(255,255,255,.85);
     box-shadow:0 4px 14px rgba(109,74,255,.14),inset 0 1px 0 rgba(255,255,255,.8)}
 .body{flex:1;padding:22px 46px 40px;display:flex;gap:30px;min-height:0}
 .col{flex:1;min-width:0}
@@ -102,14 +99,13 @@ code{font-family:"Inter",Arial,sans-serif;font-size:.9em;font-weight:600;backgro
 .toc{display:grid;grid-template-columns:1fr 1fr;gap:14px 46px;width:100%;align-content:center}
 .toc .it{display:flex;gap:13px;align-items:center;font-size:16.5px;color:var(--ink);font-weight:600;
     border-radius:14px;padding:12px 15px;
-    background:rgba(255,255,255,.55);border:1px solid rgba(255,255,255,.7);
-    -webkit-backdrop-filter:blur(14px) saturate(140%);backdrop-filter:blur(14px) saturate(140%);
+    background:rgba(255,255,255,.85);border:1px solid rgba(255,255,255,.7);
     box-shadow:0 8px 26px rgba(17,19,26,.07),inset 0 1px 0 rgba(255,255,255,.7)}
 .toc .it .ico{width:38px;height:38px;border-radius:11px;color:var(--accent);display:grid;place-items:center;flex-shrink:0;
     background:linear-gradient(150deg,rgba(109,74,255,.16),rgba(109,74,255,.06));border:1px solid rgba(255,255,255,.7)}
 .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;width:100%;align-self:center}
 .stat{border:1px solid rgba(255,255,255,.7);border-radius:16px;padding:20px 22px;display:flex;flex-direction:column;gap:5px;
-    background:rgba(255,255,255,.5);-webkit-backdrop-filter:blur(16px) saturate(140%);backdrop-filter:blur(16px) saturate(140%);
+    background:rgba(255,255,255,.82);
     box-shadow:0 10px 30px rgba(17,19,26,.08),inset 0 1px 0 rgba(255,255,255,.75)}
 .stat .si{width:38px;height:38px;border-radius:11px;color:var(--accent);display:grid;place-items:center;margin-bottom:6px;
     background:linear-gradient(150deg,rgba(109,74,255,.16),rgba(109,74,255,.06));border:1px solid rgba(255,255,255,.7)}
@@ -117,7 +113,7 @@ code{font-family:"Inter",Arial,sans-serif;font-size:.9em;font-weight:600;backgro
 .stat .lbl{font-size:13px;color:var(--muted);font-weight:500}
 .roles{display:grid;grid-template-columns:1fr 1fr;gap:14px;width:100%}
 .role{border:1px solid rgba(255,255,255,.7);border-radius:14px;padding:15px 17px;
-    background:rgba(255,255,255,.5);-webkit-backdrop-filter:blur(14px) saturate(140%);backdrop-filter:blur(14px) saturate(140%);
+    background:rgba(255,255,255,.82);
     box-shadow:0 8px 24px rgba(17,19,26,.07),inset 0 1px 0 rgba(255,255,255,.7)}
 .role.me2{border-color:rgba(109,74,255,.55);background:linear-gradient(150deg,rgba(247,245,255,.75),rgba(255,255,255,.5));box-shadow:0 10px 28px rgba(109,74,255,.18),inset 0 1px 0 rgba(255,255,255,.8)}
 .role b{font-size:15.5px;color:var(--ink)}
@@ -135,12 +131,11 @@ code{font-family:"Inter",Arial,sans-serif;font-size:.9em;font-weight:600;backgro
 .quote{border-left:4px solid var(--accent);border-radius:0 14px 14px 0;
        padding:16px 20px;font-size:18px;font-weight:600;color:var(--ink);line-height:1.4;
        background:linear-gradient(120deg,rgba(247,245,255,.8),rgba(255,255,255,.45));
-       -webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);
        box-shadow:0 8px 24px rgba(109,74,255,.10),inset 0 1px 0 rgba(255,255,255,.6)}
 .stackgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;width:100%;align-self:center}
 .tech{border:1px solid rgba(255,255,255,.7);border-radius:16px;padding:20px 16px;display:flex;flex-direction:column;
       align-items:center;gap:10px;text-align:center;
-      background:rgba(255,255,255,.5);-webkit-backdrop-filter:blur(16px) saturate(140%);backdrop-filter:blur(16px) saturate(140%);
+      background:rgba(255,255,255,.82);
       box-shadow:0 10px 28px rgba(17,19,26,.08),inset 0 1px 0 rgba(255,255,255,.75)}
 .tech img{height:46px;width:auto}
 .tech b{font-size:14.5px;color:var(--ink)}
@@ -159,7 +154,7 @@ code{font-family:"Inter",Arial,sans-serif;font-size:.9em;font-weight:600;backgro
 .src b{color:var(--accent);font-weight:600}
 .vargrid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:13px;width:100%}
 .varc{border:1px solid rgba(255,255,255,.7);border-radius:13px;padding:14px 15px;
-    background:rgba(255,255,255,.5);-webkit-backdrop-filter:blur(14px) saturate(140%);backdrop-filter:blur(14px) saturate(140%);
+    background:rgba(255,255,255,.82);
     box-shadow:0 8px 22px rgba(17,19,26,.07),inset 0 1px 0 rgba(255,255,255,.7)}
 .varc .vt{font-weight:700;color:var(--ink);font-size:14.5px;display:flex;align-items:center;gap:8px}
 .varc .vt .ic{width:18px;height:18px;color:var(--accent)}
