@@ -18,17 +18,17 @@
 
 ---
 
-## 0. La vidéo de 2 min — AU DÉBUT de la démo
+## 0. La vidéo de 2 min — slide-pont (fin présentation → début démo)
 
-**Décision : montrer la vidéo en ouverture de la démonstration.**
+La vidéo est la **dernière slide du diaporama** (slide 39, embarquée dans le `.pptx`). Elle **clôt la présentation** et **ouvre la démonstration** : je la lance à la toute fin du parlé, puis j'enchaîne sur les manips live.
 
 1. La vraie **ColorRoom** (2 cellules, 42 plaques) est à **LUMEN**, pas dans la salle : la vidéo est **le seul moyen de montrer le système réel complet** exigé par le jury (« éléments réels correspondant au diagramme de déploiement »).
 2. Elle **plante le décor** (matériel, dalles qui s'allument) avant les manips live.
 3. **Filet de sécurité** : si le Pi/CS-160/Wi-Fi bug en live, le jury a déjà vu le système marcher.
 
-**À dire en lançant la vidéo (15 s) :** « Avant de manipuler en direct, voici en 2 minutes le **système réel** installé à LUMEN : les deux cellules, les plaques pilotées en **RS-485**, et l'application en service. » → puis enchaîner sur les **tests de recette live**.
+**À dire en lançant la vidéo (15 s) :** « Voici en 2 minutes le **système réel** installé à LUMEN : les deux cellules, les plaques pilotées en **RS-485**, et l'application en service. » → puis enchaîner sur les **tests de recette live**.
 
-> ❌ Ne pas la garder pour la fin : risque de manquer de temps, et la fin doit montrer **toi en train de piloter** le système, pas une vidéo.
+> ▶️ Lecture : clic sur la vidéo dans PowerPoint (ou auto en diaporama). Garder `video_demo.mp4` à côté en secours.
 
 ---
 
@@ -157,11 +157,12 @@ Projet d'**équipe de 8**, 2 sous-équipes (JavaScript / Python). **Moi = E2.**
 
 ## 6. Montrer/expliquer mon code et son évolution (2 min)
 
-**3 extraits à ouvrir en live** (les connaître par cœur) :
+**4 extraits à ouvrir en live** (les mêmes que dans le deck, slides 16/18/20/27) :
 
-1. **`lib/auth.ts`** — `hashPassword` : `pbkdf2Sync(password, salt, 100_000, 64, 'sha512')`, format `sel:hash`. → *« je ne stocke jamais un mot de passe en clair. »*
-2. **`app/api/auth/register/route.ts`** — `db.transaction(() => { … })()` → inscription **atomique** (ACID) : user + adhésion classe, tout-ou-rien.
-3. **`app/_components/GamePuissance4.tsx`** — `scoreWindow` + `minimax` alpha-bêta. → *« voici l'intelligence de l'IA. »*
+1. **`app/api/auth/register/route.ts`** — **variable transactionnelle** : `db.transaction(() => { … })()` → user + adhésion classe, **tout-ou-rien** (BEGIN/COMMIT/ROLLBACK, ACID).
+2. **`app/api/supervision/batch/route.ts`** — **variable atomique** : compteur `hwInFlight` + file de Promises (`acquireHwSlot`/`releaseHwSlot`), atomique car boucle d'événements **mono-thread**, borné à **2 slots**.
+3. **`lib/auth.ts`** — `hashPassword` : `pbkdf2Sync(password, salt, 100_000, 64, 'sha512')`, format `sel:hash`. → *« jamais de mot de passe en clair. »*
+4. **`app/_components/GamePuissance4.tsx`** — `scoreWindow` + `minimax` alpha-bêta. → *« l'intelligence de l'IA. »*
 
 **Évolution dans le temps (à raconter avec `git log`) :**
 - **Début** : scaffold Next.js + Docker, API jeux, auth en **localStorage**.
@@ -186,7 +187,7 @@ git log --oneline | wc -l                 # ~280 commits = travail incrémental
 - [ ] Compte enseignant **et** compte apprenant prêts
 - [ ] Une partie multijoueur testée à 2 terminaux (le code fonctionne)
 - [ ] **Vidéos de secours** prêtes (R1, R2, R3)
-- [ ] `git log` ouvert dans un terminal, les 3 extraits de code ouverts dans l'éditeur
+- [ ] `git log` ouvert dans un terminal, les 4 extraits de code ouverts dans l'éditeur
 - [ ] Portainer ouvert dans un onglet
 
 > **Le jury évalue : ta contribution personnelle, ta maîtrise technique, ton implication.** À chaque test de recette, dis *« c'est moi qui ai développé cette partie »* et explique le **comment** (pas seulement le quoi).

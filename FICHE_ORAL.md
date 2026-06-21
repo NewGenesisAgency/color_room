@@ -61,6 +61,12 @@ La **ColorRoom** est un équipement scientifique du laboratoire **ENTPE / LTDS /
 - **`app/_components/Room3D.tsx`** — vue 3D Three.js (WebGLRenderer, `forceContextLoss` au démontage, pause via Page Visibility API).
 - **`lib/multiplayer.ts` + `app/api/multiplayer/state/route.ts`** — sessions persistées en base (`crg_mp_sessions.state_json`), lues en **polling**.
 
+> **4 extraits de code montrés dans le deck** (avec fichier + lien GitHub + lignes) :
+> - **Slide 16 · Variable transactionnelle (ACID)** — `db.transaction()` de `register/route.ts` (INSERT user + jonction classe, tout-ou-rien).
+> - **Slide 18 · Variable atomique · sémaphore** — `hwInFlight` + `acquireHwSlot/releaseHwSlot` de `supervision/batch/route.ts`.
+> - **Slide 20 · Hachage PBKDF2** — `hashPassword` de `lib/auth.ts`.
+> - **Slide 27 · Minimax (alpha-bêta)** — `scoreWindow` de `GamePuissance4.tsx`.
+
 ---
 
 ## 5. Fiche réponses du jury (Q&A)
@@ -137,66 +143,70 @@ La **ColorRoom** est un équipement scientifique du laboratoire **ENTPE / LTDS /
 
 ---
 
-## 7. Script slide par slide — 20 min pile (présentation PDF)
+## 7. Script slide par slide — 39 slides (≈18 min parlé + vidéo 2 min)
 
-> Mon deck = **`ColorRoom_Presentation.pdf`** (36 slides). Les **slides 1→12 sont le tronc commun de l'équipe** (mêmes infos/chiffres/diagrammes que le deck d'Ilyes) ; à partir de la slide 13 c'est **ma partie (E2)**. Colonne « ⏱ » = durée cible ; ne jamais dépasser. Ce que je **dis** est en clair, le **mot technique à placer** est en gras.
+> Mon deck = **`ColorRoom_Presentation.pdf` / `.pptx`** (**39 slides**). Les **slides 1→13 = tronc commun** (contexte, archi, choix) ; **14→34 = ma partie E2** ; **35→39 = clôture + vidéo**. Colonne « ⏱ » = durée cible. Le **parlé fait ~18 min**, la **vidéo (slide 39) fait 2 min** → **20 min** pile. Mot technique à placer **en gras**.
 
-### Bloc A — Contexte & commanditaire (tronc commun) · ~5 min
-
-| # | Slide | ⏱ | Ce que je dis (l'essentiel) |
-|---|-------|----|------------------------------|
-| 1 | Titre | 0:15 | « Bonjour, je suis Téo Trompier, candidat E2. Je présente le projet **ColorRoom – Serious Games**, réalisé pour le laboratoire **LUMEN / ENTPE**. » |
-| 2 | Plan | 0:20 | « Contexte, architecture et choix techniques, puis **ma contribution**, et enfin la démonstration. » |
-| 3 | Projet & commanditaire | 0:45 | Commanditaire = **ENTPE / LTDS**, labo **BPMNP** (Bio-ingénierie, Perception, Mécanique Numérique), hébergé à **LUMEN – Cité de la Lumière** (Lyon Confluence). |
-| 4 | Installation lumineuse unique | 1:00 | **2 cellules jumelles**, **42 plaques** (21/cellule). Une plaque : **80×80 cm**, **2360 LED**, ~**300 W**, **32 canaux** = **24 spectres étroits (proche UV→proche IR) + 8 blancs**. Pilotage des plaques par **bus RS-485**. |
-| 5 | Le besoin | 0:40 | Le **logiciel de recherche** est trop complexe (réservé aux chercheurs). Besoin : une interface **pédagogique** = **ColorRoomGames**, pour **enseignants** (créateurs) et **apprenants** (joueurs). |
-| 6 | Acteurs & fonctions (cas d'utilisation) | 0:45 | Diagramme de **cas d'utilisation** : Enseignant → *Créer/Générer un jeu* ; Apprenant → *Jouer* ; les deux → *Mesurer (CS-160)* ; tout *inclut* *Allumer les dalles*. |
-| 7 | Équipe (8) | 0:35 | **8 étudiants, 2 sous-équipes** : **JavaScript/React (E1→E4, dont moi E2)** et **Python/NiceGUI (E5→E8)**. |
-
-### Bloc B — Architecture & choix techniques · ~4 min
+### Bloc A — Contexte & commanditaire (tronc commun) · ~4 min
 
 | # | Slide | ⏱ | Ce que je dis |
 |---|-------|----|----------------|
-| 8 | Vue d'ensemble (composants) | 0:45 | **Diagramme de composants** : Navigateur → **Route Handlers** Next.js → couche `lib/` (auth, db, services) → **SQLite** + matériel (proxy supervision, pont CS-160). |
-| 9 | Conception orientée objet (classes) | 0:40 | **Diagramme de classes** : entités métier typées en **TypeScript** (User, Game, Session, Score…). |
-| 10 | React/Next/TS **vs** JS + Node-RED | 1:15 | **LA question clé.** Node-RED est **flow-based** : top pour automatiser des flux, mais inadapté à une **vraie UI multi-pages** (3D, catalogue, jeux) et ses flux JSON sont durs à **versionner**. React/Next/**TS** = composants réutilisables + **typage strict** (erreurs à la **compilation**) + code **versionnable** + un **seul runtime Node** à déployer. |
-| 11 | Technologies mises en œuvre | 0:40 | Next.js 16, React 19, TS 5.5 strict, **better-sqlite3** (synchrone), **Three.js** (3D), Docker arm64. |
-| 12 | Docker · Pi 5 · **déploiement** | 1:00 | **Diagramme de déploiement** : **Raspberry Pi 5** héberge dans **Docker** l'app Next.js + Ollama + supervision ; **dalles via RS-485**, **CS-160 en USB** ; clients en **Wi-Fi local** ; accès **http://172.17.40.39/**. **100 % hors-ligne.** |
+| 1 | Titre | 0:15 | « Bonjour, Téo Trompier, candidat **E2**. Projet **ColorRoom – Serious Games** pour **LUMEN / ENTPE**. » |
+| 2 | Sommaire | 0:15 | « Contexte, architecture et choix techniques, **ma contribution**, puis démonstration. » |
+| 3 | Contexte & partenaire | 0:45 | Commanditaire **ENTPE / LTDS**, labo **BPMNP**, à **LUMEN – Cité de la Lumière** (Lyon Confluence). |
+| 4 | Le système ColorRoom | 0:55 | **2 cellules jumelles**, **42 plaques** (21/cellule), **80×80 cm**, **2360 LED**, ~**300 W**, **32 canaux = 24 spectres étroits + 8 blancs**, pilotage **bus RS-485**. |
+| 5 | Le besoin | 0:40 | Logiciel de recherche trop complexe → interface **pédagogique** = serious games pour **enseignants** + **apprenants**. |
+| 6 | Cas d'utilisation | 0:35 | **Diagramme CU** : Enseignant *crée/génère*, Apprenant *joue*, les deux *mesurent (CS-160)* ; tout *inclut Allumer les dalles*. |
+| 7 | Équipe & répartition | 0:30 | **8 étudiants, 2 sous-équipes** : **JS/React (E1→E4, dont moi E2)** + **Python/NiceGUI (E5→E8)**. |
+| 8 | **Diagramme de Gantt** | 0:25 | Projet **planifié** ; ma contribution (E2) suivie tout du long. *(gestion de projet)* |
 
-### Bloc C — Ma partie E2 (le cœur) · ~9 min
-
-| # | Slide | ⏱ | Ce que je dis |
-|---|-------|----|----------------|
-| 13 | Ma partie · **interface** | 0:40 | UI que j'ai conçue : catalogue, vue **3D temps réel** (Three.js), pages jeux/mesure/gestion. Rendu **unifié** couleur écran = couleur dalle. |
-| 14 | Données · **modèle relationnel (ERD)** | 0:50 | **SQLite** via **better-sqlite3** ; tables `crg_*` ; **migrations idempotentes** (`CREATE TABLE IF NOT EXISTS`), **WAL**, `busy_timeout`, **clés étrangères**. |
-| 15 | **Extrait de code · données** | 0:50 | `lib/db/index.ts` : connexion **singleton**, `PRAGMA journal_mode=WAL`. Dire **pourquoi WAL** (lectures concurrentes pendant une écriture). |
-| 16 | **Typologie des variables / persistance** | 1:00 | **Atomique/transactionnelle** (`db.transaction` ACID) · **volatile** (état runtime `useRef`, perdu au reload) · **persistante** (SQLite + volume Docker) · **concurrente** (sémaphore matériel) · **réactive** (`useState`) · **environnement** (`process.env`, `.env` hors Git). |
-| 17 | Ma partie · **sécurité** | 0:50 | Mots de passe **jamais en clair** : **PBKDF2-HMAC-SHA512**, 100 000 itérations, sel 16 o ; sessions cookie **HttpOnly + SameSite=lax** ; **RGPD** (pseudo, minimisation). |
-| 18 | **Extrait de code · sécurité** | 0:45 | `lib/auth.ts` → `hashPassword` (`pbkdf2Sync(..., 100_000, 64, 'sha512')`, format `sel:hash`). |
-| 19 | **Séquence · connexion** | 0:35 | **Diagramme de séquence** : saisie → `verifyPassword` → création de session (token `randomBytes(32)`, **30 j** glissants) → cookie. |
-| 20 | Ma partie · **gestion** (tableau de bord) | 0:40 | Espace enseignant : classes, scores, **export CSV (UTF-8 + BOM)**, 3 rôles. |
-| 21 | Ma partie · **jeux solo** | 0:40 | Color Speed, Simon, Tetris color-match, Puissance 4… pilotage des dalles en temps réel. |
-| 22 | **Séquence · exécution d'un jeu** | 0:35 | Clic → Runtime → graphe de nœuds → `/api/supervision/batch` → dalles ; score renvoyé. |
-| 23 | **Diagramme d'états · jeu** | 0:25 | Cycle de vie d'une partie (prêt → en cours → terminé). |
-| 24 | Ma partie · **IA (Puissance 4)** | 1:00 | **Minimax + élagage alpha-bêta**, profondeurs **1/2/5/9/12** ; `scoreWindow` (**défense −170 > attaque +130**, victoire 1 000 000, centralité) ; **anti-piège**. |
-| 25 | **Extrait de code · IA** | 0:45 | `GamePuissance4.tsx` → fonction `minimax` / `scoreWindow`. Dire l'intérêt de l'**alpha-bêta** (couper les branches inutiles). |
-| 26 | Ma partie · **jeux en réseau** | 0:45 | Multijoueur **sans WebSocket** : état **persisté** (`crg_mp_sessions.state_json`) lu en **polling** ; **code** de salon, hôte = siège 1, **heartbeat**. |
-| 27 | **Séquence · multijoueur** | 0:35 | Hôte crée → invité saisit le code → polling de `/state` → scores synchronisés. |
-| 28 | Ma partie · **physique de la lumière** | 0:50 | Mesure **CS-150/160** : **tristimulus CIE XYZ**, **luminance Lv (cd/m²)**, **chromaticité x,y**, **diagramme CIE 1931**, **ΔE**. |
-| 29 | **Séquence · mesure** | 0:35 | Connecter → allumer dalle → mesurer → lire XYZ/Lv/x,y → point CIE. |
-| 30 | **Diagramme d'états · CS-160** | 0:25 | Déconnecté → connecté → mesure → résultat. |
-| 31 | **Diagramme d'activité · remap** | 0:25 | Transformation d'une couleur RGB vers les 32 canaux. |
-
-### Bloc D — Clôture · ~2 min
+### Bloc B — Architecture & choix techniques · ~3:45
 
 | # | Slide | ⏱ | Ce que je dis |
 |---|-------|----|----------------|
-| 32 | Ma partie · **qualité** | 0:40 | Vérif **types `tsc`** + **build prod** à chaque étape ; **transactions ACID** ; exports UTF-8 ; **tests API par E4**. |
-| 33 | **Démarche d'ingénieur** | 0:30 | Besoin → conception **UML** (15 diagrammes) → dev **incrémental** (Git, ~280 commits) → **CI/CD** → déploiement Pi. |
-| 34 | **Conclusion** | 0:40 | « J'ai livré le **cœur applicatif** : données, API, UI, jeux, IA, multijoueur, mesure. Solution **embarquée, hors-ligne, robuste**. » |
-| 35-36 | Place à la démonstration | 0:15 | « Je vous propose maintenant de passer à la **démonstration sur le matériel réel**. » |
+| 9 | Architecture (composants) | 0:45 | **Diagramme de composants** : Navigateur → **Route Handlers** Next.js → `lib/` → **SQLite** + matériel (proxy supervision, pont CS-160). |
+| 10 | Diagramme de classes | 0:30 | Entités métier **typées TypeScript** (User, Game, Session, Score…). |
+| 11 | **Choix techniques · comparatif** | 1:15 | **LA slide clé** (tableau ✗/✓). Node-RED **flow-based** → inadapté UI multi-pages, flux JSON peu **versionnables**. Retenu : **React** (Virtual DOM), **TS strict** (erreurs à la **compilation**), **Next.js** (Route Handlers, un seul runtime Node). |
+| 12 | La pile technique | 0:30 | Next 16, React 19, TS 5.5, **better-sqlite3**, **Three.js**, Docker arm64. |
+| 13 | Réseau & déploiement | 0:50 | **Diagramme de déploiement** : **Pi 5** + Docker (app + Ollama + supervision) ; **dalles RS-485**, **CS-160 USB**, **Wi-Fi local**, accès **http://172.17.40.39/**. **100 % hors-ligne.** |
 
-**Total ≈ 20:00.** Si je suis en retard : raccourcir 9 (classes), 23/30/31 (diagrammes d'états/activité) — ne JAMAIS sacrifier 10 (Node-RED), 16 (variables), 24 (IA).
+### Bloc C — Ma partie E2 (le cœur) · ~9:30
+
+| # | Slide | ⏱ | Ce que je dis |
+|---|-------|----|----------------|
+| 14 | Interface & design system | 0:35 | UI conçue par moi : catalogue, **3D temps réel** (Three.js), pages jeux/mesure/gestion ; couleur écran = couleur dalle. |
+| 15 | Base de données SQLite (ERD) | 0:40 | **better-sqlite3** ; tables `crg_*` ; **migrations idempotentes**, **WAL**, `busy_timeout`, **clés étrangères**. |
+| 16 | **Code · variable transactionnelle (ACID)** | 0:45 | `register/route.ts` : `db.transaction()` = INSERT user **+** jonction classe, **tout-ou-rien** (BEGIN/COMMIT/**ROLLBACK**). |
+| 17 | Typologie des variables | 0:40 | **Transactionnelle/atomique**, **volatile** (`useRef`), **persistante** (SQLite+volume), **concurrente** (sémaphore), **réactive** (`useState`), **environnement** (`.env`). |
+| 18 | **Code · variable atomique (sémaphore)** | 0:45 | `supervision/batch` : compteur **`hwInFlight`** + file de Promises ; **atomique** car boucle d'événements **mono-thread** ; borné à **2 slots**. |
+| 19 | Sécurité | 0:35 | Mots de passe jamais en clair : **PBKDF2-HMAC-SHA512** ; cookie **HttpOnly+SameSite** ; **RGPD** (pseudo). |
+| 20 | **Code · hachage PBKDF2** | 0:35 | `lib/auth.ts` → `pbkdf2Sync(pw, sel, 100_000, 64, 'sha512')`, format `sel:hash`. |
+| 21 | Séquence · connexion | 0:25 | `verifyPassword` → session (token `randomBytes(32)`, **30 j** glissants) → cookie. |
+| 22 | Gestion (tableau de bord) | 0:30 | Enseignant : classes, scores, **export CSV (UTF-8+BOM)**, 3 rôles. |
+| 23 | Jeux solo | 0:35 | Color Speed, Simon, Tetris, Puissance 4… pilotage **32 canaux** en parallèle (`Promise.all`, `AbortController`). |
+| 24 | Séquence · exécution d'un jeu | 0:25 | Clic → **Runtime** → graphe de nœuds → `/api/supervision/batch` → dalles ; score renvoyé. |
+| 25 | Diagramme d'états · jeu | 0:15 | Prête → en cours → terminée. |
+| 26 | IA Puissance 4 (minimax) | 0:50 | **Minimax + alpha-bêta**, profondeurs **1/2/5/9/12** ; `scoreWindow` (**défense −170 > attaque +130**), **anti-piège**. |
+| 27 | **Code · minimax (alpha-bêta)** | 0:40 | `GamePuissance4.tsx` → `scoreWindow` ; l'**alpha-bêta** coupe les branches inutiles → explore plus profond. |
+| 28 | Jeux en réseau | 0:35 | Multijoueur **sans WebSocket** : état **persisté** (`state_json`) lu en **polling** ; code de salon, hôte = siège 1, **heartbeat**. |
+| 29 | Séquence · multijoueur | 0:25 | Hôte crée → invité saisit le code → polling `/state` → écrans synchronisés. |
+| 30 | Physique de la lumière | 0:45 | **CS-150/160** : **tristimulus XYZ**, **Lv (cd/m²)**, **x,y**, **diagramme CIE 1931**, **ΔE**. |
+| 31 | Séquence · mesure | 0:25 | Connecter → allumer dalle → mesurer → XYZ/Lv/x,y → point CIE. |
+| 32 | Diagramme d'états · CS-160 | 0:15 | Déconnecté → connecté → mesure → résultat. |
+| 33 | Diagramme d'activité · remap | 0:15 | Couleur **RGB** → remappée sur les **32 canaux** (profils par longueur d'onde). |
+
+### Bloc D — Clôture + vidéo · ~2:30 (+ vidéo 2 min)
+
+| # | Slide | ⏱ | Ce que je dis |
+|---|-------|----|----------------|
+| 34 | Qualité | 0:35 | **types `tsc`** + **build prod** à chaque étape ; **ACID** ; tests API par **E4**. |
+| 35 | Démarche d'ingénieur | 0:30 | Besoin → **UML** (15 diagrammes) → dev **incrémental** (Git, ~280 commits) → **CI/CD** → Pi. |
+| 36 | Conclusion | 0:35 | « J'ai livré le **cœur applicatif** : données, API, UI, jeux, IA, multi, mesure. Solution **embarquée, hors-ligne, robuste**. » |
+| 37 | Place à la démonstration | 0:10 | « On passe à la **démonstration sur le matériel réel**. » |
+| 38 | Merci / questions | 0:05 | (transition) |
+| 39 | **Vidéo du projet** | **2:00** | **Lancer la vidéo** (embarquée dans le `.pptx`) : la ColorRoom réelle en fonctionnement → enchaîne sur la démo live. |
+
+**Total ≈ 18 min parlé + 2 min vidéo = 20:00.** Si en retard : raccourcir 10 (classes), 25/32/33 (états/activité). **Ne JAMAIS sacrifier** 11 (comparatif Node-RED), 16/18 (variables transactionnelle/atomique), 26 (IA).
 
 ---
 
@@ -214,16 +224,18 @@ La **ColorRoom** est un équipement scientifique du laboratoire **ENTPE / LTDS /
 
 ---
 
-## 9. La vidéo de 2 min — où la placer ?
+## 9. La vidéo de 2 min — la slide-pont (slide 39)
 
-**Recommandation : AU DÉBUT de la démonstration.** Raisons :
-1. La vraie **ColorRoom** (2 cellules, 42 plaques) est à **LUMEN**, pas dans la salle d'examen : la vidéo est **le seul moyen de montrer le système réel** exigé par le jury (« éléments réels correspondant au diagramme de déploiement »).
-2. Elle **plante le décor** en 2 min (matériel, dalles qui s'allument, salle) → le jury comprend le contexte **avant** les manipulations live.
-3. **Filet de sécurité** : si le Pi / CS-160 / Wi-Fi bug pendant le live, le jury a **déjà vu** le système fonctionner.
+La vidéo est **embarquée dans le `.pptx`** (dernière slide). Elle sert de **pont entre la présentation et la démonstration** : je la lance **à la toute fin du parlé**, puis j'enchaîne directement sur la démo live.
 
-**Enchaînement conseillé :** vidéo 2 min (contexte réel) → puis **tests de recette en live** (R1 jouer/dalles, R2 mesure CS-160, R3 IA/multi) → outils/CI → code & évolution.
+Pourquoi c'est le bon endroit :
+1. La vraie **ColorRoom** (2 cellules, 42 plaques) est à **LUMEN**, pas dans la salle : la vidéo est **le seul moyen de montrer le système réel complet** exigé par le jury (« éléments réels du diagramme de déploiement »).
+2. Elle **clôt la présentation** sur du concret et **ouvre la démo** sans rupture.
+3. **Filet de sécurité** : si le Pi / CS-160 / Wi-Fi bug, le jury a **déjà vu** le système fonctionner.
 
-> ⚠️ À éviter : la mettre **à la fin** = risque de **manquer de temps** (20 min serré) et de finir sur du passif au lieu d'une manip live. La fin doit montrer **toi en train de piloter** le système, pas une vidéo.
+**Enchaînement :** slide 39 (vidéo 2 min) → **tests de recette en live** (R1 jouer/dalles, R2 mesure CS-160, R3 IA/multi) → outils/CI → code & évolution.
+
+> ▶️ **Pour la lancer** : dans PowerPoint, clic sur la vidéo (ou lecture auto en mode diaporama). Garder `video_demo.mp4` à côté en secours.
 
 ---
 
