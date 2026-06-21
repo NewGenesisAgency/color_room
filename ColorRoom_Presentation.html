@@ -219,11 +219,11 @@
     <div class="roles">
       <div class="role" style="--c:var(--indigo)"><b>E1 · Maxime Bonnevay</b><span>Infrastructure Pi & Docker, CI/CD, intégration colorimètre, sécurité, notice d'installation</span></div>
       <div class="role me"><b>E2 · Téo Trompier <span class="tag">MOI</span></b><span>Base de données, API REST, UI/UX & design, jeux solo + multijoueur, proxy LED, documentation</span></div>
-      <div class="role" style="--c:var(--green)"><b>E3 · Ilyes Arbadji</b><span>Éditeur de jeux no-code (ReactFlow), catalogue de nœuds, moteur d'exécution, aperçu 3D</span></div>
+      <div class="role" style="--c:var(--green)"><b>E3 · Ilyes Arbadji</b><span>Éditeur de jeux (hors de mon périmètre E2)</span></div>
       <div class="role" style="--c:var(--amber)"><b>E4 · Hasan Akyuz</b><span>Tests de l'API, simulateur de plaques, Swagger/Postman, fiches de recette</span></div>
     </div>
     <div style="font-size:13.5px;color:var(--grey);background:var(--light);border-radius:12px;padding:10px 14px;">
-      <b style="color:var(--slate)">Ma contribution (E2)</b> : tout le cœur de l'application web (données, interface, jeux et réseau) sur lequel s'appuient les autres parties (l'éditeur de E3 et les tests de E4).
+      <b style="color:var(--slate)">Ma contribution (E2)</b> : tout le cœur de l'application web (données, interface, jeux et réseau) sur lequel s'appuient les autres parties (notamment les tests d'API de E4).
     </div>
   </div>
   <div class="pageno">6 / 22</div>
@@ -235,16 +235,16 @@
   <div class="body" style="flex-direction:column;justify-content:center;gap:18px;">
     <div class="flow">
       <div class="node" style="background:var(--indigo)"><b>Navigateur</b><small>Tablette / PC (Wi-Fi local)</small></div><span class="arr">→</span>
-      <div class="node" style="background:var(--violet)"><b>Next.js</b><small>UI React + routes API</small></div><span class="arr">→</span>
-      <div class="node" style="background:var(--slate)"><b>Couche lib/</b><small>auth · db · services</small></div><span class="arr">→</span>
+      <div class="node" style="background:var(--violet)"><b>Next.js</b><small>App Router · Route Handlers</small></div><span class="arr">→</span>
+      <div class="node" style="background:var(--slate)"><b>Couche lib/</b><small>auth · db · services métier</small></div><span class="arr">→</span>
       <div class="node" style="background:var(--amber)"><b>SQLite</b><small>better-sqlite3</small></div>
     </div>
     <div class="flow">
-      <div class="node" style="background:var(--cyan)"><b>Proxy supervision</b><small>pilotage des 42 dalles</small></div>
+      <div class="node" style="background:var(--cyan)"><b>Proxy supervision</b><small>HTTP → 42 dalles</small></div>
       <div class="node" style="background:var(--green)"><b>Pont CS-160</b><small>colorimètre (USB)</small></div>
       <div class="node" style="background:var(--pink)"><b>Three.js</b><small>vue 3D de la salle</small></div>
     </div>
-    <p style="text-align:center;color:var(--grey);font-size:14px;max-width:920px;margin:0 auto;">Un serveur unique conteneurisé (Docker) sur le Raspberry Pi 5 : le navigateur appelle les routes d'API Next.js, qui s'appuient sur SQLite et sur le matériel via des proxys. Tout fonctionne hors-ligne.</p>
+    <p style="text-align:center;color:var(--grey);font-size:14px;max-width:920px;margin:0 auto;">Serveur unique conteneurisé (Docker) sur Raspberry Pi 5. Next.js App Router : Server Components pour le rendu, Route Handlers pour l'API. La couche lib/ isole l'accès aux données (better-sqlite3) et au matériel (proxy HTTP de supervision, pont .NET du CS-160). Exécution 100 % hors-ligne.</p>
   </div>
   <div class="pageno">7 / 22</div>
 </section>
@@ -255,16 +255,16 @@
   <div class="body">
     <div class="col">
       <div class="band" style="background:var(--slate)">Piste initiale : Node-RED</div>
-      <ul><li>Excellent pour câbler des flux, <b>mal adapté</b> à une vraie appli multi-pages</li>
+      <ul><li>Modèle <b>flow-based</b> : parfait pour l'automatisation, <b>mal adapté</b> à une appli multi-pages</li>
         <li>Pas de composants visuels pour une UI/UX pédagogique riche</li>
         <li>Flux vite illisibles à grande échelle, rendu HTML/CSS limité</li></ul>
     </div>
     <div class="col">
       <div class="band" style="background:var(--violet)">Choix retenu : Next.js + React + TS</div>
-      <ul><li><b>React</b> : composants réutilisables + état réactif (jeux instantanés)</li>
-        <li><b>TypeScript</b> : typage strict, erreurs vues à la compilation (maintenable)</li>
-        <li><b>Next.js</b> : UI + API + un seul serveur Node, idéal sur Pi</li>
-        <li class="sub">Next.js 16 · TS 5.5 · better-sqlite3 · Three.js · Docker</li></ul>
+      <ul><li><b>React</b> : composants réutilisables, DOM virtuel et réconciliation, état réactif (re-rendu ciblé)</li>
+        <li><b>TypeScript strict</b> : typage statique vérifié à la transpilation (tsc) + ESLint</li>
+        <li><b>Next.js</b> : UI + Route Handlers natifs (pas d'Express séparé), un seul runtime Node</li>
+        <li class="sub">Next.js 16.2 · TypeScript 5.5 strict · better-sqlite3 11.5 · Three.js 0.160 · Docker</li></ul>
     </div>
   </div>
   <div class="pageno">8 / 22</div>
@@ -275,12 +275,13 @@
   <div class="head"><div class="num">5</div><div><div class="kick">Docker · Raspberry Pi 5</div><h2>Réseau et déploiement</h2></div></div>
   <div class="body">
     <div class="col"><ul>
-      <li>Image <b>Docker multi-stage</b> (deps → builder → runner) pour arm64</li>
+      <li>Image <b>Docker multi-stage</b> (deps → builder → runner), base node:alpine, cible <b>arm64</b></li>
       <li>Application exposée sur le <b>port 8080</b>, supervisée par <b>Portainer</b></li>
       <li>Le Pi fournit le Wi-Fi local <b>ColorRoom_WiFI</b> (tablettes, PC)</li>
       <li>API de supervision des dalles atteinte depuis le Pi ; <b>CS-160 en USB</b></li>
       <li>Base SQLite dans un volume Docker (persistance entre redémarrages)</li>
-      <li>Secrets (compte admin) isolés dans un fichier <b>.env</b></li>
+      <li>Secrets (compte admin) isolés dans un fichier <b>.env</b> (hors versionnement Git)</li>
+      <li class="sub">Exposition de l'API de supervision via pare-feu Windows + portproxy (netsh, port 18080)</li>
     </ul></div>
     <div style="width:420px;display:flex;align-items:center"><div class="codecard" style="width:100%">
       <span class="c"># déploiement sur le Raspberry Pi</span><br>
@@ -304,10 +305,10 @@
       <li>Apparition progressive des pavés (flou + translation + opacité)</li>
     </ul></div>
     <div class="col"><ul>
-      <li><b>Vue 3D temps réel</b> (Three.js, composant Room3D)</li>
+      <li><b>Vue 3D temps réel</b> (Three.js : WebGLRenderer, PerspectiveCamera, composant Room3D)</li>
       <li>Représente les <b>2 cellules jumelles</b> ; clic = transition caméra (GSAP)</li>
-      <li class="sub">Rendu uniquement côté navigateur, canvas détruit au démontage (pas de fuite mémoire)</li>
-      <li class="sub">Pause quand l'onglet est masqué (économie de batterie sur tablette)</li>
+      <li class="sub">Rendu client uniquement ; libération du contexte WebGL (forceContextLoss) au démontage (anti-fuite mémoire)</li>
+      <li class="sub">Boucle de rendu mise en pause via l'API Page Visibility (économie batterie tablette)</li>
     </ul></div>
   </div>
   <div class="pageno">10 / 22</div>
@@ -318,11 +319,11 @@
   <div class="head"><div class="num">6</div><div><div class="kick">Ma partie · données</div><h2>Base de données SQLite</h2></div><span class="me">E2</span></div>
   <div class="body">
     <div class="col"><ul>
-      <li><b>SQLite</b> (better-sqlite3) : un simple fichier, sans serveur, idéal embarqué</li>
+      <li><b>SQLite</b> via <b>better-sqlite3</b> (API synchrone, requêtes préparées = anti-injection SQL)</li>
       <li><b>7 tables</b> : crg_users, crg_sessions, crg_classes, crg_class_members, crg_scores, crg_games…</li>
-      <li>Relations par clés étrangères, suppression en cascade</li>
+      <li>Intégrité référentielle : clés étrangères <b>ON DELETE CASCADE</b></li>
       <li><b>Migrations idempotentes</b> (CREATE TABLE IF NOT EXISTS) au démarrage</li>
-      <li>Mode <b>WAL + busy_timeout</b> : accès concurrents sans erreur SQLITE_BUSY</li>
+      <li><b>PRAGMA journal_mode=WAL</b> + <b>busy_timeout</b> : lectures concurrentes, anti <b>SQLITE_BUSY</b></li>
     </ul></div>
     <div style="width:380px;display:flex;align-items:center"><div class="codecard" style="width:100%">
       <span class="c">CREATE TABLE IF NOT EXISTS crg_users (</span><br>
@@ -341,8 +342,8 @@
   <div class="head"><div class="num">6</div><div><div class="kick">Ma partie · sécurité</div><h2>Authentification et données personnelles</h2></div><span class="me">E2</span></div>
   <div class="body" style="flex-direction:column;justify-content:center;"><ul>
     <li><span class="badge" style="--c:var(--slate);width:30px;height:30px"><svg><use href="#g-lock"/></svg></span><b>3 rôles</b> : administrateur (créé via .env), enseignant, apprenant</li>
-    <li><span class="badge" style="--c:var(--violet);width:30px;height:30px"><svg><use href="#g-lock"/></svg></span>Mots de passe hachés <b>PBKDF2-SHA512</b> (100 000 itérations, sel aléatoire), jamais en clair</li>
-    <li><span class="badge" style="--c:var(--cyan);width:30px;height:30px"><svg><use href="#g-network"/></svg></span>Sessions par <b>cookie HttpOnly + SameSite=lax</b> (7 jours) : anti-XSS / anti-CSRF</li>
+    <li><span class="badge" style="--c:var(--violet);width:30px;height:30px"><svg><use href="#g-lock"/></svg></span>Hachage <b>PBKDF2-HMAC-SHA512</b> : 100 000 itérations, sel 16 octets, clé dérivée 64 octets ; stockage au format <code>sel:hash</code></li>
+    <li><span class="badge" style="--c:var(--cyan);width:30px;height:30px"><svg><use href="#g-network"/></svg></span>Jeton de session aléatoire en <b>cookie HttpOnly + SameSite=lax</b> (7 j) : atténue vol de session (XSS) et CSRF</li>
     <li><span class="badge" style="--c:var(--green);width:30px;height:30px"><svg><use href="#g-check"/></svg></span><b>Données 100 % locales</b> : tout reste sur le Pi, rien sur Internet</li>
     <li><span class="badge" style="--c:var(--amber);width:30px;height:30px"><svg><use href="#g-check"/></svg></span>Minimisation (pseudo seul), droit à l'effacement en cascade, cloisonnement par rôle</li>
   </ul></div>
@@ -357,13 +358,13 @@
       <li><b>Inscription / connexion</b> : rôle détecté côté serveur, connexion auto après inscription</li>
       <li><b>Classes</b> : code à 6 caractères (sans 0/O, 1/I), rejointe à l'inscription ou via code</li>
       <li><b>Niveaux</b> (collège → grand public) assignés par l'enseignant</li>
-      <li><b>Historique des scores</b> : l'apprenant voit les siens, l'enseignant ceux de tous (403 sinon)</li>
+      <li><b>Scores</b> : requête SQL avec <b>JOIN</b> scores × users ; paramètre <code>all=1</code> réservé admin/enseignant (HTTP <b>403</b> sinon)</li>
     </ul></div>
     <div class="col"><ul>
       <li><b>Tableau de bord /gestion</b> (enseignants/admins), 3 onglets :</li>
       <li class="sub">Utilisateurs : niveau, reset mot de passe, suppression</li>
       <li class="sub">Classes : création, code, membres</li>
-      <li class="sub">Scores : consultation, filtre, <b>export CSV</b> (UTF-8 + BOM pour Excel)</li>
+      <li class="sub">Scores : <b>export CSV</b> côté client (Blob + URL.createObjectURL, BOM UTF-8)</li>
     </ul></div>
   </div>
   <div class="pageno">13 / 22</div>
@@ -380,7 +381,7 @@
     <div class="fcard" style="--c:var(--pink)"><span class="badge" style="--c:var(--pink)"><svg><use href="#g-target"/></svg></span><div><h3>Chasseur de Gamut</h3><p>Reproduire une cible sur le CIE</p></div></div>
     <div class="fcard" style="--c:var(--cyan)"><span class="badge" style="--c:var(--cyan)"><svg><use href="#g-palette"/></svg></span><div><h3>Mix de Canaux</h3><p>Mélanger 3 canaux LED</p></div></div>
   </div></div>
-  <div class="pageno" style="left:30px;right:auto">Pilotage temps réel : 32 canaux envoyés en parallèle (concurrence limitée) · couleur écran = couleur dalle</div>
+  <div class="pageno" style="left:30px;right:auto">Pilotage temps réel : 32 canaux/dalle envoyés en parallèle (Promise.all, concurrence bornée + timeout AbortController) · CHANNEL_PROFILES calés sur la longueur d'onde réelle</div>
   <div class="pageno">14 / 22</div>
 </section>
 
@@ -391,8 +392,8 @@
     <div class="col"><ul>
       <li>Grille 7×6 projetée sur les 42 dalles, à 2 joueurs ou contre l'ordinateur</li>
       <li>IA <b>100 % hors-ligne</b>, directement dans le navigateur</li>
-      <li>Algorithme <b>minimax + élagage alpha-bêta</b> : anticipe plusieurs coups</li>
-      <li>Fonction d'évaluation : bonus alignements, malus accru sur les menaces (défense)</li>
+      <li>Algorithme <b>minimax</b> avec <b>élagage alpha-bêta</b> (anticipe jusqu'à 7 demi-coups / plies)</li>
+      <li>Heuristique d'évaluation (bonus alignements, malus menaces) + <b>move ordering</b> central pour maximiser l'élagage</li>
       <li><b>3 niveaux</b> (vert / jaune / rouge) = profondeur 2 / 4 / 7</li>
       <li>Décision quasi instantanée (~70 ms), fluide même sur tablette</li>
     </ul></div>
@@ -413,12 +414,12 @@
   <div class="head"><div class="num">7</div><div><div class="kick">Ma partie · jeux en réseau</div><h2>Les jeux multijoueur</h2></div><span class="me">E2</span></div>
   <div class="body">
     <div class="col"><ul>
-      <li>État de la partie conservé <b>en base</b>, récupéré par <b>polling</b> de /state</li>
+      <li>État de partie persisté <b>en base</b>, récupéré par <b>polling</b> périodique de la route <code>/state</code></li>
       <li class="sub">Plus simple à déployer sur Pi que des WebSockets</li>
       <li><b>Spectre Chromatique</b> : jusqu'à 8 joueurs, reproduire une couleur (score = distance)</li>
       <li><b>Morpion en réseau</b> : 2 joueurs (X/O), dalles rouge/bleu, détection de victoire</li>
       <li><b>Multijoueur générique</b> : chaque joueur règle un canal vers une cible commune</li>
-      <li>Système de <b>présence</b> léger ; le siège 1 contrôle démarrage et arrêt</li>
+      <li><b>Heartbeat</b> de présence ; jetons de session = <b>UUID</b> aléatoires ; hôte = siège 1</li>
     </ul></div>
     <div style="width:300px;display:flex;align-items:center;justify-content:center;gap:14px">
       <div style="width:90px;height:180px;background:var(--dark);border:3px solid var(--slate);border-radius:20px;display:grid;place-items:center"><div style="width:58px;height:90px;border-radius:12px;background:var(--green)"></div></div>
@@ -433,8 +434,8 @@
   <div class="head"><div class="num">8</div><div><div class="kick">Ma partie · physique de la lumière</div><h2>Mesure colorimétrique et chromaticité</h2></div><span class="me">E2</span></div>
   <div class="body">
     <div class="col"><ul>
-      <li>Page /mesure reliée au colorimètre <b>Konica Minolta CS-150/160</b> (pont /api/CS160)</li>
-      <li>Mesure réelle : coordonnées <b>XYZ</b>, luminance <b>Lv</b>, chromaticité <b>x, y</b></li>
+      <li>Colorimètre <b>Konica Minolta CS-150/160</b> via un pont logiciel .NET exposé par <code>/api/CS160</code></li>
+      <li>Tristimulus <b>CIE XYZ</b>, luminance <b>Lv (cd/m²)</b>, chromaticité <b>(x, y)</b> ; écart <b>ΔE</b> pour le score</li>
       <li>Point tracé sur le <b>diagramme CIE 1931</b> : comparer le réel à l'attendu</li>
       <li>32 canaux = <b>18 LED spectrales</b> (404→780 nm) + <b>14 LED phosphore</b> (blanc chaud)</li>
       <li class="sub">Profils colorimétriques corrigés à partir des longueurs d'onde réelles</li>
