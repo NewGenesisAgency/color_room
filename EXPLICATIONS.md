@@ -241,6 +241,22 @@ function minimax(grid, depth, alpha, beta, maximizing): number {
 ```
 *Niveaux = profondeur :* `novice {depth:1}` … `legendaire {depth:12}`.
 
+**Les 5 niveaux (DIFF_CONFIG) :**
+
+| Niveau | `depth` (coups anticipés) | `noise` (part d'aléatoire) | `block` | Comportement |
+|--------|---------------------------|----------------------------|---------|--------------|
+| Novice | 1 | 0.70 | non | anticipe 1 coup, joue **souvent au hasard** |
+| Facile | 2 | 0.30 | non | quelques erreurs |
+| Moyen | 5 | 0.08 | oui | bon niveau, bloque les menaces |
+| Difficile | 9 | 0.00 | oui | très fort, sans erreur |
+| Légendaire | 12 | 0.00 | oui | anticipe 12 coups, **quasi imbattable** |
+
+- **`depth`** = profondeur de l'arbre minimax = **combien de coups l'IA simule à l'avance**.
+- **`noise`** = **probabilité de jouer un coup au hasard** au lieu du meilleur (rend les niveaux faciles « humains »).
+- **`block`** = activer le blocage des victoires adverses immédiates + l'anti-piège.
+
+**Pourquoi `WIN_SCORE = 1 000 000` ?** C'est une valeur **volontairement énorme** qui représente « **partie gagnée** » dans l'évaluation. Comme tous les autres scores sont petits (un alignement de 3 = 130, de 2 = 14…), une victoire **écrase** tout : le minimax choisira **toujours** un coup qui gagne plutôt qu'un coup qui « marque des points ». L'opposé, `-1 000 000`, représente « partie perdue » → l'IA fuit ces coups à tout prix. Ce n'est pas une vraie « infinité » (on garde `±Infinity` pour les bornes alpha-bêta) : un **grand nombre fini** suffit, et on lui ajoute la profondeur (`WIN_SCORE + depth`) pour préférer une victoire **plus rapide**.
+
 ---
 
 ## 9. Réseau de neurones vs minimax (ce que je n'utilise PAS, et pourquoi)

@@ -20,7 +20,7 @@
 
 ## 0. La vidéo de 2 min : slide-pont (fin présentation → début démo)
 
-La vidéo est la **dernière slide du diaporama** (slide 49, embarquée dans le `.pptx`). Elle **clôt la présentation** et **ouvre la démonstration** : je la lance à la toute fin du parlé, puis j'enchaîne sur les manips live.
+La vidéo est la **dernière slide du diaporama** (slide 46, embarquée dans le `.pptx`). Elle **clôt la présentation** et **ouvre la démonstration** : je la lance à la toute fin du parlé, puis j'enchaîne sur les manips live.
 
 1. La vraie **ColorRoom** (2 cellules, 42 plaques) est à **LUMEN**, pas dans la salle : la vidéo est **le seul moyen de montrer le système réel complet** exigé par le jury (« éléments réels correspondant au diagramme de déploiement »).
 2. Elle **plante le décor** (matériel, dalles qui s'allument) avant les manips live.
