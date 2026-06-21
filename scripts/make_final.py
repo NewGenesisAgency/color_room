@@ -23,7 +23,7 @@ IMG={
  "erd":uml("ERD"),"sauth":uml("Seq_Auth"),"sjeu":uml("Seq_Jeu"),"scs":uml("Seq_CS160"),
  "smp":uml("Seq_MP"),"ej":uml("Etats_Jeu"),"ecs":uml("Etats_CS160"),"remap":uml("Activite_Remap"),
 }
-LOGOS={n:logo(n) for n in ["react","nextdotjs","typescript","sqlite","docker","threedotjs","nodedotjs","raspberrypi","javascript","nodered"]}
+LOGOS={n:logo(n) for n in ["react","nextdotjs","typescript","sqlite","docker","threedotjs","nodedotjs","raspberrypi","javascript","nodered","greensock","lucide","ollama"]}
 PHO={"lumen":photo("lumen.jpg"),"map":photo("map.jpg"),"plaque":photo("plaque.jpg"),"gantt":photo("gantt.png"),
      "colorroom":photo("colorroom.jpg"),"labcouleur":photo("labcouleur.jpg"),"supervision":photo("supervision.jpg")}
 
@@ -98,6 +98,11 @@ code{font-family:"Inter",Arial,sans-serif;font-size:.9em;font-weight:600;backgro
 .locrow.b .lp{background:#e6f7f3;color:var(--accent2)}
 .locrow b{font-size:13.5px;color:var(--ink)}
 .locrow small{display:block;font-size:11.5px;color:var(--muted);margin-top:1px}
+.dbtables{display:flex;flex-direction:column;gap:7px;width:100%}
+.dbrow{display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.7);border:1px solid var(--line);border-radius:10px;padding:7px 11px}
+.dbrow code{font-size:11.5px;font-weight:700;white-space:nowrap}
+.dbrow span{font-size:12px;color:var(--ink2)}
+.dbrow.rel{border-left:3px solid var(--accent2)}
 .media{flex:1;display:flex;align-items:center;justify-content:center;min-width:0}
 .cover{justify-content:center;align-items:center;padding:0 64px;gap:48px}
 .cover .l{flex:1.15}
@@ -464,21 +469,21 @@ S.append(slide(head("React / Next.js / TypeScript vs JS + Node-RED","Choix techn
  f'<div class="cmph bad"><div class="lg"><img src="{LOGOS["javascript"]}"><img src="{LOGOS["nodered"]}"></div><b>JS + Node-RED</b><span class="st">Piste écartée</span></div>'
  f'<div class="cmph good"><div class="lg"><img src="{LOGOS["react"]}"><img src="{LOGOS["nextdotjs"]}"><img src="{LOGOS["typescript"]}"></div><b>Next.js + React + TS</b><span class="st">Retenu</span></div>'
  # lignes de comparaison
- +cmprow("Façon de programmer",
-   "On <b>relie des boîtes</b> (flux) : peu adapté à une vraie appli à plusieurs pages",
-   "On <b>assemble des blocs</b> réutilisables (composants) + pages claires")
- +cmprow("Interface",
-   "Pas de blocs d'interface réutilisables (3D, catalogue difficiles)",
-   "<b>React</b> : blocs réutilisables, l'écran se met à jour <b>tout seul</b>")
- +cmprow("Fiabilité du code",
-   "<b>JavaScript</b> : les erreurs apparaissent <b>une fois l'appli lancée</b>",
-   "<b>TypeScript</b> : les erreurs sont repérées <b>avant de lancer</b> (à l'écriture)")
- +cmprow("Maintenance",
-   "Fichiers de flux <b>difficiles à relire</b> et à suivre dans Git",
-   "Code clair, <b>facile à relire</b> et à suivre version par version (Git)")
- +cmprow("Côté serveur",
-   "Logique <b>dispersée</b>, liée à l'outil de flux",
-   "Front <b>et</b> back dans un <b>seul projet</b> (Next.js)")
+ +cmprow("Paradigme",
+   "Programmation <b>par flux</b> (dataflow) : peu adapté à une appli multi-pages",
+   "<b>Composants déclaratifs</b> (JSX/TSX) + routage <b>App Router</b>")
+ +cmprow("Rendu / UI",
+   "Pas de composants ni de <b>Virtual DOM</b>",
+   "<b>Virtual DOM</b> + <b>réconciliation</b> : mise à jour minimale du DOM, état réactif")
+ +cmprow("Typage",
+   "<b>JavaScript</b> dynamique : erreurs au <b>runtime</b>",
+   "<b>TypeScript</b> : typage statique, erreurs à la <b>compilation</b> (tsc + ESLint)")
+ +cmprow("Maintenabilité",
+   "Flux <b>JSON</b> peu lisibles en revue de code / Git",
+   "Code <b>modulaire</b> et <b>versionnable</b> (diffs Git, revue de code)")
+ +cmprow("Back-end",
+   "Logique couplée au <b>moteur de flux</b>",
+   "<b>Route Handlers</b> + <b>Server Components</b> : un seul <b>runtime</b> Node (SSR)")
  +'</div></div>'))
 
 # 11 STACK (logos)
@@ -489,16 +494,20 @@ S.append(slide(head("Technologies mises en œuvre","La pile technique","boxes",m
  tech("typescript","TypeScript","5.5 · strict")+tech("nodedotjs","Node.js","runtime serveur")+
  tech("sqlite","SQLite","better-sqlite3 11.5")+tech("threedotjs","Three.js","0.160 · vue 3D")+
  tech("docker","Docker","multi-stage arm64")+tech("raspberrypi","Raspberry Pi","5 · cible")+
- '</div></div>'))
+ tech("greensock","GSAP","animations 3D")+tech("lucide","Lucide","icônes")+
+ tech("ollama","Ollama","IA locale (éditeur)")+
+ '</div>'
+ '<div style="text-align:center;margin-top:14px;font-size:12.5px;color:var(--muted)">CSS <b>maison</b> (variables + design system, sans framework) · tests <b>Playwright</b></div>'
+ '</div>'))
 
 # 12 RESEAU
 S.append(slide(head("Docker · Raspberry Pi 5 · diagramme de déploiement","Réseau et déploiement","share-2")+
  f'''<div class="body"><div class="col" style="flex:0 0 38%;display:flex;flex-direction:column;justify-content:center"><ul>
-   <li>Image <b>Docker multi-stage</b> (deps → builder → runner), <b>arm64</b></li>
-   <li>App supervisée par <b>Portainer</b> · dalles pilotées en <b>RS-485</b></li>
-   <li>Wi-Fi local <b>ColorRoom_WiFI</b> ; <b>CS-160 en USB</b></li>
-   <li>Accès depuis tout appareil : <b>http://172.17.40.39/</b></li>
-   <li class="sub">SQLite en volume · git pull puis docker compose up</li></ul></div>
+   <li><b>Raspberry Pi 5</b> + <b>Docker</b> (image arm64)</li>
+   <li><b>Dalles</b> : bus <b>RS-485</b></li>
+   <li><b>CS-160</b> : <b>USB</b> + API</li>
+   <li><b>Clients</b> : <b>Wi-Fi local</b> (ColorRoom_WiFI)</li>
+   <li><b>Accès</b> : <b>http://172.17.40.39:8080</b></li></ul></div>
    <div class="media"><img class="diagram" src="{IMG['dep']}"></div></div>'''))
 
 # 12b CONFIGURATION
@@ -518,123 +527,58 @@ S.append(media_slide("Ma partie · interface","Interface et design system",
 
 # 13b THREE.JS (code)
 S.append(code_slide("Extrait de code · 3D temps réel","Vue 3D de la salle (Three.js)","boxes",
- '''<ul><li><b>Scène + caméra + WebGLRenderer</b> montés dans la page</li>
-   <li>Chaque <b>dalle</b> = un <code>Mesh</code> ; sa couleur suit l'état du jeu en direct</li>
-   <li><b>Boucle de rendu</b> via <code>requestAnimationFrame</code></li>
-   <li>Au démontage : <b>forceContextLoss</b> → évite la fuite de contexte WebGL</li></ul>''',
+ '''<ul><li><b>WebGLRenderer</b> : moteur qui transforme la scène 3D en image via le <b>GPU</b> (carte graphique)</li>
+   <li>Une dalle = un <code>Mesh</code> à <b>géométrie BoxGeometry</b> + matériau <b>émissif</b> (le panneau « émet » sa couleur)</li>
+   <li>Couleur mise à jour en direct : <code>material.emissive.set(color)</code></li>
+   <li><b>Boucle</b> <code>requestAnimationFrame</code> ; au démontage <b>forceContextLoss</b> (anti-fuite WebGL)</li></ul>''',
  "app/app/_components/Room3D.tsx",
- '''<span class="cm">// Scène, caméra, renderer WebGL</span>
-<span class="kw">const</span> scene = <span class="kw">new</span> THREE.<span class="fn">Scene</span>();
-<span class="kw">const</span> camera = <span class="kw">new</span> THREE.<span class="fn">PerspectiveCamera</span>(CAM_FOV, W/H, <span class="nb">0.05</span>, <span class="nb">80</span>);
+ '''<span class="cm">// WebGLRenderer : rend la scène 3D via le GPU</span>
 <span class="kw">const</span> renderer = <span class="kw">new</span> THREE.<span class="fn">WebGLRenderer</span>({ antialias: <span class="kw">true</span> });
-renderer.<span class="fn">setSize</span>(W, H);
-mount.<span class="fn">appendChild</span>(renderer.domElement);
+renderer.<span class="fn">setPixelRatio</span>(Math.<span class="fn">min</span>(devicePixelRatio, <span class="nb">1.5</span>));
+renderer.outputColorSpace = THREE.SRGBColorSpace;   <span class="cm">// couleurs fidèles</span>
+<span class="kw">const</span> scene  = <span class="kw">new</span> THREE.<span class="fn">Scene</span>();
+<span class="kw">const</span> camera = <span class="kw">new</span> THREE.<span class="fn">PerspectiveCamera</span>(CAM_FOV, W/H, <span class="nb">0.05</span>, <span class="nb">80</span>);
 
-<span class="cm">// une dalle = un Mesh ajouté à la scène</span>
-<span class="kw">const</span> plate = <span class="kw">new</span> THREE.<span class="fn">Mesh</span>(geometry, material);
-scene.<span class="fn">add</span>(plate);
+<span class="cm">// une dalle = panneau 3D (Box) au matériau émissif</span>
+<span class="kw">const</span> mat   = <span class="kw">new</span> THREE.<span class="fn">MeshStandardMaterial</span>({ emissive: <span class="nb">0x000000</span> });
+<span class="kw">const</span> plate = <span class="kw">new</span> THREE.<span class="fn">Mesh</span>(<span class="kw">new</span> THREE.<span class="fn">BoxGeometry</span>(PS, PS, PT), mat);
+mat.emissive.<span class="fn">set</span>(color); scene.<span class="fn">add</span>(plate);   <span class="cm">// la dalle s'allume</span>
 
-<span class="cm">// boucle de rendu</span>
 <span class="kw">function</span> <span class="fn">loop</span>() { renderer.<span class="fn">render</span>(scene, camera); raf = <span class="fn">requestAnimationFrame</span>(loop); }
 <span class="fn">loop</span>();
-
 <span class="kw">return</span> () =&gt; { <span class="fn">cancelAnimationFrame</span>(raf); renderer.<span class="fn">forceContextLoss</span>(); };''',
- "app/app/_components/Room3D.tsx","L255-L539"))
+ "app/app/_components/Room3D.tsx","L255-L545"))
 
 # 14 BDD
 S.append(slide(head("Ma partie · données · modèle relationnel","Base de données SQLite","database",me=True)+
- f'''<div class="body"><div class="col" style="flex:0 0 32%;display:flex;flex-direction:column;justify-content:center"><ul>
-   <li><b>better-sqlite3</b> (API synchrone, requêtes préparées)</li>
-   <li>Clés étrangères <b>ON DELETE CASCADE</b></li>
-   <li>Migrations <b>idempotentes</b> au démarrage</li>
-   <li><b>journal_mode=WAL</b> + busy_timeout</li></ul></div>
-   <div class="media"><img class="diagram" src="{IMG['erd']}"></div></div>'''))
+ f'''<div class="body"><div class="col" style="flex:0 0 37%;display:flex;flex-direction:column;justify-content:center"><ul>
+   <li><b>better-sqlite3</b> · requêtes <b>préparées</b> (anti-injection)</li>
+   <li>Tables <b>créées automatiquement</b> au démarrage : on peut <b>relancer sans rien casser</b></li>
+   <li><b>WAL</b> : on peut <b>lire pendant qu'on écrit</b> (pas de blocage)</li>
+   <li>Si la base est occupée, l'app <b>réessaie</b> quelques secondes au lieu d'échouer</li>
+   <li>Suppression d'un compte = ses données liées <b>supprimées en cascade</b></li></ul></div>
+   <div class="col" style="flex:1"><div class="dbtables">
+   <div class="dbrow"><code>crg_users</code><span>comptes : pseudo, mot de passe haché, rôle</span></div>
+   <div class="dbrow"><code>crg_classes</code><span>classes (code + QR), créées par un enseignant</span></div>
+   <div class="dbrow rel"><code>crg_class_members</code><span>lien élève ↔ classe (users ↔ classes)</span></div>
+   <div class="dbrow rel"><code>crg_sessions</code><span>jetons de connexion → users</span></div>
+   <div class="dbrow rel"><code>crg_scores</code><span>scores par jeu → users</span></div>
+   <div class="dbrow"><code>crg_games</code><span>jeux (natifs + créés dans l'éditeur)</span></div>
+   <div class="dbrow rel"><code>crg_mp_sessions / mp_players</code><span>parties multijoueur (players → session)</span></div>
+   <div class="dbrow"><code>crg_app_config</code><span>réglages (URL des API)</span></div>
+   </div></div></div>'''))
 
 # 14c VARIABLES / PERSISTANCE
 def varc(i,t,d): return f'<div class="varc"><div class="vt">{ic(i)}{t}</div><p>{d}</p></div>'
 S.append(slide(head("Typologie des variables et de la persistance","Gestion de l'état","database",me=True)+
- '<div class="body" style="align-items:center"><div class="vargrid">'
+ '<div class="body" style="flex-direction:column;align-items:center;gap:10px"><div class="vargrid">'
  +varc("database","Persistante","Stockée durablement en SQLite (survit aux redémarrages, volume Docker). <code>lib/db</code>")
  +varc("circle-check","Transactionnelle · atomique","<code>db.transaction()</code> : ACID, tout-ou-rien (user + classe). <code>register</code>")
  +varc("zap","Volatile (en mémoire)","<code>useRef</code> : état runtime des dalles/jeux, perdu au rechargement. <code>app/jeux</code>")
  +varc("lock","Environnement","<code>process.env</code> : secrets (clé, mot de passe admin) via <code>.env</code>, hors Git.")
  +varc("share-2","Réactive","<code>useState</code> : déclenche le re-rendu de l'interface à chaque changement.")
  +varc("network","Concurrente","Sémaphore <code>HW_CONCURRENCY=2</code> : sérialise les accès au matériel. <code>batch</code>")
- +'</div></div>'))
-
-# 14b CODE transaction atomique
-S.append(code_slide("Extrait de code · données","Variable transactionnelle (ACID)","circle-check",
- '''<ul><li><span style="font-size:12px;color:var(--muted)">(ACID = Atomicité, Cohérence, Isolation, Durabilité : les garanties d'une transaction)</span></li>
-   <li><code>db.transaction()</code> encapsule un <b>BEGIN / COMMIT / ROLLBACK</b></li>
-   <li>L'inscription = INSERT utilisateur <b>+</b> jonction de classe, en <b>une seule unité</b></li>
-   <li><b>Atomicité</b> : exception &rarr; <b>ROLLBACK</b> total, jamais de compte « à moitié créé »</li>
-   <li>Requêtes <b>préparées</b> (<code>prepare</code>) = anti-injection SQL</li></ul>''',
- "app/app/api/auth/register/route.ts",
- '''<span class="cm">// Variable transactionnelle : tout-ou-rien (ACID).</span>
-<span class="kw">const</span> insertAll = db.<span class="fn">transaction</span>(() =&gt; {
-  db.<span class="fn">prepare</span>(<span class="st">"INSERT INTO crg_users (id, name,</span>
-    <span class="st">user_type, password_hash, …) VALUES (?,…)"</span>)
-    .<span class="fn">run</span>(id, name, <span class="st">'apprenant'</span>, hash, …);
-
-  <span class="kw">if</span> (classCode?.<span class="fn">trim</span>()) {            <span class="cm">// jonction optionnelle</span>
-    <span class="kw">const</span> cls = db.<span class="fn">prepare</span>(<span class="st">"SELECT id FROM</span>
-      <span class="st">crg_classes WHERE code = ?"</span>).<span class="fn">get</span>(code);
-    <span class="kw">if</span> (cls) db.<span class="fn">prepare</span>(<span class="st">"INSERT OR IGNORE INTO</span>
-      <span class="st">crg_class_members …"</span>).<span class="fn">run</span>(rid, cls.id, id);
-  }
-});
-<span class="fn">insertAll</span>();   <span class="cm">// BEGIN … COMMIT (ROLLBACK si throw)</span>''',
- "app/app/api/auth/register/route.ts","L47-L62"))
-
-# 14d CODE compteur atomique / semaphore materiel
-S.append(code_slide("Extrait de code · concurrence","Variable atomique · sémaphore matériel","cpu",
- '''<ul><li><code>hwInFlight</code> = <b>compteur atomique</b> des accès au matériel en cours</li>
-   <li><b>Atomique</b> de fait : la boucle d'événements de Node est <b>mono-thread</b> (pas d'accès simultané réel)</li>
-   <li>Au-delà de <b>2 slots</b>, les requêtes attendent dans une <b>file</b> (Promises)</li>
-   <li>supervision.exe est <b>quasi-série</b> : on borne pour ne pas le saturer</li></ul>''',
- "app/app/api/supervision/batch/route.ts",
- '''<span class="kw">const</span> HW_CONCURRENCY = <span class="nb">2</span>;   <span class="cm">// quasi-série</span>
-<span class="kw">let</span> hwInFlight = <span class="nb">0</span>;          <span class="cm">// variable atomique</span>
-<span class="kw">const</span> hwWaiters: Waiter[] = [];  <span class="cm">// file d'attente</span>
-
-<span class="kw">async function</span> <span class="fn">acquireHwSlot</span>() {
-  <span class="kw">if</span> (hwInFlight &lt; HW_CONCURRENCY) {
-    hwInFlight++; <span class="kw">return</span> <span class="kw">true</span>;     <span class="cm">// slot libre</span>
-  }
-  <span class="kw">return new</span> <span class="fn">Promise</span>(r =&gt; hwWaiters.<span class="fn">push</span>({ resolve: r }));
-}
-<span class="kw">function</span> <span class="fn">releaseHwSlot</span>() {
-  hwInFlight--;                  <span class="cm">// libère un slot</span>
-  <span class="fn">drainWaiters</span>();              <span class="cm">// réveille le suivant</span>
-}''',
- "app/app/api/supervision/batch/route.ts","L39-L80"))
-
-# 15b CODE variable volatile (useRef) - apres securite
-S.append(code_slide("Extrait de code · variable volatile","État temporaire en mémoire (useRef)","zap",
- '''<ul><li>Une variable <b>volatile</b> vit en <b>mémoire vive</b> le temps de la partie : <b>perdue au rechargement</b></li>
-   <li><code>useRef</code> : valeur mutable <b>sans re-rendu</b> (rapide : état de jeu haute fréquence)</li>
-   <li><code>useState</code> : volatile <b>réactif</b> (re-dessine l'écran quand ça change)</li>
-   <li>On ne <b>persiste</b> (SQLite) que le <b>résultat final</b> : le score</li></ul>''',
- "app/app/_components/GameColorSpeed.tsx",
- '''<span class="cm">// Volatile RÉACTIF : re-affiche l'écran quand ça change</span>
-<span class="kw">const</span> [score, setScore]       = <span class="fn">useState</span>(<span class="nb">0</span>);
-<span class="kw">const</span> [timeLeft, setTimeLeft] = <span class="fn">useState</span>(cfg.duration);
-
-<span class="cm">// Volatile PUR : en mémoire, NE déclenche PAS de re-rendu (rapide)</span>
-<span class="kw">const</span> comboRef     = <span class="fn">useRef</span>(<span class="nb">0</span>);   <span class="cm">// combo en cours</span>
-<span class="kw">const</span> lightRef     = <span class="fn">useRef</span>(<span class="nb">0</span>);   <span class="cm">// dalle allumée</span>
-<span class="kw">const</span> tileStartRef = <span class="fn">useRef</span>(<span class="nb">0</span>);   <span class="cm">// instant d'allumage</span>
-
-comboRef.current++;            <span class="cm">// mutation directe, sans re-render</span>
-<span class="cm">// ... en fin de partie SEULEMENT, on persiste le score en base.</span>''',
- "app/app/_components/GameColorSpeed.tsx","L160-L181"))
-
-# 15 SECURITE
-S.append(media_slide("Ma partie · sécurité","Authentification et données personnelles",
- '''<ul><li><b>3 rôles</b> : apprenant, enseignant, administrateur</li>
-   <li>Les mots de passe ne sont <b>jamais en clair</b> : ils sont <b>hachés</b> (transformés en empreinte impossible à inverser)</li>
-   <li>Connexion gardée par un <b>cookie sécurisé</b> (inaccessible aux autres sites)</li>
-   <li><b>Tout reste en local</b> : un simple pseudo suffit (respect du RGPD)</li></ul>''',IMG['login'],"lock",ratio="0 0 50%"))
+ +'</div><div style="font-size:13px;color:var(--muted)">Code détaillé des variables transactionnelle, atomique et volatile : <b>voir en annexes</b>.</div></div>'))
 
 # 16 SEQ AUTH
 S.append(diagram("Séquence · connexion","Authentification (PBKDF2 + cookie)",IMG['sauth'],"lock",me=True,
@@ -656,13 +600,6 @@ S.append(media_slide("Ma partie · parcours apprenant","Création de compte et a
    <li><b>Rejoindre une classe</b> en saisissant son <b>code</b> (fourni par l'enseignant)</li>
    <li>Création <b>atomique</b> (compte + adhésion) puis <b>connexion automatique</b></li>
    <li class="sub">RGPD : un simple <b>pseudo</b> suffit, aucune donnée nominative</li></ul>''',IMG['register'],"users",ratio="0 0 46%"))
-
-# 19 SEQ JEU
-S.append(diagram("Séquence · exécution d'un jeu","Du clic joueur aux dalles",IMG['sjeu'],"gamepad-2",me=True,
- notes=nl("Le joueur lance une partie depuis le catalogue",
-   "Le <b>runtime</b> parcourt le graphe de nœuds du jeu",
-   "Chaque nœud couleur appelle <b>/api/supervision</b>",
-   "Les <b>dalles</b> s'allument ; le score remonte à l'écran")))
 
 # 27 ACTIVITE REMAP
 S.append(diagram("Diagramme d'activité","Remappage des canaux LED",IMG['remap'],"share-2",me=True,
@@ -734,37 +671,10 @@ S.append(media_slide("Ma partie · aide &amp; qualité","Documentation et robust
 S.append(slide(head("Démarche d'ingénieur","Difficultés rencontrées et solutions","flask-conical",me=True)+
  '<div class="body" style="flex-direction:column;justify-content:center">'+
  ''.join(f'<div class="fix"><div class="pb">{p}</div><div class="ar">'+ic("share-2")+f'</div><div class="so">'+ic("circle-check")+f'<span>{s}</span></div></div>' for p,s in [
-   ("CORS &amp; pare-feu bloquant l'API Supervision","En-têtes CORS + ouverture du port Windows + portproxy (slide suivante)"),
+   ("CORS &amp; pare-feu bloquant l'API Supervision","En-têtes CORS + ouverture du port Windows + portproxy"),
    ("Latence des plaques (32 canaux)","Envoi parallèle (Promise.all) + timeout (AbortController)"),
    ("Couleur écran différente des dalles","Rendu unifié + profils calés sur les longueurs d'onde"),
-   ("Accès concurrents (SQLITE_BUSY)","Mode WAL + busy_timeout + connexion singleton"),
-   ("Multijoueur temps réel sur Pi","État en base + polling /state (vs WebSockets)"),
  ])+'</div>'))
-
-# 29b NOTES RESEAU WINDOWS (CORS / ports)
-_winpre='''<span class="cm"># 1) Autoriser le port 18080 dans le pare-feu</span>
-<span class="fn">New-NetFirewallRule</span> -DisplayName <span class="st">"ColorRoom-Supervision"</span> `
-  -Direction Inbound -Protocol TCP -LocalPort <span class="nb">18080</span> -Action Allow
-
-<span class="cm"># 2) Rediriger le port 18080 (réseau) vers 8080 (local)</span>
-netsh interface portproxy <span class="fn">add</span> v4tov4 `
-  listenport=<span class="nb">18080</span> listenaddress=<span class="nb">0.0.0.0</span> `
-  connectport=<span class="nb">8080</span> connectaddress=<span class="nb">127.0.0.1</span>
-
-<span class="cm"># L'API écoute en local sur 8080 ; la</span>
-<span class="cm"># redirection l'expose sur 18080.</span>'''
-_winbull='''<ul><li>Le navigateur bloquait l'API Supervision (<b>CORS</b> + pare-feu)</li>
-   <li>L'API écoute en <b>local sur 8080</b> ; on l'expose sur le réseau via <b>18080</b></li>
-   <li>À lancer dans <b>PowerShell (administrateur)</b> sur le poste hôte de l'API</li>
-   <li class="sub">Combiné aux <b>en-têtes CORS</b> renvoyés par l'API</li></ul>'''
-_winsrc=f'<div class="src">{ic("wrench")}<span><b>Notes d\'installation · réseau Windows</b><br>PowerShell (administrateur) · poste hôte de la Supervision</span></div>'
-_wincard=(f'<div class="code"><div class="codebar">'
-          f'<span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span>'
-          f'<span class="dot" style="background:#28c840"></span><span class="file">PowerShell · administrateur</span></div>'
-          f'<pre>{_winpre}</pre></div>')
-S.append(slide(head("Notes réseau · ouvrir les ports (Windows)","Rendre l'API Supervision joignable","share-2",me=True)+
- f'<div class="body"><div class="col" style="flex:0 0 36%;min-width:0;display:flex;flex-direction:column;justify-content:center">{_winbull}{_winsrc}</div>'
- f'<div class="col" style="flex:1;min-width:0;display:flex;align-items:center">{_wincard}</div></div>'))
 
 # 31 DEMO (slide-pont vers la démonstration)
 S.append(slide('<div class="body center"><div class="hicon" style="width:64px;height:64px;border-radius:18px;margin-bottom:6px">'+ic("eye")+'</div><div class="kick">Place à la</div><div class="big">Démonstration</div><p style="color:var(--muted);font-size:16px;margin-top:12px;max-width:760px;line-height:1.8">Connexion · catalogue et un jeu sur les dalles · Puissance 4 contre l’IA · un jeu multijoueur · mesure CS-160 et diagramme CIE · tableau de bord enseignant</p></div>'))
@@ -779,6 +689,114 @@ S.append(slide('<div class="body center">'
  +ic("circle-play")+'<span style="font-family:Bricolage Grotesque,Inter,sans-serif">video_demo.mov</span></div>'
  '</div>'))
 
+
+# ===== ANNEXES (après la vidéo) =====
+S.append(slide('<div class="body center"><div class="hicon" style="width:64px;height:64px;border-radius:18px;margin-bottom:6px">'+ic("file-text")+'</div><div class="kick">Pour les questions du jury</div><div class="big">Annexes</div><p style="color:var(--muted);font-size:15px;margin-top:10px;max-width:780px;line-height:1.7">Code détaillé (variables transactionnelle / atomique / volatile, sécurité) et architecture des dossiers.</p></div>'))
+# 14b CODE transaction atomique
+S.append(code_slide("Extrait de code · données","Variable transactionnelle (ACID)","circle-check",
+ '''<ul><li><span style="font-size:12px;color:var(--muted)">(ACID = Atomicité, Cohérence, Isolation, Durabilité : les garanties d'une transaction)</span></li>
+   <li><code>db.transaction()</code> encapsule un <b>BEGIN / COMMIT / ROLLBACK</b></li>
+   <li>L'inscription = INSERT utilisateur <b>+</b> jonction de classe, en <b>une seule unité</b></li>
+   <li><b>Atomicité</b> : exception &rarr; <b>ROLLBACK</b> total, jamais de compte « à moitié créé »</li>
+   <li>Requêtes <b>préparées</b> (<code>prepare</code>) = anti-injection SQL</li></ul>''',
+ "app/app/api/auth/register/route.ts",
+ '''<span class="cm">// Variable transactionnelle : tout-ou-rien (ACID).</span>
+<span class="kw">const</span> insertAll = db.<span class="fn">transaction</span>(() =&gt; {
+  db.<span class="fn">prepare</span>(<span class="st">"INSERT INTO crg_users (id, name,</span>
+    <span class="st">user_type, password_hash, …) VALUES (?,…)"</span>)
+    .<span class="fn">run</span>(id, name, <span class="st">'apprenant'</span>, hash, …);
+
+  <span class="kw">if</span> (classCode?.<span class="fn">trim</span>()) {            <span class="cm">// jonction optionnelle</span>
+    <span class="kw">const</span> cls = db.<span class="fn">prepare</span>(<span class="st">"SELECT id FROM</span>
+      <span class="st">crg_classes WHERE code = ?"</span>).<span class="fn">get</span>(code);
+    <span class="kw">if</span> (cls) db.<span class="fn">prepare</span>(<span class="st">"INSERT OR IGNORE INTO</span>
+      <span class="st">crg_class_members …"</span>).<span class="fn">run</span>(rid, cls.id, id);
+  }
+});
+<span class="fn">insertAll</span>();   <span class="cm">// BEGIN … COMMIT (ROLLBACK si throw)</span>''',
+ "app/app/api/auth/register/route.ts","L47-L62"))
+
+# 14d CODE compteur atomique / semaphore materiel
+S.append(code_slide("Extrait de code · concurrence","Variable atomique · sémaphore matériel","cpu",
+ '''<ul><li><code>hwInFlight</code> = <b>compteur atomique</b> des accès au matériel en cours</li>
+   <li><b>Atomique</b> de fait : la boucle d'événements de Node est <b>mono-thread</b> (pas d'accès simultané réel)</li>
+   <li>Au-delà de <b>2 slots</b>, les requêtes attendent dans une <b>file</b> (Promises)</li>
+   <li>supervision.exe est <b>quasi-série</b> : on borne pour ne pas le saturer</li></ul>''',
+ "app/app/api/supervision/batch/route.ts",
+ '''<span class="kw">const</span> HW_CONCURRENCY = <span class="nb">2</span>;   <span class="cm">// quasi-série</span>
+<span class="kw">let</span> hwInFlight = <span class="nb">0</span>;          <span class="cm">// variable atomique</span>
+<span class="kw">const</span> hwWaiters: Waiter[] = [];  <span class="cm">// file d'attente</span>
+
+<span class="kw">async function</span> <span class="fn">acquireHwSlot</span>() {
+  <span class="kw">if</span> (hwInFlight &lt; HW_CONCURRENCY) {
+    hwInFlight++; <span class="kw">return</span> <span class="kw">true</span>;     <span class="cm">// slot libre</span>
+  }
+  <span class="kw">return new</span> <span class="fn">Promise</span>(r =&gt; hwWaiters.<span class="fn">push</span>({ resolve: r }));
+}
+<span class="kw">function</span> <span class="fn">releaseHwSlot</span>() {
+  hwInFlight--;                  <span class="cm">// libère un slot</span>
+  <span class="fn">drainWaiters</span>();              <span class="cm">// réveille le suivant</span>
+}''',
+ "app/app/api/supervision/batch/route.ts","L39-L80"))
+
+# 15b CODE variable volatile (useRef) - apres securite
+S.append(code_slide("Extrait de code · variable volatile","État temporaire en mémoire (useRef)","zap",
+ '''<ul><li>Une variable <b>volatile</b> vit en <b>mémoire vive</b> le temps de la partie : <b>perdue au rechargement</b></li>
+   <li><code>useRef</code> : valeur mutable <b>sans re-rendu</b> (rapide : état de jeu haute fréquence)</li>
+   <li><code>useState</code> : volatile <b>réactif</b> (re-dessine l'écran quand ça change)</li>
+   <li>On ne <b>persiste</b> (SQLite) que le <b>résultat final</b> : le score</li></ul>''',
+ "app/app/_components/GameColorSpeed.tsx",
+ '''<span class="cm">// Volatile RÉACTIF : re-affiche l'écran quand ça change</span>
+<span class="kw">const</span> [score, setScore]       = <span class="fn">useState</span>(<span class="nb">0</span>);
+<span class="kw">const</span> [timeLeft, setTimeLeft] = <span class="fn">useState</span>(cfg.duration);
+
+<span class="cm">// Volatile PUR : en mémoire, NE déclenche PAS de re-rendu (rapide)</span>
+<span class="kw">const</span> comboRef     = <span class="fn">useRef</span>(<span class="nb">0</span>);   <span class="cm">// combo en cours</span>
+<span class="kw">const</span> lightRef     = <span class="fn">useRef</span>(<span class="nb">0</span>);   <span class="cm">// dalle allumée</span>
+<span class="kw">const</span> tileStartRef = <span class="fn">useRef</span>(<span class="nb">0</span>);   <span class="cm">// instant d'allumage</span>
+
+comboRef.current++;            <span class="cm">// mutation directe, sans re-render</span>
+<span class="cm">// ... en fin de partie SEULEMENT, on persiste le score en base.</span>''',
+ "app/app/_components/GameColorSpeed.tsx","L160-L181"))
+
+
+# ANNEXE CODE PBKDF2
+S.append(code_slide("Annexe · sécurité","Hachage des mots de passe (PBKDF2)","lock",
+ '''<ul><li>Dérivation lente <b>PBKDF2-HMAC-SHA512</b>, 100 000 itérations</li>
+   <li><b>Sel aléatoire</b> de 16 octets par compte (anti rainbow-tables)</li>
+   <li>Vérification : on <b>recalcule</b> avec le même sel et on compare</li></ul>''',
+ "app/lib/auth.ts",
+ '''<span class="kw">export function</span> <span class="fn">hashPassword</span>(password) {
+  <span class="kw">const</span> salt = <span class="fn">randomBytes</span>(<span class="nb">16</span>).toString(<span class="st">'hex'</span>);
+  <span class="kw">const</span> hash = <span class="fn">pbkdf2Sync</span>(password, salt, <span class="nb">100_000</span>, <span class="nb">64</span>, <span class="st">'sha512'</span>);
+  <span class="kw">return</span> salt + <span class="st">':'</span> + hash.toString(<span class="st">'hex'</span>);  <span class="cm">// format sel:hash</span>
+}
+<span class="kw">export function</span> <span class="fn">verifyPassword</span>(pw, stored) {
+  <span class="kw">const</span> [salt, hash] = stored.<span class="fn">split</span>(<span class="st">':'</span>);
+  <span class="kw">const</span> calc = <span class="fn">pbkdf2Sync</span>(pw, salt, <span class="nb">100_000</span>, <span class="nb">64</span>, <span class="st">'sha512'</span>);
+  <span class="kw">return</span> calc.toString(<span class="st">'hex'</span>) === hash;   <span class="cm">// recalcule + compare</span>
+}''',
+ "app/lib/auth.ts","L19-L36"))
+
+# ANNEXE ARBORESCENCE DES DOSSIERS
+S.append(slide(head("Annexe · architecture des dossiers","Où se trouve chaque partie","boxes")+
+ '''<div class="body"><div class="col" style="display:flex;align-items:center"><div class="code" style="width:100%"><div class="codebar"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="file">arborescence</span></div><pre>app/
+&#9500; app/                <span class="cm"># Next.js (App Router)</span>
+&#9474;  &#9500; _components/      <span class="cm"># UI + jeux (Room3D, P4)</span>
+&#9474;  &#9500; api/              <span class="cm"># routes serveur</span>
+&#9474;  &#9474;   &#9500; auth/  supervision/  cs160/
+&#9474;  &#9474;   &#9492; multiplayer/  scores/  games/
+&#9474;  &#9492; jeux/ editeur/ mesure/ gestion/   <span class="cm"># pages</span>
+&#9500; lib/                 <span class="cm"># logique partagée</span>
+&#9474;  &#9500; db/               <span class="cm"># SQLite + migrations</span>
+&#9474;  &#9500; auth.ts           <span class="cm"># hachage + sessions</span>
+&#9474;  &#9492; multiplayer.ts  settings.ts
+&#9492; public/  Dockerfile  package.json</pre></div></div>
+ <div class="col" style="flex:0 0 36%;display:flex;flex-direction:column;justify-content:center"><ul>
+   <li><b>app/app/api/</b> : tout le <b>back</b> (mes Route Handlers)</li>
+   <li><b>app/app/_components/</b> : l'<b>interface</b> et les <b>jeux</b></li>
+   <li><b>app/lib/</b> : <b>base de données</b>, <b>auth</b>, services</li>
+   <li class="sub">Un seul projet = front + back ensemble</li></ul></div></div>'''))
 HTML=f'''<!DOCTYPE html><html lang="fr"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>ColorRoom · Téo Trompier (E2)</title>
