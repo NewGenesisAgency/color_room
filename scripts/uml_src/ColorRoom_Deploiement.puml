@@ -1,0 +1,38 @@
+@startuml
+skinparam dpi 150
+skinparam defaultFontName Inter
+skinparam defaultFontSize 14
+skinparam ArrowColor #5b6472
+skinparam nodeBorderColor #9aa3b2
+skinparam componentBorderColor #6b7280
+skinparam rectangleBorderColor #9aa3b2
+
+actor "Apprenant /\nEnseignant" as USER
+
+node "Tablette / Téléphone\n(navigateur)" as CLIENT #AEEBFF
+
+node "Raspberry Pi 5" as PI #EEF1F6 {
+  rectangle "Docker" as DOCKER #F7F8FB {
+    component "App Next.js\n(port 8080)" as APP #AEEBFF
+    component "supervision.exe\n(pont matériel)" as SUP #CCF2CF
+    component "pont .NET\nCS-160" as BRIDGE #CCF2CF
+    component "Ollama\n(IA locale)" as OLLAMA #D9C9F2
+  }
+}
+
+node "Plaques LED\n2 cellules" as DALLES #FFF3C4
+node "Colorimètre CS-160" as CS #F8CBCB
+
+USER "1..*" -- "1" CLIENT
+CLIENT "1..*" --> "1" APP : Wi-Fi local (HTTP)
+APP "1" --> "1" SUP : HTTP
+APP "1" --> "1" OLLAMA : HTTP
+APP "1" ..> "1" CS : <<API>> HTTP
+APP --> BRIDGE : HTTP
+SUP "1" --> "42" DALLES : RS-485
+CS "1" -- "1" PI : USB
+
+legend right
+Cardinalités : 1 Pi, 1..* clients Wi-Fi, 42 plaques (2 cellules), 1 CS-160
+endlegend
+@enduml

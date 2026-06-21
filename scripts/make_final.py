@@ -390,7 +390,8 @@ S.append(slide(head("Vue d'ensemble · diagramme de composants","Architecture lo
    <li>Serveur unique <b>Next.js</b> (App Router) conteneurisé</li>
    <li><b>Route Handlers</b> + couche <b>lib/</b> (auth, db, services)</li>
    <li>Proxy HTTP de <b>supervision</b> ; pont <b>.NET</b> du CS-160</li>
-   <li class="sub">SQLite (better-sqlite3) · 100 % hors-ligne</li></ul></div>
+   <li class="sub">SQLite (better-sqlite3) · 100 % hors-ligne</li>
+   <li class="sub">Diagramme <b>logiciel</b> : le matériel (Raspberry Pi) figure sur le diagramme de <b>déploiement</b></li></ul></div>
    <div class="media"><img class="diagram" src="{IMG['comp']}"></div></div>'''))
 
 # 9 CLASSES
@@ -620,14 +621,18 @@ S.append(diagram("Séquence · multijoueur","État partagé et interrogation pé
 
 # 24 MESURE
 S.append(media_slide("Ma partie · physique de la lumière","Mesure colorimétrique et chromaticité",
- '''<ul><li>Colorimètre <b>Konica Minolta CS-150/160</b> via pont .NET (<code>/api/CS160</code>)</li>
-   <li>Tristimulus <b>CIE XYZ</b>, luminance <b>Lv (cd/m²)</b>, chromaticité <b>(x, y)</b></li>
-   <li>Tracé sur le <b>diagramme CIE 1931</b> ; écart <b>ΔE</b> pour le score</li>
-   <li>32 canaux = <b>24 spectres étroits</b> (proche UV → proche IR) + <b>8 blancs</b></li></ul>''',IMG['chroma'],"palette",ratio="0 0 42%"))
+ '''<ul><li>Colorimètre <b>Konica Minolta CS-160</b> via un <b>pont .NET</b></li>
+   <li>Lecture du <b>tristimulus XYZ</b>, de la <b>chromaticité (x, y)</b> et de la luminance <b>Lv</b></li>
+   <li>Point tracé sur le <b>diagramme CIE 1931</b> ; <b>ΔE</b> = score de précision</li></ul>
+   <div class="varc" style="margin-top:14px">
+     <div class="vt">''' + ic("flask-conical") + ''' Deux termes à retenir</div>
+     <p><b>Tristimulus XYZ</b> : 3 valeurs (X, Y, Z) qui décrivent une couleur <b>telle que perçue par l'œil</b> (base de la colorimétrie CIE).<br>
+     <b>ΔE (Delta E)</b> : l'<b>écart perçu</b> entre deux couleurs ; plus il est petit, plus la couleur mesurée est proche de la cible.</p>
+   </div>''',IMG['chroma'],"palette",ratio="0 0 46%"))
 
 # 25 SEQ CS160
 S.append(diagram("Séquence · mesure","Pilotage du colorimètre CS-160",IMG['scs'],"palette",me=True,
- notes=nl("Connexion au CS-160 via le <b>pont .NET</b> (/api/CS160)",
+ notes=nl("Connexion au CS-160 via le <b>pont .NET</b>",
    "Allumage de la <b>dalle cible</b> à mesurer",
    "Mesure : <b>tristimulus XYZ</b>, <b>Lv</b>, chromaticité <b>(x, y)</b>",
    "Tracé du point sur le <b>diagramme CIE 1931</b>")))
