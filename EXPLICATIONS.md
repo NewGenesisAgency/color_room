@@ -378,7 +378,7 @@ return () => {                                        // nettoyage au démontage
 
 ## 14. Méthode agile, suivi client & versionnement Git
 
-**🔴 Version complexe :** projet conduit en **agile** : itérations courtes, livraisons incrémentales, priorisation continue du besoin via des **points réguliers avec le client M. Labayrade** (directeur du labo **BPMNP**). Côté code, workflow Git à deux branches : je développe et j'intègre sur **`ux-last`**, puis je **fusionne sur `main`** (branche stable, déployée). Une chaîne **CI/CD** (GitLab) build l'image Docker et la déploie sur le Raspberry Pi. La **documentation** (guide technique, 15 diagrammes UML, notice, README) a été **rédigée par moi**.
+**🔴 Version complexe :** projet conduit en **agile** : itérations courtes, livraisons incrémentales, priorisation continue du besoin via des **points réguliers avec le client M. Labayrade** (directeur du labo **BPMNP**). Le suivi des tâches se fait sur un **tableau Kanban** (colonnes À faire / En cours / Terminé). Côté code, workflow Git à deux branches : je développe et j'intègre sur **`ux-last`**, puis je **fusionne sur `main`** (branche stable, déployée). Une chaîne **CI/CD** (GitLab) build l'image Docker et la déploie sur le Raspberry Pi. La **documentation** (guide technique, 15 diagrammes UML, notice, README) a été **rédigée par moi**.
 
 **🟢 Version simple :** on a avancé **par petites étapes**, en montrant régulièrement le travail au **client** pour ajuster. Le code a deux branches : une **de travail** (`ux-last`) et une **propre** (`main`) ; quand c'est prêt, je **fusionne** l'une dans l'autre, et ça se déploie tout seul sur le Raspberry Pi. **C'est moi qui ai écrit la doc.**
 

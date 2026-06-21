@@ -145,6 +145,7 @@ Dans mon projet, j'utilise du volatile pour l'**état runtime des jeux** (le com
 
 ## 9. Colorimétrie · matériel (la ColorRoom)
 
+- **Cellule (salle)** : la ColorRoom compte **2 cellules jumelles** ; chaque cellule est tapissée de plaques sur les **murs** ET le **plafond**. ▸ **42 plaques** au total (21/cellule)
 - **RS-485** : **bus série** robuste qui pilote les 42 plaques (côté matériel). ▸ piloté par `supervision.exe`, appelé via `POST /api/supervision/batch`
 - **Canal (LED)** : une commande de couleur ; **32 par plaque**. ▸ `for (let i = 1; i <= 32; i++) { … }`
 - **Spectre / longueur d'onde (nm)** : la « recette » de la lumière. ▸ 24 canaux à spectre étroit (≈404→780 nm) + 8 blancs
@@ -171,6 +172,7 @@ Dans mon projet, j'utilise du volatile pour l'**état runtime des jeux** (le com
 - **Git** : gestion de versions (commits, branches). ▸ `git push -u origin ux-last`
 - **Branche / merge** : je développe sur **`ux-last`** (intégration) puis je **fusionne sur `main`** (stable). ▸ `git checkout main && git merge ux-last`
 - **Méthode agile** : développement **incrémental**, livraisons régulières, **échanges réguliers avec le client** (M. Labayrade, directeur BPMNP). ▸ itérations + retours client
+- **Kanban** : tableau de suivi des tâches en colonnes **À faire / En cours / Terminé** ▸ visualise l'avancement de l'équipe
 - **CSV · UTF-8 · BOM** : export tableur lisible par Excel. ▸ `const csv = '﻿' + rows.join('\n')` *(le BOM force les accents)*
 - **Ollama / Gemini** : IA **locale** (hors-ligne) / IA cloud (optionnelle). ▸ `OLLAMA_URL=http://ollama:11434`
 

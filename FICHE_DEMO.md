@@ -20,7 +20,7 @@
 
 ## 0. La vidéo de 2 min : slide-pont (fin présentation → début démo)
 
-La vidéo est la **dernière slide du diaporama** (slide 47, embarquée dans le `.pptx`). Elle **clôt la présentation** et **ouvre la démonstration** : je la lance à la toute fin du parlé, puis j'enchaîne sur les manips live.
+La vidéo est la **dernière slide du diaporama** (slide 49, embarquée dans le `.pptx`). Elle **clôt la présentation** et **ouvre la démonstration** : je la lance à la toute fin du parlé, puis j'enchaîne sur les manips live.
 
 1. La vraie **ColorRoom** (2 cellules, 42 plaques) est à **LUMEN**, pas dans la salle : la vidéo est **le seul moyen de montrer le système réel complet** exigé par le jury (« éléments réels correspondant au diagramme de déploiement »).
 2. Elle **plante le décor** (matériel, dalles qui s'allument) avant les manips live.
@@ -171,7 +171,7 @@ Projet d'**équipe de 8**, 2 sous-équipes (JavaScript / Python). **Moi = E2.**
 
 ## 6. Montrer/expliquer mon code et son évolution (2 min)
 
-**5 extraits à ouvrir en live** (les mêmes que dans le deck, slides 18/20/22/24/32) :
+**5 extraits à ouvrir en live** (les mêmes que dans le deck, slides 20/22/24/26/34) :
 
 1. **`app/app/_components/Room3D.tsx`** : **Three.js** : `new THREE.Scene()` + `WebGLRenderer`, un `Mesh` par dalle, boucle `requestAnimationFrame`, `forceContextLoss` au démontage.
 2. **`app/app/api/auth/register/route.ts`** : **variable transactionnelle** : `db.transaction(() => { … })()` → user + adhésion classe, **tout-ou-rien** (BEGIN/COMMIT/ROLLBACK, ACID).

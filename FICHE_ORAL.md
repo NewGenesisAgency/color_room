@@ -62,11 +62,11 @@ La **ColorRoom** est un équipement scientifique du laboratoire **ENTPE / LTDS /
 - **`lib/multiplayer.ts` + `app/api/multiplayer/state/route.ts`** : sessions persistées en base (`crg_mp_sessions.state_json`), lues en **polling**.
 
 > **5 extraits de code montrés dans le deck** (fichier + lien GitHub + lignes) :
-> - **Three.js** (slide 18) : `Room3D.tsx` : Scene + WebGLRenderer + boucle de rendu + `forceContextLoss`.
-> - **Variable transactionnelle ACID** (slide 20) : `db.transaction()` de `register/route.ts`.
-> - **Variable atomique · sémaphore** (slide 22) : `hwInFlight` de `supervision/batch/route.ts`.
-> - **Hachage PBKDF2** (slide 24) : `hashPassword` de `lib/auth.ts`.
-> - **Minimax (alpha-bêta)** (slide 32) : `scoreWindow` de `GamePuissance4.tsx`.
+> - **Three.js** (slide 20) : `Room3D.tsx` : Scene + WebGLRenderer + boucle de rendu + `forceContextLoss`.
+> - **Variable transactionnelle ACID** (slide 22) : `db.transaction()` de `register/route.ts`.
+> - **Variable atomique · sémaphore** (slide 24) : `hwInFlight` de `supervision/batch/route.ts`.
+> - **Hachage PBKDF2** (slide 26) : `hashPassword` de `lib/auth.ts`.
+> - **Minimax (alpha-bêta)** (slide 34) : `scoreWindow` de `GamePuissance4.tsx`.
 
 ---
 
@@ -152,105 +152,109 @@ La **ColorRoom** est un équipement scientifique du laboratoire **ENTPE / LTDS /
 
 ---
 
-## 7. Script slide par slide : 47 slides (≈18 min parlé + vidéo 2 min)
+## 7. Script slide par slide : 49 slides (≈18 min parlé + vidéo 2 min)
 
-> Deck = **`ColorRoom_Presentation.pdf/.pptx`** (**47 slides**). ⏱ = durée cible. Le **parlé ≈ 18 min**, la **vidéo (slide 47) = 2 min** → **20 min**. Mot technique à placer **en gras**. Slides « ⚡ » = montrer vite si en retard ; **★ = ne jamais sacrifier**.
+> Deck = **`ColorRoom_Presentation.pdf/.pptx`** (**49 slides**). ⏱ = durée cible. Parlé ≈ 18 min + vidéo (slide 49) 2 min = **20 min**. **★ = ne jamais sacrifier** · **⚡ = montrer vite si en retard**.
 
-### Bloc A : Contexte, équipe, gestion de projet (1→10) · ~4:00
-
-| # | Slide | ⏱ | Ce que je dis |
-|---|-------|----|----------------|
-| 1 | Titre | 0:15 | « Bonjour, Téo Trompier, candidat **E2**. Projet **ColorRoom – Serious Games** pour **LUMEN / ENTPE**. » |
-| 2 | Sommaire | 0:15 | Annoncer le plan : contexte, ma contribution, démonstration. |
-| 3 | Contexte & partenaire | 0:40 | Commanditaire **ENTPE / LTDS**, labo **BPMNP**, à **LUMEN – Cité de la Lumière** (Lyon Confluence). |
-| 4 | Le système ColorRoom | 0:50 | **2 cellules**, **42 plaques** (21/cellule), **80×80 cm**, **2360 LED**, ~**300 W**, **32 canaux = 24 spectres étroits + 8 blancs**, bus **RS-485**. |
-| 5 | Le besoin | 0:35 | Logiciel de recherche trop complexe → **serious games** pour **enseignants** + **apprenants**. |
-| 6 | Cas d'utilisation (plein écran) | 0:40 | Acteurs **Apprenant / Enseignant** (héritage), include/extend ; légende **couleur = responsable** (E1→E4). |
-| 7 | Équipe | 0:25 | **8 étudiants, 2 sous-équipes** : JS/React (E1→E4, dont moi E2) + Python/NiceGUI (E5→E8). |
-| 8 ⚡ | Gantt (plein écran) | 0:20 | Projet **planifié** ; ma contribution (E2) suivie tout du long. |
-| 9 ★ | **Gestion de projet** | 0:40 | **Agile** (incrémental, livraisons régulières) ; **échanges avec le client M. Labayrade** (directeur BPMNP) ; **Git** : branche **ux-last → merge main** ; **CI/CD** ; **docs rédigées par moi**. |
-| 10 | Transition · Ma contribution E2 | 0:10 | « Je passe maintenant à **ma partie** : architecture, données, sécurité, jeux, IA, mesure. » |
-
-### Bloc B : Architecture & choix techniques (11→16) · ~3:45
+### Bloc A : contexte, équipement, équipe, gestion (1→12) · ~4:30
 
 | # | Slide | ⏱ | Ce que je dis |
 |---|-------|----|----------------|
-| 11 | Architecture (composants) | 0:40 | **Diagramme de composants** : Navigateur → **Route Handlers** → `lib/` → **SQLite** + matériel. *(diagramme logiciel : le Pi est sur le déploiement)*. |
-| 12 ⚡ | Diagramme de classes | 0:25 | Entités métier **typées TypeScript** (User, Classe, Jeu, Score, Session). |
-| 13 ★ | **Choix techniques (comparatif)** | 1:00 | Tableau ✗/✓ : Node-RED **flow-based** inadapté / **React** (Virtual DOM), **TS strict** (erreurs à la **compilation**), **Next.js** (Route Handlers, un seul runtime). |
-| 14 | Pile technique | 0:25 | Next 16, React 19, TS 5.5, **better-sqlite3**, **Three.js**, Docker arm64. |
-| 15 | Réseau & déploiement | 0:45 | **Diagramme de déploiement** : **Pi 5** + Docker ; **dalles RS-485**, **CS-160 USB**, **API** App↔CS-160 ; **Wi-Fi local**, `http://172.17.40.39/`. Cardinalités (1 Pi, 1..* clients, 42 plaques). |
-| 16 | Configuration | 0:30 | **URL d'API modifiables à chaud**, test **/health**, banc des **32 canaux LED**. |
+| 1 | Titre | 0:15 | « Téo Trompier, candidat **E2** : projet **ColorRoom – Serious Games** pour **LUMEN / ENTPE**. » |
+| 2 | Sommaire | 0:15 | Annoncer le plan. |
+| 3 | Contexte & partenaire | 0:35 | **ENTPE** (École Nat. des Travaux Publics de l'État) **/ LTDS**, équipe **BPMNP** (Bio-ingénierie, Perception, Mécanique Numérique), à **LUMEN** (Cité de la Lumière, Lyon Confluence). |
+| 4 | La ColorRoom (photo réelle) | 0:40 | **2 cellules jumelles** ; chaque cellule tapissée de plaques sur les **murs ET le plafond** ; **42 plaques** (21/cellule). |
+| 5 | La plaque lumineuse | 0:40 | **80 × 80 cm** (ép. ~23 cm), **2360 LED**, ~**300 W**, **32 canaux = 24 spectres étroits (proche UV→IR) + 8 blancs**, bus **RS-485**. |
+| 6 | Appli de supervision actuelle | 0:30 | Logiciel **réservé aux chercheurs**, **trop complexe** (grille + 32 sliders + spectre) → besoin d'un outil **pédagogique**. |
+| 7 | Le besoin | 0:30 | Rendre la salle **accessible** par des **serious games** ; objectifs / contraintes (Pi, hors-ligne, latence). |
+| 8 | Cas d'utilisation (plein écran) | 0:35 | Acteurs **Apprenant / Enseignant**, include/extend, légende **couleur = responsable** (E1→E4). |
+| 9 | Équipe | 0:25 | **8 étudiants, 2 sous-équipes** : JS/React (E1→E4, dont moi E2) + Python/NiceGUI (E5→E8). |
+| 10 ⚡ | Gantt (plein écran) | 0:20 | Projet **planifié**, ma contribution (E2) suivie tout du long. |
+| 11 ★ | **Gestion de projet** | 0:40 | **Agile** + **Kanban** (À faire/En cours/Terminé) ; **échanges client M. Labayrade** (directeur BPMNP) ; **Git ux-last → merge main** ; **CI/CD** ; **docs rédigées par moi**. |
+| 12 | Transition · Ma contribution E2 | 0:10 | « Place à **ma partie** : architecture, données, sécurité, jeux, IA, mesure. » |
 
-### Bloc C : Ma partie E2 : le cœur (17→39) · ~9:00
-
-| # | Slide | ⏱ | Ce que je dis |
-|---|-------|----|----------------|
-| 17 | Interface & design system | 0:35 | UI conçue par moi : **3D temps réel** (Three.js), pages jeux/mesure/gestion ; couleur écran = couleur dalle. |
-| 18 | **Code · Three.js** | 0:35 | `Room3D.tsx` : Scene + **WebGLRenderer**, un **Mesh** par dalle, boucle `requestAnimationFrame`, `forceContextLoss`. |
-| 19 | Base de données (ERD) | 0:35 | **better-sqlite3**, tables `crg_*`, **migrations idempotentes**, **WAL**, FK. |
-| 20 ★ | **Code · variable transactionnelle (ACID)** | 0:40 | `db.transaction()` : user + jonction classe, **tout-ou-rien** (BEGIN/COMMIT/**ROLLBACK**). |
-| 21 | Typologie des variables | 0:35 | **Transactionnelle/atomique**, **volatile** (`useRef`), **persistante**, **concurrente**, **réactive**, **environnement**. |
-| 22 ★ | **Code · variable atomique (sémaphore)** | 0:40 | `hwInFlight` borné à **2** + file de Promises ; **atomique** car Node **mono-thread**. |
-| 23 | Sécurité | 0:30 | Mots de passe jamais en clair ; cookie **HttpOnly+SameSite** ; **RGPD** (pseudo). |
-| 24 | **Code · PBKDF2** | 0:35 | `pbkdf2Sync(pw, sel, 100_000, 64, 'sha512')`, format `sel:hash`. |
-| 25 ⚡ | Séquence · connexion | 0:20 | `verifyPassword` → session (token, **30 j**) → cookie. |
-| 26 | Tableau de bord enseignant | 0:35 | **Classes** : code 6 car. (`CS5VHX`) **+ QR code** ; suivi élèves ; **gestion utilisateurs** ; export **CSV**. |
-| 27 | Parcours apprenant | 0:30 | Inscription **3 étapes** ; **rejoindre une classe** via le **code** ; création atomique + connexion auto. |
-| 28 | Jeux solo | 0:30 | Color Speed, Simon, Tetris, P4… pilotage **32 canaux** en parallèle (`Promise.all`, `AbortController`). |
-| 29 ⚡ | Séquence · exécution d'un jeu | 0:20 | Clic → Runtime → graphe de nœuds → `/api/supervision/batch` → dalles ; score. |
-| 30 ⚡ | États · partie | 0:12 | Prête → en cours → terminée. |
-| 31 ★ | IA Puissance 4 | 0:50 | **Minimax + alpha-bêta**, profondeurs **1/2/5/9/12** ; `scoreWindow` (**défense −170 > attaque +130**) ; **anti-piège**. *(pas un réseau de neurones)* |
-| 32 ★ | **Code · minimax (alpha-bêta)** | 0:35 | `scoreWindow` + coupure `if (alpha >= beta) break;`. |
-| 33 | Jeux multijoueur | 0:35 | **Sans WebSocket** : état **persisté** (`state_json`) lu en **polling** ; **code de salon**, hôte = siège 1, heartbeat. |
-| 34 ⚡ | Séquence · multijoueur | 0:20 | Hôte crée → invité saisit le code → polling `/state` → synchro. |
-| 35 | Éditeur + IA générative | 0:30 | Éditeur **no-code** (E3) ; **mon exploration** : « Créer avec l'IA » (`/api/ai/generate-game`, **Ollama** local). |
-| 36 | Physique de la lumière | 0:40 | **CS-160** : **tristimulus XYZ**, **Lv (cd/m²)**, **x,y**, **CIE 1931**, **ΔE**. *(définitions sous la slide)* |
-| 37 | Séquence · mesure CS-160 | 0:25 | App → **/api/cs160** → pont .NET → CS-160 (**USB**) → XYZ/Lv/x,y → point CIE → ΔE. |
-| 38 ⚡ | États · CS-160 | 0:12 | Déconnecté → connecté → mesure → résultat. |
-| 39 ⚡ | Activité · remap | 0:12 | Couleur **RGB** → **32 canaux** (profils par longueur d'onde). |
-
-### Bloc D : Aide, qualité, clôture + vidéo (40→47) · ~2:30 (+ 2 min vidéo)
+### Bloc B : architecture & choix (13→18) · ~3:30
 
 | # | Slide | ⏱ | Ce que je dis |
 |---|-------|----|----------------|
-| 40 ⚡ | Aide intégrée | 0:20 | Page **/aide** hors-ligne pour l'apprenant. |
-| 41 | Qualité & doc | 0:25 | **`tsc`** + build prod ; **ACID** ; tests API E4 ; **15 diagrammes UML** (par moi). |
-| 42 | Difficultés / solutions | 0:30 | **CORS & pare-feu** (→ slide suivante), latence (Promise.all), SQLITE_BUSY (WAL), multi (polling). |
-| 43 | Notes réseau Windows | 0:25 | **CORS** : ouverture du port `New-NetFirewallRule` + **portproxy** 18080→8080. |
-| 44 | Conclusion / bilan | 0:35 | « J'ai livré le **cœur applicatif** : données, API, UI, jeux, IA, multi, mesure. **Embarqué, hors-ligne, robuste**. » |
-| 45 | Place à la démonstration | 0:10 | « Place à la **démonstration sur le matériel réel**. » |
-| 46 | Merci / questions | 0:05 | (transition) |
-| 47 ★ | **Vidéo du projet** | **2:00** | **Lancer la vidéo** (embarquée) : la ColorRoom réelle → enchaîne sur la démo live. |
+| 13 | Architecture (composants) | 0:35 | **Route Handlers** → `lib/` → **SQLite** + matériel. *(le Pi est sur le déploiement)*. |
+| 14 ⚡ | Diagramme de classes | 0:25 | Entités **typées TypeScript**. |
+| 15 ★ | **Choix techniques (comparatif)** | 1:00 | Node-RED **flow-based** inadapté / **React** (Virtual DOM), **TS strict**, **Next.js** (un seul runtime). |
+| 16 | Pile technique | 0:25 | Next 16, React 19, TS 5.5, better-sqlite3, Three.js, Docker arm64. |
+| 17 | Réseau & déploiement | 0:45 | **Pi 5** + Docker ; **dalles RS-485**, **CS-160 USB**, **API** App↔CS-160 ; cardinalités. |
+| 18 | Configuration | 0:25 | URL d'API **à chaud**, test **/health**, banc des **32 canaux**. |
 
-**Total ≈ 18 min parlé + 2 min vidéo = 20:00.** En retard → couper les « ⚡ » (8, 12, 25, 29, 30, 34, 38, 39, 40). **Ne jamais sacrifier les ★** (9, 13, 20, 22, 31, 32, 47).
+### Bloc C : ma partie E2 (19→41) · ~9:00
+
+| # | Slide | ⏱ | Ce que je dis |
+|---|-------|----|----------------|
+| 19 | Interface | 0:30 | UI 3D temps réel (Three.js), pages, menu par rôle. |
+| 20 | **Code · Three.js** | 0:35 | Scene + **WebGLRenderer**, un Mesh/dalle, boucle `requestAnimationFrame`, `forceContextLoss`. |
+| 21 | Base de données (ERD) | 0:30 | better-sqlite3, **WAL**, migrations idempotentes, FK. |
+| 22 ★ | **Code · transactionnelle (ACID)** | 0:40 | `db.transaction()` : user + classe, **tout-ou-rien** (ROLLBACK). |
+| 23 | Typologie des variables | 0:35 | transactionnelle, **volatile** (`useRef`), persistante, concurrente, réactive, environnement. |
+| 24 ★ | **Code · atomique (sémaphore)** | 0:40 | `hwInFlight` borné à **2**, file de Promises, **mono-thread**. |
+| 25 | Sécurité | 0:30 | Cookie **HttpOnly+SameSite**, **RGPD** (pseudo). |
+| 26 | **Code · PBKDF2** | 0:30 | `pbkdf2Sync(..., 100_000, 64, 'sha512')`, `sel:hash`. |
+| 27 ⚡ | Séquence · connexion | 0:18 | `verifyPassword` → session (30 j) → cookie. |
+| 28 | Tableau de bord enseignant | 0:35 | **Classes** : code 6 car. (`CS5VHX`) **+ QR code** ; suivi élèves ; gestion utilisateurs ; **CSV**. |
+| 29 | Parcours apprenant | 0:30 | Inscription 3 étapes ; **rejoindre une classe** via le **code** ; atomique + connexion auto. |
+| 30 | Jeux solo | 0:30 | Color Speed, Simon, Tetris, P4 ; **32 canaux** en parallèle. |
+| 31 ⚡ | Séquence · exécution jeu | 0:18 | Clic → Runtime → `/api/supervision/batch` → dalles. |
+| 32 ⚡ | États · partie | 0:12 | Prête → en cours → terminée. |
+| 33 ★ | IA Puissance 4 | 0:50 | **Minimax + alpha-bêta**, profondeurs 1/2/5/9/12, **défense > attaque**, anti-piège. *(pas un réseau de neurones)* |
+| 34 ★ | **Code · minimax** | 0:35 | `scoreWindow` + `if (alpha >= beta) break;`. |
+| 35 | Jeux multijoueur | 0:30 | **Sans WebSocket** : état persisté lu en **polling** ; **code de salon**, heartbeat. |
+| 36 ⚡ | Séquence · multijoueur | 0:18 | Hôte crée → invité saisit le code → synchro. |
+| 37 | Éditeur + IA générative | 0:30 | Éditeur no-code (E3) ; **mon exploration** « Créer avec l'IA » (Ollama local). |
+| 38 | Physique de la lumière | 0:35 | **CS-160** : **XYZ**, **Lv**, **x,y**, **CIE 1931**, **ΔE** *(défs sous la slide)*. |
+| 39 | Séquence · mesure CS-160 | 0:25 | App → `/api/cs160` → pont .NET → CS-160 (**USB**) → XYZ → CIE → ΔE. |
+| 40 ⚡ | États · CS-160 | 0:12 | Déconnecté → connecté → mesure → résultat. |
+| 41 ⚡ | Activité · remap | 0:12 | RGB → **32 canaux**. |
+
+### Bloc D : aide, qualité, clôture + vidéo (42→49) · ~2:30 (+2 min vidéo)
+
+| # | Slide | ⏱ | Ce que je dis |
+|---|-------|----|----------------|
+| 42 ⚡ | Aide intégrée | 0:18 | Page **/aide** hors-ligne. |
+| 43 | Qualité & doc | 0:25 | **`tsc`** + build prod ; ACID ; tests API E4 ; **15 diagrammes UML** (par moi). |
+| 44 | Difficultés / solutions | 0:30 | **CORS & pare-feu** (→ suivante), latence, SQLITE_BUSY (WAL), multi (polling). |
+| 45 | Notes réseau Windows | 0:25 | **CORS** : `New-NetFirewallRule` + **portproxy** 18080→8080. |
+| 46 | Conclusion / bilan | 0:30 | « Cœur applicatif livré : données, API, UI, jeux, IA, multi, mesure. **Embarqué, hors-ligne, robuste**. » |
+| 47 | Place à la démonstration | 0:10 | « Place à la **démonstration**. » |
+| 48 | Merci / questions | 0:05 | (transition) |
+| 49 ★ | **Vidéo du projet** | **2:00** | **Lancer la vidéo** (la ColorRoom réelle) → enchaîne sur la démo live. |
+
+**Total ≈ 18 min parlé + 2 min vidéo = 20:00.** En retard → couper les « ⚡ ». Ne jamais sacrifier les ★ (11, 15, 22, 24, 33, 34, 49).
 
 ---
 
 ## 8. Mémo « infos complexes que je risque d'oublier »
 
-- **Méthode agile + client** : itérations courtes, **échanges réguliers avec M. Labayrade** (directeur du labo **BPMNP**) ; **moi = E2**.
-- **Git** : je développe sur **`ux-last`** puis **merge sur `main`** (stable) ; ~280 commits ; **CI/CD** GitLab → Docker → Pi.
-- **Code de classe** (`CS5VHX`, 6 car. sans 0/O 1/I) **+ QR code** pour rejoindre une classe ≠ **code de salon** multijoueur (rejoindre une partie).
-- **RS-485** : bus série **différentiel multi-points** → pilote les **42 plaques** ; `supervision.exe` parle RS-485, **pas mon API** (qui passe par le proxy).
-- **CS-160** : branché en **USB** sur le Pi ; l'app l'appelle via une **API HTTP** (`/api/cs160` → pont .NET).
-- **URL démo : `http://172.17.40.39/`** (Wi-Fi **ColorRoom_WiFI**), à taper en premier sur la tablette.
-- **WAL** : lectures **concurrentes** pendant une écriture. **PBKDF2** : 100 000 itérations + **sel** unique. **Alpha-bêta** : coupe les branches inutiles. **Sémaphore** `HW_CONCURRENCY=2` : matériel quasi-série.
-- **Tristimulus XYZ** = couleur perçue (CIE) ; **x,y** = chromaticité ; **Lv** = cd/m² ; **ΔE** = écart perçu.
-- ⚠️ **L'IA du Puissance 4 = minimax, PAS un réseau de neurones** (aucun entraînement, aucune donnée).
+- **ColorRoom** : **2 cellules jumelles** ; plaques sur **murs + plafond** ; **42 plaques** (21/cellule).
+- **Plaque** : **80×80 cm** (ép. ~23 cm), **2360 LED**, ~**300 W**, **32 canaux = 24 spectres étroits + 8 blancs**, bus **RS-485**.
+- **Sigles** : **ENTPE** = École Nationale des Travaux Publics de l'État · **LTDS** = Lab. de Tribologie et Dynamique des Systèmes · **BPMNP** = Bio-ingénierie, Perception, Mécanique Numérique · **LUMEN** = Cité de la Lumière.
+- **Existant** : appli de supervision **trop complexe** (réservée aux chercheurs) → d'où ColorRoomGames.
+- **Méthode** : **agile + Kanban** ; **client M. Labayrade** (directeur BPMNP) ; **moi = E2** ; **docs rédigées par moi**.
+- **Git** : branche **`ux-last`** (intégration) → **merge `main`** (stable) ; **CI/CD** GitLab → Docker → Pi.
+- **Code de classe** (`CS5VHX` + **QR code**) pour rejoindre une **classe** ≠ **code de salon** multijoueur (rejoindre une **partie**).
+- **CS-160** : **USB** sur le Pi ; appelé via **API HTTP** ; XYZ / Lv / x,y / **CIE 1931** / **ΔE**.
+- **RS-485** : bus série multi-points pour les 42 plaques. **WAL** : lectures concurrentes. **PBKDF2** : 100 000 itér. + sel. **Alpha-bêta** : coupe les branches inutiles. **Sémaphore** `HW_CONCURRENCY=2`.
+- ⚠️ **IA du Puissance 4 = minimax, PAS un réseau de neurones.**
+- **URL démo : `http://172.17.40.39/`** (Wi-Fi **ColorRoom_WiFI**).
 
 ---
 
-## 9. La vidéo de 2 min : slide-pont (slide 47)
+## 9. La vidéo de 2 min : slide-pont (slide 49)
 
 Vidéo **embarquée dans le `.pptx`** (dernière slide) = **pont présentation → démonstration**. Je la lance à la fin du parlé, puis j'enchaîne sur la démo live.
 
-1. La vraie **ColorRoom** est à **LUMEN**, pas dans la salle : la vidéo est **le seul moyen de montrer le système réel complet**.
-2. Elle **clôt la présentation** et **ouvre la démo** sans rupture.
-3. **Filet de sécurité** si le matériel bug en live.
+1. La vraie **ColorRoom** est à **LUMEN**, pas dans la salle : seul moyen de montrer le **système réel complet**.
+2. Elle **clôt** la présentation et **ouvre** la démo.
+3. **Filet de sécurité** si le matériel bug.
 
 > ▶️ Lecture : clic sur la vidéo (ou auto en diaporama). Garder `video_demo.mp4` à côté en secours.
 
 ---
 
-*Bon courage Téo : la section 5 = 90 % des questions, la section 7 = ton minutage exact (47 slides, 20 min).*
+*Bon courage Téo : section 5 = 90 % des questions, section 7 = ton minutage (49 slides, 20 min).*
