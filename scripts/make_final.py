@@ -107,6 +107,7 @@ code{font-family:"Inter",Arial,sans-serif;font-size:.9em;font-weight:600;backgro
     box-shadow:0 8px 26px rgba(17,19,26,.07),inset 0 1px 0 rgba(255,255,255,.7)}
 .toc .it .ico{width:38px;height:38px;border-radius:11px;color:var(--accent);display:grid;place-items:center;flex-shrink:0;
     background:linear-gradient(150deg,rgba(109,74,255,.16),rgba(109,74,255,.06));border:1px solid rgba(255,255,255,.7)}
+.toc .it .tn{font-family:"Bricolage Grotesque",Inter,sans-serif;font-weight:800;font-size:13px;color:var(--accent);opacity:.65;min-width:20px}
 .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;width:100%;align-self:center}
 .stat{border:1px solid rgba(255,255,255,.7);border-radius:16px;padding:20px 22px;display:flex;flex-direction:column;gap:5px;
     background:rgba(255,255,255,.82);
@@ -273,12 +274,14 @@ S.append(slide(f'''<div class="body cover">
   <div class="media" style="flex:1"><img class="shot" src="{IMG['home']}"></div>
 </div>'''))
 
-# 2 SOMMAIRE
-toc=[("target","Contexte et système"),("users","Cas d'utilisation et équipe"),("network","Architecture et classes"),
- ("code-xml","Choix techniques et stack"),("share-2","Réseau et déploiement"),("layout-dashboard","Interface et données"),
- ("lock","Sécurité et comptes"),("gamepad-2","Jeux, IA et multijoueur"),("palette","Mesure et chromaticité"),
- ("file-text","Documentation et qualité"),("chart-column","Bilan"),("eye","Démonstration")]
-toc_html="".join(f'<div class="it"><span class="ico">{ic(i)}</span>{t}</div>' for i,t in toc)
+# 2 SOMMAIRE (aligné sur le déroulé réel des diapositives)
+toc=[("target","Contexte et commanditaire"),("cpu","Le système ColorRoom"),
+ ("puzzle","Besoin et cas d'utilisation"),("users","Équipe et planification"),
+ ("network","Architecture et conception"),("code-xml","Choix techniques et pile"),
+ ("share-2","Réseau et déploiement"),("layout-dashboard","Interface et base de données"),
+ ("lock","Sécurité et comptes"),("gamepad-2","Jeux, IA et multijoueur"),
+ ("palette","Mesure et chromaticité"),("chart-column","Qualité, bilan et démo")]
+toc_html="".join(f'<div class="it"><span class="ico">{ic(i)}</span><span class="tn">{n:02d}</span>{t}</div>' for n,(i,t) in enumerate(toc,1))
 S.append(slide(head("Plan de la présentation","Sommaire","layout-dashboard")+f'<div class="body"><div class="toc">{toc_html}</div></div>'))
 
 # 3 CONTEXTE (vraies photos : bâtiment LUMEN + carte Lyon)
