@@ -79,6 +79,11 @@ code{font-family:"Inter",Arial,sans-serif;font-size:.9em;font-weight:600;backgro
 .pageno{position:absolute;bottom:16px;right:20px;font-size:11.5px;color:#aeb6c6;font-weight:500}
 .diagram{max-height:100%;max-width:100%;width:auto;display:block;margin:auto;border:none;border-radius:8px;background:#fff}
 .dcard{background:#fff;border:1px solid var(--line);border-radius:16px;padding:16px;display:flex;align-items:center;justify-content:center;width:100%;height:100%;box-shadow:0 10px 28px rgba(17,19,26,.07)}
+.fullwrap{flex:1;display:flex;align-items:center;justify-content:center;padding:8px 10px 6px;position:relative;min-height:0}
+.fullimg{max-width:100%;max-height:100%;width:auto;height:auto;border-radius:10px;border:1px solid var(--line);background:#fff}
+.fulltag{position:absolute;top:12px;left:18px;z-index:2;display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--ink);background:rgba(255,255,255,.88);border:1px solid var(--line);border-radius:30px;padding:5px 13px}
+.fulltag .ic{width:15px;height:15px;color:var(--accent)}
+.fulltag b{color:var(--ink)}
 .shot{width:100%;border-radius:12px;border:1px solid var(--line);box-shadow:0 10px 30px rgba(17,19,26,.12);display:block}
 .photo{border-radius:14px;border:1px solid rgba(255,255,255,.7);display:block;object-fit:cover;
     box-shadow:0 14px 38px rgba(17,19,26,.16),inset 0 1px 0 rgba(255,255,255,.4)}
@@ -263,6 +268,11 @@ def diagram(kick,title,img,icon,me=False,notes=None):
 
 def nl(*items): return "<ul>"+"".join(f"<li>{x}</li>" for x in items)+"</ul>"
 
+def fullshot(kick,title,img,icon,me=False):
+    tag=(f'<div class="fulltag">{ic(icon)}<b>{title}</b><span style="color:var(--muted)">· {kick}</span></div>')
+    badge='<div class="me">MA PARTIE · E2</div>' if me else ''
+    return slide(f'<div class="fullwrap">{tag}{badge}<img class="fullimg" src="{img}"></div>')
+
 def media_slide(kick,title,bullets,img,icon,me=True,ratio="0 0 40%"):
     return slide(head(kick,title,icon,me)+
         f'<div class="body"><div class="col" style="flex:{ratio};display:flex;flex-direction:column;justify-content:center">{bullets}</div>'
@@ -349,11 +359,7 @@ S.append(slide(head("Le besoin","Problématique et objectifs","puzzle")+
  '</div></div>'))
 
 # 6 USE CASES
-S.append(diagram("Acteurs et fonctions attendues","Diagramme de cas d'utilisation",IMG['uc'],"users",
- notes=nl("Deux acteurs : <b>Enseignant</b> (crée et génère des jeux) et <b>Apprenant</b> (joue)",
-   "Les deux peuvent <b>Mesurer</b> avec le colorimètre CS-160",
-   "<i>Créer un jeu</i> <b>inclut</b> <i>Générer par IA</i>",
-   "<i>Jouer</i> et <i>Mesurer</i> <b>incluent</b> <i>Allumer les dalles</i>")))
+S.append(fullshot("Acteurs et fonctions attendues","Diagramme de cas d'utilisation",IMG['uc'],"users"))
 
 # 7 EQUIPE
 def member(ini,name,role,icon,bg,me=False):
@@ -376,10 +382,7 @@ S.append(slide(head("8 étudiants · sous-équipes JavaScript et Python","Équip
  +'</div></div>'))
 
 # 7b PLANIFICATION (Gantt réel)
-S.append(slide(head("Planification du projet","Diagramme de Gantt","chart-column")+
- f'''<div class="body" style="padding:6px 24px 24px;flex-direction:column;align-items:center;justify-content:center;gap:5px">
-   <img class="photo" src="{PHO['gantt']}" style="max-height:512px;max-width:100%;width:auto;background:#fff">
-   <div class="cap">{ic("flask-conical")} Jalons par étudiant · ma contribution (E2) suivie tout au long du projet</div></div>'''))
+S.append(fullshot("Planification du projet · jalons par étudiant (E2 suivie tout du long)","Diagramme de Gantt",PHO['gantt'],"chart-column"))
 
 # 8 ARCHITECTURE
 S.append(slide(head("Vue d'ensemble · diagramme de composants","Architecture logicielle","network",me=True)+

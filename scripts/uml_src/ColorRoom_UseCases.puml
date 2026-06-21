@@ -1,0 +1,66 @@
+@startuml
+left to right direction
+skinparam dpi 160
+skinparam defaultFontName Inter
+skinparam defaultFontSize 15
+skinparam ArrowColor #5b6472
+skinparam usecaseBorderColor #6b7280
+skinparam rectangleBorderColor #9aa3b2
+
+actor "Apprenant" as AP
+actor "Enseignant" as EN
+EN --|> AP
+
+rectangle "ColorRoom Serious game" {
+  usecase "Choisir le jeu" as UC_choisir #AEEBFF
+  usecase "Choisir un type\nde jeux" as UC_type #AEEBFF
+  usecase "Choisir un niveau" as UC_niveau #AEEBFF
+  usecase "Jouer" as UC_jouer #AEEBFF
+  usecase "Visualiser les\nrésultats" as UC_visu #AEEBFF
+  usecase "S'identifier" as UC_id #AEEBFF
+  usecase "Commander les\nplaques lumineuses" as UC_cmd #AEEBFF
+  usecase "Appliquer\ndes scènes" as UC_scenes #AEEBFF
+  usecase "Créer des comptes\napprenants" as UC_comptes #AEEBFF
+  usecase "Gérer les scores" as UC_scores #AEEBFF
+  usecase "Acquérir des\nmesures" as UC_mesures #CCF2CF
+  usecase "Tester les\ncommandes" as UC_testcmd #CCF2CF
+  usecase "Tester les plaques" as UC_testpl #F8CBCB
+  usecase "Créer/Modifier\ndes jeux" as UC_jeux #D9C9F2
+  usecase "Concevoir l'interface\nutilisateur (UI)" as UC_ui #D9C9F2
+  usecase "Programmer la\nlogique" as UC_logique #D9C9F2
+}
+
+node "Logiciel de commande\net plaques lumineuse" as SYS
+node "Appareils de mesure" as MES
+
+AP --> UC_choisir
+AP --> UC_jouer
+AP --> UC_visu
+AP --> UC_id
+EN --> UC_testpl
+EN --> UC_testcmd
+EN --> UC_comptes
+EN --> UC_jeux
+EN --> UC_scores
+
+UC_choisir ..> UC_type : <<include>>
+UC_choisir ..> UC_niveau : <<include>>
+UC_jouer ..> UC_cmd : <<include>>
+UC_jouer ..> UC_mesures : <<include>>
+UC_scenes ..> UC_cmd : <<extend>>
+UC_jeux ..> UC_ui : <<include>>
+UC_jeux ..> UC_logique : <<include>>
+
+UC_cmd --> SYS
+UC_mesures --> MES
+UC_testcmd --> MES
+UC_testpl --> SYS
+
+legend right
+|= |= Responsable et perimetre |
+|<#AEEBFF>  | E2 : UI/UX, Base de donnees, Gestion utilisateurs |
+|<#CCF2CF>  | E1 : Serveur, Docker, CI-CD, Instruments mesure |
+|<#D9C9F2>  | E3 : Creation jeux, Execution, Composants |
+|<#F8CBCB>  | E4 : API REST ColorRoom, Tests, Documentation |
+endlegend
+@enduml
