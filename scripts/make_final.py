@@ -365,7 +365,7 @@ S.append(diagram("Diagramme d'états","Cycle de vie d'une partie",IMG['ej'],"gam
 
 # 21 P4 IA
 S.append(media_slide("Ma partie · intelligence artificielle","Puissance 4 et son IA minimax",
- '''<ul><li>Grille 6 colonnes × 6 lignes ; 2 joueurs ou contre l'ordinateur</li>
+ '''<ul><li>Grille 6 colonnes × 7 lignes (42 cases) ; 2 joueurs ou contre l'ordinateur</li>
    <li>IA <b>hors-ligne</b> : <b>minimax</b> + <b>élagage alpha-bêta</b>, anti-piège</li>
    <li>Heuristique par <b>fenêtres de 4</b> (défense pondérée &gt; attaque) + poids central</li>
    <li><b>5 niveaux</b> : profondeur <b>1 / 2 / 5 / 9 / 12</b> + bruit décroissant</li></ul>''',IMG['p4'],"bot",ratio="0 0 44%"))
