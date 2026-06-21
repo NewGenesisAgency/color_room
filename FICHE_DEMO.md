@@ -1,4 +1,4 @@
-# Fiche de démonstration — Oral E6 · ColorRoom · Téo Trompier (E2)
+# Fiche de démonstration : Oral E6 · ColorRoom · Téo Trompier (E2)
 
 **Après les 20 min de présentation → 20 min de démonstration.** Cette fiche couvre, point par point, **exactement** ce qu'a demandé M. Delbosc. Coche mentalement chaque exigence pendant que tu démontres.
 
@@ -18,9 +18,9 @@
 
 ---
 
-## 0. La vidéo de 2 min — slide-pont (fin présentation → début démo)
+## 0. La vidéo de 2 min : slide-pont (fin présentation → début démo)
 
-La vidéo est la **dernière slide du diaporama** (slide 39, embarquée dans le `.pptx`). Elle **clôt la présentation** et **ouvre la démonstration** : je la lance à la toute fin du parlé, puis j'enchaîne sur les manips live.
+La vidéo est la **dernière slide du diaporama** (slide 47, embarquée dans le `.pptx`). Elle **clôt la présentation** et **ouvre la démonstration** : je la lance à la toute fin du parlé, puis j'enchaîne sur les manips live.
 
 1. La vraie **ColorRoom** (2 cellules, 42 plaques) est à **LUMEN**, pas dans la salle : la vidéo est **le seul moyen de montrer le système réel complet** exigé par le jury (« éléments réels correspondant au diagramme de déploiement »).
 2. Elle **plante le décor** (matériel, dalles qui s'allument) avant les manips live.
@@ -60,13 +60,26 @@ ip a | grep wlan                  # le Pi diffuse bien le réseau de la salle
 
 ---
 
-## 2. Tests issus de la recette (7 min) — le cœur de la démo
+## 2. Tests issus de la recette (7 min) : le cœur de la démo
 
 Pour **chaque** test, je verbalise les 5 temps imposés : **(a) cas d'utilisation + acteurs → (b) conditions initiales → (c) scénario → (d) résultat → (e) objectif du CDC validé.**
 
 > Les cas d'utilisation viennent du **diagramme de cas d'utilisation** : acteurs **Enseignant** et **Apprenant** ; CU *Jouer*, *Mesurer (CS-160)*, *Générer par IA*, *Créer un jeu*, *Allumer les dalles*.
 
-### Fiche de recette R1 — « Un apprenant joue et les dalles s'allument »
+### Fiche de recette R0 : « Un apprenant crée son compte et rejoint une classe »
+
+| Champ | Contenu |
+|-------|---------|
+| **Cas d'utilisation** | *S'identifier* / *Rejoindre une classe* |
+| **Acteur(s)** | **Enseignant** (crée la classe) puis **Apprenant** (s'inscrit) |
+| **Préconditions** | App UP ; l'enseignant a une classe **BTS CIEL 1** avec un **code** (ex. `CS5VHX`) et son **QR code** |
+| **Scénario nominal** | 1) Côté enseignant : montrer la classe, le **code à 6 caractères** + le **QR code** → 2) Côté apprenant : « Créer un compte » (pseudo + mot de passe) → 3) **saisir le code de classe** (ou scanner le QR) → 4) validation → connexion auto, l'élève apparaît dans la classe |
+| **Résultat attendu** | Compte créé **atomiquement** (user + adhésion), l'élève figure dans le tableau de bord de l'enseignant |
+| **Objectif CDC validé** | Gestion des **comptes et des classes** ; un enseignant suit ses apprenants |
+
+> 💡 **Code de classe ≠ code de salon multijoueur** : le premier sert à **rejoindre une classe** (gestion) ; le second (voir R3) sert à **rejoindre une partie** en réseau.
+
+### Fiche de recette R1 : « Un apprenant joue et les dalles s'allument »
 
 | Champ | Contenu |
 |-------|---------|
@@ -79,7 +92,7 @@ Pour **chaque** test, je verbalise les 5 temps imposés : **(a) cas d'utilisatio
 
 **Pourquoi c'est probant techniquement** : le navigateur ne parle **jamais** directement au matériel. Le clic → route API `/api/supervision/batch` → **sémaphore `HW_CONCURRENCY=2`** + file d'attente (supervision est quasi-série) → envoi des **32 canaux** avec `AbortController` (timeout). Couleur écran = couleur dalle via `CHANNEL_PROFILES` (chaque canal ↔ sa longueur d'onde).
 
-### Fiche de recette R2 — « Mesure colorimétrique au CS-160 »
+### Fiche de recette R2 : « Mesure colorimétrique au CS-160 »
 
 | Champ | Contenu |
 |-------|---------|
@@ -90,7 +103,7 @@ Pour **chaque** test, je verbalise les 5 temps imposés : **(a) cas d'utilisatio
 | **Résultat attendu** | Valeurs tristimulus cohérentes ; point CIE positionné ; ΔE calculé vs cible |
 | **Objectif CDC validé** | Donner accès à la **mesure scientifique réelle** (colorimétrie) de façon pédagogique |
 
-### Fiche de recette R3 — « Affrontement contre l'IA / Multijoueur »
+### Fiche de recette R3 : « Affrontement contre l'IA / Multijoueur »
 
 | Champ | Contenu |
 |-------|---------|
@@ -110,12 +123,13 @@ Pour **chaque** test, je verbalise les 5 temps imposés : **(a) cas d'utilisatio
 
 **À montrer concrètement (pas juste citer) :**
 
-- **Git + GitHub** : `git log --oneline` → **~280 commits**, messages clairs et préfixés (`feat`, `fix`, `perf`, `docs`, `chore`). Montrer la liste des **branches** (`ux-last` = intégration, `main` = stable) et un commit type.
-- **GitLab CI/CD** (`.gitlab-ci.yml`) : pipeline **4 étapes** `pretest → test → build → deploy`, runner **tagué `raspberry`**, déclenché sur la branche d'app → `docker compose build` puis `docker compose up -d` **directement sur le Pi**. C'est le **déploiement continu** réel.
-- **Portainer** (`http://<pi>:9000`) : supervision graphique des conteneurs (logs, restart, état) — montrer les conteneurs UP.
-- **Docker / docker-compose** : multi-services (app, portainer, ollama, ollama-pull), **volumes** (`./app/data:/data` = base persistante), **healthcheck**, image **multi-stage arm64**.
+- **Méthode agile** : développement **incrémental** par itérations, livraisons régulières, et **échanges réguliers avec le client M. Labayrade** (directeur du labo **BPMNP**) pour ajuster le besoin.
+- **Git + GitHub** : `git log --oneline` → **~280 commits** préfixés (`feat`, `fix`, `perf`, `docs`). Workflow : je développe sur **`ux-last`** (intégration) puis **`git merge` sur `main`** (stable). Montrer `git branch` + un commit type.
+- **GitLab CI/CD** (`.gitlab-ci.yml`) : pipeline **4 étapes** `pretest → test → build → deploy`, runner **`raspberry`** → `docker compose build` puis `up -d` **directement sur le Pi**.
+- **Portainer** (`http://<pi>:9000`) : supervision graphique des conteneurs (logs, restart, état).
+- **Documentation (par moi)** : guide technique, **15 diagrammes UML**, notice apprenant (/aide), README d'installation.
 
-**Phrase :** « Le code est versionné sur Git/GitHub avec des commits atomiques ; une chaîne CI/CD GitLab construit et déploie automatiquement l'image Docker sur le Raspberry Pi ; Portainer me sert à superviser les conteneurs en production. »
+**Phrase :** « Méthode **agile** avec des points réguliers côté **client (M. Labayrade)** ; code versionné sur Git/GitHub (branche **`ux-last` → merge `main`**) ; **CI/CD** GitLab qui build et déploie l'image Docker sur le Pi ; Portainer pour la supervision. La **documentation, c'est moi qui l'ai rédigée**. »
 
 ---
 
@@ -137,10 +151,10 @@ Projet d'**équipe de 8**, 2 sous-équipes (JavaScript / Python). **Moi = E2.**
 ## 5. Constituants de ma partie + interactions / tests d'intégration (3 min)
 
 **Mes constituants (ce que j'ai construit) :**
-- **Couche données** `lib/db/index.ts` — SQLite singleton, migrations idempotentes (WAL, busy_timeout, FK).
-- **Auth** `lib/auth.ts` — PBKDF2-HMAC-SHA512, sessions cookie HttpOnly/SameSite.
-- **API** `app/api/*` — `auth`, `classes`, `scores`, `games`, `multiplayer`, `p4`, `spectre`, `cs160`, `supervision`, `ai`, `admin`, `health`.
-- **UI/jeux** `app/_components/*` — catalogue, Room3D, Color Speed, Puissance 4 (IA), Simon, Tetris, multijoueur, page Mesure.
+- **Couche données** `lib/db/index.ts` : SQLite singleton, migrations idempotentes (WAL, busy_timeout, FK).
+- **Auth** `lib/auth.ts` : PBKDF2-HMAC-SHA512, sessions cookie HttpOnly/SameSite.
+- **API** `app/api/*` : `auth`, `classes`, `scores`, `games`, `multiplayer`, `p4`, `spectre`, `cs160`, `supervision`, `ai`, `admin`, `health`.
+- **UI/jeux** `app/_components/*` : catalogue, Room3D, Color Speed, Puissance 4 (IA), Simon, Tetris, multijoueur, page Mesure.
 
 **Interactions (= les tests d'intégration entre nos parties) :**
 
@@ -157,12 +171,13 @@ Projet d'**équipe de 8**, 2 sous-équipes (JavaScript / Python). **Moi = E2.**
 
 ## 6. Montrer/expliquer mon code et son évolution (2 min)
 
-**4 extraits à ouvrir en live** (les mêmes que dans le deck, slides 16/18/20/27) :
+**5 extraits à ouvrir en live** (les mêmes que dans le deck, slides 18/20/22/24/32) :
 
-1. **`app/api/auth/register/route.ts`** — **variable transactionnelle** : `db.transaction(() => { … })()` → user + adhésion classe, **tout-ou-rien** (BEGIN/COMMIT/ROLLBACK, ACID).
-2. **`app/api/supervision/batch/route.ts`** — **variable atomique** : compteur `hwInFlight` + file de Promises (`acquireHwSlot`/`releaseHwSlot`), atomique car boucle d'événements **mono-thread**, borné à **2 slots**.
-3. **`lib/auth.ts`** — `hashPassword` : `pbkdf2Sync(password, salt, 100_000, 64, 'sha512')`, format `sel:hash`. → *« jamais de mot de passe en clair. »*
-4. **`app/_components/GamePuissance4.tsx`** — `scoreWindow` + `minimax` alpha-bêta. → *« l'intelligence de l'IA. »*
+1. **`app/app/_components/Room3D.tsx`** : **Three.js** : `new THREE.Scene()` + `WebGLRenderer`, un `Mesh` par dalle, boucle `requestAnimationFrame`, `forceContextLoss` au démontage.
+2. **`app/app/api/auth/register/route.ts`** : **variable transactionnelle** : `db.transaction(() => { … })()` → user + adhésion classe, **tout-ou-rien** (BEGIN/COMMIT/ROLLBACK, ACID).
+3. **`app/app/api/supervision/batch/route.ts`** : **variable atomique** : compteur `hwInFlight` + file de Promises (`acquireHwSlot`/`releaseHwSlot`), atomique car boucle d'événements **mono-thread**, borné à **2 slots**.
+4. **`app/lib/auth.ts`** : `hashPassword` : `pbkdf2Sync(password, salt, 100_000, 64, 'sha512')`, format `sel:hash`. → *« jamais de mot de passe en clair. »*
+5. **`app/app/_components/GamePuissance4.tsx`** : `scoreWindow` + `minimax` alpha-bêta. → *« l'intelligence de l'IA (pas un réseau de neurones). »*
 
 **Évolution dans le temps (à raconter avec `git log`) :**
 - **Début** : scaffold Next.js + Docker, API jeux, auth en **localStorage**.

@@ -345,5 +345,56 @@ return (                                         // description déclarative de 
 
 ---
 
+## 13. Three.js : la vue 3D temps réel de la salle
+
+**🔴 Version complexe :** la salle est rendue en WebGL via **Three.js**. Je monte une **Scene**, une **PerspectiveCamera** et un **WebGLRenderer** dont le `domElement` est inséré dans la page ; chaque **dalle** est un `Mesh` dont le matériau suit l'état du jeu. Le rendu tourne dans une **boucle `requestAnimationFrame`**. Au démontage du composant, je libère explicitement le contexte GPU (`forceContextLoss`) et j'annule la boucle, pour éviter une **fuite de contexte WebGL** (le navigateur en limite le nombre).
+
+**🟢 Version simple :** je dessine la salle en **3D dans le navigateur** ; chaque dalle est un petit carré 3D qui prend la couleur envoyée au jeu. Une boucle redessine l'image en continu, et quand on quitte la page je **fais le ménage** pour ne pas saturer la carte graphique.
+
+**Exemple concret** *(app/app/_components/Room3D.tsx)* :
+```ts
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(CAM_FOV, W / H, 0.05, 80);
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(W, H);
+mount.appendChild(renderer.domElement);
+
+const plate = new THREE.Mesh(geometry, material);   // une dalle
+scene.add(plate);
+
+function loop() {                                    // boucle de rendu
+  renderer.render(scene, camera);
+  raf = requestAnimationFrame(loop);
+}
+loop();
+
+return () => {                                        // nettoyage au démontage
+  cancelAnimationFrame(raf);
+  renderer.forceContextLoss();                        // évite la fuite WebGL
+};
+```
+
+---
+
+## 14. Méthode agile, suivi client & versionnement Git
+
+**🔴 Version complexe :** projet conduit en **agile** : itérations courtes, livraisons incrémentales, priorisation continue du besoin via des **points réguliers avec le client M. Labayrade** (directeur du labo **BPMNP**). Côté code, workflow Git à deux branches : je développe et j'intègre sur **`ux-last`**, puis je **fusionne sur `main`** (branche stable, déployée). Une chaîne **CI/CD** (GitLab) build l'image Docker et la déploie sur le Raspberry Pi. La **documentation** (guide technique, 15 diagrammes UML, notice, README) a été **rédigée par moi**.
+
+**🟢 Version simple :** on a avancé **par petites étapes**, en montrant régulièrement le travail au **client** pour ajuster. Le code a deux branches : une **de travail** (`ux-last`) et une **propre** (`main`) ; quand c'est prêt, je **fusionne** l'une dans l'autre, et ça se déploie tout seul sur le Raspberry Pi. **C'est moi qui ai écrit la doc.**
+
+**Exemple concret** *(workflow Git réel du projet)* :
+```bash
+# 1) je développe sur la branche d'intégration
+git add -A && git commit -m "feat(ia): minimax alpha-beta + anti-piege"
+git push -u origin ux-last
+
+# 2) quand c'est stable, je fusionne sur main (branche déployée)
+git checkout main
+git merge ux-last --no-edit
+git push -u origin main        # -> CI/CD GitLab -> build Docker -> Raspberry Pi
+```
+
+---
+
 *Astuce finale : pour chaque notion, le réflexe gagnant = **« version pro »** → si besoin **« autrement dit… »** (version simple) → **« et voici dans le code »** (le bloc). C'est exactement ce que le jury attend en E6.*
 </content>

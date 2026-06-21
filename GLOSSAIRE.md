@@ -135,6 +135,10 @@ Dans mon projet, j'utilise du volatile pour l'**état runtime des jeux** (le com
 - **Heartbeat** : signal de **présence**. ▸ `updated_at` rafraîchi à chaque appel d'état
 - **UUID / id aléatoire** : identifiant unique. ▸ `randomBytes(16).toString('hex')`
 - **`state_json`** : état de la partie **sérialisé en base**. ▸ `SELECT … state_json FROM crg_mp_sessions WHERE status = 'active'`
+- **Code de salon (multijoueur)** : code court pour **rejoindre une partie** (≠ code de classe). ▸ `room_code` dans `crg_mp_sessions`
+- **Code de classe + QR code** : code à 6 caractères (ex. `CS5VHX`, sans 0/O 1/I) pour **rejoindre une classe** ; doublé d'un **QR code**. ▸ saisi à l'inscription : `body.classCode`
+- **CORS** (*Cross-Origin Resource Sharing*) : règle qui **bloque** par défaut les appels d'un site vers une autre origine ; il a fallu **autoriser** l'API Supervision. ▸ en-têtes `Access-Control-Allow-Origin`
+- **portproxy / pare-feu (Windows)** : exposer l'API locale (8080) sur le réseau (18080). ▸ `netsh interface portproxy add v4tov4 listenport=18080 connectport=8080`
 - **AbortController** : **annule** une requête trop longue (timeout). ▸ `forceAbortCtrl.abort(); forceAbortCtrl = new AbortController()`
 
 ---
@@ -165,6 +169,8 @@ Dans mon projet, j'utilise du volatile pour l'**état runtime des jeux** (le com
 - **Portainer** : supervision web des conteneurs. ▸ `image: portainer/portainer-ce:2.21.4`
 - **CI/CD** : test → build → deploy **automatiques**. ▸ `.gitlab-ci.yml` : `stages: [pretest, test, build, deploy]`
 - **Git** : gestion de versions (commits, branches). ▸ `git push -u origin ux-last`
+- **Branche / merge** : je développe sur **`ux-last`** (intégration) puis je **fusionne sur `main`** (stable). ▸ `git checkout main && git merge ux-last`
+- **Méthode agile** : développement **incrémental**, livraisons régulières, **échanges réguliers avec le client** (M. Labayrade, directeur BPMNP). ▸ itérations + retours client
 - **CSV · UTF-8 · BOM** : export tableur lisible par Excel. ▸ `const csv = '﻿' + rows.join('\n')` *(le BOM force les accents)*
 - **Ollama / Gemini** : IA **locale** (hors-ligne) / IA cloud (optionnelle). ▸ `OLLAMA_URL=http://ollama:11434`
 
