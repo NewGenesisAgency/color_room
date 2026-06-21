@@ -109,6 +109,22 @@ code{font-family:"Inter",Arial,sans-serif;font-size:.9em;font-weight:600;backgro
 .tech small{font-size:11.5px;color:var(--muted)}
 .logorow{display:flex;gap:14px;align-items:center;margin-top:16px;flex-wrap:wrap}
 .logorow img{height:26px;width:auto}
+.foot{position:absolute;bottom:15px;left:26px;font-size:11px;color:#aeb6c6;font-weight:600;letter-spacing:.02em}
+.code{background:#0e1018;border-radius:12px;overflow:hidden;border:1px solid #1b1f2c;width:100%}
+.codebar{display:flex;align-items:center;gap:7px;padding:9px 13px;background:#161a26;border-bottom:1px solid #222838}
+.codebar .dot{width:10px;height:10px;border-radius:50%}
+.codebar .file{margin-left:8px;font-size:12px;color:#aeb6c6;font-weight:600}
+.code pre{padding:14px 16px;font-family:"Inter",Arial,sans-serif;font-size:12.5px;line-height:1.6;color:#d6def0;white-space:pre-wrap;word-break:break-word;font-feature-settings:"tnum"}
+.code .kw{color:#c792ea} .code .st{color:#86e0ad} .code .cm{color:#737d92} .code .fn{color:#82aaff} .code .nb{color:#f7c668}
+.src{font-size:11.5px;color:var(--muted);margin-top:11px;display:flex;align-items:center;gap:8px;line-height:1.4}
+.src .ic{width:16px;height:16px;color:var(--accent);flex-shrink:0}
+.src b{color:var(--accent);font-weight:600}
+.vargrid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:13px;width:100%}
+.varc{border:1px solid var(--line);border-radius:13px;padding:14px 15px}
+.varc .vt{font-weight:700;color:var(--ink);font-size:14.5px;display:flex;align-items:center;gap:8px}
+.varc .vt .ic{width:18px;height:18px;color:var(--accent)}
+.varc p{font-size:12px;color:var(--muted);margin-top:5px;line-height:1.4}
+.varc code{font-size:10.5px}
 @media print{
   @page{size:1180px 663.75px;margin:0}
   body{background:#fff;padding:0}.deck{gap:0}
@@ -122,7 +138,18 @@ def head(kick,title,icon,me=False):
             f'<div class="rule"></div>'+('<div class="me">MA PARTIE · E2</div>' if me else ''))
 
 def slide(inner,cls=""):
-    return f'<section class="slide {cls}">{inner}<div class="pageno"></div></section>'
+    return f'<section class="slide {cls}">{inner}<div class="foot">Téo Trompier</div><div class="pageno"></div></section>'
+
+GH="github.com/NewGenesisAgency/color_room/blob/main/app"
+def code_slide(kick,title,icon,bullets,filelabel,pre,ghpath,lines):
+    src=(f'<div class="src">{ic("code-xml")}<span><b>{filelabel}</b><br>{GH}/{ghpath}#{lines}</span></div>')
+    codecard=(f'<div class="code"><div class="codebar">'
+              f'<span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span>'
+              f'<span class="dot" style="background:#28c840"></span><span class="file">{filelabel}</span></div>'
+              f'<pre>{pre}</pre></div>')
+    return slide(head(kick,title,icon,me=True)+
+        f'<div class="body"><div class="col" style="flex:0 0 38%;display:flex;flex-direction:column;justify-content:center">{bullets}{src}</div>'
+        f'<div class="col" style="flex:1;display:flex;align-items:center">{codecard}</div></div>')
 
 def diagram(kick,title,img,icon,me=False):
     return slide(head(kick,title,icon,me)+
@@ -264,12 +291,54 @@ S.append(slide(head("Ma partie · données · modèle relationnel","Base de donn
    <li><b>journal_mode=WAL</b> + busy_timeout</li></ul></div>
    <div class="media"><img class="diagram" src="{IMG['erd']}"></div></div>'''))
 
+# 14b CODE transaction atomique
+S.append(code_slide("Extrait de code · données","Transaction atomique (ACID)","circle-check",
+ '''<ul><li>L'inscription crée l'utilisateur <b>et</b> son adhésion de classe</li>
+   <li><b>Tout-ou-rien</b> : si une étape échoue, rien n'est écrit (pas de compte « à moitié créé »)</li>
+   <li>Garanti par <code>db.transaction()</code> de better-sqlite3</li></ul>''',
+ "app/api/auth/register/route.ts",
+ '''<span class="cm">// Tout-ou-rien : si la jonction de classe échoue,</span>
+<span class="cm">// l'utilisateur n'est pas créé non plus.</span>
+<span class="kw">const</span> insertAll = db.<span class="fn">transaction</span>(() =&gt; {
+  db.<span class="fn">prepare</span>(<span class="st">"INSERT INTO crg_users …"</span>).<span class="fn">run</span>(…);
+  <span class="kw">if</span> (classCode) db.<span class="fn">prepare</span>(<span class="st">"INSERT OR IGNORE</span>
+        <span class="st">INTO crg_class_members …"</span>).<span class="fn">run</span>(…);
+});
+<span class="fn">insertAll</span>();   <span class="cm">// exécution atomique (ACID)</span>''',
+ "api/auth/register/route.ts","L47-L58"))
+
+# 14c VARIABLES / PERSISTANCE
+def varc(i,t,d): return f'<div class="varc"><div class="vt">{ic(i)}{t}</div><p>{d}</p></div>'
+S.append(slide(head("Typologie des variables et de la persistance","Gestion de l'état","database",me=True)+
+ '<div class="body" style="align-items:center"><div class="vargrid">'
+ +varc("database","Persistante","Stockée durablement en SQLite (survit aux redémarrages, volume Docker). <code>lib/db</code>")
+ +varc("circle-check","Transactionnelle · atomique","<code>db.transaction()</code> : ACID, tout-ou-rien (user + classe). <code>register</code>")
+ +varc("zap","Volatile (en mémoire)","<code>useRef</code> : état runtime des dalles/jeux, perdu au rechargement. <code>app/jeux</code>")
+ +varc("lock","Environnement","<code>process.env</code> : secrets (clé, mot de passe admin) via <code>.env</code>, hors Git.")
+ +varc("share-2","Réactive","<code>useState</code> : déclenche le re-rendu de l'interface à chaque changement.")
+ +varc("network","Concurrente","Sémaphore <code>HW_CONCURRENCY=2</code> : sérialise les accès au matériel. <code>batch</code>")
+ +'</div></div>'))
+
 # 15 SECURITE
 S.append(media_slide("Ma partie · sécurité","Authentification et données personnelles",
  '''<ul><li><b>3 rôles</b> : admin (via .env), enseignant, apprenant</li>
    <li>Hachage <b>PBKDF2-HMAC-SHA512</b> (100 000 itér., sel 16 o, clé 64 o)</li>
    <li>Session en <b>cookie HttpOnly + SameSite=lax</b> (anti-XSS / CSRF)</li>
    <li><b>Données 100 % locales</b> ; minimisation, effacement en cascade</li></ul>''',IMG['login'],"lock",ratio="0 0 50%"))
+
+# 15b CODE PBKDF2
+S.append(code_slide("Extrait de code · sécurité","Hachage des mots de passe (PBKDF2)","lock",
+ '''<ul><li>Dérivation lente <b>PBKDF2-HMAC-SHA512</b>, 100 000 itérations</li>
+   <li><b>Sel aléatoire</b> de 16 octets par compte (anti rainbow-tables)</li>
+   <li>Stockage au format <code>sel:hash</code> ; le clair n'est jamais conservé</li></ul>''',
+ "app/lib/auth.ts",
+ '''<span class="kw">export function</span> <span class="fn">hashPassword</span>(password: string) {
+  <span class="kw">const</span> salt = <span class="fn">randomBytes</span>(<span class="nb">16</span>).toString(<span class="st">'hex'</span>);
+  <span class="kw">const</span> hash = <span class="fn">pbkdf2Sync</span>(password, salt,
+              <span class="nb">100_000</span>, <span class="nb">64</span>, <span class="st">'sha512'</span>).toString(<span class="st">'hex'</span>);
+  <span class="kw">return</span> <span class="st">`${salt}:${hash}`</span>;  <span class="cm">// format sel:hash</span>
+}''',
+ "lib/auth.ts","L19-L23"))
 
 # 16 SEQ AUTH
 S.append(diagram("Séquence · connexion","Authentification (PBKDF2 + cookie)",IMG['sauth'],"lock",me=True))
@@ -296,10 +365,27 @@ S.append(diagram("Diagramme d'états","Cycle de vie d'une partie",IMG['ej'],"gam
 
 # 21 P4 IA
 S.append(media_slide("Ma partie · intelligence artificielle","Puissance 4 et son IA minimax",
- '''<ul><li>Grille 7×6 sur les 42 dalles ; 2 joueurs ou contre l'ordinateur</li>
-   <li>IA <b>hors-ligne</b> : <b>minimax</b> + <b>élagage alpha-bêta</b> (7 plies)</li>
-   <li>Heuristique + <b>move ordering</b> central</li>
-   <li><b>5 niveaux</b> ; décision ~70 ms</li></ul>''',IMG['p4'],"bot",ratio="0 0 44%"))
+ '''<ul><li>Grille 6 colonnes × 6 lignes ; 2 joueurs ou contre l'ordinateur</li>
+   <li>IA <b>hors-ligne</b> : <b>minimax</b> + <b>élagage alpha-bêta</b>, anti-piège</li>
+   <li>Heuristique par <b>fenêtres de 4</b> (défense pondérée &gt; attaque) + poids central</li>
+   <li><b>5 niveaux</b> : profondeur <b>1 / 2 / 5 / 9 / 12</b> + bruit décroissant</li></ul>''',IMG['p4'],"bot",ratio="0 0 44%"))
+
+# 21b CODE minimax
+S.append(code_slide("Extrait de code · IA","Évaluation minimax (alpha-bêta)","bot",
+ '''<ul><li>Chaque fenêtre de 4 cases est notée du point de vue de l'IA</li>
+   <li><b>Défense &gt; attaque</b> : un alignement adverse de 3 vaut -170, le mien +130</li>
+   <li>Victoire = <code>WIN_SCORE</code> (1 000 000) ; recherche bornée en profondeur</li></ul>''',
+ "app/_components/GamePuissance4.tsx",
+ '''<span class="cm">// Note d'une fenêtre de 4 (défense &gt; attaque)</span>
+<span class="kw">function</span> <span class="fn">scoreWindow</span>(me, opp) {
+  <span class="kw">if</span> (me&gt;<span class="nb">0</span> &amp;&amp; opp&gt;<span class="nb">0</span>) <span class="kw">return</span> <span class="nb">0</span>;   <span class="cm">// fenêtre morte</span>
+  <span class="kw">if</span> (me===<span class="nb">4</span>)  <span class="kw">return</span> WIN_SCORE; <span class="cm">// 1 000 000</span>
+  <span class="kw">if</span> (me===<span class="nb">3</span>)  <span class="kw">return</span> <span class="nb">130</span>;
+  <span class="kw">if</span> (opp===<span class="nb">3</span>) <span class="kw">return</span> -<span class="nb">170</span>;    <span class="cm">// bloque la menace</span>
+  ...
+}
+<span class="cm">// minimax + alpha-bêta · profondeur 1 → 12</span>''',
+ "_components/GamePuissance4.tsx","L116-L128"))
 
 # 22 MULTIJOUEUR
 S.append(media_slide("Ma partie · jeux en réseau","Les jeux multijoueur",
