@@ -22,8 +22,8 @@ IMG={
  "erd":uml("ERD"),"sauth":uml("Seq_Auth"),"sjeu":uml("Seq_Jeu"),"scs":uml("Seq_CS160"),
  "smp":uml("Seq_MP"),"ej":uml("Etats_Jeu"),"ecs":uml("Etats_CS160"),"remap":uml("Activite_Remap"),
 }
-LOGOS={n:logo(n) for n in ["react","nextdotjs","typescript","sqlite","docker","threedotjs","nodedotjs","raspberrypi"]}
-PHO={"lumen":photo("lumen.jpg"),"map":photo("map.jpg"),"plaque":photo("plaque.jpg"),"gantt":photo("gantt.png")}
+LOGOS={n:logo(n) for n in ["react","nextdotjs","typescript","sqlite","docker","threedotjs","nodedotjs","raspberrypi","javascript","nodered"]}
+PHO={"lumen":photo("lumen.jpg"),"plaque":photo("plaque.jpg"),"gantt":photo("gantt.png")}
 
 # --- Sprite Lucide (icones officielles, ISC) ---
 def luc_inner(name):
@@ -32,7 +32,7 @@ def luc_inner(name):
     return m.group(1).strip()
 LIST=["house","gamepad-2","bot","lock","database","share-2","palette","cpu","layout-dashboard",
       "target","users","code-xml","file-text","boxes","zap","circle-check","chart-column",
-      "network","puzzle","eye","sparkles","flask-conical","wrench"]
+      "network","puzzle","eye","sparkles","flask-conical","wrench","circle-x","map-pin","circle-play"]
 SPRITE='<svg width="0" height="0" style="position:absolute">'+"".join(
     f'<symbol id="ic-{n}" viewBox="0 0 24 24">{luc_inner(n)}</symbol>' for n in LIST)+'</svg>'
 def ic(name): return f'<svg class="ic"><use href="#ic-{name}"></use></svg>'
@@ -84,6 +84,13 @@ code{font-family:"Inter",Arial,sans-serif;font-size:.9em;font-weight:600;backgro
     box-shadow:0 14px 38px rgba(17,19,26,.16),inset 0 1px 0 rgba(255,255,255,.4)}
 .photostack{display:flex;flex-direction:column;gap:12px;width:100%;height:100%;justify-content:center}
 .cap{font-size:11.5px;color:var(--muted);font-weight:500;margin-top:6px;display:flex;align-items:center;gap:6px}
+.loccard{background:rgba(255,255,255,.85);border:1px solid var(--line);border-radius:13px;padding:12px 14px;display:flex;flex-direction:column;gap:10px;box-shadow:0 8px 22px rgba(17,19,26,.06)}
+.locrow{display:flex;gap:11px;align-items:center}
+.locrow .lp{width:32px;height:32px;border-radius:9px;background:#f1eeff;color:var(--accent);display:grid;place-items:center;flex-shrink:0}
+.locrow .lp .ic{width:17px;height:17px}
+.locrow.b .lp{background:#e6f7f3;color:var(--accent2)}
+.locrow b{font-size:13.5px;color:var(--ink)}
+.locrow small{display:block;font-size:11.5px;color:var(--muted);margin-top:1px}
 .media{flex:1;display:flex;align-items:center;justify-content:center;min-width:0}
 .cover{justify-content:center;padding:0 70px;gap:46px}
 .cover .l{flex:1.25}
@@ -178,6 +185,25 @@ code{font-family:"Inter",Arial,sans-serif;font-size:.9em;font-weight:600;backgro
 .varc .vt .ic{width:18px;height:18px;color:var(--accent)}
 .varc p{font-size:12px;color:var(--muted);margin-top:5px;line-height:1.4}
 .varc code{font-size:10.5px}
+/* tableau comparatif Node-RED vs stack retenue */
+.cmptbl{display:grid;grid-template-columns:0.82fr 1.1fr 1.1fr;gap:10px;width:100%;align-self:center}
+.cmph{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;padding:13px 10px;border-radius:14px;
+    background:rgba(255,255,255,.85);border:1px solid var(--line);box-shadow:0 10px 26px rgba(17,19,26,.08),inset 0 1px 0 rgba(255,255,255,.7)}
+.cmph.bad{background:linear-gradient(150deg,#fdf1f1,#fff);border-color:#f1d4d4}
+.cmph.good{background:linear-gradient(150deg,#eefbf4,#fff);border-color:#c6ecd8;box-shadow:0 12px 30px rgba(31,180,135,.16),inset 0 1px 0 rgba(255,255,255,.8)}
+.cmph .lg{display:flex;gap:9px;align-items:center;height:30px}
+.cmph .lg img{height:26px;width:auto}
+.cmph b{font-size:13.5px;color:var(--ink)}
+.cmph .st{font-size:10.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
+.cmph.bad .st{color:#cf5560} .cmph.good .st{color:#1aa074}
+.crit{display:flex;align-items:center;font-size:13px;font-weight:700;color:var(--ink);padding:4px 12px;line-height:1.25}
+.cell{display:flex;gap:9px;align-items:flex-start;padding:11px 13px;border-radius:12px;font-size:12.5px;line-height:1.34;font-weight:500;
+    box-shadow:0 6px 16px rgba(17,19,26,.05),inset 0 1px 0 rgba(255,255,255,.6)}
+.cell.bad{background:rgba(253,242,242,.92);color:#9c3a42;border:1px solid #f1dada}
+.cell.good{background:rgba(238,250,243,.92);color:#1a6f4f;border:1px solid #cdebda}
+.cell .ci{width:18px;height:18px;flex-shrink:0;margin-top:1px}
+.cell.bad .ci{color:#e05660} .cell.good .ci{color:#1fb487}
+.cell b{color:inherit;font-weight:750}
 @media print{
   @page{size:1180px 663.75px;margin:0}
   body{background:#fff;padding:0}.deck{gap:0}
@@ -189,6 +215,8 @@ code{font-family:"Inter",Arial,sans-serif;font-size:.9em;font-weight:600;backgro
   .hicon,.stat .si,.toc .it .ico{background:#f1eeff !important;border-color:#e7eaf0 !important}
   .quote{background:#f7f5ff !important}
   .shot,.photo,.diagram{box-shadow:none !important}
+  /* effet verre conserve sur les 2 en-tetes du comparatif (leger, pour rester <1Mo) */
+  .cmph.good{box-shadow:0 7px 16px rgba(31,180,135,.13) !important}
 }
 """
 
@@ -262,8 +290,11 @@ S.append(slide(head("Le projet et son commanditaire","Contexte et partenaire","t
    <li>Éclairages à <b>spectres précis</b> et hautes intensités</li>
    <li class="sub">Contacts : M. Labayrade, M. Vella · Professeur : M. Delbosc</li></ul></div>
    <div class="media"><div class="photostack">
-     <div><img class="photo" src="{PHO['lumen']}" style="width:100%;height:215px"><div class="cap">{ic("target")} LUMEN · Cité de la Lumière (Lyon Confluence)</div></div>
-     <div><img class="photo" src="{PHO['map']}" style="width:100%;height:150px"><div class="cap">{ic("network")} Implantation : LUMEN &amp; ENTPE, agglomération lyonnaise</div></div>
+     <div><img class="photo" src="{PHO['lumen']}" style="width:100%;height:250px"><div class="cap">{ic("target")} LUMEN · Cité de la Lumière (Lyon Confluence)</div></div>
+     <div class="loccard">
+       <div class="locrow"><div class="lp">{ic("map-pin")}</div><div><b>LUMEN · Cité de la Lumière</b><small>Lyon Confluence · accueille la ColorRoom</small></div></div>
+       <div class="locrow b"><div class="lp">{ic("map-pin")}</div><div><b>ENTPE / LTDS · labo BPMNP</b><small>Campus de Vaulx-en-Velin · commanditaire</small></div></div>
+     </div>
    </div></div></div>'''))
 
 # 4 SYSTEME (vraie photo de la plaque + stats + RS-485)
@@ -347,15 +378,33 @@ S.append(diagram("Conception orientée objet","Diagramme de classes",IMG['cls'],
    "Vue <b>objet</b> du domaine, complémentaire du modèle relationnel")))
 
 # 10 CHOIX TECHNIQUES
-S.append(slide(head("React / Next.js / TypeScript vs JS + Node-RED","Choix techniques","code-xml",me=True)+
- '''<div class="body"><div class="col"><div class="lab">Piste initiale : Node-RED</div><ul>
-   <li>Modèle <b>flow-based</b> : mal adapté à une appli multi-pages</li>
-   <li>Pas de composants visuels pour une UI/UX riche</li>
-   <li>Flux illisibles à grande échelle</li></ul></div>
-   <div class="col"><div class="lab a">Choix retenu : Next.js + React + TS</div><ul>
-   <li><b>React</b> : composants réutilisables, DOM virtuel, état réactif</li>
-   <li><b>TypeScript strict</b> : erreurs à la compilation (tsc + ESLint)</li>
-   <li><b>Next.js</b> : Route Handlers natifs, un seul runtime Node</li></ul></div></div>'''))
+def cmprow(crit,bad,good):
+    return (f'<div class="crit">{crit}</div>'
+            f'<div class="cell bad">{ic("circle-x")}<div>{bad}</div></div>'
+            f'<div class="cell good">{ic("circle-check")}<div>{good}</div></div>')
+S.append(slide(head("React / Next.js / TypeScript vs JS + Node-RED","Choix techniques · étude comparative","code-xml",me=True)+
+ '<div class="body" style="align-items:center"><div class="cmptbl">'
+ # ligne d'en-tete
+ '<div class="crit" style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em">Critère</div>'
+ f'<div class="cmph bad"><div class="lg"><img src="{LOGOS["javascript"]}"><img src="{LOGOS["nodered"]}"></div><b>JS + Node-RED</b><span class="st">Piste écartée</span></div>'
+ f'<div class="cmph good"><div class="lg"><img src="{LOGOS["react"]}"><img src="{LOGOS["nextdotjs"]}"><img src="{LOGOS["typescript"]}"></div><b>Next.js + React + TS</b><span class="st">Retenu</span></div>'
+ # lignes de comparaison
+ +cmprow("Paradigme",
+   "Modèle <b>flow-based</b> (dataflow visuel) : inadapté à une appli <b>multi-pages</b> stateful",
+   "Paradigme <b>déclaratif à composants</b> (JSX) + routage <b>App Router</b>")
+ +cmprow("Interface / UI",
+   "Pas de <b>composants</b> réutilisables pour une UI/UX riche (3D, catalogue)",
+   "<b>React</b> : <b>Virtual DOM</b> + réconciliation, rendu ciblé, état réactif")
+ +cmprow("Sûreté du code",
+   "<b>JavaScript</b> non typé : erreurs détectées au <b>runtime</b>",
+   "<b>TypeScript strict</b> : typage statique, erreurs à la <b>compilation</b> (tsc + ESLint)")
+ +cmprow("Maintenabilité",
+   "Flux <b>JSON sérialisés</b> peu <b>diffables</b>, illisibles à grande échelle",
+   "Code <b>modulaire</b> et <b>versionnable</b> (diffs Git lisibles, revue de code)")
+ +cmprow("Back-end",
+   "Logique éclatée en <b>nœuds</b> ad hoc, couplée au moteur de flux",
+   "<b>Route Handlers</b> natifs + <b>Server Components</b> : un seul <b>runtime Node</b>")
+ +'</div></div>'))
 
 # 11 STACK (logos)
 def tech(l,name,ver): return f'<div class="tech"><img src="{LOGOS[l]}"><b>{name}</b><small>{ver}</small></div>'
@@ -579,6 +628,16 @@ S.append(slide('<div class="body center"><div class="hicon" style="width:64px;he
 
 # 32 MERCI
 S.append(slide('<div class="body center"><div class="dash" style="justify-content:center"><i style="background:var(--r)"></i><i style="background:var(--y)"></i><i style="background:var(--g)"></i><i style="background:var(--b)"></i><i style="background:var(--accent)"></i></div><div class="big" style="margin-top:8px">Merci de votre attention</div><div style="color:var(--accent);font-weight:700;font-size:21px;margin-top:12px;font-family:Bricolage Grotesque,Inter,sans-serif">Avez-vous des questions ?</div><div style="position:absolute;bottom:28px;left:0;right:0;text-align:center;color:var(--muted);font-size:13px">ColorRoom · Téo Trompier (E2) · BTS CIEL option IR · Session 2026</div></div>'))
+
+# 33 VIDEO (a lancer en fin de presentation)
+S.append(slide('<div class="body center">'
+ '<div class="hicon" style="width:84px;height:84px;border-radius:26px;margin-bottom:10px">'+ic("circle-play")+'</div>'
+ '<div class="kick">Démonstration</div>'
+ '<div class="big">Vidéo du projet</div>'
+ '<p style="color:var(--muted);font-size:16px;margin-top:10px;max-width:680px;line-height:1.7">Présentation filmée de la ColorRoom en fonctionnement · ≈ 2 min</p>'
+ '<div style="margin-top:18px;display:inline-flex;align-items:center;gap:9px;background:rgba(109,74,255,.10);border:1px solid rgba(109,74,255,.35);color:var(--accent);font-weight:700;border-radius:30px;padding:9px 18px;font-size:14px">'
+ +ic("circle-play")+'<span style="font-family:Bricolage Grotesque,Inter,sans-serif">video_demo.mov</span></div>'
+ '</div>'))
 
 HTML=f'''<!DOCTYPE html><html lang="fr"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
