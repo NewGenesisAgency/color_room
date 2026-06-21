@@ -23,7 +23,7 @@ IMG={
  "smp":uml("Seq_MP"),"ej":uml("Etats_Jeu"),"ecs":uml("Etats_CS160"),"remap":uml("Activite_Remap"),
 }
 LOGOS={n:logo(n) for n in ["react","nextdotjs","typescript","sqlite","docker","threedotjs","nodedotjs","raspberrypi"]}
-PHO={"lumen":photo("lumen.png"),"map":photo("map.png"),"plaque":photo("plaque.jpg"),"gantt":photo("gantt.png")}
+PHO={"lumen":photo("lumen.jpg"),"map":photo("map.jpg"),"plaque":photo("plaque.jpg"),"gantt":photo("gantt.png")}
 
 # --- Sprite Lucide (icones officielles, ISC) ---
 def luc_inner(name):
@@ -48,12 +48,8 @@ body{background:var(--ghost);font-family:"Inter",Arial,sans-serif;color:var(--in
      padding:30px 0 64px;-webkit-font-smoothing:antialiased}
 .deck{display:flex;flex-direction:column;align-items:center;gap:26px}
 .slide{width:min(1180px,95vw);aspect-ratio:16/9;border-radius:20px;
-       overflow:hidden;position:relative;display:flex;flex-direction:column;
-       background:linear-gradient(135deg,#ffffff 0%,#fbfaff 52%,#f5fbfa 100%);
+       overflow:hidden;position:relative;display:flex;flex-direction:column;background:#fcfcff;
        box-shadow:0 1px 0 rgba(17,19,26,.04),0 18px 50px rgba(17,19,26,.10);border:1px solid #edf0f5}
-/* liquid glass : halos colorés diffus derrière les panneaux dépolis */
-.slide::before{content:"";position:absolute;inset:0;pointer-events:none;z-index:0;
-       background:radial-gradient(44% 58% at 90% 6%,rgba(109,74,255,.09),transparent 62%),radial-gradient(40% 52% at 5% 98%,rgba(31,182,166,.08),transparent 64%)}
 .slide>*{position:relative;z-index:1}
 h1,h2,h3,.disp,.big,.num,.lab,.toc .n{font-family:"Bricolage Grotesque","Inter",Arial,sans-serif;letter-spacing:-.02em}
 .ic{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;display:block}
@@ -164,6 +160,13 @@ code{font-family:"Inter",Arial,sans-serif;font-size:.9em;font-weight:600;backgro
   @page{size:1180px 663.75px;margin:0}
   body{background:#fff;padding:0}.deck{gap:0}
   .slide{width:1180px;height:663.75px;aspect-ratio:auto;border-radius:0;border:none;box-shadow:none;page-break-after:always}
+  /* PDF leger : on retire les ombres rasterisees (gardees a l'ecran) et on rend les cartes opaques */
+  .slide *{box-shadow:none !important}
+  .stat,.role,.tech,.varc,.toc .it,.hicon,.stat .si,.toc .it .ico,.me{background:#fff !important;border-color:#e7eaf0 !important}
+  .role.me2{background:#f7f5ff !important;border-color:#cfc2ff !important}
+  .hicon,.stat .si,.toc .it .ico{background:#f1eeff !important;border-color:#e7eaf0 !important}
+  .quote{background:#f7f5ff !important}
+  .shot,.photo,.diagram{box-shadow:none !important}
 }
 """
 
