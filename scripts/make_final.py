@@ -385,6 +385,34 @@ S.append(slide(head("8 étudiants · sous-équipes JavaScript et Python","Équip
 # 7b PLANIFICATION (Gantt réel)
 S.append(fullshot("Planification du projet · jalons par étudiant (E2 suivie tout du long)","Diagramme de Gantt",PHO['gantt'],"chart-column"))
 
+# 7c GESTION DE PROJET (agile, client, git, docs)
+def frow2(icon,text,b=False):
+    return f'<div class="frow{" b" if b else ""}"><div class="fi">{ic(icon)}</div><div class="ft">{text}</div></div>'
+S.append(slide(head("Gestion de projet · méthode et outils","Agile, suivi client et versionnement","users",me=True)+
+ '<div class="body" style="flex-direction:column;justify-content:center;gap:18px">'
+ '<div class="split">'
+ f'<div class="col"><div class="lab a">{ic("target")}Méthode &amp; suivi</div><div class="feat">'
+ +frow2("flask-conical","Démarche <b>agile</b> : développement <b>incrémental</b>, livraisons régulières, ajustements")
+ +frow2("users","Échanges réguliers avec le <b>client M. Labayrade</b> (directeur du labo <b>BPMNP</b>)")
+ +frow2("file-text","<b>Documentation</b> du projet rédigée par moi (guide technique, 15 diagrammes UML, notice)")
+ +'</div></div>'
+ f'<div class="col"><div class="lab b">{ic("code-xml")}Versionnement</div><div class="feat">'
+ +frow2("share-2","<b>Git / GitHub</b> : commits clairs (~280), historique lisible",b=True)
+ +frow2("boxes","Travail sur la branche <b>ux-last</b> (intégration) puis <b>merge sur main</b> (stable)",b=True)
+ +frow2("circle-check","Chaîne <b>CI/CD</b> GitLab → build Docker → déploiement sur le Pi",b=True)
+ +'</div></div>'
+ '</div></div>'))
+
+# 7d TRANSITION : début de ma contribution (E2)
+S.append(slide('<div class="body center">'
+ '<div class="hicon" style="width:72px;height:72px;border-radius:22px;margin-bottom:8px">'+ic("code-xml")+'</div>'
+ '<div class="kick">Partie 2 · de la présentation générale à ma contribution</div>'
+ '<div class="big">Ma contribution · E2</div>'
+ '<p style="color:var(--muted);font-size:16px;margin-top:12px;max-width:780px;line-height:1.8">'
+ 'Architecture &amp; choix techniques · base de données · sécurité · interface 3D · jeux solo, IA et multijoueur · mesure colorimétrique</p>'
+ '<div class="dash" style="justify-content:center;margin-top:18px"><i style="background:var(--r)"></i><i style="background:var(--y)"></i><i style="background:var(--g)"></i><i style="background:var(--b)"></i><i style="background:var(--accent)"></i></div>'
+ '</div>'))
+
 # 8 ARCHITECTURE
 S.append(slide(head("Vue d'ensemble · diagramme de composants","Architecture logicielle","network",me=True)+
  f'''<div class="body"><div class="col" style="flex:0 0 33%;display:flex;flex-direction:column;justify-content:center"><ul>

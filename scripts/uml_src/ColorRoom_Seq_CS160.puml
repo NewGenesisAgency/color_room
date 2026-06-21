@@ -1,0 +1,26 @@
+@startuml
+skinparam dpi 150
+skinparam defaultFontName Inter
+skinparam defaultFontSize 14
+skinparam sequenceMessageAlign center
+skinparam ParticipantBorderColor #6b7280
+skinparam sequenceLifeLineBorderColor #b8c0cd
+
+actor "Apprenant /\nEnseignant" as U
+participant "App Next.js\n(/mesure)" as APP #AEEBFF
+participant "Route API\n/api/cs160" as API #AEEBFF
+participant "Pont .NET\nCS-160" as BR #CCF2CF
+participant "Colorimètre\nCS-160 (USB)" as CS #F8CBCB
+participant "Plaque LED" as LED #FFF3C4
+
+U -> APP : Lancer une mesure
+APP -> LED : Allumer la dalle cible (RS-485)
+APP -> API : GET /api/cs160 (HTTP)
+API -> BR : appel mesure
+BR -> CS : déclenche (liaison USB)
+CS --> BR : XYZ, Lv, x, y
+BR --> API : JSON
+API --> APP : { X, Y, Z, Lv, x, y }
+APP -> APP : tracer le point sur\nle diagramme CIE 1931
+APP --> U : ΔE vs cible (score)
+@enduml
