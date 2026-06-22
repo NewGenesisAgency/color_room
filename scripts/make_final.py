@@ -643,25 +643,27 @@ S.append(code_slide("Ma partie · intelligence artificielle","Puissance 4 et son
    <li>Coups triés <b>centre d'abord</b> (<code>orderColumns</code>) pour élaguer plus tôt</li>
    <li><b>5 niveaux</b> réglés par <code>depth</code> et <code>noise</code> ; victoire = <code>WIN_SCORE</code></li></ul>''',
  "app/app/_components/GamePuissance4.tsx",
- '''<span class="cm">// minimax avec élagage alpha-bêta (depth, noise → difficulté)</span>
-<span class="kw">function</span> <span class="fn">minimax</span>(grid, depth, alpha, beta, maximizing) {
-  <span class="kw">if</span> (depth === <span class="nb">0</span>) <span class="kw">return</span> <span class="fn">evaluateBoard</span>(grid); <span class="cm">// heuristique</span>
-  <span class="kw">if</span> (maximizing) {                       <span class="cm">// tour de l'IA</span>
-    <span class="kw">let</span> value = -Infinity;
-    <span class="kw">for</span> (<span class="kw">const</span> c <span class="kw">of</span> <span class="fn">orderColumns</span>(valid)) { <span class="cm">// centre d'abord</span>
-      <span class="kw">const</span> d = <span class="fn">dropAt</span>(grid, c, AI);
-      <span class="kw">const</span> v = <span class="fn">winsAt</span>(d.grid, d.row, c, AI)
-        ? WIN_SCORE + depth                <span class="cm">// gain immédiat</span>
-        : <span class="fn">minimax</span>(d.grid, depth-<span class="nb">1</span>, alpha, beta, <span class="kw">false</span>);
-      value = Math.<span class="fn">max</span>(value, v);
-      alpha = Math.<span class="fn">max</span>(alpha, value);
-      <span class="kw">if</span> (alpha &gt;= beta) <span class="kw">break</span>;          <span class="cm">// coupure bêta</span>
-    }
-    <span class="kw">return</span> value;
+ '''<span class="cm">// 1) Heuristique : note une fenêtre de 4 (défense &gt; attaque)</span>
+<span class="kw">function</span> <span class="fn">scoreWindow</span>(me, opp) {
+  <span class="kw">if</span> (me === <span class="nb">4</span>)  <span class="kw">return</span> WIN_SCORE; <span class="cm">// 4 à moi = victoire (1 000 000)</span>
+  <span class="kw">if</span> (opp === <span class="nb">3</span>) <span class="kw">return</span> -<span class="nb">170</span>;      <span class="cm">// menace adverse : DANGER → défense</span>
+  <span class="kw">if</span> (me === <span class="nb">3</span>)  <span class="kw">return</span> <span class="nb">130</span>;       <span class="cm">// ma menace : bon, mais moins</span>
+  <span class="kw">return</span> me - opp;                  <span class="cm">// léger avantage sinon</span>
+}
+
+<span class="cm">// 2) minimax + élagage alpha-bêta (depth = coups d'avance)</span>
+<span class="kw">function</span> <span class="fn">minimax</span>(grid, depth, alpha, beta, iaJoue) {
+  <span class="kw">if</span> (depth === <span class="nb">0</span>) <span class="kw">return</span> <span class="fn">evaluateBoard</span>(grid); <span class="cm">// feuille : on note</span>
+  <span class="kw">let</span> best = iaJoue ? -Infinity : Infinity;
+  <span class="kw">for</span> (<span class="kw">const</span> c <span class="kw">of</span> <span class="fn">orderColumns</span>(coups)) {   <span class="cm">// centre d'abord → coupe + tôt</span>
+    <span class="kw">const</span> v = <span class="fn">minimax</span>(<span class="fn">joue</span>(grid, c), depth-<span class="nb">1</span>, alpha, beta, !iaJoue);
+    <span class="kw">if</span> (iaJoue) { best = Math.<span class="fn">max</span>(best, v); alpha = Math.<span class="fn">max</span>(alpha, best); } <span class="cm">// IA maximise</span>
+    <span class="kw">else</span>       { best = Math.<span class="fn">min</span>(best, v); beta  = Math.<span class="fn">min</span>(beta,  best); } <span class="cm">// joueur minimise</span>
+    <span class="kw">if</span> (alpha &gt;= beta) <span class="kw">break</span>;            <span class="cm">// coupure : branche inutile</span>
   }
-  <span class="cm">// ... cas minimisant (joueur) : coupure alpha symétrique</span>
+  <span class="kw">return</span> best;
 }''',
- "app/app/_components/GamePuissance4.tsx","L174-L199"))
+ "app/app/_components/GamePuissance4.tsx","L116-L199"))
 
 # 22 MULTIJOUEUR
 S.append(media_slide("Ma partie · jeux en réseau","Les jeux multijoueur",
