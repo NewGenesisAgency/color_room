@@ -455,13 +455,6 @@ S.append(slide(head("Vue d'ensemble · diagramme de composants","Architecture lo
    <li class="sub">Diagramme <b>logiciel</b> : le matériel (Raspberry Pi) figure sur le diagramme de <b>déploiement</b></li></ul></div>
    <div class="media"><img class="diagram" src="{IMG['comp']}"></div></div>'''))
 
-# 9 CLASSES
-S.append(diagram("Conception orientée objet","Diagramme de classes",IMG['cls'],"boxes",me=True,
- notes=nl("Entités métier modélisées et <b>typées en TypeScript</b>",
-   "Utilisateur, Classe, Jeu, Score, Session…",
-   "Relations <b>1-N</b> (une classe regroupe plusieurs apprenants)",
-   "Vue <b>objet</b> du domaine, complémentaire du modèle relationnel")))
-
 # 10 CHOIX TECHNIQUES
 def cmprow(crit,bad,good):
     return (f'<div class="crit">{crit}</div>'
@@ -531,26 +524,29 @@ S.append(media_slide("Ma partie · interface","Interface et design system",
 
 # 13b THREE.JS (code)
 S.append(code_slide("Extrait de code · 3D temps réel","Vue 3D de la salle (Three.js)","boxes",
- '''<ul><li><b>WebGLRenderer</b> : moteur qui transforme la scène 3D en image via le <b>GPU</b> (carte graphique)</li>
-   <li>Une dalle = un <code>Mesh</code> à <b>géométrie BoxGeometry</b> + matériau <b>émissif</b> (le panneau « émet » sa couleur)</li>
-   <li>Couleur mise à jour en direct : <code>material.emissive.set(color)</code></li>
-   <li><b>Boucle</b> <code>requestAnimationFrame</code> ; au démontage <b>forceContextLoss</b> (anti-fuite WebGL)</li></ul>''',
+ '''<ul><li><b>WebGLRenderer</b> → rendu <b>GPU</b></li>
+   <li><b>Scène</b> + <b>caméra</b></li>
+   <li>Dalle = <b>Box</b> + matériau <b>émissif</b></li>
+   <li><code>emissive.set(color)</code> : couleur en direct</li>
+   <li><code>requestAnimationFrame</code> : boucle</li>
+   <li><code>forceContextLoss</code> : nettoyage</li></ul>''',
  "app/app/_components/Room3D.tsx",
- '''<span class="cm">// WebGLRenderer : rend la scène 3D via le GPU</span>
+ '''<span class="cm">// rendu de la scène 3D via le GPU</span>
 <span class="kw">const</span> renderer = <span class="kw">new</span> THREE.<span class="fn">WebGLRenderer</span>({ antialias: <span class="kw">true</span> });
-renderer.<span class="fn">setPixelRatio</span>(Math.<span class="fn">min</span>(devicePixelRatio, <span class="nb">1.5</span>));
-renderer.outputColorSpace = THREE.SRGBColorSpace;   <span class="cm">// couleurs fidèles</span>
 <span class="kw">const</span> scene  = <span class="kw">new</span> THREE.<span class="fn">Scene</span>();
 <span class="kw">const</span> camera = <span class="kw">new</span> THREE.<span class="fn">PerspectiveCamera</span>(CAM_FOV, W/H, <span class="nb">0.05</span>, <span class="nb">80</span>);
 
-<span class="cm">// une dalle = panneau 3D (Box) au matériau émissif</span>
+<span class="cm">// une dalle = un panneau 3D qui émet sa couleur</span>
 <span class="kw">const</span> mat   = <span class="kw">new</span> THREE.<span class="fn">MeshStandardMaterial</span>({ emissive: <span class="nb">0x000000</span> });
 <span class="kw">const</span> plate = <span class="kw">new</span> THREE.<span class="fn">Mesh</span>(<span class="kw">new</span> THREE.<span class="fn">BoxGeometry</span>(PS, PS, PT), mat);
-mat.emissive.<span class="fn">set</span>(color); scene.<span class="fn">add</span>(plate);   <span class="cm">// la dalle s'allume</span>
+mat.emissive.<span class="fn">set</span>(color);   <span class="cm">// la dalle s'allume</span>
+scene.<span class="fn">add</span>(plate);
 
-<span class="kw">function</span> <span class="fn">loop</span>() { renderer.<span class="fn">render</span>(scene, camera); raf = <span class="fn">requestAnimationFrame</span>(loop); }
+<span class="cm">// boucle de rendu</span>
+<span class="kw">function</span> <span class="fn">loop</span>() { renderer.<span class="fn">render</span>(scene, camera); <span class="fn">requestAnimationFrame</span>(loop); }
 <span class="fn">loop</span>();
-<span class="kw">return</span> () =&gt; { <span class="fn">cancelAnimationFrame</span>(raf); renderer.<span class="fn">forceContextLoss</span>(); };''',
+
+<span class="kw">return</span> () =&gt; renderer.<span class="fn">forceContextLoss</span>();   <span class="cm">// nettoyage</span>''',
  "app/app/_components/Room3D.tsx","L255-L545"))
 
 # 14 BDD
@@ -607,34 +603,6 @@ S.append(diagram("Séquence · connexion","Authentification (PBKDF2 + cookie)",I
    "Si valide, création d'une <b>session</b> (token aléatoire)",
    "Renvoi d'un cookie <b>HttpOnly + SameSite</b> (30 j glissants)")))
 
-# 17 GESTION
-S.append(media_slide("Ma partie · gestion","Tableau de bord enseignant",
- '''<ul><li><b>Classes</b> : code de 6 caractères (ex. <code>CS5VHX</code>, sans 0/O, 1/I) + <b>QR code</b></li>
-   <li><b>Suivi des élèves</b> : niveau et scores par apprenant</li>
-   <li><b>Gestion des utilisateurs</b> : rôles, réinitialisation, suppression (admin)</li>
-   <li class="sub">Export <b>CSV</b> (Blob, BOM UTF-8) · scores en JOIN scores × users</li></ul>''',IMG['gestion'],"users",ratio="0 0 44%"))
-
-# 17b PARCOURS APPRENANT (création de compte + rejoindre une classe)
-S.append(media_slide("Ma partie · parcours apprenant","Création de compte et adhésion à une classe",
- '''<ul><li>Inscription guidée en <b>3 étapes</b> : pseudo + mot de passe, avatar, classe</li>
-   <li><b>Rejoindre une classe</b> en saisissant son <b>code</b> (fourni par l'enseignant)</li>
-   <li>Création <b>atomique</b> (compte + adhésion) puis <b>connexion automatique</b></li>
-   <li class="sub">RGPD : un simple <b>pseudo</b> suffit, aucune donnée nominative</li></ul>''',IMG['register'],"users",ratio="0 0 46%"))
-
-# 27 ACTIVITE REMAP
-S.append(diagram("Diagramme d'activité","Remappage des canaux LED",IMG['remap'],"share-2",me=True,
- notes=nl("Entrée : une couleur <b>RGB</b> demandée par le jeu",
-   "Conversion vers les <b>32 canaux</b> de la plaque",
-   "Application des <b>profils</b> (longueur d'onde réelle)",
-   "Envoi de la trame au matériel (proxy supervision)")))
-
-# 20 ETATS JEU
-S.append(diagram("Diagramme d'états","Cycle de vie d'une partie",IMG['ej'],"gamepad-2",me=True,
- notes=nl("États : <b>Prête</b> → <b>En cours</b> → <b>Terminée</b>",
-   "Transitions : démarrer, jouer un coup, fin de partie",
-   "Calcul et enregistrement du <b>score</b> en fin de partie",
-   "Réinitialisation pour <b>rejouer</b>")))
-
 # 21 P4 IA (minimax + alpha-beta, fusionne)
 S.append(code_slide("Ma partie · intelligence artificielle","Puissance 4 et son IA minimax","bot",
  '''<ul><li>Grille 6 × 7 ; 2 joueurs ou IA <b>hors-ligne</b></li>
@@ -671,13 +639,6 @@ S.append(media_slide("Ma partie · jeux en réseau","Les jeux multijoueur",
    <li><b>Spectre Chromatique</b> : jusqu'à 8 joueurs (score = distance)</li>
    <li><b>Morpion en réseau</b> : 2 joueurs, détection de victoire</li>
    <li><b>Heartbeat</b> de présence · jetons <b>UUID</b> · hôte = siège 1</li></ul>''',IMG['multi'],"users",ratio="0 0 48%"))
-
-# 23 SEQ MP
-S.append(diagram("Séquence · multijoueur","État partagé et interrogation périodique",IMG['smp'],"share-2",me=True,
- notes=nl("L'hôte crée une session et obtient un <b>code</b>",
-   "Les invités rejoignent en saisissant ce code",
-   "L'état est <b>persisté en base</b> (state_json)",
-   "Chaque client interroge <b>/state</b> en <b>polling</b> → écrans synchronisés")))
 
 # 23c EDITEUR + IA GENERATIVE
 S.append(media_slide("Exploration · éditeur &amp; génération par IA","Créer un jeu sans coder",
